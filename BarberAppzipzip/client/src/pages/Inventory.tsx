@@ -1,0 +1,256 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Inventory, MenuItem, Category } from "@shared/schema";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Package, AlertTriangle, Plus, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { format, addDays, isBefore } from "date-fns";
+
+export default function InventoryPage() {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [selectedItem, setSelectedItem] = useState<{ id: number, type: "product" | "service" } | null>(null);
+  const [quantity, setQuantity] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [unit, setUnit] = useState("Unidade");
+  const [itemsPerUnit, setItemsPerUnit] = useState("1");
+
+  const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
+    queryKey: ["/api/inventory"],
+  });
+
+  const { data: menuItems = [] } = useQuery<MenuItem[]>({
+    queryKey: ["/api/menu-items"],
+  });
+
+  const upsertMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/inventory", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Sucesso", description: "Estoque atualizado" });
+      setSelectedItem(null);
+      setQuantity("");
+      setExpiryDate("");
+    },
+  });
+
+  if (user?.role !== "admin") {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh] p-4">
+        <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
+          <CardHeader>
+            <CardTitle className="text-destructive font-black italic uppercase tracking-tighter text-xl">Acesso Restrito</CardTitle>
+          </CardHeader>
+          <CardContent className="text-white/60 font-medium">
+            Somente o proprietário tem acesso ao controle de estoque.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const isExpiringSoon = (date: string | null) => {
+    if (!date) return false;
+    const expiry = new Date(date);
+    const warningDate = addDays(new Date(), 7);
+    return isBefore(expiry, warningDate);
+  };
+
+  const getItemName = (inv: Inventory) => {
+    const item = menuItems.find(m => m.id === inv.itemId);
+    return item?.name || "Item desconhecido";
+  };
+
+  const handleUpsert = () => {
+    if (!selectedItem || !quantity) return;
+    upsertMutation.mutate({
+      itemId: selectedItem.id,
+      itemType: selectedItem.type,
+      quantity: parseInt(quantity),
+      unit,
+      itemsPerUnit: parseInt(itemsPerUnit),
+      expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+    });
+  };
+
+  return (
+    <div className="p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 min-h-screen bg-transparent relative z-10 max-w-[2400px] mx-auto overflow-x-hidden">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-black/40 backdrop-blur-md p-5 rounded-2xl border border-white/10 gap-4 shadow-2xl">
+        <div className="space-y-1">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-black italic tracking-tighter text-white uppercase leading-none">
+            Gestão de <span className="text-primary">Estoque</span>
+          </h1>
+          <p className="text-[10px] md:text-xs font-bold text-white/40 uppercase tracking-[0.3em]">Logística & Controle de Insumos</p>
+        </div>
+        <Badge variant="outline" className="text-xs md:text-sm bg-primary/5 border-primary/20 text-primary px-4 py-1.5 font-black italic uppercase tracking-wider">
+          Operador: {user.username}
+        </Badge>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 md:gap-8 items-start">
+        <Card className="xl:col-span-4 2xl:col-span-3 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl h-fit sticky xl:top-8">
+          <CardHeader className="border-b border-white/5 pb-4">
+            <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl">
+              <Plus className="h-6 w-6 text-primary" /> Entrada de Item
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5 p-5 md:p-6 lg:p-8">
+            <div className="space-y-2.5">
+              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Produto / Insumo</Label>
+              <Select onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
+                <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl">
+                  <SelectValue placeholder="Selecione para ajustar" />
+                </SelectTrigger>
+                <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                  {menuItems.map(item => (
+                    <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-3 font-bold uppercase italic text-xs">
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2.5">
+                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd Atual</Label>
+                <Input 
+                  type="number" 
+                  value={quantity} 
+                  onChange={e => setQuantity(e.target.value)} 
+                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold text-lg focus:border-primary/50 transition-all rounded-xl"
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2.5">
+                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Embalagem</Label>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                    <SelectItem value="Unidade" className="py-3 font-bold uppercase italic text-xs text-white">Unidade</SelectItem>
+                    <SelectItem value="Bag" className="py-3 font-bold uppercase italic text-xs text-white">Bag</SelectItem>
+                    <SelectItem value="Caixa" className="py-3 font-bold uppercase italic text-xs text-white">Caixa</SelectItem>
+                    <SelectItem value="Pacote" className="py-3 font-bold uppercase italic text-xs text-white">Pacote</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Itens p/ Unidade</Label>
+              <Input 
+                type="number" 
+                value={itemsPerUnit} 
+                onChange={e => setItemsPerUnit(e.target.value)} 
+                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-2.5">
+              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Data de Validade</Label>
+              <Input 
+                type="date" 
+                value={expiryDate} 
+                onChange={e => setExpiryDate(e.target.value)} 
+                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all [color-scheme:dark] rounded-xl"
+              />
+            </div>
+
+            <Button 
+              className="w-full bg-primary hover:bg-white text-black font-black italic uppercase h-14 transition-all active:scale-[0.98] mt-6 shadow-[0_0_30px_rgba(0,255,102,0.2)] rounded-xl text-lg tracking-tighter" 
+              onClick={handleUpsert}
+              disabled={upsertMutation.isPending}
+            >
+              {upsertMutation.isPending ? <Loader2 className="animate-spin h-6 w-6" /> : "Atualizar Inventário"}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="xl:col-span-8 2xl:col-span-9 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden rounded-2xl">
+          <CardHeader className="border-b border-white/5 p-6 flex flex-row items-center justify-between bg-white/5">
+            <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
+              <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
+            </CardTitle>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-[0.2em]">
+                Status em Tempo Real
+              </span>
+              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest hidden sm:inline-block">
+                {inventory.length} SKUs Registrados
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            {isLoadingInv ? (
+              <div className="flex justify-center p-20"><Loader2 className="animate-spin h-12 w-12 text-primary" /></div>
+            ) : (
+              <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+                <Table className="min-w-[800px] w-full table-fixed">
+                  <TableHeader>
+                    <TableRow className="border-white/5 hover:bg-transparent bg-black/40">
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[30%] py-6 pl-8">Item</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[12%] py-6">Qtd</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[20%] py-6">Tipo/Embalagem</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Vencimento</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest text-right pr-8 w-[23%] py-6">Análise</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {inventory.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-32 text-white/40 italic uppercase text-sm font-black tracking-[0.4em]">
+                          Base de dados vazia
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      inventory.map((inv) => (
+                        <TableRow key={inv.id} className="border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0">
+                          <TableCell className="font-black italic text-white py-6 lg:py-8 pl-8 truncate text-base lg:text-xl group-hover:text-primary transition-colors tracking-tighter uppercase">
+                            {getItemName(inv)}
+                          </TableCell>
+                          <TableCell className="text-primary font-black text-base lg:text-2xl italic tracking-tighter">
+                            {inv.quantity}
+                          </TableCell>
+                          <TableCell className="text-white/60 truncate text-xs lg:text-sm font-bold uppercase">
+                            {inv.unit} <span className="text-white/40">/</span> {inv.itemsPerUnit} un
+                          </TableCell>
+                          <TableCell className="text-white/40 text-xs lg:text-sm font-bold">
+                            {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yyyy") : "PERMANENTE"}
+                          </TableCell>
+                          <TableCell className="text-right pr-8 py-6 lg:py-8">
+                            <div className="flex justify-end items-center gap-3">
+                              {isExpiringSoon(inv.expiryDate) ? (
+                                <Badge variant="destructive" className="bg-red-500 text-black border-none gap-1.5 animate-pulse font-black italic uppercase text-[9px] lg:text-[11px] px-3 py-1 rounded-sm shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                                  <AlertTriangle className="h-3.5 w-3.5" /> Atenção: Validade
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/20 font-black italic uppercase text-[9px] lg:text-[11px] px-3 py-1 rounded-sm">Estoque OK</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

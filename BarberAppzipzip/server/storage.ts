@@ -1,0 +1,362 @@
+import { db } from "./db";
+import {
+  users, services, tickets, queueState, categories, menuItems,
+  cashRegisters, sales, saleItems, payments, transactions,
+  inventory, inventoryLogs, settings, enterprises,
+  type User, type InsertUser,
+  type Service, type InsertService, type UpdateServiceRequest,
+  type Ticket, type InsertTicket,
+  type QueueState, type InsertQueueState,
+  type Category, type InsertCategory,
+  type MenuItem, type InsertMenuItem,
+  type CashRegister, type InsertCashRegister,
+  type Sale, type InsertSale,
+  type SaleItem, type InsertSaleItem,
+  type Payment, type InsertPayment,
+  type Transaction,
+  type Inventory, type InsertInventory,
+  type InventoryLog, type InsertInventoryLog,
+  type Settings,
+  type Enterprise, type InsertEnterprise
+} from "@shared/schema";
+import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
+
+export interface IStorage {
+  // Enterprise
+  getEnterprises(): Promise<Enterprise[]>;
+  getEnterprise(id: number): Promise<Enterprise | undefined>;
+  getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined>;
+  createEnterprise(enterprise: InsertEnterprise): Promise<Enterprise>;
+  updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise>;
+  deleteEnterprise(id: number): Promise<void>;
+
+  // User
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+
+  // Services
+  getServices(): Promise<Service[]>;
+  getService(id: number): Promise<Service | undefined>;
+  createService(service: InsertService): Promise<Service>;
+  updateService(id: number, service: UpdateServiceRequest): Promise<Service>;
+  deleteService(id: number): Promise<void>;
+
+  // User Management
+  getUsers(): Promise<User[]>;
+  deleteUser(id: number): Promise<void>;
+
+  // Queue & Tickets
+  getQueueState(): Promise<QueueState>;
+  updateQueueState(state: Partial<QueueState>): Promise<QueueState>;
+  createTicket(ticket: InsertTicket): Promise<Ticket>;
+  getTicketByNumber(number: number): Promise<Ticket | undefined>;
+  getLatestTicket(): Promise<Ticket | undefined>;
+
+  // Digital Menu
+  getCategories(): Promise<Category[]>;
+  createCategory(category: InsertCategory): Promise<Category>;
+  getMenuItems(): Promise<MenuItem[]>;
+  getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]>;
+  createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
+
+  // Cashier
+  getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
+  openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
+  closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
+  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
+  getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
+  cancelSale(id: number): Promise<Sale>;
+  updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError'>>): Promise<Sale>;
+
+  // Financial Transactions
+  getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]>;
+  createTransaction(transaction: any): Promise<Transaction>;
+  // Inventory
+  getInventory(): Promise<Inventory[]>;
+  getInventoryItem(id: number): Promise<Inventory | undefined>;
+  updateInventory(id: number, quantity: number): Promise<Inventory>;
+  upsertInventory(data: any): Promise<Inventory>;
+  createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
+  updateTicketItems(id: number, items: string[]): Promise<Ticket>;
+
+  // Settings
+  getSettings(enterpriseId?: number): Promise<Settings>;
+  updateSettings(update: Partial<Settings>): Promise<Settings>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getEnterprises(): Promise<Enterprise[]> {
+    return await db.select().from(enterprises);
+  }
+
+  async getEnterprise(id: number): Promise<Enterprise | undefined> {
+    const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.id, id));
+    return enterprise;
+  }
+
+  async getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined> {
+    const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.slug, slug));
+    return enterprise;
+  }
+
+  async createEnterprise(enterprise: InsertEnterprise): Promise<Enterprise> {
+    const [newEnterprise] = await db.insert(enterprises).values(enterprise).returning();
+    // Initialize settings for new enterprise
+    await db.insert(settings).values({ enterpriseId: newEnterprise.id });
+    return newEnterprise;
+  }
+
+  async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
+    const [updated] = await db.update(enterprises).set(update).where(eq(enterprises.id, id)).returning();
+    return updated;
+  }
+
+  async deleteEnterprise(id: number): Promise<void> {
+    await db.delete(settings).where(eq(settings.enterpriseId, id));
+    await db.delete(enterprises).where(eq(enterprises.id, id));
+  }
+
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user;
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [newUser] = await db.insert(users).values(user).returning();
+    return newUser;
+  }
+
+  async getServices(): Promise<Service[]> {
+    return await db.select().from(services).where(eq(services.isActive, true));
+  }
+
+  async getService(id: number): Promise<Service | undefined> {
+    const [service] = await db.select().from(services).where(eq(services.id, id));
+    return service;
+  }
+
+  async createService(service: InsertService): Promise<Service> {
+    const [newService] = await db.insert(services).values(service).returning();
+    return newService;
+  }
+
+  async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
+    const [updated] = await db.update(services).set(update).where(eq(services.id, id)).returning();
+    return updated;
+  }
+
+  async deleteService(id: number): Promise<void> {
+    // Soft delete
+    await db.update(services).set({ isActive: false }).where(eq(services.id, id));
+  }
+
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users);
+  }
+
+  async deleteUser(id: number): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
+  async getQueueState(): Promise<QueueState> {
+    let [state] = await db.select().from(queueState);
+    if (!state) {
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+    }
+    return state;
+  }
+
+  async updateQueueState(update: Partial<QueueState>): Promise<QueueState> {
+    let [state] = await db.select().from(queueState);
+    if (!state) {
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+    }
+    const [updated] = await db.update(queueState)
+      .set(update)
+      .where(eq(queueState.id, state.id))
+      .returning();
+    return updated;
+  }
+
+  async createTicket(ticket: InsertTicket): Promise<Ticket> {
+    const [newTicket] = await db.insert(tickets).values(ticket).returning();
+    return newTicket;
+  }
+
+  async getTicketByNumber(number: number): Promise<Ticket | undefined> {
+    const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
+    return ticket;
+  }
+
+  async getLatestTicket(): Promise<Ticket | undefined> {
+    const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
+    return ticket;
+  }
+
+  async getCategories(): Promise<Category[]> {
+    return await db.select().from(categories).orderBy(asc(categories.order));
+  }
+
+  async createCategory(category: InsertCategory): Promise<Category> {
+    const [newCategory] = await db.insert(categories).values(category).returning();
+    return newCategory;
+  }
+
+  async getMenuItems(): Promise<MenuItem[]> {
+    return await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
+  }
+
+  async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {
+    return await db.select().from(menuItems).where(eq(menuItems.categoryId, categoryId));
+  }
+
+  async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
+    const [newItem] = await db.insert(menuItems).values(item).returning();
+    return newItem;
+  }
+
+  // Cashier
+  async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
+    const [register] = await db.select()
+      .from(cashRegisters)
+      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+    return register;
+  }
+
+  async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
+    const [newRegister] = await db.insert(cashRegisters).values(register).returning();
+    return newRegister;
+  }
+
+  async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
+    const [updated] = await db.update(cashRegisters)
+      .set({ closingAmount, closedAt: new Date() })
+      .where(eq(cashRegisters.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
+    return await db.transaction(async (tx) => {
+      const [newSale] = await tx.insert(sales).values(sale).returning();
+      
+      const itemsWithSaleId = items.map(item => ({ ...item, saleId: newSale.id }));
+      await tx.insert(saleItems).values(itemsWithSaleId);
+      
+      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: newSale.id }));
+      await tx.insert(payments).values(paymentsWithSaleId);
+      
+      return newSale;
+    });
+  }
+
+  async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
+    let conditions = [];
+    if (filters.startDate) conditions.push(gte(sales.createdAt, filters.startDate));
+    if (filters.endDate) conditions.push(lte(sales.createdAt, filters.endDate));
+    
+    return await db.select()
+      .from(sales)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(sales.createdAt));
+  }
+
+  async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
+    const [updated] = await db.update(sales)
+      .set(update)
+      .where(eq(sales.id, id))
+      .returning();
+    return updated;
+  }
+
+  async cancelSale(id: number): Promise<Sale> {
+    const [updated] = await db.update(sales)
+      .set({ status: "cancelled" })
+      .where(eq(sales.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
+    let conditions = [];
+    if (filters.startDate) conditions.push(gte(transactions.createdAt, filters.startDate));
+    if (filters.endDate) conditions.push(lte(transactions.createdAt, filters.endDate));
+    if (filters.businessType) conditions.push(eq(transactions.businessType, filters.businessType));
+    
+    return await db.select()
+      .from(transactions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(transactions.createdAt));
+  }
+
+  async getInventory(): Promise<Inventory[]> {
+    return await db.select().from(inventory).orderBy(asc(inventory.expiryDate));
+  }
+
+  async getInventoryItem(id: number): Promise<Inventory | undefined> {
+    const [item] = await db.select().from(inventory).where(eq(inventory.id, id));
+    return item;
+  }
+
+  async updateInventory(id: number, quantity: number): Promise<Inventory> {
+    const [updated] = await db.update(inventory)
+      .set({ quantity, updatedAt: new Date() })
+      .where(eq(inventory.id, id))
+      .returning();
+    return updated;
+  }
+
+  async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
+    const [newLog] = await db.insert(inventoryLogs).values(log).returning();
+    return newLog;
+  }
+
+  async createTransaction(transaction: any): Promise<Transaction> {
+    const [newTransaction] = await db.insert(transactions).values(transaction).returning();
+    return newTransaction;
+  }
+
+  async upsertInventory(data: any): Promise<Inventory> {
+    const [item] = await db.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
+    if (item) {
+      const [updated] = await db.update(inventory).set(data).where(eq(inventory.id, item.id)).returning();
+      return updated;
+    }
+    const [newInv] = await db.insert(inventory).values(data).returning();
+    return newInv;
+  }
+
+  async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
+    const [updated] = await db.update(tickets)
+      .set({ items })
+      .where(eq(tickets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getSettings(enterpriseId?: number): Promise<Settings> {
+    let condition = enterpriseId ? eq(settings.enterpriseId, enterpriseId) : isNull(settings.enterpriseId);
+    let [item] = await db.select().from(settings).where(condition).limit(1);
+    if (!item) {
+      [item] = await db.insert(settings).values({ enterpriseId }).returning();
+    }
+    return item;
+  }
+
+  async updateSettings(update: Partial<Settings>): Promise<Settings> {
+    const current = await this.getSettings(update.enterpriseId || undefined);
+    const [updated] = await db.update(settings)
+      .set(update)
+      .where(eq(settings.id, current.id))
+      .returning();
+    return updated;
+  }
+}
+
+export const storage = new DatabaseStorage();

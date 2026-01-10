@@ -1,0 +1,128 @@
+import { useEffect } from "react";
+import { Switch, Route, useLocation } from "wouter";
+import { queryClient } from "./lib/queryClient";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { useUser } from "@/hooks/use-auth";
+import { Loader2 } from "lucide-react";
+
+import Home from "@/pages/Home";
+import BarberHome from "@/pages/BarberHome";
+import Login from "@/pages/Login";
+import Admin from "@/pages/Admin";
+import DigitalMenu from "@/pages/DigitalMenu";
+import BarberQueue from "@/pages/BarberQueue";
+import Cashier from "@/pages/Cashier";
+import Financeiro from "@/pages/Financeiro";
+import Reports from "@/pages/Reports";
+import Inventory from "@/pages/Inventory";
+import ClientCart from "@/pages/ClientCart";
+import NotFound from "@/pages/not-found";
+import { BackgroundIcons } from "@/components/BackgroundIcons";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import { Menu } from "lucide-react";
+
+function ProtectedRoute({ component: Component, ...rest }: any) {
+  const { data: user, isLoading } = useUser();
+  const [, setLocation] = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
+    }
+  }, [user, isLoading, setLocation]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <Component {...rest} />;
+}
+
+function Router() {
+  const { data: user, isLoading } = useUser();
+  const [, setLocation] = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden flex items-center justify-center p-4">
+        <BackgroundIcons />
+        <Login />
+      </div>
+    );
+  }
+
+  return (
+    <Switch>
+      <Route path="/" component={Home} />
+      <Route path="/barber" component={BarberHome} />
+      <Route path="/login" component={Login} />
+      <Route path="/menu" component={DigitalMenu} />
+      <Route path="/barber-queue" component={BarberQueue} />
+      <Route path="/admin">
+        {() => <ProtectedRoute component={Admin} />}
+      </Route>
+      <Route path="/caixa">
+        {() => <ProtectedRoute component={Cashier} />}
+      </Route>
+      <Route path="/financeiro">
+        {() => <ProtectedRoute component={Financeiro} />}
+      </Route>
+      <Route path="/relatorios">
+        {() => <ProtectedRoute component={Reports} />}
+      </Route>
+      <Route path="/inventory">
+        {() => <ProtectedRoute component={Inventory} />}
+      </Route>
+      <Route path="/cart" component={ClientCart} />
+      
+      <Route component={NotFound} />
+    </Switch>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden">
+          <BackgroundIcons />
+          <SidebarProvider>
+            <div className="flex w-full bg-transparent relative z-10 min-h-screen">
+              <AppSidebar side="right" />
+              <div className="flex-1 flex flex-col min-w-0 bg-transparent min-h-screen">
+                <header className="flex items-center justify-end p-4 bg-transparent shrink-0">
+                  <SidebarTrigger className="text-white hover:text-primary transition-colors bg-white/5 backdrop-blur-md border border-white/10 h-10 w-10">
+                    <Menu className="w-6 h-6" />
+                  </SidebarTrigger>
+                </header>
+                <main className="flex-1 relative bg-transparent flex flex-col">
+                  <Router />
+                </main>
+              </div>
+            </div>
+          </SidebarProvider>
+        </div>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}

@@ -1,0 +1,291 @@
+DOCUMENTAÇÃO TÉCNICA + CÓDIGO
+SISTEMA DE CAIXA E GESTÃO – BARBEARIA
+(Preparado estruturalmente para Padaria e Confeitaria)
+
+========================================================
+1. VISÃO GERAL TÉCNICA
+========================================================
+
+Aplicação web rodando no Replit.
+Arquitetura cliente-servidor.
+
+- Backend: Node.js + Express
+- Banco de dados: SQLite
+- Frontend: HTML + CSS + JS
+- Controle de estado crítico: Banco de dados
+
+Toda operação financeira depende de:
+- Usuário autenticado
+- Caixa aberto
+
+========================================================
+2. ESTRUTURA DE PASTAS (REPLIT)
+========================================================
+
+/src
+ ├── server.js
+ ├── database.js
+ ├── routes/
+ │    ├── auth.routes.js
+ │    ├── cash.routes.js
+ │    └── sales.routes.js
+ ├── controllers/
+ │    ├── auth.controller.js
+ │    ├── cash.controller.js
+ │    └── sales.controller.js
+
+/public
+ ├── login.html
+ ├── caixa.html
+ └── js/
+      ├── auth.js
+      └── caixa.js
+
+========================================================
+3. BANCO DE DADOS (SQL COMPLETO)
+========================================================
+
+-- USERS
+CREATE TABLE users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+  role TEXT NOT NULL,
+  active INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CASH REGISTER
+CREATE TABLE cash_register (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  opened_at DATETIME,
+  closed_at DATETIME,
+  opening_amount REAL,
+  closing_amount REAL,
+  difference REAL,
+  status TEXT,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- PRODUCTS
+CREATE TABLE products (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  category TEXT,
+  price REAL,
+  cost_price REAL,
+  stock_quantity INTEGER,
+  expiration_date DATE,
+  batch TEXT,
+  is_perishable INTEGER,
+  active INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SERVICES
+CREATE TABLE services (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT,
+  price REAL,
+  active INTEGER DEFAULT 1
+);
+
+-- SALES
+CREATE TABLE sales (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cash_register_id INTEGER,
+  user_id INTEGER,
+  total_amount REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- SALE ITEMS
+CREATE TABLE sale_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER,
+  item_type TEXT,
+  item_id INTEGER,
+  quantity INTEGER,
+  unit_price REAL,
+  total_price REAL
+);
+
+-- PAYMENTS
+CREATE TABLE payments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sale_id INTEGER,
+  method TEXT,
+  amount REAL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+========================================================
+4. database.js
+========================================================
+
+const sqlite3 = require('sqlite3').verbose();
+const db = new sqlite3.Database('./database.db');
+module.exports = db;
+
+========================================================
+5. server.js
+========================================================
+
+const express = require('express');
+const app = express();
+const db = require('./database');
+
+app.use(express.json());
+app.use(express.static('public'));
+
+const authRoutes = require('./routes/auth.routes');
+const cashRoutes = require('./routes/cash.routes');
+const salesRoutes = require('./routes/sales.routes');
+
+app.use('/auth', authRoutes);
+app.use('/cash', cashRoutes);
+app.use('/sales', salesRoutes);
+
+app.listen(3000, () => console.log('Servidor rodando'));
+
+========================================================
+6. ABERTURA DE CAIXA – FUNCIONAMENTO + CÓDIGO
+========================================================
+
+REGRA:
+- Só pode existir UM caixa aberto por usuário.
+
+routes/cash.routes.js
+
+const express = require('express');
+const router = express.Router();
+const controller = require('../controllers/cash.controller');
+
+router.post('/open', controller.openCash);
+router.post('/close', controller.closeCash);
+
+module.exports = router;
+
+controllers/cash.controller.js
+
+const db = require('../database');
+
+exports.openCash = (req, res) => {
+  const { user_id, opening_amount } = req.body;
+
+  db.get(
+    "SELECT * FROM cash_register WHERE user_id = ? AND status = 'open'",
+    [user_id],
+    (err, row) => {
+      if (row) return res.status(400).json({ error: 'Caixa já aberto' });
+
+      db.run(
+        "INSERT INTO cash_register (user_id, opened_at, opening_amount, status) VALUES (?, datetime('now'), ?, 'open')",
+        [user_id, opening_amount],
+        () => res.json({ success: true })
+      );
+    }
+  );
+};
+
+========================================================
+7. CONCEITO TÉCNICO DE VENDA
+========================================================
+
+Venda só existe quando finalizada.
+Antes disso, os dados vivem apenas no frontend.
+
+Finalizar venda é operação atômica.
+
+========================================================
+8. FINALIZAÇÃO DE VENDA – CÓDIGO REAL
+========================================================
+
+routes/sales.routes.js
+
+const express = require('express');
+const router = express.Router();
+const controller = require('../controllers/sales.controller');
+
+router.post('/finalize', controller.finalizeSale);
+module.exports = router;
+
+controllers/sales.controller.js
+
+const db = require('../database');
+
+exports.finalizeSale = (req, res) => {
+  const { cash_register_id, user_id, items, payments } = req.body;
+
+  db.serialize(() => {
+    db.run("BEGIN TRANSACTION");
+
+    db.run(
+      "INSERT INTO sales (cash_register_id, user_id, total_amount) VALUES (?, ?, ?)",
+      [cash_register_id, user_id, 0],
+      function () {
+        const saleId = this.lastID;
+        let total = 0;
+
+        items.forEach(item => {
+          total += item.total_price;
+
+          db.run(
+            "INSERT INTO sale_items (sale_id, item_type, item_id, quantity, unit_price, total_price) VALUES (?, ?, ?, ?, ?, ?)",
+            [saleId, item.type, item.id, item.quantity, item.unit_price, item.total_price]
+          );
+
+          if (item.type === 'product') {
+            db.run(
+              "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?",
+              [item.quantity, item.id]
+            );
+          }
+        });
+
+        payments.forEach(p => {
+          db.run(
+            "INSERT INTO payments (sale_id, method, amount) VALUES (?, ?, ?)",
+            [saleId, p.method, p.amount]
+          );
+        });
+
+        db.run(
+          "UPDATE sales SET total_amount = ? WHERE id = ?",
+          [total, saleId]
+        );
+
+        db.run("COMMIT");
+        res.json({ success: true });
+      }
+    );
+  });
+};
+
+========================================================
+9. FECHAMENTO DE CAIXA – LÓGICA
+========================================================
+
+- Soma vendas do caixa
+- Usuário informa valor real
+- Sistema calcula diferença
+- Caixa muda status para closed
+- Nenhuma venda futura permitida
+
+========================================================
+10. REGRAS TÉCNICAS ABSOLUTAS
+========================================================
+
+- Não vender sem caixa aberto
+- Não editar venda
+- Não excluir venda
+- Estoque nunca negativo
+- Produto vencido bloqueado
+- Tudo vinculado a usuário
+- Tudo registrado em banco
+
+========================================================
+FIM DO DOCUMENTO TÉCNICO + CÓDIGO
+========================================================

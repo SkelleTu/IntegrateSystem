@@ -1,0 +1,205 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* HSL Values - Premium Emerald / Dark Theme */
+  --background: 180 10% 4%;        /* #060808 */
+  --foreground: 0 0% 98%;          /* Near white */
+  
+  --primary: 158 82% 47%;         /* #10b981 - Emerald Green */
+  --primary-foreground: 180 10% 4%;
+  
+  --secondary: 180 10% 10%;        /* Deep dark gray */
+  --secondary-foreground: 158 82% 47%;
+  
+  --muted: 180 10% 15%;
+  --muted-foreground: 0 0% 100%;
+  
+  --accent: 158 82% 47%;          
+  --accent-foreground: 180 10% 4%;
+  
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 98%;
+  
+  --border: 180 10% 15%;
+  --input: 180 10% 12%;
+  --ring: 158 82% 47%;
+  
+  --card: 180 10% 7%;
+  --card-foreground: 0 0% 100%;
+  --card-border: 180 10% 12%;
+
+  --radius: 1rem;
+  
+  /* Fonts */
+  --font-display: 'Montserrat', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  /* Global Background and Layering */
+  html, body {
+    background-color: #050707 !important;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply text-foreground antialiased selection:bg-primary/30 selection:text-primary relative;
+    font-family: var(--font-body);
+    background: transparent !important;
+  }
+
+  /* Full Screen Background Layer - Fixed and Pro Texture */
+  body::before {
+    content: '';
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: -9999 !important;
+    background-color: #050707 !important;
+    background-image: 
+      /* Repeating geometric pattern - Optimized SVG */
+      url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 0l60 60-60 60L0 60z' fill='%2310b981' fill-opacity='0.2'/%3E%3C/svg%3E"),
+      /* Radial highlights */
+      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.4) 0, transparent 70%),
+      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.4) 0, transparent 70%),
+      radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.2) 0, transparent 80%) !important;
+    background-attachment: fixed !important;
+    background-size: 120px 120px, 100% 100%, 100% 100%, 100% 100% !important;
+    pointer-events: none !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    /* Hardware acceleration hints */
+    transform: translate3d(0,0,0);
+    will-change: transform;
+  }
+
+  html[data-hidden="true"] body::before {
+    display: none !important;
+  }
+
+  /* Force transparency on ALL containers to reveal background */
+  #root, 
+  .min-h-screen, 
+  [data-sidebar-provider], 
+  [data-sidebar], 
+  main,
+  .bg-background,
+  .bg-card,
+  .bg-sidebar {
+    background-color: transparent !important;
+    background: transparent !important;
+  }
+
+  /* Unified Opacity Policy - Clear Elements */
+  button:not(.bg-primary), .button:not(.bg-primary), .bg-primary, .glass, .card, .bg-card, .shadcn-card, [role="menu"], .relative.glass, .glass-card, .panel-translucent {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    background-image: none !important;
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+    box-shadow: none !important;
+    @apply transition-all duration-500;
+  }
+
+  /* Specific adjustments for inputs and forms - Clear */
+  input, textarea, select {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  }
+
+  /* Containers with Blur - Modal Body, Sidebar, Main Cards, Popovers, Dropdowns */
+  [role="dialog"], 
+  [role="popover"],
+  [role="menu"],
+  [role="tooltip"],
+  [data-sidebar="sidebar"],
+  .card,
+  .bg-card,
+  .shadcn-card,
+  .glass-login-card,
+  .bg-popover,
+  .bg-dropdown-menu {
+    backdrop-filter: blur(4px) !important;
+    -webkit-backdrop-filter: blur(4px) !important;
+  }
+  [role="dialog"] * {
+    color: white !important;
+  }
+
+  /* Force white text on buttons */
+  button, .button, .bg-primary, .bg-secondary, .bg-destructive {
+    @apply text-white !important;
+  }
+  
+  /* Primary button override */
+  .bg-primary {
+    @apply bg-primary/30 border-primary/40 !important;
+  }
+
+  /* Specific styles for translucent panels */
+  .panel-translucent {
+    @apply bg-white/10 backdrop-blur-[4px] border border-white/20 rounded-2xl shadow-none;
+  }
+
+  .bg-floating-icons {
+    background-color: var(--background);
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10l5 5m10-5l-5 5m40 20l5 5m10-5l-5 5M80 70l5 5m10-5l-5 5M20 80l5 5m10-5l-5 5' stroke='%2310b981' stroke-width='0.5' fill='none' opacity='0.05'/%3E%3Ccircle cx='50' cy='10' r='2' fill='%2310b981' opacity='0.03'/%3E%3Crect x='85' y='40' width='4' height='4' fill='%2310b981' opacity='0.02'/%3E%3C/svg%3E");
+    background-attachment: fixed;
+    position: relative;
+  }
+
+  .bg-floating-icons::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+    pointer-events: none;
+  }
+
+  .text-neon-green {
+    @apply text-primary;
+    text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .neon-border {
+    @apply border-primary/30;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), inset 0 0 10px rgba(16, 185, 129, 0.05);
+  }
+
+  .neon-glow-circle {
+    @apply flex items-center justify-center rounded-full bg-black/40 border border-primary/40;
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.1);
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full border-2 border-transparent bg-clip-padding hover:bg-white/20;
+}
