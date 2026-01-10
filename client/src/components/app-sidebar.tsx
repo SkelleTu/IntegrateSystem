@@ -677,22 +677,20 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       </Dialog>
 
       <Dialog open={timeClockOpen} onOpenChange={setTimeClockOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden">
-          {/* Botão de Fechar Absoluto (dentro do DialogContent para não sumir com o conteúdo) */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setTimeClockOpen(false)}
-            className="absolute top-3 right-3 z-50 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all h-10 w-10"
-            data-testid="button-close-time-clock-absolute"
-          >
-            <Plus className="w-6 h-6 rotate-45 text-white" />
-          </Button>
-
-          <div className="p-4 border-b border-white/5 flex flex-row items-center gap-4 space-y-0">
+        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden !z-[9999]">
+          <div className="p-4 border-b border-white/5 flex flex-row items-center justify-between gap-4 space-y-0">
             <DialogTitle className="text-lg font-black italic uppercase tracking-tighter flex items-center gap-2">
               <Fingerprint className="text-primary w-5 h-5" /> Registro de Ponto
             </DialogTitle>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setTimeClockOpen(false)}
+              className="rounded-full bg-white/10 border-white/20 hover:bg-white/20 transition-all h-10 w-10 flex items-center justify-center shrink-0"
+              data-testid="button-close-time-clock-header"
+            >
+              <Plus className="w-6 h-6 rotate-45 text-white" />
+            </Button>
           </div>
           <div className="p-6">
             <div className="relative group mb-4">
