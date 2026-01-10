@@ -668,9 +668,13 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                 <p className="text-[10px] uppercase font-black tracking-[0.2em] text-primary/50 mb-4 italic">Status de Operação</p>
                 
                 <div className="relative mb-6">
-                  <div className="absolute -inset-4 bg-primary/10 rounded-full blur-xl animate-pulse"></div>
-                  <Fingerprint className="w-16 h-16 text-primary drop-shadow-[0_0_15px_rgba(0,255,102,0.5)] relative z-10" />
-                  <div className="absolute inset-0 w-16 h-16 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  <div className="absolute -inset-8 bg-primary/20 rounded-full blur-2xl animate-pulse"></div>
+                  <div className="absolute -inset-4 bg-primary/10 rounded-full blur-xl animate-[pulse_3s_ease-in-out_infinite]"></div>
+                  <div className="relative z-10 flex items-center justify-center">
+                    <Fingerprint className="w-16 h-16 text-primary drop-shadow-[0_0_20px_rgba(0,255,102,0.8)] animate-[pulse_2s_ease-in-out_infinite]" />
+                    <div className="absolute inset-0 w-20 h-20 -left-2 -top-2 border-2 border-primary/20 border-t-primary rounded-full animate-[spin_3s_linear_infinite]"></div>
+                    <div className="absolute inset-0 w-24 h-24 -left-4 -top-4 border border-primary/10 border-b-primary rounded-full animate-[spin_4s_linear_infinite_reverse]"></div>
+                  </div>
                 </div>
 
                 <h3 className="text-xl font-black italic uppercase text-white tracking-tighter mb-6 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
