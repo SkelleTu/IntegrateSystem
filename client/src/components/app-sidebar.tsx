@@ -272,6 +272,10 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
         out: "Expediente Finalizado"
       };
       toast({ title: labels[data.type] || "Ponto Registrado", description: "Ponto batido com sucesso!" });
+      
+      // Manually update the query cache for immediate UI feedback
+      queryClient.setQueryData(["/api/time-clock/status"], { latest: data });
+      
       refetchStatus();
       refetchHistory();
     },
