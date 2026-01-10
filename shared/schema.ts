@@ -127,6 +127,19 @@ export const transactions = pgTable("transactions", {
 
 export const insertTransactionSchema = createInsertSchema(transactions);
 
+export const timeClock = pgTable("time_clock", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  clockIn: timestamp("clock_in").defaultNow().notNull(),
+  clockOut: timestamp("clock_out"),
+  fingerprintId: text("fingerprint_id"), // Identificador da digital vinculada
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertTimeClockSchema = createInsertSchema(timeClock);
+export type TimeClock = typeof timeClock.$inferSelect;
+export type InsertTimeClock = z.infer<typeof insertTimeClockSchema>;
+
 export const enterprises = pgTable("enterprises", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),

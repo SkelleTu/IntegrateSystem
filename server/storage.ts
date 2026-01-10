@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
-  inventory, inventoryLogs, settings, enterprises,
+  inventory, inventoryLogs, settings, enterprises, timeClock,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -17,7 +17,8 @@ import {
   type Inventory, type InsertInventory,
   type InventoryLog, type InsertInventoryLog,
   type Settings,
-  type Enterprise, type InsertEnterprise
+  type Enterprise, type InsertEnterprise,
+  type TimeClock, type InsertTimeClock
 } from "@shared/schema";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
@@ -79,6 +80,12 @@ export interface IStorage {
   upsertInventory(data: any): Promise<Inventory>;
   createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
   updateTicketItems(id: number, items: string[]): Promise<Ticket>;
+
+  // Time Clock
+  getTimeClockHistory(userId: number): Promise<TimeClock[]>;
+  getLatestTimeClock(userId: number): Promise<TimeClock | undefined>;
+  createTimeClock(data: InsertTimeClock): Promise<TimeClock>;
+  updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock>;
 
   // Settings
   getSettings(enterpriseId?: number): Promise<Settings>;
@@ -337,6 +344,28 @@ export class DatabaseStorage implements IStorage {
       .set({ items })
       .where(eq(tickets.id, id))
       .returning();
+    return updated;
+  }
+
+  async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
+    return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.clockIn));
+  }
+
+  async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
+    const [latest] = await db.select().from(timeClock)
+      .where(and(eq(timeClock.userId, userId), isNull(timeClock.clockOut)))
+      .orderBy(desc(timeClock.clockIn))
+      .limit(1);
+    return latest;
+  }
+
+  async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
+    const [newClock] = await db.insert(timeClock).values(data).returning();
+    return newClock;
+  }
+
+  async updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock> {
+    const [updated] = await db.update(timeClock).set(data).where(eq(timeClock.id, id)).returning();
     return updated;
   }
 

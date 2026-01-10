@@ -23,7 +23,9 @@ import {
   Palette,
   Building2,
   Trash2,
-  Plus
+  Plus,
+  Fingerprint,
+  History
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -44,6 +46,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [enterprisesOpen, setEnterprisesOpen] = useState(false);
+  const [timeClockOpen, setTimeClockOpen] = useState(false);
   const [newBarber, setNewBarber] = useState({ username: "", password: "" });
   const [newEnterprise, setNewEnterprise] = useState({ name: "", slug: "" });
 
@@ -177,6 +180,38 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     },
   });
 
+  const { data: timeClockStatus, refetch: refetchStatus } = useQuery<any>({
+    queryKey: ["/api/time-clock/status"],
+    enabled: !!user
+  });
+
+  const { data: timeClockHistory } = useQuery<any[]>({
+    queryKey: ["/api/time-clock/history"],
+    enabled: timeClockOpen
+  });
+
+  const clockInMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/time-clock/clock-in", { fingerprintId: `fp-${user?.id}` });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Ponto Batido", description: "Entrada registrada com sucesso!" });
+      refetchStatus();
+    }
+  });
+
+  const clockOutMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/time-clock/clock-out");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Ponto Batido", description: "Saída registrada com sucesso!" });
+      refetchStatus();
+    }
+  });
+
   const navItems = [
     { title: "Início", url: "/", icon: Home },
     { title: "Caixa", url: "/caixa", icon: ClipboardList },
@@ -186,6 +221,12 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
     { title: "Barbearia", url: "/barber", icon: Scissors },
   ]
+
+  const timeClockItem = {
+    title: "Registro de Ponto",
+    icon: Fingerprint,
+    onClick: () => setTimeClockOpen(true)
+  };
 
   if (!user) return null;
 
@@ -229,6 +270,19 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                   </SidebarMenuItem>
                 );
               })}
+
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  onClick={timeClockItem.onClick}
+                  className="hover:bg-primary/10 hover:text-primary transition-colors py-6"
+                >
+                  <timeClockItem.icon className="w-5 h-5" />
+                  <span className="font-bold uppercase italic tracking-tighter">{timeClockItem.title}</span>
+                  {timeClockStatus?.active && (
+                    <div className="absolute right-2 top-2 w-2 h-2 bg-primary rounded-full animate-pulse" />
+                  )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               {user.role === "admin" && (
                 <SidebarMenuItem>
@@ -512,6 +566,59 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           </div>
           <DialogFooter>
             <Button variant="ghost" className="w-full" onClick={() => setEnterprisesOpen(false)}>Fechar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={timeClockOpen} onOpenChange={setTimeClockOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+              <Fingerprint className="text-primary" /> Registro de Ponto
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-6 space-y-6">
+            <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/50 border border-white/5 rounded-2xl">
+              <p className="text-xs uppercase text-zinc-500 mb-2">Status Atual</p>
+              <h3 className={`text-lg font-black italic uppercase ${timeClockStatus?.active ? "text-primary" : "text-zinc-500"}`}>
+                {timeClockStatus?.active ? "Em Expediente" : "Fora de Expediente"}
+              </h3>
+              
+              <Button 
+                size="lg"
+                className={`mt-6 w-full font-black uppercase italic ${timeClockStatus?.active ? "bg-red-500 text-white hover:bg-red-600" : "bg-primary text-black hover:bg-primary/80"}`}
+                onClick={() => timeClockStatus?.active ? clockOutMutation.mutate() : clockInMutation.mutate()}
+                disabled={clockInMutation.isPending || clockOutMutation.isPending}
+              >
+                {timeClockStatus?.active ? "Bater Saída" : "Bater Entrada"}
+              </Button>
+              <p className="text-[10px] text-zinc-600 mt-4 uppercase">Identificação Biométrica Ativa: {user.username}</p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-zinc-400">
+                <History className="w-4 h-4" />
+                <span className="text-xs font-bold uppercase tracking-widest">Últimos Registros</span>
+              </div>
+              <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                {timeClockHistory?.map((clock) => (
+                  <div key={clock.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] flex justify-between items-center">
+                    <div>
+                      <p className="font-bold text-zinc-300">ENTRADA: {new Date(clock.clockIn).toLocaleString()}</p>
+                      {clock.clockOut && (
+                        <p className="text-zinc-500 mt-1 uppercase">SAÍDA: {new Date(clock.clockOut).toLocaleString()}</p>
+                      )}
+                    </div>
+                    {!clock.clockOut && <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">ABERTO</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" className="w-full" onClick={() => setTimeClockOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

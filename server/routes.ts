@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema } from "@shared/schema";
+import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";
 import session from "express-session";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
@@ -581,6 +581,46 @@ export async function registerRoutes(
     } catch (err) {
       res.status(500).json({ message: "Erro ao atualizar comanda" });
     }
+  });
+
+  // Time Clock Routes
+  app.get("/api/time-clock/history", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const history = await storage.getTimeClockHistory(user.id);
+    res.json(history);
+  });
+
+  app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const latest = await storage.getLatestTimeClock(user.id);
+    res.json({ active: !!latest, latest });
+  });
+
+  app.post("/api/time-clock/clock-in", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const existing = await storage.getLatestTimeClock(user.id);
+    if (existing) return res.status(400).json({ message: "Já existe um ponto aberto" });
+    
+    // Simulação de validação de digital (o ID seria enviado pelo hardware/leitor)
+    const { fingerprintId } = req.body;
+    
+    const clock = await storage.createTimeClock({
+      userId: user.id,
+      fingerprintId: fingerprintId || "simulated-fingerprint",
+      clockIn: new Date(),
+    });
+    res.json(clock);
+  });
+
+  app.post("/api/time-clock/clock-out", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const existing = await storage.getLatestTimeClock(user.id);
+    if (!existing) return res.status(400).json({ message: "Não há ponto aberto para fechar" });
+    
+    const updated = await storage.updateTimeClock(existing.id, {
+      clockOut: new Date()
+    });
+    res.json(updated);
   });
 
   app.get("/api/tickets/:number", async (req, res) => {
