@@ -673,10 +673,23 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                   
                   <div className="relative z-10 flex items-center justify-center p-4">
                     {/* Realistic Fingerprint Shape SVG */}
-                    <div className="relative w-20 h-28 flex items-center justify-center">
+                      {/* Dynamic light beams/rays */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
+                          <div 
+                            key={i}
+                            className="absolute h-[2px] w-24 bg-gradient-to-r from-primary/60 via-primary/20 to-transparent origin-left opacity-0 animate-[beam_4s_linear_infinite]"
+                            style={{ 
+                              transform: `rotate(${angle}deg)`,
+                              animationDelay: `${i * 0.5}s`
+                            }}
+                          />
+                        ))}
+                      </div>
+
                       <svg 
                         viewBox="0 0 100 140" 
-                        className="w-full h-full text-primary drop-shadow-[0_0_25px_rgba(0,255,102,0.9)] animate-[pulse_2s_ease-in-out_infinite]"
+                        className="w-full h-full text-primary drop-shadow-[0_0_25px_rgba(0,255,102,0.9)] animate-[pulse_2s_ease-in-out_infinite] relative z-20"
                         fill="none" 
                         stroke="currentColor" 
                         strokeWidth="2.5" 
@@ -697,10 +710,6 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                         {/* Scanning line animation */}
                         <rect x="5" y="0" width="90" height="2" className="fill-primary/50 animate-[bounce_3s_linear_infinite]" />
                       </svg>
-                      
-                      {/* Orbital effects around the finger shape */}
-                      <div className="absolute inset-0 -m-4 border-2 border-primary/20 border-t-primary rounded-[40%] animate-[spin_5s_linear_infinite]"></div>
-                      <div className="absolute inset-0 -m-8 border border-primary/10 border-b-primary rounded-[45%] animate-[spin_7s_linear_infinite_reverse]"></div>
                     </div>
                   </div>
                 </div>
