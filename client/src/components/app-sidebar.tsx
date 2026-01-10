@@ -272,49 +272,52 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
         });
         return res.json();
       } catch (err: any) {
-        // Fallback para o modo de demonstração caso o hardware falhe no ambiente de desenvolvimento
-        console.warn("Hardware real não disponível, usando validação de conta logada.");
-        const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
-          fingerprintId: user.fingerprintId 
-        });
-        return res.json();
+        console.error("WebAuthn Error:", err);
+        throw new Error("Falha na validação da digital. O ponto só pode ser batido com a digital correta.");
       }
     },
     onSuccess: () => {
       toast({ title: "Identidade Confirmada", description: "Entrada registrada com sucesso!" });
       refetchStatus();
     },
-    onError: (error: any) => {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
-    }
+    // ...
   });
 
   const clockOutMutation = useMutation({
     mutationFn: async () => {
-      return new Promise((resolve, reject) => {
-        setFingerprintScanning({
-          open: true,
-          title: "Validando Digital",
-          description: "Aguardando toque no sensor biométrico para registrar saída...",
-          onScan: async () => {
-            try {
-              const res = await apiRequest("POST", "/api/time-clock/clock-out");
-              setFingerprintScanning(prev => ({ ...prev, open: false }));
-              resolve(await res.json());
-            } catch (err) {
-              setFingerprintScanning(prev => ({ ...prev, open: false }));
-              reject(err);
-            }
+      if (!user?.fingerprintId) {
+        throw new Error("Você precisa cadastrar sua digital primeiro!");
+      }
+
+      try {
+        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+        const assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            allowCredentials: [{
+              id: Uint8Array.from(atob(user.fingerprintId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
+              type: "public-key"
+            }],
+            userVerification: "required",
+            timeout: 60000
           }
         });
-      });
+
+        if (!assertion) throw new Error("Verificação falhou.");
+
+        const res = await apiRequest("POST", "/api/time-clock/clock-out");
+        return res.json();
+      } catch (err: any) {
+        console.error("WebAuthn Error:", err);
+        throw new Error("Falha na validação da digital. O ponto só pode ser batido com a digital correta.");
+      }
     },
     onSuccess: () => {
-      toast({ title: "Digital Reconhecida", description: "Saída registrada com sucesso!" });
+      toast({ title: "Identidade Confirmada", description: "Saída registrada com sucesso!" });
       refetchStatus();
     },
-    onError: () => {
-      toast({ title: "Erro na Digital", description: "Não foi possível reconhecer a digital. Tente novamente.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Erro na Digital", description: error.message, variant: "destructive" });
     }
   });
 
