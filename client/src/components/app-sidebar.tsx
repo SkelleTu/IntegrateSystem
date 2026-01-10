@@ -204,17 +204,38 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const registerFingerprintMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Gera um ID determinístico baseado no ID do usuário para testes consistentes
-        const fpId = `fp-user-${user?.id}`;
+        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+        const credential = await navigator.credentials.create({
+          publicKey: {
+            challenge,
+            rp: { name: "BarberFlow" },
+            user: {
+              id: window.crypto.getRandomValues(new Uint8Array(16)),
+              name: user?.username || "user",
+              displayName: user?.username || "User"
+            },
+            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
+            authenticatorSelection: {
+              authenticatorAttachment: "platform",
+              userVerification: "required"
+            },
+            timeout: 60000
+          }
+        });
+        if (!credential) throw new Error("Falha ao acessar sensor biométrico.");
+        
+        // Usamos o ID real do sensor WebAuthn
+        const fpId = (credential as any).id;
         
         const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
         return res.json();
       } catch (err: any) {
-        throw new Error("Erro ao registrar digital no banco.");
+        console.error("Erro no cadastro biométrico:", err);
+        throw new Error(err.name === "NotAllowedError" ? "Operação cancelada ou sensor não encontrado." : "Erro ao ler digital real.");
       }
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Biometria registrada e vinculada ao seu usuário no banco de dados!" });
+      toast({ title: "Sucesso", description: "Sua digital real foi vinculada e salva no banco de dados!" });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: any) => toast({ title: "Falha", description: error.message, variant: "destructive" })
@@ -225,14 +246,33 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       if (!user?.fingerprintId) throw new Error("Cadastre sua digital primeiro!");
       
       try {
-        // Validamos apenas se o fingerprintId enviado coincide com o do banco (simplificado)
+        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
+        
+        // Converte o ID salvo de volta para Buffer para o WebAuthn validar
+        const savedId = Uint8Array.from(atob(user.fingerprintId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+
+        const assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            allowCredentials: [{
+              id: savedId,
+              type: "public-key"
+            }],
+            userVerification: "required",
+            timeout: 60000
+          }
+        });
+
+        if (!assertion) throw new Error("Verificação falhou.");
+        
         const res = await apiRequest("POST", "/api/time-clock/register", { 
           type, 
           fingerprintId: user.fingerprintId 
         });
         return res.json();
       } catch (err: any) {
-        throw new Error("Falha na validação da digital.");
+        console.error("Erro na validação biométrica:", err);
+        throw new Error("Digital não reconhecida ou operação cancelada.");
       }
     },
     onSuccess: (data) => {
