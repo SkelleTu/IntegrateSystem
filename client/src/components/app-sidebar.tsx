@@ -673,6 +673,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                   
                   <div className="relative z-10 flex items-center justify-center p-4">
                     {/* Realistic Fingerprint Shape SVG */}
+                    <div className="relative w-20 h-28 flex items-center justify-center">
                       {/* Dynamic light beams/rays */}
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (

@@ -4,6 +4,23 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes beam {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--tw-rotate)) translateX(0) scaleX(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--tw-rotate)) translateX(40px) scaleX(1.5);
+  }
+}
+
 :root {
   /* HSL Values - Premium Emerald / Dark Theme */
   --background: 180 10% 4%;        /* #060808 */
