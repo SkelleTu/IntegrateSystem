@@ -192,23 +192,39 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   const clockInMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/time-clock/clock-in", { fingerprintId: `fp-${user?.id}` });
+      // Simulação de leitura de digital
+      toast({ title: "Aguardando Digital...", description: "Por favor, encoste o dedo no leitor." });
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
+        fingerprintId: `fp-${user?.id}-${Math.random().toString(36).substr(2, 9)}` 
+      });
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Ponto Batido", description: "Entrada registrada com sucesso!" });
+      toast({ title: "Digital Reconhecida", description: "Entrada registrada com sucesso!" });
       refetchStatus();
+    },
+    onError: () => {
+      toast({ title: "Erro na Digital", description: "Não foi possível reconhecer a digital. Tente novamente.", variant: "destructive" });
     }
   });
 
   const clockOutMutation = useMutation({
     mutationFn: async () => {
+      // Simulação de leitura de digital
+      toast({ title: "Aguardando Digital...", description: "Por favor, encoste o dedo no leitor para confirmar a saída." });
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       const res = await apiRequest("POST", "/api/time-clock/clock-out");
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Ponto Batido", description: "Saída registrada com sucesso!" });
+      toast({ title: "Digital Reconhecida", description: "Saída registrada com sucesso!" });
       refetchStatus();
+    },
+    onError: () => {
+      toast({ title: "Erro na Digital", description: "Não foi possível reconhecer a digital. Tente novamente.", variant: "destructive" });
     }
   });
 
