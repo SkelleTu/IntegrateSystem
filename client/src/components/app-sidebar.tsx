@@ -204,6 +204,8 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const registerFingerprintMutation = useMutation({
     mutationFn: async () => {
       try {
+        toast({ title: "Iniciando...", description: "Por favor, siga as instruções do seu navegador para ler sua digital." });
+        
         const challenge = window.crypto.getRandomValues(new Uint8Array(32));
         const credential = await navigator.credentials.create({
           publicKey: {
@@ -222,6 +224,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
             timeout: 60000
           }
         });
+        
         if (!credential) throw new Error("Falha ao acessar sensor biométrico.");
         
         // Usamos o ID real do sensor WebAuthn
@@ -231,11 +234,14 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
         return res.json();
       } catch (err: any) {
         console.error("Erro no cadastro biométrico:", err);
-        throw new Error(err.name === "NotAllowedError" ? "Operação cancelada ou sensor não encontrado." : "Erro ao ler digital real.");
+        if (err.name === "NotAllowedError") {
+          throw new Error("Operação cancelada ou sensor não encontrado. Certifique-se de que seu dispositivo suporta biometria e que o site tem permissão.");
+        }
+        throw new Error("Erro ao ler digital real. Tente novamente.");
       }
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Sua digital real foi vinculada e salva no banco de dados!" });
+      toast({ title: "Sucesso", description: "Sua digital foi cadastrada com sucesso no banco de dados!" });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: any) => toast({ title: "Falha", description: error.message, variant: "destructive" })
