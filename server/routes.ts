@@ -623,6 +623,15 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const { fingerprintId } = req.body;
+    if (!fingerprintId) return res.status(400).json({ message: "ID da digital é obrigatório" });
+    
+    await db.update(users).set({ fingerprintId }).where(eq(users.id, user.id));
+    res.json({ message: "Digital vinculada com sucesso" });
+  });
+
   app.get("/api/tickets/:number", async (req, res) => {
     const ticket = await storage.getTicketByNumber(Number(req.params.number));
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });

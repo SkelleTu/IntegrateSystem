@@ -190,14 +190,30 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     enabled: timeClockOpen
   });
 
+  const registerFingerprintMutation = useMutation({
+    mutationFn: async () => {
+      toast({ title: "Cadastrando Digital...", description: "Por favor, encoste o dedo no leitor para vincular à sua conta." });
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const fpId = `fp-${user?.id}-${Math.random().toString(36).substr(2, 9)}`;
+      const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Sua digital foi vinculada com segurança!" });
+      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    }
+  });
+
   const clockInMutation = useMutation({
     mutationFn: async () => {
-      // Simulação de leitura de digital
+      if (!user?.fingerprintId) {
+        throw new Error("Você precisa cadastrar sua digital primeiro!");
+      }
       toast({ title: "Aguardando Digital...", description: "Por favor, encoste o dedo no leitor." });
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
-        fingerprintId: `fp-${user?.id}-${Math.random().toString(36).substr(2, 9)}` 
+        fingerprintId: user.fingerprintId 
       });
       return res.json();
     },
@@ -205,8 +221,8 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       toast({ title: "Digital Reconhecida", description: "Entrada registrada com sucesso!" });
       refetchStatus();
     },
-    onError: () => {
-      toast({ title: "Erro na Digital", description: "Não foi possível reconhecer a digital. Tente novamente.", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Ação Necessária", description: error.message, variant: "destructive" });
     }
   });
 
@@ -601,15 +617,28 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                 {timeClockStatus?.active ? "Em Expediente" : "Fora de Expediente"}
               </h3>
               
-              <Button 
-                size="lg"
-                className={`mt-6 w-full font-black uppercase italic ${timeClockStatus?.active ? "bg-red-500 text-white hover:bg-red-600" : "bg-primary text-black hover:bg-primary/80"}`}
-                onClick={() => timeClockStatus?.active ? clockOutMutation.mutate() : clockInMutation.mutate()}
-                disabled={clockInMutation.isPending || clockOutMutation.isPending}
-              >
-                {timeClockStatus?.active ? "Bater Saída" : "Bater Entrada"}
-              </Button>
-              <p className="text-[10px] text-zinc-600 mt-4 uppercase">Identificação Biométrica Ativa: {user.username}</p>
+              {!user.fingerprintId ? (
+                <Button 
+                  size="lg"
+                  className="mt-6 w-full font-black uppercase italic bg-yellow-500 text-black hover:bg-yellow-600"
+                  onClick={() => registerFingerprintMutation.mutate()}
+                  disabled={registerFingerprintMutation.isPending}
+                >
+                  Cadastrar Minha Digital
+                </Button>
+              ) : (
+                <Button 
+                  size="lg"
+                  className={`mt-6 w-full font-black uppercase italic ${timeClockStatus?.active ? "bg-red-500 text-white hover:bg-red-600" : "bg-primary text-black hover:bg-primary/80"}`}
+                  onClick={() => timeClockStatus?.active ? clockOutMutation.mutate() : clockInMutation.mutate()}
+                  disabled={clockInMutation.isPending || clockOutMutation.isPending}
+                >
+                  {timeClockStatus?.active ? "Bater Saída" : "Bater Entrada"}
+                </Button>
+              )}
+              <p className="text-[10px] text-zinc-600 mt-4 uppercase">
+                {user.fingerprintId ? "Digital Vinculada" : "Digital não cadastrada"}: {user.username}
+              </p>
             </div>
 
             <div className="space-y-3">

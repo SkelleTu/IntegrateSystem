@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   role: text("role").notNull().default("barber"), // "admin" or "barber"
+  fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
 });
 
 export const services = pgTable("services", {
