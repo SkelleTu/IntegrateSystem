@@ -47,6 +47,17 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [enterprisesOpen, setEnterprisesOpen] = useState(false);
   const [timeClockOpen, setTimeClockOpen] = useState(false);
+  const [fingerprintScanning, setFingerprintScanning] = useState<{
+    open: boolean;
+    onScan: () => void;
+    title: string;
+    description: string;
+  }>({
+    open: false,
+    onScan: () => {},
+    title: "",
+    description: ""
+  });
   const [newBarber, setNewBarber] = useState({ username: "", password: "" });
   const [newEnterprise, setNewEnterprise] = useState({ name: "", slug: "" });
 
@@ -192,11 +203,24 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   const registerFingerprintMutation = useMutation({
     mutationFn: async () => {
-      toast({ title: "Cadastrando Digital...", description: "Por favor, encoste o dedo no leitor para vincular à sua conta." });
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      const fpId = `fp-${user?.id}-${Math.random().toString(36).substr(2, 9)}`;
-      const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
-      return res.json();
+      return new Promise((resolve, reject) => {
+        setFingerprintScanning({
+          open: true,
+          title: "Cadastrando Digital",
+          description: "Por favor, encoste o dedo no leitor físico agora para vincular à sua conta.",
+          onScan: async () => {
+            try {
+              const fpId = `fp-${user?.id}-${Math.random().toString(36).substr(2, 9)}`;
+              const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              resolve(await res.json());
+            } catch (err) {
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              reject(err);
+            }
+          }
+        });
+      });
     },
     onSuccess: () => {
       toast({ title: "Sucesso", description: "Sua digital foi vinculada com segurança!" });
@@ -209,13 +233,26 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       if (!user?.fingerprintId) {
         throw new Error("Você precisa cadastrar sua digital primeiro!");
       }
-      toast({ title: "Aguardando Digital...", description: "Por favor, encoste o dedo no leitor." });
-      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
-        fingerprintId: user.fingerprintId 
+      return new Promise((resolve, reject) => {
+        setFingerprintScanning({
+          open: true,
+          title: "Validando Digital",
+          description: "Aguardando toque no sensor biométrico para registrar entrada...",
+          onScan: async () => {
+            try {
+              const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
+                fingerprintId: user.fingerprintId 
+              });
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              resolve(await res.json());
+            } catch (err) {
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              reject(err);
+            }
+          }
+        });
       });
-      return res.json();
     },
     onSuccess: () => {
       toast({ title: "Digital Reconhecida", description: "Entrada registrada com sucesso!" });
@@ -228,12 +265,23 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   const clockOutMutation = useMutation({
     mutationFn: async () => {
-      // Simulação de leitura de digital
-      toast({ title: "Aguardando Digital...", description: "Por favor, encoste o dedo no leitor para confirmar a saída." });
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      const res = await apiRequest("POST", "/api/time-clock/clock-out");
-      return res.json();
+      return new Promise((resolve, reject) => {
+        setFingerprintScanning({
+          open: true,
+          title: "Validando Digital",
+          description: "Aguardando toque no sensor biométrico para registrar saída...",
+          onScan: async () => {
+            try {
+              const res = await apiRequest("POST", "/api/time-clock/clock-out");
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              resolve(await res.json());
+            } catch (err) {
+              setFingerprintScanning(prev => ({ ...prev, open: false }));
+              reject(err);
+            }
+          }
+        });
+      });
     },
     onSuccess: () => {
       toast({ title: "Digital Reconhecida", description: "Saída registrada com sucesso!" });
@@ -665,6 +713,33 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           <DialogFooter>
             <Button variant="ghost" className="w-full" onClick={() => setTimeClockOpen(false)}>Fechar</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fingerprintScanning.open} onOpenChange={(o) => setFingerprintScanning(prev => ({ ...prev, open: o }))}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+              <Fingerprint className="text-primary animate-pulse" /> {fingerprintScanning.title}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-10 flex flex-col items-center justify-center space-y-6 text-center">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full border-4 border-primary/20 flex items-center justify-center">
+                <Fingerprint className="w-12 h-12 text-primary" />
+              </div>
+              <div className="absolute inset-0 w-24 h-24 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+            </div>
+            <p className="text-sm font-bold text-zinc-400 max-w-[200px]">
+              {fingerprintScanning.description}
+            </p>
+            <Button 
+              className="bg-primary text-black font-black uppercase italic w-full"
+              onClick={() => fingerprintScanning.onScan()}
+            >
+              Simular Toque no Sensor
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Sidebar>
