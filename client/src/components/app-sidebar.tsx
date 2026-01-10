@@ -684,7 +684,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                     onClick={() => registerFingerprintMutation.mutate()}
                     disabled={registerFingerprintMutation.isPending}
                   >
-                    Vincular Digital Neon
+                    Cadastrar Digital
                   </Button>
                 ) : (
                   <Button 
