@@ -678,19 +678,20 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
       <Dialog open={timeClockOpen} onOpenChange={setTimeClockOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden">
-          <DialogHeader className="p-4 border-b border-white/5 flex flex-row items-center gap-4 space-y-0">
+          <div className="p-4 border-b border-white/5 flex flex-row items-center gap-4 space-y-0">
             <Button 
               variant="ghost" 
               size="icon" 
               onClick={() => setTimeClockOpen(false)}
-              className="hover:bg-white/5 h-8 w-8"
+              className="hover:bg-white/5 h-10 w-10 flex items-center justify-center rounded-full"
+              data-testid="button-close-time-clock"
             >
-              <Plus className="w-4 h-4 rotate-45" />
+              <Plus className="w-6 h-6 rotate-45 text-zinc-400 hover:text-white transition-colors" />
             </Button>
             <DialogTitle className="text-lg font-black italic uppercase tracking-tighter flex items-center gap-2">
               <Fingerprint className="text-primary w-5 h-5" /> Registro de Ponto
             </DialogTitle>
-          </DialogHeader>
+          </div>
           <div className="p-6">
             <div className="relative group mb-4">
               <div className="absolute -inset-0.5 bg-primary/20 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
