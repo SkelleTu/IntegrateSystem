@@ -661,7 +661,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
               <Fingerprint className="text-primary" /> Registro de Ponto
             </DialogTitle>
           </DialogHeader>
-          
+          <div>
             <div className="relative group mb-4">
               <div className="absolute -inset-0.5 bg-primary/20 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
               <div className="relative flex flex-col items-center justify-center p-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl text-center">
