@@ -662,56 +662,88 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
             </DialogTitle>
           </DialogHeader>
           
-          <div className="py-6 space-y-6">
-            <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/50 border border-white/5 rounded-2xl text-center">
-              <p className="text-xs uppercase text-zinc-500 mb-2">Próxima Ação</p>
-              <h3 className="text-lg font-black italic uppercase text-primary">
-                {currentAction.label}
-              </h3>
-              
-              {!user.fingerprintId ? (
-                <Button 
-                  size="lg"
-                  className="mt-6 w-full font-black uppercase italic bg-yellow-500 text-black hover:bg-yellow-600"
-                  onClick={() => registerFingerprintMutation.mutate()}
-                  disabled={registerFingerprintMutation.isPending}
-                >
-                  Cadastrar Minha Digital
-                </Button>
-              ) : (
-                <Button 
-                  size="lg"
-                  className="mt-6 w-full font-black uppercase italic bg-primary text-black hover:bg-primary/80"
-                  onClick={() => registerClockMutation.mutate(currentAction.type)}
-                  disabled={registerClockMutation.isPending}
-                >
+            <div className="relative group mb-4">
+              <div className="absolute -inset-0.5 bg-primary/20 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
+              <div className="relative flex flex-col items-center justify-center p-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl text-center">
+                <p className="text-[10px] uppercase font-black tracking-[0.2em] text-primary/50 mb-4 italic">Status de Operação</p>
+                
+                <div className="relative mb-6">
+                  <div className="absolute -inset-4 bg-primary/10 rounded-full blur-xl animate-pulse"></div>
+                  <Fingerprint className="w-16 h-16 text-primary drop-shadow-[0_0_15px_rgba(0,255,102,0.5)] relative z-10" />
+                  <div className="absolute inset-0 w-16 h-16 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                </div>
+
+                <h3 className="text-xl font-black italic uppercase text-white tracking-tighter mb-6 drop-shadow-[0_0_8px_rgba(255,255,255,0.3)]">
                   {currentAction.label}
-                </Button>
-              )}
-              <p className="text-[10px] text-zinc-600 mt-4 uppercase">
-                {user.fingerprintId ? "Digital Vinculada" : "Digital não cadastrada"}: {user.username}
-              </p>
+                </h3>
+                
+                {!user.fingerprintId ? (
+                  <Button 
+                    size="lg"
+                    className="w-full font-black uppercase italic bg-yellow-500 text-black hover:bg-yellow-400 shadow-[0_0_20px_rgba(234,179,8,0.3)] transition-all duration-300 hover:scale-[1.02]"
+                    onClick={() => registerFingerprintMutation.mutate()}
+                    disabled={registerFingerprintMutation.isPending}
+                  >
+                    Vincular Digital Neon
+                  </Button>
+                ) : (
+                  <Button 
+                    size="lg"
+                    className="w-full font-black uppercase italic bg-primary text-black hover:bg-primary/80 shadow-[0_0_20px_rgba(0,255,102,0.3)] transition-all duration-300 hover:scale-[1.02] flex items-center justify-center gap-2"
+                    onClick={() => registerClockMutation.mutate(currentAction.type)}
+                    disabled={registerClockMutation.isPending}
+                  >
+                    <Fingerprint className="w-5 h-5" />
+                    {currentAction.label}
+                  </Button>
+                )}
+                <div className="mt-6 pt-4 border-t border-white/5 w-full">
+                  <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
+                    Operador: <span className="text-zinc-300">{user.username}</span>
+                  </p>
+                  <p className="text-[9px] text-zinc-600 mt-1 uppercase font-bold">
+                    {user.fingerprintId ? "Biometria Ativa" : "Biometria Pendente"}
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <History className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">Seu Histórico Completo</span>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <History className="w-4 h-4 text-primary" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] italic">Linha do Tempo</span>
+                </div>
+                <div className="h-[1px] flex-1 bg-gradient-to-r from-primary/20 to-transparent ml-4"></div>
               </div>
-              <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+              
+              <div className="max-h-[250px] overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                 {timeClockHistory?.map((clock) => {
                   const labels: Record<string, string> = {
-                    in: "ENTRADA",
-                    break_start: "INTERVALO",
-                    break_end: "RETORNO",
-                    out: "SAÍDA"
+                    in: "Entrada",
+                    break_start: "Intervalo",
+                    break_end: "Retorno",
+                    out: "Saída"
+                  };
+                  const colors: Record<string, string> = {
+                    in: "text-primary border-primary/20 bg-primary/5",
+                    break_start: "text-yellow-500 border-yellow-500/20 bg-yellow-500/5",
+                    break_end: "text-blue-500 border-blue-500/20 bg-blue-500/5",
+                    out: "text-red-500 border-red-500/20 bg-red-500/5"
                   };
                   return (
-                    <div key={clock.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] flex justify-between items-center">
-                      <div>
-                        <p className="font-bold text-zinc-300 uppercase">{labels[clock.type] || "PONTO"}</p>
-                        <p className="text-zinc-500 mt-1">{new Date(clock.timestamp).toLocaleString()}</p>
+                    <div key={clock.id} className={`p-4 border rounded-xl backdrop-blur-sm transition-all duration-300 hover:bg-white/5 ${colors[clock.type] || "border-white/10"}`}>
+                      <div className="flex justify-between items-start mb-1">
+                        <p className="font-black italic uppercase text-[11px] tracking-tight">{labels[clock.type] || "Ponto"}</p>
+                        <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse"></div>
                       </div>
+                      <p className="text-[10px] font-bold opacity-70">{new Date(clock.timestamp).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}</p>
                     </div>
                   );
                 })}
