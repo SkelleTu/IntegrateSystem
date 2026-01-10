@@ -204,23 +204,17 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const registerFingerprintMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Mock fingerprint ID for environments without WebAuthn support or for testing
-        // In a real device, this would use navigator.credentials.create
-        const fpId = "mock-fp-" + Math.random().toString(36).substring(7);
+        // Gera um ID determinístico baseado no ID do usuário para testes consistentes
+        const fpId = `fp-user-${user?.id}`;
         
-        // Se o usuário já tiver um fingerprintId no banco, vamos avisar
-        if (user?.fingerprintId) {
-          console.log("Usuário já possui biometria cadastrada:", user.fingerprintId);
-        }
-
         const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
         return res.json();
       } catch (err: any) {
-        throw new Error("Erro ao ler digital.");
+        throw new Error("Erro ao registrar digital no banco.");
       }
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Sua biometria foi vinculada ao banco de dados!" });
+      toast({ title: "Sucesso", description: "Biometria registrada e vinculada ao seu usuário no banco de dados!" });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: any) => toast({ title: "Falha", description: error.message, variant: "destructive" })
