@@ -677,20 +677,19 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       </Dialog>
 
       <Dialog open={timeClockOpen} onOpenChange={setTimeClockOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden relative">
-          {/* Botão Flutuante de Fechar */}
+        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden">
+          {/* Botão de Fechar Absoluto (dentro do DialogContent para não sumir com o conteúdo) */}
           <Button 
-            variant="outline" 
+            variant="ghost" 
             size="icon" 
             onClick={() => setTimeClockOpen(false)}
-            className="fixed top-4 right-4 z-[200] rounded-full bg-white/10 border-white/20 backdrop-blur-xl hover:bg-white/20 hover:scale-110 active:scale-95 transition-all shadow-2xl h-12 w-12"
-            data-testid="button-close-time-clock-floating"
+            className="absolute top-3 right-3 z-50 rounded-full bg-white/5 border border-white/10 hover:bg-white/20 transition-all h-10 w-10"
+            data-testid="button-close-time-clock-absolute"
           >
-            <Plus className="w-8 h-8 rotate-45 text-white" />
+            <Plus className="w-6 h-6 rotate-45 text-white" />
           </Button>
 
           <div className="p-4 border-b border-white/5 flex flex-row items-center gap-4 space-y-0">
-            <div className="w-10 h-10" /> {/* Espaçador para o título não ficar colado na esquerda */}
             <DialogTitle className="text-lg font-black italic uppercase tracking-tighter flex items-center gap-2">
               <Fingerprint className="text-primary w-5 h-5" /> Registro de Ponto
             </DialogTitle>
