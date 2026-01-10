@@ -40,7 +40,7 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db } from "./db";
-import { tickets } from "@shared/schema";
+import { tickets, users } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
