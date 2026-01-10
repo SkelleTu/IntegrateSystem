@@ -677,22 +677,13 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       </Dialog>
 
       <Dialog open={timeClockOpen} onOpenChange={setTimeClockOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md p-0 overflow-hidden !z-[9999]">
-          <div className="p-4 border-b border-white/5 flex flex-row items-center justify-between gap-4 space-y-0">
-            <DialogTitle className="text-lg font-black italic uppercase tracking-tighter flex items-center gap-2">
-              <Fingerprint className="text-primary w-5 h-5" /> Registro de Ponto
+        <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+              <Fingerprint className="text-primary" /> Registro de Ponto
             </DialogTitle>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setTimeClockOpen(false)}
-              className="rounded-full bg-white/10 border-white/20 hover:bg-white/20 transition-all h-10 w-10 flex items-center justify-center shrink-0"
-              data-testid="button-close-time-clock-header"
-            >
-              <Plus className="w-6 h-6 rotate-45 text-white" />
-            </Button>
-          </div>
-          <div className="p-6">
+          </DialogHeader>
+          <div>
             <div className="relative group mb-4">
               <div className="absolute -inset-0.5 bg-primary/20 rounded-full blur opacity-75 group-hover:opacity-100 transition duration-1000 group-hover:duration-200 animate-pulse"></div>
               <div className="relative flex flex-col items-center justify-center p-8 bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl text-center">
@@ -823,6 +814,10 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
               </div>
             </div>
           </div>
+
+          <DialogFooter>
+            <Button variant="ghost" className="w-full" onClick={() => setTimeClockOpen(false)}>Fechar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
