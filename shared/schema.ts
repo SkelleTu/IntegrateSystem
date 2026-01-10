@@ -131,9 +131,9 @@ export const insertTransactionSchema = createInsertSchema(transactions);
 export const timeClock = pgTable("time_clock", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").references(() => users.id).notNull(),
-  clockIn: timestamp("clock_in").defaultNow().notNull(),
-  clockOut: timestamp("clock_out"),
-  fingerprintId: text("fingerprint_id"), // Identificador da digital vinculada
+  type: text("type").notNull(), // "in", "break_start", "break_end", "out"
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  fingerprintId: text("fingerprint_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

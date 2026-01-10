@@ -204,9 +204,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const registerFingerprintMutation = useMutation({
     mutationFn: async () => {
       try {
-        // Gera um desafio aleatório para o hardware
         const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-        
         const credential = await navigator.credentials.create({
           publicKey: {
             challenge,
@@ -216,40 +214,32 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
               name: user?.username || "user",
               displayName: user?.username || "User"
             },
-            pubKeyCredParams: [{ alg: -7, type: "public-key" }], // ES256
+            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
             authenticatorSelection: {
-              authenticatorAttachment: "platform", // Força o uso do leitor local (digital/faceid)
+              authenticatorAttachment: "platform",
               userVerification: "required"
             },
             timeout: 60000
           }
         });
-
         if (!credential) throw new Error("Falha ao acessar sensor biométrico.");
-
-        // O ID da credencial é a "assinatura" única da digital
         const fpId = (credential as any).id;
         const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
         return res.json();
       } catch (err: any) {
-        console.error("WebAuthn Error:", err);
         throw new Error(err.name === "NotAllowedError" ? "Operação cancelada ou sensor não encontrado." : "Erro ao ler digital.");
       }
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Sua digital real foi vinculada com segurança!" });
+      toast({ title: "Sucesso", description: "Sua digital real foi vinculada!" });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
-    onError: (error: any) => {
-      toast({ title: "Falha na Biometria", description: error.message, variant: "destructive" });
-    }
+    onError: (error: any) => toast({ title: "Falha", description: error.message, variant: "destructive" })
   });
 
-  const clockInMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.fingerprintId) {
-        throw new Error("Você precisa cadastrar sua digital primeiro!");
-      }
+  const registerClockMutation = useMutation({
+    mutationFn: async (type: string) => {
+      if (!user?.fingerprintId) throw new Error("Cadastre sua digital primeiro!");
       
       try {
         const challenge = window.crypto.getRandomValues(new Uint8Array(32));
@@ -264,62 +254,47 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
             timeout: 60000
           }
         });
-
         if (!assertion) throw new Error("Verificação falhou.");
-
-        const res = await apiRequest("POST", "/api/time-clock/clock-in", { 
+        const res = await apiRequest("POST", "/api/time-clock/register", { 
+          type, 
           fingerprintId: user.fingerprintId 
         });
         return res.json();
       } catch (err: any) {
-        console.error("WebAuthn Error:", err);
-        throw new Error("Falha na validação da digital. O ponto só pode ser batido com a digital correta.");
+        throw new Error("Falha na validação da digital.");
       }
     },
-    onSuccess: () => {
-      toast({ title: "Identidade Confirmada", description: "Entrada registrada com sucesso!" });
+    onSuccess: (data) => {
+      const labels: Record<string, string> = {
+        in: "Expediente Iniciado",
+        break_start: "Intervalo Iniciado",
+        break_end: "Expediente Retomado",
+        out: "Expediente Finalizado"
+      };
+      toast({ title: labels[data.type] || "Ponto Registrado", description: "Ponto batido com sucesso!" });
       refetchStatus();
     },
-    // ...
+    onError: (error: any) => toast({ title: "Erro", description: error.message, variant: "destructive" })
   });
 
-  const clockOutMutation = useMutation({
-    mutationFn: async () => {
-      if (!user?.fingerprintId) {
-        throw new Error("Você precisa cadastrar sua digital primeiro!");
-      }
+  const getNextAction = () => {
+    if (!timeClockStatus?.latest) return { type: "in", label: "Iniciar Expediente" };
+    const lastType = timeClockStatus.latest.type;
+    
+    // Se o último ponto foi "in", o próximo é "break_start" (Intervalo)
+    if (lastType === "in") return { type: "break_start", label: "Intervalo" };
+    
+    // Se o último ponto foi "break_start", o próximo é "break_end" (Retomar Expediente)
+    if (lastType === "break_start") return { type: "break_end", label: "Retomar Expediente" };
+    
+    // Se o último ponto foi "break_end", o próximo é "out" (Término de Expediente)
+    if (lastType === "break_end") return { type: "out", label: "Término de Expediente" };
+    
+    // Se o último ponto foi "out", o ciclo reinicia com "in" (Iniciar Expediente)
+    return { type: "in", label: "Iniciar Expediente" };
+  };
 
-      try {
-        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-        const assertion = await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            allowCredentials: [{
-              id: Uint8Array.from(atob(user.fingerprintId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)),
-              type: "public-key"
-            }],
-            userVerification: "required",
-            timeout: 60000
-          }
-        });
-
-        if (!assertion) throw new Error("Verificação falhou.");
-
-        const res = await apiRequest("POST", "/api/time-clock/clock-out");
-        return res.json();
-      } catch (err: any) {
-        console.error("WebAuthn Error:", err);
-        throw new Error("Falha na validação da digital. O ponto só pode ser batido com a digital correta.");
-      }
-    },
-    onSuccess: () => {
-      toast({ title: "Identidade Confirmada", description: "Saída registrada com sucesso!" });
-      refetchStatus();
-    },
-    onError: (error: any) => {
-      toast({ title: "Erro na Digital", description: error.message, variant: "destructive" });
-    }
-  });
+  const currentAction = getNextAction();
 
   const navItems = [
     { title: "Início", url: "/", icon: Home },
@@ -688,10 +663,10 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           </DialogHeader>
           
           <div className="py-6 space-y-6">
-            <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/50 border border-white/5 rounded-2xl">
-              <p className="text-xs uppercase text-zinc-500 mb-2">Status Atual</p>
-              <h3 className={`text-lg font-black italic uppercase ${timeClockStatus?.active ? "text-primary" : "text-zinc-500"}`}>
-                {timeClockStatus?.active ? "Em Expediente" : "Fora de Expediente"}
+            <div className="flex flex-col items-center justify-center p-8 bg-zinc-900/50 border border-white/5 rounded-2xl text-center">
+              <p className="text-xs uppercase text-zinc-500 mb-2">Próxima Ação</p>
+              <h3 className="text-lg font-black italic uppercase text-primary">
+                {currentAction.label}
               </h3>
               
               {!user.fingerprintId ? (
@@ -706,11 +681,11 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
               ) : (
                 <Button 
                   size="lg"
-                  className={`mt-6 w-full font-black uppercase italic ${timeClockStatus?.active ? "bg-red-500 text-white hover:bg-red-600" : "bg-primary text-black hover:bg-primary/80"}`}
-                  onClick={() => timeClockStatus?.active ? clockOutMutation.mutate() : clockInMutation.mutate()}
-                  disabled={clockInMutation.isPending || clockOutMutation.isPending}
+                  className="mt-6 w-full font-black uppercase italic bg-primary text-black hover:bg-primary/80"
+                  onClick={() => registerClockMutation.mutate(currentAction.type)}
+                  disabled={registerClockMutation.isPending}
                 >
-                  {timeClockStatus?.active ? "Bater Saída" : "Bater Entrada"}
+                  {currentAction.label}
                 </Button>
               )}
               <p className="text-[10px] text-zinc-600 mt-4 uppercase">
@@ -721,20 +696,25 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-zinc-400">
                 <History className="w-4 h-4" />
-                <span className="text-xs font-bold uppercase tracking-widest">Últimos Registros</span>
+                <span className="text-xs font-bold uppercase tracking-widest">Seu Histórico Completo</span>
               </div>
               <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                {timeClockHistory?.map((clock) => (
-                  <div key={clock.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-zinc-300">ENTRADA: {new Date(clock.clockIn).toLocaleString()}</p>
-                      {clock.clockOut && (
-                        <p className="text-zinc-500 mt-1 uppercase">SAÍDA: {new Date(clock.clockOut).toLocaleString()}</p>
-                      )}
+                {timeClockHistory?.map((clock) => {
+                  const labels: Record<string, string> = {
+                    in: "ENTRADA",
+                    break_start: "INTERVALO",
+                    break_end: "RETORNO",
+                    out: "SAÍDA"
+                  };
+                  return (
+                    <div key={clock.id} className="p-3 bg-white/5 border border-white/5 rounded-xl text-[10px] flex justify-between items-center">
+                      <div>
+                        <p className="font-bold text-zinc-300 uppercase">{labels[clock.type] || "PONTO"}</p>
+                        <p className="text-zinc-500 mt-1">{new Date(clock.timestamp).toLocaleString()}</p>
+                      </div>
                     </div>
-                    {!clock.clockOut && <span className="bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">ABERTO</span>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

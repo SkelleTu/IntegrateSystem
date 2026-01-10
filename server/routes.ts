@@ -590,37 +590,38 @@ export async function registerRoutes(
     res.json(history);
   });
 
+  app.get("/api/admin/time-clock/history/:userId", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao administrador" });
+    const history = await storage.getTimeClockHistory(Number(req.params.userId));
+    res.json(history);
+  });
+
   app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const latest = await storage.getLatestTimeClock(user.id);
-    res.json({ active: !!latest, latest });
+    res.json({ latest });
   });
 
-  app.post("/api/time-clock/clock-in", isAuthenticated, async (req, res) => {
+  app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    const existing = await storage.getLatestTimeClock(user.id);
-    if (existing) return res.status(400).json({ message: "Já existe um ponto aberto" });
+    const { type, fingerprintId } = req.body;
     
-    // Simulação de validação de digital (o ID seria enviado pelo hardware/leitor)
-    const { fingerprintId } = req.body;
+    if (!user.fingerprintId) {
+      return res.status(400).json({ message: "Você precisa cadastrar sua digital primeiro!" });
+    }
+
+    if (fingerprintId !== user.fingerprintId) {
+      return res.status(400).json({ message: "Digital não reconhecida." });
+    }
     
     const clock = await storage.createTimeClock({
       userId: user.id,
-      fingerprintId: fingerprintId || "simulated-fingerprint",
-      clockIn: new Date(),
+      type, // "in", "break_start", "break_end", "out"
+      timestamp: new Date(),
+      fingerprintId
     });
     res.json(clock);
-  });
-
-  app.post("/api/time-clock/clock-out", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    const existing = await storage.getLatestTimeClock(user.id);
-    if (!existing) return res.status(400).json({ message: "Não há ponto aberto para fechar" });
-    
-    const updated = await storage.updateTimeClock(existing.id, {
-      clockOut: new Date()
-    });
-    res.json(updated);
   });
 
   app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {

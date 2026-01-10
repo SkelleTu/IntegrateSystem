@@ -347,16 +347,16 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
-    return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.clockIn));
-  }
-
   async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
     const [latest] = await db.select().from(timeClock)
-      .where(and(eq(timeClock.userId, userId), isNull(timeClock.clockOut)))
-      .orderBy(desc(timeClock.clockIn))
+      .where(eq(timeClock.userId, userId))
+      .orderBy(desc(timeClock.timestamp))
       .limit(1);
     return latest;
+  }
+
+  async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
+    return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp));
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
