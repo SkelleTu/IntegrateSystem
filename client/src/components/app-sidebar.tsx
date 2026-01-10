@@ -668,12 +668,40 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                 <p className="text-[10px] uppercase font-black tracking-[0.2em] text-primary/50 mb-4 italic">Status de Operação</p>
                 
                 <div className="relative mb-6">
-                  <div className="absolute -inset-8 bg-primary/20 rounded-full blur-2xl animate-pulse"></div>
-                  <div className="absolute -inset-4 bg-primary/10 rounded-full blur-xl animate-[pulse_3s_ease-in-out_infinite]"></div>
-                  <div className="relative z-10 flex items-center justify-center">
-                    <Fingerprint className="w-16 h-16 text-primary drop-shadow-[0_0_20px_rgba(0,255,102,0.8)] animate-[pulse_2s_ease-in-out_infinite]" />
-                    <div className="absolute inset-0 w-20 h-20 -left-2 -top-2 border-2 border-primary/20 border-t-primary rounded-full animate-[spin_3s_linear_infinite]"></div>
-                    <div className="absolute inset-0 w-24 h-24 -left-4 -top-4 border border-primary/10 border-b-primary rounded-full animate-[spin_4s_linear_infinite_reverse]"></div>
+                  <div className="absolute -inset-12 bg-primary/30 rounded-full blur-3xl animate-pulse"></div>
+                  <div className="absolute -inset-6 bg-primary/10 rounded-full blur-2xl animate-[pulse_3s_ease-in-out_infinite]"></div>
+                  
+                  <div className="relative z-10 flex items-center justify-center p-4">
+                    {/* Realistic Fingerprint Shape SVG */}
+                    <div className="relative w-20 h-28 flex items-center justify-center">
+                      <svg 
+                        viewBox="0 0 100 140" 
+                        className="w-full h-full text-primary drop-shadow-[0_0_25px_rgba(0,255,102,0.9)] animate-[pulse_2s_ease-in-out_infinite]"
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round"
+                      >
+                        {/* Outer loops - defining the finger shape */}
+                        <path d="M50 10 C25 10 10 35 10 70 C10 110 25 130 50 130 C75 130 90 110 90 70 C90 35 75 10 50 10" strokeOpacity="0.3" />
+                        
+                        {/* Fingerprint ridges */}
+                        <path d="M50 30 C35 30 25 45 25 70 C25 90 35 105 50 105 C65 105 75 90 75 70 C75 45 65 30 50 30" />
+                        <path d="M50 45 C42 45 35 55 35 70 C35 85 42 95 50 95 C58 95 65 85 65 70 C65 55 58 45 50 45" />
+                        <path d="M50 60 C47 60 44 65 44 70 C44 75 47 80 50 80 C53 80 56 75 56 70 C56 65 53 60 50 60" />
+                        
+                        {/* Lower ridge patterns */}
+                        <path d="M20 90 C20 105 30 115 50 115 C70 115 80 105 80 90" />
+                        <path d="M15 110 C15 120 30 125 50 125 C70 125 85 120 85 110" />
+                        
+                        {/* Scanning line animation */}
+                        <rect x="5" y="0" width="90" height="2" className="fill-primary/50 animate-[bounce_3s_linear_infinite]" />
+                      </svg>
+                      
+                      {/* Orbital effects around the finger shape */}
+                      <div className="absolute inset-0 -m-4 border-2 border-primary/20 border-t-primary rounded-[40%] animate-[spin_5s_linear_infinite]"></div>
+                      <div className="absolute inset-0 -m-8 border border-primary/10 border-b-primary rounded-[45%] animate-[spin_7s_linear_infinite_reverse]"></div>
+                    </div>
                   </div>
                 </div>
 
