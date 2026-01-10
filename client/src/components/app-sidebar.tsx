@@ -196,9 +196,9 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     enabled: !!user
   });
 
-  const { data: timeClockHistory } = useQuery<any[]>({
+  const { data: timeClockHistory, refetch: refetchHistory } = useQuery<any[]>({
     queryKey: ["/api/time-clock/history"],
-    enabled: timeClockOpen
+    enabled: !!user // Changed to always refetch when logged in
   });
 
   const registerFingerprintMutation = useMutation({
@@ -273,6 +273,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       };
       toast({ title: labels[data.type] || "Ponto Registrado", description: "Ponto batido com sucesso!" });
       refetchStatus();
+      refetchHistory();
     },
     onError: (error: any) => toast({ title: "Erro", description: error.message, variant: "destructive" })
   });
