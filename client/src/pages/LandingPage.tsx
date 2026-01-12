@@ -36,7 +36,7 @@ export default function LandingPage() {
   };
 
   const handlePayment = () => {
-    toast({ title: "Sucesso!", description: "Pagamento processado (Simulação). Bem-vindo ao Barber-Flow!" });
+    toast({ title: "Sucesso!", description: "Pagamento processado (Simulação). Bem-vindo ao Vanguard Flow!" });
     setLocation("/login");
   };
 

@@ -210,7 +210,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
         const credential = await navigator.credentials.create({
           publicKey: {
             challenge,
-            rp: { name: "BarberFlow" },
+            rp: { name: "Vanguard Flow" },
             user: {
               id: window.crypto.getRandomValues(new Uint8Array(16)),
               name: user?.username || "user",
