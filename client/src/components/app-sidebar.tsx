@@ -815,8 +815,8 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="ghost" className="w-full" onClick={() => setTimeClockOpen(false)}>Fechar</Button>
+          <DialogFooter className="p-4 sm:p-6 bg-zinc-950 border-t border-white/10 relative z-[10001]">
+            <Button variant="ghost" className="w-full text-white hover:bg-white/10" onClick={() => setTimeClockOpen(false)}>Fechar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
