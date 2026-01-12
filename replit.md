@@ -1,4 +1,4 @@
-# Barber-Flow
+# Vanguard Flow
 
 Sistema de gestão para barbearias e estabelecimentos multi-serviços.
 

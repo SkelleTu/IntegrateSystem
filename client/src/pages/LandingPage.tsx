@@ -51,7 +51,7 @@ export default function LandingPage() {
             </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter text-white">
-            Evolua sua <span className="text-primary">Gestão</span>
+            Evolua sua <span className="text-primary">Gestão</span> com o <span className="text-primary">Vanguard Flow</span>
           </h1>
           <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto font-medium">
             O sistema integrado definitivo para barbearias, padarias e estabelecimentos multi-serviços.
