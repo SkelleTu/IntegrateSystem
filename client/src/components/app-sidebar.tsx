@@ -319,7 +319,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const currentAction = getNextAction();
 
   const navItems = [
-    { title: "Início", url: "/", icon: Home },
+    { title: "Dashboard", url: "/app", icon: Home },
     { title: "Ponto", url: "/ponto", icon: Fingerprint },
     { title: "Caixa", url: "/caixa", icon: ClipboardList },
     { title: "Financeiro", url: "/financeiro", icon: Landmark, adminOnly: true },

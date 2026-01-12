@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
+import LandingPage from "@/pages/LandingPage";
 import Home from "@/pages/Home";
 import BarberHome from "@/pages/BarberHome";
 import Login from "@/pages/Login";
@@ -62,18 +63,10 @@ function Router() {
     );
   }
 
-  if (!user) {
-    return (
-      <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden flex items-center justify-center p-4">
-        <BackgroundIcons />
-        <Login />
-      </div>
-    );
-  }
-
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={LandingPage} />
+      <Route path="/app" component={Home} />
       <Route path="/barber" component={BarberHome} />
       <Route path="/login" component={Login} />
       <Route path="/menu" component={DigitalMenu} />
