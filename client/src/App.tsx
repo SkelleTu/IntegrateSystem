@@ -103,7 +103,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden">
+        <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden pb-safe">
           <BackgroundIcons />
           <SidebarProvider>
             <div className="flex w-full bg-transparent relative z-10 min-h-screen">
@@ -114,7 +114,7 @@ export default function App() {
                     <Menu className="w-6 h-6" />
                   </SidebarTrigger>
                 </header>
-                <main className="flex-1 relative bg-transparent flex flex-col">
+                <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
                   <Router />
                 </main>
               </div>
