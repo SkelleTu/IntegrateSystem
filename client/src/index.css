@@ -22,34 +22,34 @@
 }
 
 :root {
-  /* HSL Values - Premium Emerald / Dark Theme */
-  --background: 180 10% 4%;        /* #060808 */
-  --foreground: 0 0% 98%;          /* Near white */
+  /* HSL Values - Tech Neon Dark Theme */
+  --background: 220 25% 3%;        /* #05070a */
+  --foreground: 210 20% 98%;          /* Near white */
   
-  --primary: 158 82% 47%;         /* #10b981 - Emerald Green */
-  --primary-foreground: 180 10% 4%;
+  --primary: 190 100% 50%;         /* Cyber Blue Neon #00e5ff */
+  --primary-foreground: 220 25% 3%;
   
-  --secondary: 180 10% 10%;        /* Deep dark gray */
-  --secondary-foreground: 158 82% 47%;
+  --secondary: 260 80% 60%;        /* Electric Purple Neon */
+  --secondary-foreground: 210 20% 98%;
   
-  --muted: 180 10% 15%;
-  --muted-foreground: 0 0% 100%;
+  --muted: 220 15% 10%;
+  --muted-foreground: 210 10% 70%;
   
-  --accent: 158 82% 47%;          
-  --accent-foreground: 180 10% 4%;
+  --accent: 190 100% 50%;          
+  --accent-foreground: 220 25% 3%;
   
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 98%;
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 20% 98%;
   
-  --border: 180 10% 15%;
-  --input: 180 10% 12%;
-  --ring: 158 82% 47%;
+  --border: 220 20% 12%;
+  --input: 220 20% 10%;
+  --ring: 190 100% 50%;
   
-  --card: 180 10% 7%;
-  --card-foreground: 0 0% 100%;
-  --card-border: 180 10% 12%;
+  --card: 220 25% 5%;
+  --card-foreground: 210 20% 100%;
+  --card-border: 220 20% 15%;
 
-  --radius: 1rem;
+  --radius: 0.75rem;
   
   /* Fonts */
   --font-display: 'Montserrat', sans-serif;
@@ -59,11 +59,10 @@
 @layer base {
   /* Global Background and Layering */
   html, body {
-    background-color: #050707 !important;
+    background-color: #05070a !important;
     margin: 0;
     padding: 0;
     min-height: 100vh;
-    min-height: -webkit-fill-available;
     width: 100%;
     overflow-x: hidden;
   }
@@ -72,10 +71,9 @@
     @apply text-foreground antialiased selection:bg-primary/30 selection:text-primary relative;
     font-family: var(--font-body);
     background: transparent !important;
-    padding-bottom: env(safe-area-inset-bottom, 20px);
   }
 
-  /* Full Screen Background Layer - Fixed and Pro Texture */
+  /* Tech Neon Background Layer */
   body::before {
     content: '';
     position: fixed !important;
@@ -84,132 +82,42 @@
     width: 100vw !important;
     height: 100vh !important;
     z-index: -9999 !important;
-    background-color: #050707 !important;
+    background-color: #05070a !important;
     background-image: 
-      /* Repeating geometric pattern - Optimized SVG */
-      url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M60 0l60 60-60 60L0 60z' fill='%2310b981' fill-opacity='0.2'/%3E%3C/svg%3E"),
-      /* Radial highlights */
-      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.4) 0, transparent 70%),
-      radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.4) 0, transparent 70%),
-      radial-gradient(at 50% 50%, rgba(16, 185, 129, 0.2) 0, transparent 80%) !important;
+      /* Grid Pattern */
+      linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px),
+      /* Radial Glows */
+      radial-gradient(at 0% 0%, rgba(0, 229, 255, 0.15) 0, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(147, 51, 234, 0.15) 0, transparent 50%);
+    background-size: 40px 40px, 40px 40px, 100% 100%, 100% 100% !important;
     background-attachment: fixed !important;
-    background-size: 120px 120px, 100% 100%, 100% 100%, 100% 100% !important;
     pointer-events: none !important;
     display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    /* Hardware acceleration hints */
-    transform: translate3d(0,0,0);
-    will-change: transform;
   }
 
-  html[data-hidden="true"] body::before {
-    display: none !important;
-  }
-
-  /* Force transparency on ALL containers to reveal background */
-  #root, 
-  .min-h-screen, 
-  [data-sidebar-provider], 
-  [data-sidebar], 
-  main,
-  .bg-background,
-  .bg-card,
-  .bg-sidebar {
-    background-color: transparent !important;
+  /* Force transparency on main containers */
+  #root, .min-h-screen {
     background: transparent !important;
   }
 
-  /* Unified Opacity Policy - Clear Elements */
-  button:not(.bg-primary), .button:not(.bg-primary), .bg-primary, .glass, .card, .bg-card, .shadcn-card, [role="menu"], .relative.glass, .glass-card, .panel-translucent {
-    background-color: rgba(255, 255, 255, 0.15) !important;
-    background-image: none !important;
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.2) !important;
-    box-shadow: none !important;
-    @apply transition-all duration-500;
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
   }
 
-  /* Specific adjustments for inputs and forms - Clear */
-  input, textarea, select {
-    background-color: rgba(255, 255, 255, 0.1) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  .neon-text-blue {
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 20px rgba(0, 229, 255, 0.3);
   }
 
-  /* Containers with Blur - Modal Body, Sidebar, Main Cards, Popovers, Dropdowns */
-  [role="dialog"], 
-  [role="popover"],
-  [role="menu"],
-  [role="tooltip"],
-  [data-sidebar="sidebar"],
-  .card,
-  .bg-card,
-  .shadcn-card,
-  .glass-login-card,
-  .bg-popover,
-  .bg-dropdown-menu {
-    backdrop-filter: blur(4px) !important;
-    -webkit-backdrop-filter: blur(4px) !important;
-  }
-  [role="dialog"] * {
-    color: white !important;
+  .neon-text-purple {
+    text-shadow: 0 0 10px rgba(147, 51, 234, 0.5), 0 0 20px rgba(147, 51, 234, 0.3);
   }
 
-  /* Force white text on buttons */
-  button, .button, .bg-primary, .bg-secondary, .bg-destructive {
-    @apply text-white !important;
+  .neon-border-blue {
+    @apply border-primary/40;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
   }
-  
-  /* Primary button override */
-  .bg-primary {
-    @apply bg-primary/30 border-primary/40 !important;
-  }
-
-  /* Specific styles for translucent panels */
-  .panel-translucent {
-    @apply bg-white/10 backdrop-blur-[4px] border border-white/20 rounded-2xl shadow-none;
-  }
-
-  .bg-floating-icons {
-    background-color: var(--background);
-    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 10l5 5m10-5l-5 5m40 20l5 5m10-5l-5 5M80 70l5 5m10-5l-5 5M20 80l5 5m10-5l-5 5' stroke='%2310b981' stroke-width='0.5' fill='none' opacity='0.05'/%3E%3Ccircle cx='50' cy='10' r='2' fill='%2310b981' opacity='0.03'/%3E%3Crect x='85' y='40' width='4' height='4' fill='%2310b981' opacity='0.02'/%3E%3C/svg%3E");
-    background-attachment: fixed;
-    position: relative;
-  }
-
-  .bg-floating-icons::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(circle at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
-    pointer-events: none;
-  }
-
-  .text-neon-green {
-    @apply text-primary;
-    text-shadow: 0 0 20px rgba(16, 185, 129, 0.4);
-  }
-
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .neon-border {
-    @apply border-primary/30;
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), inset 0 0 10px rgba(16, 185, 129, 0.05);
-  }
-
-  .neon-glow-circle {
-    @apply flex items-center justify-center rounded-full bg-black/40 border border-primary/40;
-    box-shadow: 0 0 40px rgba(16, 185, 129, 0.2), inset 0 0 20px rgba(16, 185, 129, 0.1);
-  }
+}
 }
 
 /* Custom Scrollbar */

@@ -42,38 +42,42 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-transparent relative overflow-hidden">
+      {/* Decorative Neon Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
+      
       {/* Hero Section */}
       {step === 1 && (
-        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-          <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-3xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-              <Building2 className="w-10 h-10 text-primary" />
+        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10">
+          <div className="flex justify-center mb-4">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,229,255,0.2)]">
+              <Building2 className="w-10 h-10 text-primary animate-pulse" />
             </div>
           </div>
-          <h1 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter text-white">
-            Evolua sua <span className="text-primary">Gestão</span> com o <span className="text-primary">Vanguard Flow</span>
+          <h1 className="text-5xl md:text-8xl font-black italic uppercase tracking-tighter text-white leading-none">
+            FUTURE OF <span className="text-primary neon-text-blue">MANAGEMENT</span>
           </h1>
-          <p className="text-zinc-400 text-lg md:text-xl max-w-2xl mx-auto font-medium">
-            O sistema integrado definitivo para barbearias, padarias e estabelecimentos multi-serviços.
+          <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
+            Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
-            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-black font-black uppercase italic px-8 h-14 text-lg hover:scale-105 transition-transform shadow-[0_0_20px_rgba(16,185,129,0.3)]">
-              Cadastrar Minha Instituição <ArrowRight className="ml-2 w-5 h-5" />
+          <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
+            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-black font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.4)] border-none">
+              COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-white/10 bg-white/5 text-white font-bold h-14 px-8 hover:bg-white/10">
-              Acessar Painel
+            <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md">
+              ACESSAR PAINEL
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-24">
             {[
-              { icon: ShieldCheck, title: "Segurança Total", desc: "Dados protegidos e biometria nativa" },
-              { icon: Zap, title: "Agilidade", desc: "Fluxo de caixa e comanda digital em segundos" },
-              { icon: CreditCard, title: "Pagamentos", desc: "Integração total com gateways modernos" }
+              { icon: ShieldCheck, title: "CYBER SECURITY", desc: "Arquitetura ultra-protegida para seus dados." },
+              { icon: Zap, title: "INSTANT FLOW", desc: "Fluxo de caixa e comanda digital em tempo real." },
+              { icon: CreditCard, title: "NEO PAYMENTS", desc: "Integração nativa com gateways globais." }
             ].map((feature, i) => (
-              <div key={i} className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm text-left">
-                <feature.icon className="w-8 h-8 text-primary mb-4" />
-                <h3 className="text-white font-black uppercase italic text-sm mb-2">{feature.title}</h3>
-                <p className="text-zinc-500 text-xs leading-relaxed">{feature.desc}</p>
+              <div key={i} className="p-8 rounded-2xl glass-panel text-left hover:border-primary/40 transition-colors group">
+                <feature.icon className="w-10 h-10 text-primary mb-6 group-hover:scale-110 transition-transform" />
+                <h3 className="text-white font-black uppercase italic text-lg mb-3 tracking-tighter">{feature.title}</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed font-medium">{feature.desc}</p>
               </div>
             ))}
           </div>
