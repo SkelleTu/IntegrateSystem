@@ -109,8 +109,8 @@ export default function App() {
             <div className="flex w-full bg-transparent relative z-10 min-h-screen">
               <AppSidebar side="right" />
               <div className="flex-1 flex flex-col min-w-0 bg-transparent min-h-screen">
-                <header className="flex items-center justify-end p-4 bg-transparent shrink-0">
-                  <SidebarTrigger className="text-white hover:text-primary transition-colors bg-white/5 backdrop-blur-md border border-white/10 h-10 w-10">
+                <header className="fixed top-4 left-4 z-[50] pointer-events-none">
+                  <SidebarTrigger className="text-white hover:text-primary transition-colors bg-white/10 backdrop-blur-lg border border-white/20 h-12 w-12 rounded-full shadow-2xl pointer-events-auto">
                     <Menu className="w-6 h-6" />
                   </SidebarTrigger>
                 </header>
