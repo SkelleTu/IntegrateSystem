@@ -29,7 +29,7 @@ export default function TimeClock() {
         const credential = await navigator.credentials.create({
           publicKey: {
             challenge,
-            rp: { name: "Vanguard Flow" },
+            rp: { name: "Aura" },
             user: {
               id: window.crypto.getRandomValues(new Uint8Array(16)),
               name: user?.username || "user",

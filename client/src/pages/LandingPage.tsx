@@ -36,7 +36,7 @@ export default function LandingPage() {
   };
 
   const handlePayment = () => {
-    toast({ title: "Sucesso!", description: "Pagamento processado (Simulação). Bem-vindo ao Vanguard Flow!" });
+    toast({ title: "Sucesso!", description: "Pagamento processado (Simulação). Bem-vindo ao Aura!" });
     setLocation("/login");
   };
 
@@ -55,7 +55,7 @@ export default function LandingPage() {
             </div>
           </div>
           <h1 className="text-5xl md:text-8xl font-black italic uppercase tracking-tighter text-white leading-none">
-            FUTURE OF <span className="text-primary neon-text-blue">MANAGEMENT</span>
+            AURA <span className="text-primary neon-text-blue">SYSTEM</span>
           </h1>
           <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.

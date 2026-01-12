@@ -1,4 +1,4 @@
-# Vanguard Flow
+# Aura
 
 Sistema de gestão para barbearias e estabelecimentos multi-serviços.
 
