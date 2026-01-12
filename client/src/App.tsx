@@ -18,6 +18,7 @@ import Financeiro from "@/pages/Financeiro";
 import Reports from "@/pages/Reports";
 import Inventory from "@/pages/Inventory";
 import ClientCart from "@/pages/ClientCart";
+import TimeClock from "@/pages/TimeClock";
 import NotFound from "@/pages/not-found";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -77,6 +78,9 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/menu" component={DigitalMenu} />
       <Route path="/barber-queue" component={BarberQueue} />
+      <Route path="/ponto">
+        {() => <ProtectedRoute component={TimeClock} />}
+      </Route>
       <Route path="/admin">
         {() => <ProtectedRoute component={Admin} />}
       </Route>
