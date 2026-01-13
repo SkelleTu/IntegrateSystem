@@ -138,20 +138,17 @@ export async function registerRoutes(
   });
 
   // Enterprise Routes
-  app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+  app.get("/api/admin/enterprises", async (req, res) => {
     const list = await storage.getEnterprises();
     res.json(list);
   });
 
-  app.post("/api/admin/enterprises", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+  app.post("/api/admin/enterprises", async (req, res) => {
     try {
       const enterprise = await storage.createEnterprise(req.body);
       res.status(201).json(enterprise);
     } catch (err) {
+      console.error("Erro ao criar empresa:", err);
       res.status(500).json({ message: "Erro ao criar empresa" });
     }
   });
