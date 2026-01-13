@@ -105,16 +105,44 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-24">
             {[
-              { icon: ShieldCheck, title: "CYBER SECURITY", desc: "Arquitetura ultra-protegida para seus dados." },
-              { icon: Zap, title: "INSTANT FLOW", desc: "Fluxo de caixa e comanda digital em tempo real." },
-              { icon: CreditCard, title: "NEO PAYMENTS", desc: "Integração nativa com gateways globais." }
+              { icon: ShieldCheck, title: "CYBER SECURITY", desc: "Arquitetura ultra-protegida com criptografia de ponta a ponta para seus dados institucionais." },
+              { icon: Zap, title: "INSTANT FLOW", desc: "Fluxo de caixa inteligente e comanda digital ultra-veloz em tempo real." },
+              { icon: CreditCard, title: "NEO PAYMENTS", desc: "Integração nativa com gateways globais e conciliação automática." }
             ].map((feature, i) => (
-              <div key={i} className="p-8 rounded-2xl glass-panel text-left hover:border-primary/40 transition-colors group">
-                <feature.icon className="w-10 h-10 text-primary mb-6 group-hover:scale-110 transition-transform" />
+              <div key={i} className="p-8 rounded-2xl glass-panel text-left border border-white/5 hover:border-primary/40 transition-all group relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <ShieldCheck className="w-12 h-12 text-primary" />
+                </div>
+                <feature.icon className="w-10 h-10 text-primary mb-6 group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
                 <h3 className="text-white font-black uppercase italic text-lg mb-3 tracking-tighter">{feature.title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed font-medium">{feature.desc}</p>
               </div>
             ))}
+          </div>
+
+          {/* Benefits Section */}
+          <div className="pt-32 space-y-16">
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl md:text-5xl font-black italic uppercase text-white tracking-tighter">
+                POR QUE ESCOLHER O <span className="text-primary">AURA</span>?
+              </h2>
+              <p className="text-zinc-500 font-bold uppercase text-xs tracking-[0.3em]">O Salto Tecnológico que seu Negócio Merece</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { title: "Gestão Unificada", desc: "Controle financeiro, estoque e equipe em um único terminal centralizado.", color: "text-blue-400" },
+                { title: "Segurança de Dados", desc: "Backup em nuvem militar com redundância global para nunca perder nada.", color: "text-green-400" },
+                { title: "Escalabilidade", desc: "Cresça sem limites. Aura adapta-se de pequenas lojas a grandes redes.", color: "text-purple-400" },
+                { title: "Suporte VIP", desc: "Atendimento técnico prioritário 24/7 para manter sua operação ativa.", color: "text-amber-400" }
+              ].map((benefit, i) => (
+                <div key={i} className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                  <div className={`w-2 h-2 rounded-full ${benefit.color.replace('text', 'bg')} mb-4 shadow-[0_0_10px_currentColor]`} />
+                  <h4 className="text-white font-black uppercase italic text-sm mb-2">{benefit.title}</h4>
+                  <p className="text-zinc-500 text-xs font-medium leading-relaxed">{benefit.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
