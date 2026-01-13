@@ -344,8 +344,8 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   };
 
   return (
-    <Sidebar side={side} className={user.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "z-[100]"}>
-      <SidebarContent className="bg-zinc-950/90 backdrop-blur-xl text-white">
+    <Sidebar side={side} className={user.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}>
+      <SidebarContent className="bg-transparent backdrop-blur-xl text-white">
         <SidebarGroup>
           <SidebarGroupLabel className="text-zinc-500 uppercase font-black italic tracking-widest text-[10px]">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
