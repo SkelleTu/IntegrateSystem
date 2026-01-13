@@ -25,6 +25,7 @@ import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
+import auraLogo from "@assets/AURA_1768346008566.png";
 
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { data: user, isLoading } = useUser();
@@ -122,7 +123,7 @@ export default function App() {
       {/* Floating Mini Logo Overlay */}
       <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
         <img 
-          src="/attached_assets/AURA_1768346008566.png" 
+          src={auraLogo} 
           alt="Aura Logo Overlay" 
           className="w-12 h-auto grayscale brightness-200"
         />

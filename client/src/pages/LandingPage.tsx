@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import auraLogo from "@assets/AURA_1768346008566.png";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -88,7 +89,7 @@ export default function LandingPage() {
             <div className="relative group">
               <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse" />
               <img 
-                src="/attached_assets/AURA_1768346008566.png" 
+                src={auraLogo} 
                 alt="Aura System Logo" 
                 className="w-48 md:w-64 h-auto relative z-10 drop-shadow-[0_0_30px_rgba(0,229,255,0.4)]"
               />
