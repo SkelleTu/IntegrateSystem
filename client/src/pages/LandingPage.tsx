@@ -222,19 +222,19 @@ export default function LandingPage() {
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">Comprovante Residência</label>
                     <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:content-['']" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Frente)</label>
                     <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:content-['']" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Verso)</label>
                     <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:content-['']" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
                     </div>
                   </div>
                 </div>
