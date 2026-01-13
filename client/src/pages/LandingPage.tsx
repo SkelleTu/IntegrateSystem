@@ -144,7 +144,7 @@ export default function LandingPage() {
               <CardTitle className="text-3xl md:text-5xl font-black italic uppercase text-white tracking-tighter drop-shadow-2xl">Cadastro <span className="text-primary">Aura</span></CardTitle>
               <CardDescription className="text-white/40 font-bold uppercase text-[10px] tracking-[0.5em]">Terminal de Registro v2.0</CardDescription>
             </CardHeader>
-            <CardContent className="p-8 md:p-12 pt-0 space-y-6 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
+            <CardContent className="p-8 md:p-12 pt-0 space-y-6 overflow-visible pr-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Nome da Instituição</label>
