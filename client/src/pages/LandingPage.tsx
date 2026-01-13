@@ -61,7 +61,7 @@ export default function LandingPage() {
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.4)] border-none animate-pulse">
+            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none animate-pulse">
               COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md">
