@@ -144,6 +144,13 @@ export type InsertTimeClock = z.infer<typeof insertTimeClockSchema>;
 export const enterprises = pgTable("enterprises", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
+  taxId: text("tax_id"), // CNPJ ou CPF
+  email: text("email"),
+  phone: text("phone"),
+  address: text("address"),
+  addressProofUrl: text("address_proof_url"),
+  rgFrontUrl: text("rg_front_url"),
+  rgBackUrl: text("rg_back_url"),
   slug: text("slug").notNull().unique(), // URL-friendly name
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

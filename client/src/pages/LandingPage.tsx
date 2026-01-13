@@ -14,17 +14,36 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    slug: "",
+    taxId: "",
     email: "",
-    plan: "pro"
+    phone: "",
+    address: "",
+    slug: "",
+    plan: "pro",
+    addressProof: null as File | null,
+    rgFront: null as File | null,
+    rgBack: null as File | null,
+  });
+
+  const [checklist, setChecklist] = useState({
+    name: false,
+    taxId: false,
+    email: false,
+    phone: false,
+    address: false,
+    documents: false,
   });
 
   const handleRegister = async () => {
     setLoading(true);
     try {
-      // Stub de criação de empresa
+      // Simulação de upload e registro
       await apiRequest("POST", "/api/admin/enterprises", {
         name: formData.name,
+        taxId: formData.taxId,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
         slug: formData.slug
       });
       setStep(3); // Vai para o pagamento
@@ -32,6 +51,17 @@ export default function LandingPage() {
       toast({ title: "Erro", description: "Falha ao registrar instituição.", variant: "destructive" });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateChecklist = (field: string, value: any) => {
+    setChecklist(prev => ({ ...prev, [field]: !!value }));
+  };
+
+  const handleFileChange = (field: string, file: File | null) => {
+    setFormData(prev => ({ ...prev, [field]: file }));
+    if (formData.addressProof || formData.rgFront || formData.rgBack) {
+      updateChecklist("documents", true);
     }
   };
 
@@ -48,6 +78,7 @@ export default function LandingPage() {
       
       {/* Hero Section */}
       {step === 1 && (
+        <>
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10">
           <div className="flex justify-center mb-4">
             <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,229,255,0.2)]">
@@ -82,47 +113,163 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
+
+        <footer className="mt-24 w-full max-w-4xl text-center space-y-4 border-t border-white/10 pt-12 relative z-10 pb-12">
+          <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em]">Informações da Empresa</p>
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 text-zinc-400 font-medium">
+            <div className="flex items-center gap-2">
+              <span className="text-primary text-[10px] font-black italic">CPF:</span>
+              <span className="text-sm">465.048.898-21</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-primary text-[10px] font-black italic">SUPORTE:</span>
+              <span className="text-sm">(19) 99723-8298</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-primary text-[10px] font-black italic">AURA SYSTEM © 2026</span>
+            </div>
+          </div>
+        </footer>
+        </>
       )}
 
       {/* Register Step */}
       {step === 2 && (
-        <Card className="w-full max-w-md bg-black/60 backdrop-blur-2xl border-white/10 shadow-2xl animate-in zoom-in-95 duration-500">
-          <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-black italic uppercase text-white tracking-tighter">Nova Instituição</CardTitle>
-            <CardDescription className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Passo 1 de 2: Dados Básicos</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nome da Instituição</label>
-              <Input 
-                placeholder="Ex: Barber Shop Elite"
-                className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value, slug: e.target.value.toLowerCase().replace(/ /g, "-")})}
-              />
+        <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl items-start">
+          <Card className="flex-1 bg-black/60 backdrop-blur-2xl border-white/10 shadow-2xl">
+            <CardHeader>
+              <CardTitle className="text-3xl font-black italic uppercase text-white tracking-tighter">Cadastro Robusto</CardTitle>
+              <CardDescription className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Preencha todos os campos obrigatórios</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nome da Instituição</label>
+                  <Input 
+                    placeholder="Ex: Barber Shop Elite"
+                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    value={formData.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, "-")});
+                      updateChecklist("name", val);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">CNPJ ou CPF</label>
+                  <Input 
+                    placeholder="00.000.000/0000-00"
+                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    value={formData.taxId}
+                    onChange={(e) => {
+                      setFormData({...formData, taxId: e.target.value});
+                      updateChecklist("taxId", e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">E-mail</label>
+                  <Input 
+                    type="email"
+                    placeholder="contato@empresa.com"
+                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    value={formData.email}
+                    onChange={(e) => {
+                      setFormData({...formData, email: e.target.value});
+                      updateChecklist("email", e.target.value);
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Telefone</label>
+                  <Input 
+                    placeholder="(00) 00000-0000"
+                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      setFormData({...formData, phone: e.target.value});
+                      updateChecklist("phone", e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Endereço Completo</label>
+                <Input 
+                  placeholder="Rua, Número, Bairro, Cidade, Estado"
+                  className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                  value={formData.address}
+                  onChange={(e) => {
+                    setFormData({...formData, address: e.target.value});
+                    updateChecklist("address", e.target.value);
+                  }}
+                />
+              </div>
+
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <p className="text-[10px] font-black uppercase text-primary italic">Upload de Documentos (Obrigatório)</p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-zinc-500">Comprovante de Endereço</label>
+                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-zinc-500">RG (Frente)</label>
+                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[8px] font-black uppercase text-zinc-500">RG (Verso)</label>
+                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
+                  </div>
+                </div>
+              </div>
+
+              <Button 
+                className="w-full h-14 bg-primary text-black font-black uppercase italic mt-6"
+                disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
+                onClick={handleRegister}
+              >
+                {loading ? "Verificando Dados..." : "Finalizar Cadastro Passo a Passo"}
+              </Button>
+              <Button variant="ghost" className="w-full text-zinc-500 font-bold uppercase text-[10px]" onClick={() => setStep(1)}>
+                Voltar
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="w-full md:w-80 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl p-6">
+            <CardTitle className="text-xl font-black italic uppercase text-white tracking-tighter mb-6 flex items-center gap-2">
+              <Zap className="w-5 h-5 text-primary" /> Checklist
+            </CardTitle>
+            <div className="space-y-4">
+              {[
+                { label: "Nome da Instituição", checked: checklist.name },
+                { label: "Documento (CPF/CNPJ)", checked: checklist.taxId },
+                { label: "E-mail de Contato", checked: checklist.email },
+                { label: "Telefone de Suporte", checked: checklist.phone },
+                { label: "Endereço Físico", checked: checklist.address },
+                { label: "Upload de Documentos", checked: formData.addressProof && formData.rgFront && formData.rgBack },
+              ].map((item, i) => (
+                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${item.checked ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 border border-white/5'}`}>
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${item.checked ? 'bg-primary border-primary' : 'border-white/20'}`}>
+                    {item.checked && <ShieldCheck className="w-3 h-3 text-black" />}
+                  </div>
+                  <span className={`text-[10px] font-black uppercase tracking-wider ${item.checked ? 'text-primary' : 'text-zinc-500'}`}>{item.label}</span>
+                </div>
+              ))}
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">E-mail Administrativo</label>
-              <Input 
-                type="email"
-                placeholder="admin@suaempresa.com"
-                className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-              />
+            <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10">
+              <p className="text-[9px] font-bold text-zinc-500 leading-relaxed uppercase">
+                O sistema Aura exige verificação completa para garantir a segurança de todos os assinantes.
+              </p>
             </div>
-            <Button 
-              className="w-full h-14 bg-primary text-black font-black uppercase italic mt-4 hover:scale-[1.02] transition-transform"
-              disabled={!formData.name || !formData.email || loading}
-              onClick={handleRegister}
-            >
-              {loading ? "Processando..." : "Prosseguir para Pagamento"}
-            </Button>
-            <Button variant="ghost" className="w-full text-zinc-500 font-bold uppercase text-[10px]" onClick={() => setStep(1)}>
-              Voltar
-            </Button>
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       )}
 
       {/* Payment Step */}
