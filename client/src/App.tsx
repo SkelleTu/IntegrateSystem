@@ -119,7 +119,15 @@ export default function App() {
                 </SidebarProvider>
         </div>
         <Toaster />
-      </TooltipProvider>
+      {/* Floating Mini Logo Overlay */}
+      <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
+        <img 
+          src="/attached_assets/AURA_1768346008566.png" 
+          alt="Aura Logo Overlay" 
+          className="w-12 h-auto grayscale brightness-200"
+        />
+      </div>
+    </TooltipProvider>
     </QueryClientProvider>
   );
 }

@@ -84,14 +84,16 @@ export default function LandingPage() {
       {step === 1 && (
         <>
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10">
-          <div className="flex justify-center mb-4">
-            <div className="w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(0,229,255,0.2)]">
-              <Building2 className="w-10 h-10 text-primary animate-pulse" />
+          <div className="flex justify-center mb-8">
+            <div className="relative group">
+              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse" />
+              <img 
+                src="/attached_assets/AURA_1768346008566.png" 
+                alt="Aura System Logo" 
+                className="w-48 md:w-64 h-auto relative z-10 drop-shadow-[0_0_30px_rgba(0,229,255,0.4)]"
+              />
             </div>
           </div>
-          <h1 className="text-5xl md:text-8xl font-black italic uppercase tracking-tighter text-white leading-none">
-            AURA <span className="text-primary neon-text-blue">SYSTEM</span>
-          </h1>
           <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
