@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard } from "lucide-react";
+import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -135,19 +135,22 @@ export default function LandingPage() {
 
       {/* Register Step */}
       {step === 2 && (
-        <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl items-start">
-          <Card className="flex-1 bg-black/60 backdrop-blur-2xl border-white/10 shadow-2xl">
-            <CardHeader>
-              <CardTitle className="text-3xl font-black italic uppercase text-white tracking-tighter">Cadastro Robusto</CardTitle>
-              <CardDescription className="text-zinc-500 font-bold uppercase text-[10px] tracking-widest">Preencha todos os campos obrigatórios</CardDescription>
+        <div className="flex flex-col md:flex-row gap-8 w-full max-w-5xl items-start relative z-10 animate-in fade-in zoom-in-95 duration-500">
+          <Card className="flex-1 bg-white/20 backdrop-blur-[40px] border-white/20 rounded-[2.5rem] md:rounded-[4rem] shadow-none overflow-hidden text-white relative group">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.05] via-transparent to-transparent pointer-events-none" />
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+            
+            <CardHeader className="p-8 md:p-12 pb-4">
+              <CardTitle className="text-3xl md:text-5xl font-black italic uppercase text-white tracking-tighter drop-shadow-2xl">Cadastro <span className="text-primary">Aura</span></CardTitle>
+              <CardDescription className="text-white/40 font-bold uppercase text-[10px] tracking-[0.5em]">Terminal de Registro v2.0</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Nome da Instituição</label>
+            <CardContent className="p-8 md:p-12 pt-0 space-y-6 max-h-[70vh] overflow-y-auto pr-4 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Nome da Instituição</label>
                   <Input 
-                    placeholder="Ex: Barber Shop Elite"
-                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    placeholder="IDENTIFICAÇÃO"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.name}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -156,11 +159,11 @@ export default function LandingPage() {
                     }}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">CNPJ ou CPF</label>
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Documento (CNPJ/CPF)</label>
                   <Input 
                     placeholder="00.000.000/0000-00"
-                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.taxId}
                     onChange={(e) => {
                       setFormData({...formData, taxId: e.target.value});
@@ -170,13 +173,13 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">E-mail</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">E-mail</label>
                   <Input 
                     type="email"
-                    placeholder="contato@empresa.com"
-                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    placeholder="ADMIN@EMPRESA.COM"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.email}
                     onChange={(e) => {
                       setFormData({...formData, email: e.target.value});
@@ -184,11 +187,11 @@ export default function LandingPage() {
                     }}
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Telefone</label>
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Telefone</label>
                   <Input 
                     placeholder="(00) 00000-0000"
-                    className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.phone}
                     onChange={(e) => {
                       setFormData({...formData, phone: e.target.value});
@@ -198,11 +201,11 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase text-zinc-500 ml-1">Endereço Completo</label>
+              <div className="space-y-3">
+                <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Endereço Completo</label>
                 <Input 
-                  placeholder="Rua, Número, Bairro, Cidade, Estado"
-                  className="h-12 bg-white/5 border-white/10 focus:border-primary text-white font-bold"
+                  placeholder="LOCALIZAÇÃO FÍSICA"
+                  className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                   value={formData.address}
                   onChange={(e) => {
                     setFormData({...formData, address: e.target.value});
@@ -211,61 +214,73 @@ export default function LandingPage() {
                 />
               </div>
 
-              <div className="space-y-4 pt-4 border-t border-white/5">
-                <p className="text-[10px] font-black uppercase text-primary italic">Upload de Documentos (Obrigatório)</p>
+              <div className="space-y-6 pt-6 border-t border-white/10">
+                <p className="text-[10px] font-black uppercase text-primary italic tracking-[0.2em] pl-2 flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4" /> Verificação de Documentos
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-zinc-500">Comprovante de Endereço</label>
-                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
+                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">Comprovante Residência</label>
+                    <div className="relative group/file">
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-zinc-500">RG (Frente)</label>
-                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
+                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Frente)</label>
+                    <div className="relative group/file">
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-zinc-500">RG (Verso)</label>
-                    <Input type="file" className="h-10 bg-white/5 border-white/10 text-[10px]" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
+                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Verso)</label>
+                    <div className="relative group/file">
+                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <Button 
-                className="w-full h-14 bg-primary text-black font-black uppercase italic mt-6"
-                disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
-                onClick={handleRegister}
-              >
-                {loading ? "Verificando Dados..." : "Finalizar Cadastro Passo a Passo"}
-              </Button>
-              <Button variant="ghost" className="w-full text-zinc-500 font-bold uppercase text-[10px]" onClick={() => setStep(1)}>
-                Voltar
-              </Button>
+              <div className="pt-6 space-y-4">
+                <Button 
+                  className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
+                  disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
+                  onClick={handleRegister}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                  {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : "FINALIZAR CADASTRO"}
+                </Button>
+                <Button variant="ghost" className="w-full text-white/40 hover:text-white font-bold uppercase text-[10px] tracking-widest" onClick={() => setStep(1)}>
+                  <ArrowLeft className="w-4 h-4 mr-2" /> Cancelar Operação
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="w-full md:w-80 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl p-6">
-            <CardTitle className="text-xl font-black italic uppercase text-white tracking-tighter mb-6 flex items-center gap-2">
-              <Zap className="w-5 h-5 text-primary" /> Checklist
+          <Card className="w-full md:w-80 bg-white/10 backdrop-blur-3xl border-white/10 rounded-[2rem] p-8 shadow-none text-white animate-in slide-in-from-right-8 duration-700">
+            <CardTitle className="text-xl font-black italic uppercase text-white tracking-tighter mb-8 flex items-center gap-3">
+              <Zap className="w-5 h-5 text-primary drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> CHECKLIST
             </CardTitle>
             <div className="space-y-4">
               {[
-                { label: "Nome da Instituição", checked: checklist.name },
-                { label: "Documento (CPF/CNPJ)", checked: checklist.taxId },
-                { label: "E-mail de Contato", checked: checklist.email },
-                { label: "Telefone de Suporte", checked: checklist.phone },
-                { label: "Endereço Físico", checked: checklist.address },
-                { label: "Upload de Documentos", checked: formData.addressProof && formData.rgFront && formData.rgBack },
+                { label: "IDENTIFICAÇÃO", checked: checklist.name },
+                { label: "DOCUMENTAÇÃO", checked: checklist.taxId },
+                { label: "CONTATO DIGITAL", checked: checklist.email },
+                { label: "CONECTIVIDADE", checked: checklist.phone },
+                { label: "LOGRADOURO", checked: checklist.address },
+                { label: "VERIFICAÇÃO ARQUIVOS", checked: formData.addressProof && formData.rgFront && formData.rgBack },
               ].map((item, i) => (
-                <div key={i} className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${item.checked ? 'bg-primary/20 border border-primary/30' : 'bg-white/5 border border-white/5'}`}>
-                  <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${item.checked ? 'bg-primary border-primary' : 'border-white/20'}`}>
-                    {item.checked && <ShieldCheck className="w-3 h-3 text-black" />}
+                <div key={i} className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-500 border ${item.checked ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-white/5'}`}>
+                  <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all duration-500 ${item.checked ? 'bg-primary border-primary scale-110' : 'border-white/10'}`}>
+                    {item.checked && <ShieldCheck className="w-4 h-4 text-white" />}
                   </div>
-                  <span className={`text-[10px] font-black uppercase tracking-wider ${item.checked ? 'text-primary' : 'text-zinc-500'}`}>{item.label}</span>
+                  <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${item.checked ? 'text-primary' : 'text-white/30'}`}>{item.label}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-8 p-4 rounded-xl bg-white/5 border border-white/10">
-              <p className="text-[9px] font-bold text-zinc-500 leading-relaxed uppercase">
-                O sistema Aura exige verificação completa para garantir a segurança de todos os assinantes.
+            <div className="mt-12 p-6 rounded-2xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+              <p className="text-[9px] font-bold text-white/50 leading-relaxed uppercase tracking-wider relative z-10">
+                A Aura utiliza criptografia de ponta a ponta para proteger seus documentos e dados institucionais.
               </p>
             </div>
           </Card>
