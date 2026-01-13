@@ -19,7 +19,7 @@ export default function Login() {
     setError("");
     try {
       await login.mutateAsync({ username, password });
-      setLocation("/");
+      setLocation("/app");
     } catch (err: any) {
       setError("Credenciais inválidas. Tente novamente.");
     }
