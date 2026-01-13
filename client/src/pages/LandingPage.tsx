@@ -224,7 +224,7 @@ export default function LandingPage() {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">Comprovante Residência</label>
+                    <label className="text-[10px] font-black uppercase text-white/60 pl-2 tracking-wider">Comprovante de Residência</label>
                     <input
                       type="file"
                       id="addressProof"
@@ -241,7 +241,7 @@ export default function LandingPage() {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Frente)</label>
+                    <label className="text-[10px] font-black uppercase text-white/60 pl-2 tracking-wider">RG (Frente)</label>
                     <input
                       type="file"
                       id="rgFront"
@@ -258,7 +258,7 @@ export default function LandingPage() {
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Verso)</label>
+                    <label className="text-[10px] font-black uppercase text-white/60 pl-2 tracking-wider">RG (Verso)</label>
                     <input
                       type="file"
                       id="rgBack"
