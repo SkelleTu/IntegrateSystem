@@ -25,6 +25,10 @@ export default function LandingPage() {
     rgBack: null as File | null,
   });
 
+  const handleFileClick = (id: string) => {
+    document.getElementById(id)?.click();
+  };
+
   const [checklist, setChecklist] = useState({
     name: false,
     taxId: false,
@@ -221,21 +225,54 @@ export default function LandingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">Comprovante Residência</label>
-                    <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)} />
-                    </div>
+                    <input
+                      type="file"
+                      id="addressProof"
+                      className="hidden"
+                      onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-12 bg-white/10 border-white/20 hover:bg-primary/20 hover:border-primary/50 text-white font-bold text-[10px] rounded-xl flex items-center justify-center gap-2 transition-all"
+                      onClick={() => handleFileClick("addressProof")}
+                    >
+                      {formData.addressProof ? "ARQUIVO SELECIONADO" : "ENVIAR COMPROVANTE"}
+                    </Button>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Frente)</label>
-                    <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)} />
-                    </div>
+                    <input
+                      type="file"
+                      id="rgFront"
+                      className="hidden"
+                      onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-12 bg-white/10 border-white/20 hover:bg-primary/20 hover:border-primary/50 text-white font-bold text-[10px] rounded-xl flex items-center justify-center gap-2 transition-all"
+                      onClick={() => handleFileClick("rgFront")}
+                    >
+                      {formData.rgFront ? "ARQUIVO SELECIONADO" : "ENVIAR RG FRENTE"}
+                    </Button>
                   </div>
                   <div className="space-y-2">
                     <label className="text-[8px] font-black uppercase text-white/40 pl-2">RG (Verso)</label>
-                    <div className="relative group/file">
-                      <Input type="file" className="bg-white/10 border-white/20 h-12 rounded-xl text-[10px] file:bg-primary file:text-white file:border-none file:h-full file:px-4 cursor-pointer file:text-transparent" onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)} />
-                    </div>
+                    <input
+                      type="file"
+                      id="rgBack"
+                      className="hidden"
+                      onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-12 bg-white/10 border-white/20 hover:bg-primary/20 hover:border-primary/50 text-white font-bold text-[10px] rounded-xl flex items-center justify-center gap-2 transition-all"
+                      onClick={() => handleFileClick("rgBack")}
+                    >
+                      {formData.rgBack ? "ARQUIVO SELECIONADO" : "ENVIAR RG VERSO"}
+                    </Button>
                   </div>
                 </div>
               </div>
