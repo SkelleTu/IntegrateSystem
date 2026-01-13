@@ -6,7 +6,8 @@ import {
   SidebarGroupLabel, 
   SidebarMenu, 
   SidebarMenuButton, 
-  SidebarMenuItem 
+  SidebarMenuItem,
+  useSidebar
 } from "@/components/ui/sidebar"
 import { 
   Home, 
@@ -42,6 +43,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const [, setLocation] = useLocation();
   const { data: user } = useUser();
   const { toast } = useToast();
+  const { setOpen } = useSidebar();
   const [registerOpen, setRegisterOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -332,7 +334,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   if (!user) return null;
 
   const handleNav = (url: string, adminOnly?: boolean) => {
-    if (adminOnly && user.role !== "admin") {
+    if (adminOnly && user?.role !== "admin") {
       toast({
         title: "Acesso Negado",
         description: "Somente o administrador pode acessar esta área.",
@@ -341,10 +343,13 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       return;
     }
     setLocation(url);
+    if (window.innerWidth < 768) {
+      setOpen(false);
+    }
   };
 
   return (
-    <Sidebar side={side} className={user.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}>
+    <Sidebar side={side} collapsible="icon" className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}>
       <SidebarContent className="bg-transparent backdrop-blur-xl text-white">
         <SidebarGroup>
           <SidebarGroupLabel className="text-zinc-500 uppercase font-black italic tracking-widest text-[10px]">Menu Principal</SidebarGroupLabel>
