@@ -100,7 +100,7 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest hover:scale-105 transition-all" onClick={() => setLocation("/login")}>Entrar</Button>
-          <Button className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)]" onClick={() => setStep(2)}>Assinar</Button>
+          <Button className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)]" onClick={() => setStep(2)}>Assinar</Button>
         </div>
       </nav>
 
@@ -125,7 +125,7 @@ export default function LandingPage() {
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
+            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
               COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md hover:scale-105 transition-all">
@@ -143,7 +143,7 @@ export default function LandingPage() {
                   <ShieldCheck className="w-12 h-12 text-primary" />
                 </div>
                 <feature.icon className="w-10 h-10 text-primary mb-6 group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
-                <h3 className="text-white font-black uppercase italic text-lg mb-3 tracking-tighter">{feature.title}</h3>
+                <h3 className="text-white font-black uppercase text-lg mb-3 tracking-tighter">{feature.title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed font-medium">{feature.desc}</p>
               </div>
             ))}
@@ -152,7 +152,7 @@ export default function LandingPage() {
           {/* Benefits Section */}
           <div className="pt-32 space-y-16">
             <div className="text-center space-y-4">
-              <h2 className="text-3xl md:text-5xl font-black italic uppercase text-white tracking-tighter">
+              <h2 className="text-3xl md:text-5xl font-black uppercase text-white tracking-tighter">
                 POR QUE ESCOLHER O <span className="text-primary">AURA</span>?
               </h2>
               <p className="text-zinc-500 font-bold uppercase text-xs tracking-[0.3em]">O Salto Tecnológico que seu Negócio Merece</p>
@@ -167,7 +167,7 @@ export default function LandingPage() {
               ].map((benefit, i) => (
                 <div key={i} className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
                   <div className={`w-2 h-2 rounded-full ${benefit.color.replace('text', 'bg')} mb-4 shadow-[0_0_10px_currentColor]`} />
-                  <h4 className="text-white font-black uppercase italic text-sm mb-2">{benefit.title}</h4>
+                  <h4 className="text-white font-black uppercase text-sm mb-2">{benefit.title}</h4>
                   <p className="text-zinc-500 text-xs font-medium leading-relaxed">{benefit.desc}</p>
                 </div>
               ))}
@@ -179,15 +179,15 @@ export default function LandingPage() {
           <p className="text-zinc-500 font-bold uppercase text-[10px] tracking-[0.3em]">Informações da Empresa</p>
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 text-zinc-400 font-medium">
             <div className="flex items-center gap-2">
-              <span className="text-primary text-[10px] font-black italic">CPF:</span>
+              <span className="text-primary text-[10px] font-black">CPF:</span>
               <span className="text-sm">465.048.898-21</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-primary text-[10px] font-black italic">SUPORTE:</span>
+              <span className="text-primary text-[10px] font-black">SUPORTE:</span>
               <span className="text-sm">(19) 99723-8298</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-primary text-[10px] font-black italic">AURA SYSTEM © 2026</span>
+              <span className="text-primary text-[10px] font-black">AURA SYSTEM © 2026</span>
             </div>
           </div>
         </footer>
@@ -202,7 +202,7 @@ export default function LandingPage() {
             <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
             
             <CardHeader className="p-8 md:p-12 pb-4">
-              <CardTitle className="text-3xl md:text-5xl font-black italic uppercase text-white tracking-tighter drop-shadow-2xl">Cadastro <span className="text-primary">Aura</span></CardTitle>
+              <CardTitle className="text-3xl md:text-5xl font-black uppercase text-white tracking-tighter drop-shadow-2xl">Cadastro <span className="text-primary">Aura</span></CardTitle>
               <CardDescription className="text-white/40 font-bold uppercase text-[10px] tracking-[0.5em]">Terminal de Registro v2.0</CardDescription>
             </CardHeader>
             <CardContent className="p-8 md:p-12 pt-0 space-y-6 overflow-visible pr-4">
@@ -276,7 +276,7 @@ export default function LandingPage() {
               </div>
 
               <div className="space-y-6 pt-6 border-t border-white/10">
-                <p className="text-[10px] font-black uppercase text-primary italic tracking-[0.2em] pl-2 flex items-center gap-2">
+                <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] pl-2 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4" /> Verificação de Documentos
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -336,7 +336,7 @@ export default function LandingPage() {
 
               <div className="pt-6 space-y-4">
                 <Button 
-                  className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
+                  className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
                   disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
                   onClick={handleRegister}
                 >
@@ -351,7 +351,7 @@ export default function LandingPage() {
           </Card>
 
           <Card className="w-full md:w-80 bg-white/10 backdrop-blur-3xl border-white/10 rounded-[2rem] p-8 shadow-none text-white animate-in slide-in-from-right-8 duration-700">
-            <CardTitle className="text-xl font-black italic uppercase text-white tracking-tighter mb-8 flex items-center gap-3">
+            <CardTitle className="text-xl font-black uppercase text-white tracking-tighter mb-8 flex items-center gap-3">
               <Zap className="w-5 h-5 text-primary drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]" /> CHECKLIST
             </CardTitle>
             <div className="space-y-4">
@@ -385,13 +385,13 @@ export default function LandingPage() {
       {step === 3 && (
         <Card className="w-full max-w-md bg-black/60 backdrop-blur-2xl border-white/10 shadow-2xl animate-in zoom-in-95 duration-500">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-black italic uppercase text-white tracking-tighter">Plano Pro</CardTitle>
+            <CardTitle className="text-3xl font-black uppercase text-white tracking-tighter">Plano Pro</CardTitle>
             <CardDescription className="text-primary font-black uppercase text-[10px] tracking-widest">Gateway de Pagamento Integrado</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="p-6 rounded-2xl bg-primary/10 border border-primary/20 text-center">
               <p className="text-zinc-400 text-xs uppercase font-bold mb-1">Total a Pagar</p>
-              <p className="text-4xl font-black text-white italic tracking-tighter">R$ 149,90<span className="text-sm font-normal text-zinc-500 ml-1">/mês</span></p>
+              <p className="text-4xl font-black text-white tracking-tighter">R$ 149,90<span className="text-sm font-normal text-zinc-500 ml-1">/mês</span></p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Button variant="outline" className="h-20 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/40 group">

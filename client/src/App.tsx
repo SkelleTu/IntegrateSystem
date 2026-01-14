@@ -132,7 +132,7 @@ function LandingNavigation() {
       </div>
       <div className="flex items-center gap-4">
         <a href="/login" className="text-white font-bold text-xs uppercase tracking-widest hover:text-primary transition-colors">Entrar</a>
-        <a href="/register" className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)]">Assinar</a>
+        <a href="/register" className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)]">Assinar</a>
       </div>
     </nav>
   );

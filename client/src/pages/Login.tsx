@@ -67,7 +67,7 @@ export default function Login() {
                 >
                   <ShieldCheck className="w-10 h-10 md:w-12 md:h-12 text-primary" />
                 </motion.div>
-                <h1 className="text-4xl md:text-6xl font-black italic text-white tracking-tighter uppercase leading-none mb-3 drop-shadow-2xl">
+                <h1 className="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase leading-none mb-3 drop-shadow-2xl">
                   OWNER<span className="text-primary drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]">ACCESS</span>
                 </h1>
                 <div className="flex items-center gap-3">
@@ -124,7 +124,7 @@ export default function Login() {
                 <Button 
                   type="submit" 
                   disabled={login.isPending}
-                  className="w-full h-14 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
+                  className="w-full h-14 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                   {login.isPending ? <Loader2 className="h-8 w-8 animate-spin" /> : (

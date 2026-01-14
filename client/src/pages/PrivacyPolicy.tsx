@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
     <div className="min-h-screen w-full bg-black text-white pt-32 pb-20">
       <div className="max-w-4xl mx-auto px-6">
         <div className="text-center mb-20 space-y-6">
-          <h1 className="text-4xl md:text-7xl font-black italic uppercase tracking-tighter">
+          <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">
             Política de <span className="text-primary">Privacidade</span>
           </h1>
           <p className="text-zinc-500 text-lg font-medium">Transparência total e segurança inabalável para sua instituição.</p>
@@ -41,7 +41,7 @@ export default function PrivacyPolicy() {
                 <s.icon className="w-8 h-8 text-primary" />
               </div>
               <div className="space-y-4">
-                <h2 className="text-2xl font-black uppercase italic text-primary">{s.title}</h2>
+                <h2 className="text-2xl font-black uppercase text-primary">{s.title}</h2>
                 <p className="text-zinc-400 leading-relaxed font-medium">{s.content}</p>
               </div>
             </div>

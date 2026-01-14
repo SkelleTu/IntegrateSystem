@@ -18,7 +18,7 @@ export default function AboutUs() {
           <div className="flex justify-center mb-8">
             <img src={auraLogo} alt="Aura Logo" className="w-32 md:w-48 h-auto drop-shadow-[0_0_30px_rgba(0,229,255,0.4)]" />
           </div>
-          <h1 className="text-4xl md:text-7xl font-black italic uppercase tracking-tighter leading-none">
+          <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
             A Revolução na <span className="text-primary">Gestão de Luxo</span>
           </h1>
           <p className="text-zinc-400 text-lg md:text-xl font-medium leading-relaxed">
@@ -47,7 +47,7 @@ export default function AboutUs() {
           ].map((item, i) => (
             <div key={i} className="p-8 rounded-3xl bg-white/5 border border-white/10 hover:border-primary/40 transition-all group">
               <item.icon className="w-12 h-12 text-primary mb-6 group-hover:scale-110 transition-transform" />
-              <h3 className="text-xl font-black uppercase italic mb-4">{item.title}</h3>
+              <h3 className="text-xl font-black uppercase mb-4">{item.title}</h3>
               <p className="text-zinc-500 text-sm leading-relaxed">{item.desc}</p>
             </div>
           ))}
@@ -56,7 +56,7 @@ export default function AboutUs() {
         {/* Story Section */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center border-t border-white/10 pt-24">
           <div className="space-y-6">
-            <h2 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter">Nossa <span className="text-primary">História</span></h2>
+            <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter">Nossa <span className="text-primary">História</span></h2>
             <div className="space-y-4 text-zinc-400 font-medium text-lg leading-relaxed">
               <p>
                 O Aura surgiu em 2024, no coração tecnológico do Brasil, com uma missão clara: transformar a gestão de serviços em uma forma de arte.
@@ -75,11 +75,11 @@ export default function AboutUs() {
                 <ShieldCheck className="w-24 h-24 text-primary opacity-20 absolute top-4 right-4" />
                 <div className="space-y-8">
                   <div className="flex items-center gap-4">
-                    <div className="text-4xl font-black text-primary italic">99.9%</div>
+                    <div className="text-4xl font-black text-primary">99.9%</div>
                     <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">Uptime<br/>Garantido</div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <div className="text-4xl font-black text-primary italic">100%</div>
+                    <div className="text-4xl font-black text-primary">100%</div>
                     <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">Segurança<br/>Criptografada</div>
                   </div>
                 </div>
@@ -89,8 +89,8 @@ export default function AboutUs() {
 
         {/* CTA */}
         <section className="text-center pt-24 pb-12">
-          <h2 className="text-2xl md:text-4xl font-black italic uppercase mb-8">Pronto para fazer parte da elite?</h2>
-          <a href="/register" className="inline-flex items-center gap-3 bg-primary text-white font-black italic uppercase px-12 h-20 text-xl rounded-2xl hover:scale-105 transition-transform shadow-[0_0_50px_rgba(0,229,255,0.3)]">
+          <h2 className="text-2xl md:text-4xl font-black uppercase mb-8">Pronto para fazer parte da elite?</h2>
+          <a href="/register" className="inline-flex items-center gap-3 bg-primary text-white font-black uppercase px-12 h-20 text-xl rounded-2xl hover:scale-105 transition-transform shadow-[0_0_50px_rgba(0,229,255,0.3)]">
             Assinar Agora <Award className="w-6 h-6" />
           </a>
         </section>
@@ -101,7 +101,7 @@ export default function AboutUs() {
         <div className="max-w-6xl mx-auto flex flex-col items-center gap-12">
           <div className="flex flex-col items-center gap-4 group transition-all">
             <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]" />
-            <span className="font-black italic text-sm tracking-widest text-zinc-500 uppercase">Aura System © 2026</span>
+            <span className="font-black text-sm tracking-widest text-zinc-500 uppercase">Aura System © 2026</span>
           </div>
           
           <div className="flex flex-wrap justify-center gap-12">
