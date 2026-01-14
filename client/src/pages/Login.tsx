@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
+import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
+
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -26,10 +28,17 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-transparent p-4 sm:p-6 lg:p-12 relative overflow-hidden font-body">
+    <div className="min-h-screen flex items-center justify-center bg-black p-4 sm:p-6 lg:p-12 relative overflow-hidden font-body">
+      {/* Background Image with Overlay */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
+
       {/* Dynamic Background Highlights */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
       
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
