@@ -165,6 +165,7 @@ function LandingNavigation() {
 
         {/* Mobile Menu */}
         <div className="md:hidden flex items-center gap-3">
+          <a href="/login" className="text-white font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors">Entrar</a>
           <a href="/register" className="bg-primary text-white font-black text-[10px] uppercase tracking-widest px-4 py-2 rounded-md shadow-[0_0_15px_rgba(0,229,255,0.3)]">Assinar</a>
           
           <Sheet>
