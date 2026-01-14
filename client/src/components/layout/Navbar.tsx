@@ -38,10 +38,10 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-[100] w-full bg-black/60 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 h-20 flex items-center justify-between">
       <div className="flex items-center gap-8">
-        <Link href="/app" className="flex items-center gap-3 group">
+        <Link href="/app" className="flex items-center gap-2 pl-10 -mt-3 group">
           <div className="relative">
             <div className="absolute -inset-2 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img src={auraLogo} alt="Aura Logo" className="w-10 h-auto relative z-10" />
+            <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto relative z-10" />
           </div>
           <span className="text-white font-black italic uppercase tracking-tighter hidden md:block">Aura <span className="text-primary">System</span></span>
         </Link>
