@@ -59,6 +59,8 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
   return <Component {...rest} />;
 }
 
+import MasterControl from "@/pages/MasterControl";
+
 function Router() {
   const { data: user, isLoading } = useUser();
   const [, setLocation] = useLocation();
@@ -105,6 +107,10 @@ function Router() {
         {() => <ProtectedRoute component={Inventory} />}
       </Route>
       <Route path="/cart" component={ClientCart} />
+      
+      <Route path="/admin/master">
+        {() => <ProtectedRoute component={MasterControl} />}
+      </Route>
       
       <Route component={NotFound} />
     </Switch>

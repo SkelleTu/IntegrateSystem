@@ -3,6 +3,7 @@ import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, settings, enterprises, timeClock,
+  userSessions,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -18,7 +19,8 @@ import {
   type InventoryLog, type InsertInventoryLog,
   type Settings,
   type Enterprise, type InsertEnterprise,
-  type TimeClock, type InsertTimeClock
+  type TimeClock, type InsertTimeClock,
+  type UserSession
 } from "@shared/schema";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
@@ -90,6 +92,13 @@ export interface IStorage {
   // Settings
   getSettings(enterpriseId?: number): Promise<Settings>;
   updateSettings(update: Partial<Settings>): Promise<Settings>;
+  
+  // User Sessions
+  logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession>;
+  getAdminMonitoringData(): Promise<{ 
+    sessions: (UserSession & { username: string })[], 
+    enterprises: Enterprise[] 
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -385,6 +394,31 @@ export class DatabaseStorage implements IStorage {
       .where(eq(settings.id, current.id))
       .returning();
     return updated;
+  }
+
+  async logUserSession(data: any): Promise<UserSession> {
+    const [session] = await db.insert(userSessions).values(data).returning();
+    return session;
+  }
+
+  async getAdminMonitoringData(): Promise<any> {
+    const sessionsList = await db.select({
+      id: userSessions.id,
+      userId: userSessions.userId,
+      username: users.username,
+      type: userSessions.type,
+      ipAddress: userSessions.ipAddress,
+      userAgent: userSessions.userAgent,
+      createdAt: userSessions.createdAt,
+    })
+    .from(userSessions)
+    .innerJoin(users, eq(userSessions.userId, users.id))
+    .orderBy(desc(userSessions.createdAt))
+    .limit(100);
+
+    const enterprisesList = await db.select().from(enterprises).orderBy(desc(enterprises.createdAt));
+
+    return { sessions: sessionsList, enterprises: enterprisesList };
   }
 }
 

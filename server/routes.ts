@@ -98,11 +98,27 @@ export async function registerRoutes(
   });
 
   // Auth Routes
-  app.post(api.auth.login.path, passport.authenticate("local"), (req, res) => {
+  app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
+    const user = req.user as any;
+    await storage.logUserSession({
+      userId: user.id,
+      type: "login",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
     res.json(req.user);
   });
 
-  app.post(api.auth.logout.path, (req, res) => {
+  app.post(api.auth.logout.path, async (req, res) => {
+    const user = req.user as any;
+    if (user) {
+      await storage.logUserSession({
+        userId: user.id,
+        type: "logout",
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      });
+    }
     req.logout((err) => {
       if (err) return res.status(500).json({ message: "Logout failed" });
       res.json({ message: "Logout successful" });
@@ -114,11 +130,11 @@ export async function registerRoutes(
     res.json(req.user);
   });
 
-  app.get("/api/admin/users", isAuthenticated, async (req, res) => {
+  app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const usersList = await storage.getUsers();
-    res.json(usersList);
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    const data = await storage.getAdminMonitoringData();
+    res.json(data);
   });
 
   app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
