@@ -10,9 +10,9 @@ import auraLogo from "@assets/AURA_1768346008566.png";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 export default function LandingPage() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { toast } = useToast();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(location === "/register" ? 2 : 1);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
