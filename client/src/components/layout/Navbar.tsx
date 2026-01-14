@@ -10,8 +10,17 @@ import {
   Search, 
   ShoppingCart,
   Fingerprint,
-  User
+  User,
+  ShieldAlert
 } from "lucide-react";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import auraLogo from "@assets/AURA_1768346008566.png";
 
@@ -62,25 +71,42 @@ export function Navbar() {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/5">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-            <User className="w-4 h-4 text-primary" />
-          </div>
-          <div className="hidden sm:block">
-            <p className="text-[10px] font-black text-white leading-none uppercase italic">{user.username}</p>
-            <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{user.role}</p>
-          </div>
-        </div>
-        
-        <Button 
-          variant="outline" 
-          size="icon"
-          className="border-red-500/20 bg-red-500/5 hover:bg-red-500 hover:text-white text-red-500 transition-all rounded-full h-10 w-10"
-          onClick={() => logout.mutate()}
-          disabled={logout.isPending}
-        >
-          <LogOut className="w-4 h-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-all">
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                <User className="w-4 h-4 text-primary" />
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-[10px] font-black text-white leading-none uppercase italic">{user.username}</p>
+                <p className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest">{user.role}</p>
+              </div>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white" align="end">
+            <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Minha Conta</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/5" />
+            {user.username === "SkelleTu" && (
+              <>
+                <DropdownMenuItem 
+                  className="cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors py-3"
+                  onClick={() => setLocation("/admin/master")}
+                >
+                  <ShieldAlert className="mr-2 h-4 w-4" />
+                  <span className="font-bold uppercase italic text-[10px] tracking-widest">Controle Mestre</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
+              </>
+            )}
+            <DropdownMenuItem 
+              className="cursor-pointer text-red-500 hover:bg-red-500/10 transition-colors py-3"
+              onClick={() => logout.mutate()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span className="font-bold uppercase italic text-[10px] tracking-widest">Sair do Sistema</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </nav>
   );

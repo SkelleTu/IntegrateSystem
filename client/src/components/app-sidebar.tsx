@@ -329,7 +329,6 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
     { title: "Barbearia", url: "/barber", icon: Scissors },
-    { title: "Controle Mestre", url: "/admin/master", icon: ShieldAlert },
   ]
 
   if (!user) return null;
@@ -357,9 +356,6 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isOwnerItem = item.title === "Controle Mestre";
-                if (isOwnerItem && user.username !== "SkelleTu") return null;
-                
                 const isLocked = item.adminOnly && user.role !== "admin";
                 
                 return (
