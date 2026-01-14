@@ -59,7 +59,7 @@ function ProtectedRoute({ component: Component, ...rest }: any) {
   return <Component {...rest} />;
 }
 
-import MasterControl from "@/pages/MasterControl";
+import MasterControl from "./pages/MasterControl";
 
 function Router() {
   const { data: user, isLoading } = useUser();
