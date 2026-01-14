@@ -175,6 +175,12 @@ export async function registerRoutes(
     try {
       const { name, slug, username, password } = req.body;
       
+      console.log("Recebendo dados para registro de instituição:", { name, slug, username, hasPassword: !!password });
+
+      if (!password) {
+        return res.status(400).json({ message: "A senha é obrigatória." });
+      }
+      
       // Validação básica do slug se não for enviado
       const finalSlug = slug || name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
       

@@ -21,6 +21,8 @@ export default function LandingPage() {
     phone: "",
     address: "",
     slug: "",
+    username: "",
+    password: "",
     plan: "pro",
     addressProof: null as File | null,
     rgFront: null as File | null,
@@ -37,24 +39,27 @@ export default function LandingPage() {
     email: false,
     phone: false,
     address: false,
+    username: false,
+    password: false,
     documents: false,
   });
 
   const handleRegister = async () => {
     setLoading(true);
     try {
-      // Simulação de upload e registro
       await apiRequest("POST", "/api/admin/enterprises", {
         name: formData.name,
         taxId: formData.taxId,
         email: formData.email,
         phone: formData.phone,
         address: formData.address,
-        slug: formData.slug
+        slug: formData.slug,
+        username: formData.username,
+        password: formData.password
       });
       setStep(3); // Vai para o pagamento
     } catch (err) {
-      toast({ title: "Erro", description: "Falha ao registrar instituição.", variant: "destructive" });
+      toast({ title: "Erro", description: "Falha ao registrar instituição. Verifique se o usuário já existe.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -275,6 +280,34 @@ export default function LandingPage() {
                 />
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Login de Usuário</label>
+                  <Input 
+                    placeholder="USUARIO_ADM"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
+                    value={formData.username}
+                    onChange={(e) => {
+                      setFormData({...formData, username: e.target.value});
+                      updateChecklist("username", e.target.value);
+                    }}
+                  />
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Senha de Acesso</label>
+                  <Input 
+                    type="password"
+                    placeholder="********"
+                    className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
+                    value={formData.password}
+                    onChange={(e) => {
+                      setFormData({...formData, password: e.target.value});
+                      updateChecklist("password", e.target.value);
+                    }}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-6 pt-6 border-t border-white/10">
                 <p className="text-[10px] font-black uppercase text-primary tracking-[0.2em] pl-2 flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4" /> Verificação de Documentos
@@ -337,7 +370,7 @@ export default function LandingPage() {
               <div className="pt-6 space-y-4">
                 <Button 
                   className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
-                  disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
+                  disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !checklist.username || !checklist.password || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
                   onClick={handleRegister}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -361,6 +394,7 @@ export default function LandingPage() {
                 { label: "CONTATO DIGITAL", checked: checklist.email },
                 { label: "CONECTIVIDADE", checked: checklist.phone },
                 { label: "LOGRADOURO", checked: checklist.address },
+                { label: "AUTENTICAÇÃO", checked: checklist.username && checklist.password },
                 { label: "VERIFICAÇÃO ARQUIVOS", checked: formData.addressProof && formData.rgFront && formData.rgBack },
               ].map((item, i) => (
                 <div key={i} className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-500 border ${item.checked ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-white/5'}`}>
@@ -403,9 +437,7 @@ export default function LandingPage() {
                 <span className="text-[10px] font-black uppercase text-white">PIX</span>
               </Button>
             </div>
-            <Button className="w-full h-14 bg-primary text-black font-black uppercase italic hover:scale-[1.02] transition-transform" onClick={handlePayment}>
-              Finalizar Assinatura
-            </Button>
+            <Button onClick={handlePayment} className="w-full h-14 bg-primary text-white font-black text-lg uppercase tracking-tighter shadow-[0_0_20px_rgba(0,229,255,0.4)]">Finalizar Pagamento</Button>
           </CardContent>
         </Card>
       )}
