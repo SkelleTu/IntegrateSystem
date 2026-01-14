@@ -34,6 +34,16 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
 
+import { Navbar } from "@/components/layout/Navbar";
+import { Button } from "@/components/ui/button";
+import { 
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
 function ProtectedRoute({ component: Component, ...rest }: any) {
   const { data: user, isLoading } = useUser();
   const [, setLocation] = useLocation();
@@ -208,16 +218,6 @@ function LandingNavigation() {
     </nav>
   );
 }
-
-import { Navbar } from "@/components/layout/Navbar";
-import { Button } from "@/components/ui/button";
-import { 
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 
 export default function App() {
   return (
