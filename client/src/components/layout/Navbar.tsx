@@ -36,7 +36,7 @@ export function Navbar() {
   const filteredItems = navItems.filter(item => !item.adminOnly || user.role === "admin");
 
   return (
-    <nav className="sticky top-0 z-[100] w-full bg-black/60 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 h-20 flex items-center justify-between">
+    <nav className="sticky top-0 z-[100] w-full bg-black/60 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 h-24 flex items-center justify-between">
       <div className="flex items-center gap-8">
         <div className="fixed left-0 top-0 z-[110] pointer-events-none">
           <Link href="/app" className="pointer-events-auto">
