@@ -114,7 +114,7 @@ export default function LandingPage() {
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
           <div className="flex justify-center mb-8">
             <div className="relative group">
-              <div className="absolute -inset-24 bg-white/5 backdrop-blur-3xl rounded-full border border-white/5 shadow-2xl" />
+              <div className="absolute -inset-32 bg-primary/5 backdrop-blur-[120px] rounded-full border border-primary/10 shadow-[0_0_100px_rgba(0,229,255,0.1)]" />
               <img 
                 src={auraLogo} 
                 alt="Aura System Logo" 
