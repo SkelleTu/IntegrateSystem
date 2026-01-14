@@ -92,9 +92,12 @@ export default function LandingPage() {
           <span className="text-white font-black italic tracking-tighter">AURA</span>
         </div>
         <div className="hidden md:flex items-center gap-8">
-          <a href="#" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
-          <a href="#recursos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Recursos</a>
-          <a href="#planos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Planos</a>
+          <a href="#" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Início</a>
+          <a href="#quem-somos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
+          <a href="#solucoes" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Soluções</a>
+          <a href="#depoimentos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
+          <a href="#blog" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Blog</a>
+          <a href="#contato" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Contato</a>
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest" onClick={() => setLocation("/login")}>Entrar</Button>
