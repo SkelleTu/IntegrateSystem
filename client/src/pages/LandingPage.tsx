@@ -99,8 +99,8 @@ export default function LandingPage() {
           <a href="/contato" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Contato</a>
         </div>
         <div className="flex items-center gap-4">
-          <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest" onClick={() => setLocation("/login")}>Entrar</Button>
-          <Button className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6" onClick={() => setStep(2)}>Assinar</Button>
+          <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest hover:scale-105 transition-all" onClick={() => setLocation("/login")}>Entrar</Button>
+          <Button className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)]" onClick={() => setStep(2)}>Assinar</Button>
         </div>
       </nav>
 
@@ -128,7 +128,7 @@ export default function LandingPage() {
             <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
               COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
-            <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md">
+            <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md hover:scale-105 transition-all">
               JÁ SOU ASSINANTE
             </Button>
           </div>
