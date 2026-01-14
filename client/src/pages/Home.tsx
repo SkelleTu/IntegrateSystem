@@ -31,9 +31,7 @@ export default function Home() {
   };
 
   const menuItemsList = [
-    { label: "Home", href: "/", icon: Info },
-    { label: "Serviços", href: "#services", icon: Scissors },
-    { label: "Contato", href: "#contact", icon: Phone },
+    { label: "Dashboard", href: "/app", icon: Home },
   ];
 
   const authOptions = user ? [
