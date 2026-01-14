@@ -15,7 +15,7 @@ export default function AboutUs() {
       <main className="relative z-10 pt-32 pb-20 px-6 max-w-6xl mx-auto space-y-24">
         {/* Hero Section */}
         <section className="text-center space-y-8 max-w-3xl mx-auto">
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center mb-16">
             <img src={auraLogo} alt="Aura Logo" className="w-32 md:w-48 h-auto drop-shadow-[0_0_30px_rgba(0,229,255,0.4)]" />
           </div>
           <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
