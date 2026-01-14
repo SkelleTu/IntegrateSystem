@@ -97,7 +97,7 @@ export default function Blog() {
                 <span className="w-1 h-1 rounded-full bg-white/20" />
                 <span className="text-zinc-500">{currentPost.readTime} DE LEITURA</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter leading-tight italic">
+              <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter leading-tight">
                 {currentPost.title}
               </h1>
             </div>
@@ -107,7 +107,7 @@ export default function Blog() {
             </div>
 
             <div 
-              className="prose prose-invert prose-zinc max-w-none prose-h2:text-white prose-h2:font-black prose-h2:uppercase prose-h2:italic prose-h2:tracking-tight prose-h3:text-primary prose-h3:font-bold prose-h3:uppercase prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:p-6 prose-blockquote:rounded-2xl prose-strong:text-primary"
+              className="prose prose-invert prose-zinc max-w-none prose-h2:text-white prose-h2:font-black prose-h2:uppercase prose-h2:tracking-tight prose-h3:text-primary prose-h3:font-bold prose-h3:uppercase prose-blockquote:border-primary prose-blockquote:bg-primary/5 prose-blockquote:p-6 prose-blockquote:rounded-2xl prose-strong:text-primary"
               dangerouslySetInnerHTML={{ __html: currentPost.content }}
             />
           </div>
@@ -137,7 +137,7 @@ export default function Blog() {
             <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-2">
               <p className="text-primary text-[10px] font-black uppercase tracking-[0.4em]">Enterprise Intelligence</p>
             </div>
-            <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter italic leading-none">
+            <h1 className="text-5xl md:text-8xl font-black uppercase tracking-tighter leading-none">
               AURA <span className="text-primary">INSIGHTS</span>
             </h1>
             <p className="text-zinc-400 text-lg md:text-xl font-medium max-w-2xl leading-relaxed">
@@ -185,7 +185,7 @@ export default function Blog() {
                 </div>
                 
                 <div className="space-y-4 flex-1">
-                  <h3 className="text-2xl font-black uppercase italic leading-tight group-hover:text-primary transition-colors duration-300">
+                  <h3 className="text-2xl font-black uppercase leading-tight group-hover:text-primary transition-colors duration-300">
                     {post.title}
                   </h3>
                   <p className="text-zinc-500 text-sm font-medium leading-relaxed line-clamp-3">
@@ -213,7 +213,7 @@ export default function Blog() {
           </div>
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="space-y-6">
-              <h2 className="text-3xl md:text-5xl font-black uppercase italic tracking-tighter leading-none">
+              <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none">
                 IMPACTO <span className="text-primary">MULTISECTOR</span>
               </h2>
               <p className="text-zinc-400 font-medium leading-relaxed">
