@@ -170,7 +170,7 @@ export default function TimeClock() {
                 {!user.fingerprintId ? (
                   <Button 
                     size="lg" 
-                    className="w-full h-16 font-black uppercase italic text-lg tracking-widest bg-yellow-500 hover:bg-yellow-400 text-black shadow-[0_0_30px_rgba(234,179,8,0.2)] transition-all hover:scale-[1.02] active:scale-95" 
+                    className="w-full h-16 font-black uppercase italic text-lg tracking-widest bg-primary hover:bg-primary/90 text-black shadow-[0_0_40px_rgba(0,229,255,0.3)] transition-all hover:scale-[1.02] active:scale-95" 
                     onClick={() => registerFingerprintMutation.mutate()}
                   >
                     Configurar Biometria
