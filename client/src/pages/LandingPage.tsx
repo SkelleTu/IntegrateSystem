@@ -77,17 +77,34 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-black relative overflow-hidden">
+      {/* Top Menu */}
+      <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
+          <span className="text-white font-black italic tracking-tighter">AURA</span>
+        </div>
+        <div className="hidden md:flex items-center gap-8">
+          <a href="#" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
+          <a href="#recursos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Recursos</a>
+          <a href="#planos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Planos</a>
+        </div>
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest" onClick={() => setLocation("/login")}>Entrar</Button>
+          <Button className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6" onClick={() => setStep(2)}>Assinar</Button>
+        </div>
+      </nav>
+
       {/* Decorative Neon Elements with Pulse */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[4000ms]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[4000ms] delay-1000" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[10000ms]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[10000ms] delay-1000" />
       
       {/* Hero Section */}
       {step === 1 && (
         <>
-        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10">
+        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
           <div className="flex justify-center mb-8">
             <div className="relative group">
-              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse" />
+              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse duration-[10000ms]" />
               <img 
                 src={auraLogo} 
                 alt="Aura System Logo" 
