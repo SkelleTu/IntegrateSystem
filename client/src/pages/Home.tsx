@@ -1,7 +1,3 @@
-import { useLocation } from "wouter";
-import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield } from "lucide-react";
-import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -41,17 +37,17 @@ export default function Home() {
   ];
 
   const authOptions = user ? [
-    { label: "Sair", onClick: () => logoutMutation.mutate(), icon: X, variant: "ghost" as const }
+    { label: "Sair", onClick: () => (logoutMutation as any).mutate(), icon: X, variant: "ghost" as const }
   ] : [
     { label: "Entrar", href: "/login", icon: LogIn, variant: "ghost" as const },
     { label: "Assinar", href: "/register-institution", icon: UserPlus, variant: "default" as const }
   ];
 
-  const { data: menuItems } = useQuery<MenuItem[]>({
+  const { data: menuItemsData } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"]
   });
 
-  const { data: categories } = useQuery<Category[]>({
+  const { data: categoriesData } = useQuery<Category[]>({
     queryKey: ["/api/categories"]
   });
 
@@ -78,7 +74,7 @@ export default function Home() {
           ))}
           <div className="h-4 w-[1px] bg-white/10 mx-2" />
           {authOptions.map((opt) => (
-            opt.href ? (
+            'href' in opt ? (
               <Link key={opt.label} href={opt.href}>
                 <Button variant={opt.variant} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
                   {opt.label}
@@ -132,7 +128,7 @@ export default function Home() {
             <div className="flex flex-col gap-4">
               <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Conta</p>
               {authOptions.map((opt) => (
-                opt.href ? (
+                'href' in opt ? (
                   <Link key={opt.label} href={opt.href}>
                     <Button 
                       variant={opt.variant} 
