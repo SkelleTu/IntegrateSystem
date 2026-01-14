@@ -5,12 +5,12 @@ import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 export default function AboutUs() {
   return (
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
-      {/* Background */}
+      {/* Background Image with Overlay - Match Landing Page Style */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-10"
-        style={{ backgroundImage: `url(${luxuryBg})` }}
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
       />
-      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black via-black/90 to-black" />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
 
       <main className="relative z-10 pt-32 pb-20 px-6 max-w-6xl mx-auto space-y-24">
         {/* Hero Section */}

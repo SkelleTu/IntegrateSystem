@@ -107,15 +107,44 @@ function Router() {
   );
 }
 
+function LandingNavigation() {
+  const [location] = useLocation();
+  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/depoimentos", "/blog", "/contato"].includes(location);
+
+  if (!isLandingPage) return null;
+
+  return (
+    <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
+      <div className="flex items-center gap-2">
+        <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
+        <span className="text-white font-black italic tracking-tighter">AURA</span>
+      </div>
+      <div className="hidden md:flex items-center gap-8">
+        <a href="/" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Início</a>
+        <a href="/quem-somos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
+        <a href="/solucoes" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Soluções</a>
+        <a href="/depoimentos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
+        <a href="/blog" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Blog</a>
+        <a href="/contato" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Contato</a>
+      </div>
+      <div className="flex items-center gap-4">
+        <a href="/login" className="text-white font-bold text-xs uppercase tracking-widest hover:text-primary transition-colors">Entrar</a>
+        <a href="/register" className="bg-primary text-white font-black italic text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)]">Assinar</a>
+      </div>
+    </nav>
+  );
+}
+
 import { Navbar } from "@/components/layout/Navbar";
 
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="relative min-h-screen w-full bg-transparent overflow-x-hidden pb-safe">
+        <div className="relative min-h-screen w-full bg-black overflow-x-hidden pb-safe">
           <BackgroundIcons />
           <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
+            <LandingNavigation />
             <Navbar />
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <Router />
