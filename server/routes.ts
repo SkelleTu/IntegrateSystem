@@ -5,6 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -47,7 +48,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Session & Auth Setup
-  const PostgresSessionStore = require("connect-pg-simple")(session);
+  const PostgresSessionStore = connectPgSimple(session);
   const sessionStore = new PostgresSessionStore({
     conString: process.env.DATABASE_URL,
     tableName: "session",
