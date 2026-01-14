@@ -153,9 +153,9 @@ export default function App() {
         <div className="relative min-h-screen w-full bg-black overflow-x-hidden pb-safe">
           <BackgroundIcons />
           <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
-            <LandingNavigation />
-            <Navbar />
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
+              <LandingNavigation />
+              <Navbar />
               <Router />
             </main>
           </div>
