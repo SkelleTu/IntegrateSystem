@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { DatabaseStorage, storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";

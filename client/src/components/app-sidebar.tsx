@@ -413,10 +413,15 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                   <SidebarMenuItem>
                     <SidebarMenuButton 
                       onClick={() => setEnterprisesOpen(true)}
-                      className="hover:bg-blue-500/10 hover:text-blue-500 transition-colors py-6"
+                      className="hover:bg-blue-500/10 hover:text-blue-500 transition-colors py-6 relative"
                     >
                       <Building2 className="w-5 h-5" />
-                      <span className="font-bold uppercase italic tracking-tighter">Gerenciar Empresas</span>
+                      <span className="font-bold uppercase italic tracking-tighter">Gerenciar Instituições</span>
+                      {enterprisesList && enterprisesList.filter(e => e.status === 'pending').length > 0 && (
+                        <span className="absolute right-2 top-2 bg-primary text-black text-[10px] font-black px-1.5 py-0.5 rounded-full animate-pulse">
+                          {enterprisesList.filter(e => e.status === 'pending').length}
+                        </span>
+                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>
