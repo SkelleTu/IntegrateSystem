@@ -2,14 +2,21 @@ import { useLocation } from "wouter";
 import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield } from "lucide-react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation, Link } from "wouter";
+import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleNavigation = (url: string, adminOnly?: boolean) => {
     if (!user) {
@@ -27,6 +34,19 @@ export default function Home() {
     setLocation(url);
   };
 
+  const menuItemsList = [
+    { label: "Home", href: "/", icon: Info },
+    { label: "Serviços", href: "#services", icon: Scissors },
+    { label: "Contato", href: "#contact", icon: Phone },
+  ];
+
+  const authOptions = user ? [
+    { label: "Sair", onClick: () => logoutMutation.mutate(), icon: X, variant: "ghost" as const }
+  ] : [
+    { label: "Entrar", href: "/login", icon: LogIn, variant: "ghost" as const },
+    { label: "Assinar", href: "/register-institution", icon: UserPlus, variant: "default" as const }
+  ];
+
   const { data: menuItems } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"]
   });
@@ -40,6 +60,109 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto">
+      {/* Header with Hamburger Menu */}
+      <header className="w-full max-w-7xl z-50 flex justify-between items-center mb-8">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shadow-[0_0_15px_rgba(0,229,255,0.4)]">
+            <span className="text-black font-black text-xl italic">A</span>
+          </div>
+          <span className="text-white font-black tracking-tighter italic text-xl">AURA</span>
+        </div>
+
+        {/* Desktop Nav */}
+        <nav className="hidden md:flex items-center gap-6">
+          {menuItemsList.map((item) => (
+            <Link key={item.label} href={item.href}>
+              <a className="text-white/60 hover:text-primary transition-colors font-medium text-sm uppercase tracking-widest">{item.label}</a>
+            </Link>
+          ))}
+          <div className="h-4 w-[1px] bg-white/10 mx-2" />
+          {authOptions.map((opt) => (
+            opt.href ? (
+              <Link key={opt.label} href={opt.href}>
+                <Button variant={opt.variant} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
+                  {opt.label}
+                </Button>
+              </Link>
+            ) : (
+              <Button key={opt.label} variant={opt.variant} size="sm" onClick={opt.onClick} className="font-bold uppercase tracking-widest text-[10px]">
+                {opt.label}
+              </Button>
+            )
+          ))}
+        </nav>
+
+        {/* Mobile Toggle */}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="md:hidden text-white" 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        >
+          {isMenuOpen ? <X /> : <Menu />}
+        </Button>
+      </header>
+
+      {/* Mobile Menu Overlay */}
+      <AnimatePresence>
+        {isMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100%" }}
+            className="fixed inset-0 z-40 bg-background/95 backdrop-blur-xl md:hidden flex flex-col p-8 pt-24 gap-8"
+          >
+            <div className="flex flex-col gap-6">
+              <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Navegação</p>
+              {menuItemsList.map((item) => (
+                <Link key={item.label} href={item.href}>
+                  <a 
+                    className="text-2xl font-black text-white italic flex items-center gap-4 group"
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    <item.icon className="text-primary group-hover:scale-110 transition-transform" />
+                    {item.label}
+                  </a>
+                </Link>
+              ))}
+            </div>
+
+            <div className="h-[1px] w-full bg-white/5" />
+
+            <div className="flex flex-col gap-4">
+              <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Conta</p>
+              {authOptions.map((opt) => (
+                opt.href ? (
+                  <Link key={opt.label} href={opt.href}>
+                    <Button 
+                      variant={opt.variant} 
+                      className="w-full justify-start text-xl font-black italic h-14 px-6 gap-4"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <opt.icon className="w-6 h-6" />
+                      {opt.label}
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button 
+                    key={opt.label} 
+                    variant={opt.variant} 
+                    className="w-full justify-start text-xl font-black italic h-14 px-6 gap-4"
+                    onClick={() => {
+                      opt.onClick?.();
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <opt.icon className="w-6 h-6" />
+                    {opt.label}
+                  </Button>
+                )
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div 
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
