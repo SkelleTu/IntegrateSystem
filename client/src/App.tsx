@@ -119,9 +119,10 @@ function Router() {
 
 function LandingNavigation() {
   const [location] = useLocation();
+  const { data: user } = useUser();
   const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
 
-  if (!isLandingPage) return null;
+  if (!isLandingPage || user) return null;
 
   return (
     <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
