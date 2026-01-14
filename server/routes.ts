@@ -400,18 +400,16 @@ export async function registerRoutes(
     let startDate: Date | undefined;
     let endDate: Date | undefined;
 
+    const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
+
     if (start && start !== "undefined" && start !== "") {
-      const startParts = (start as string).split('-');
-      if (startParts.length === 3) {
-        startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
-      }
+      const date = new Date(start as string);
+      if (isValidDate(date)) startDate = date;
     }
 
     if (end && end !== "undefined" && end !== "") {
-      const endParts = (end as string).split('-');
-      if (endParts.length === 3) {
-        endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
-      }
+      const date = new Date(end as string);
+      if (isValidDate(date)) endDate = date;
     }
 
     const filters = { startDate, endDate };
@@ -513,18 +511,16 @@ export async function registerRoutes(
     let startDate: Date | undefined;
     let endDate: Date | undefined;
 
+    const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
+
     if (start && start !== "undefined" && start !== "") {
-      const startParts = (start as string).split('-');
-      if (startParts.length === 3) {
-        startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
-      }
+      const date = new Date(start as string);
+      if (isValidDate(date)) startDate = date;
     }
 
     if (end && end !== "undefined" && end !== "") {
-      const endParts = (end as string).split('-');
-      if (endParts.length === 3) {
-        endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
-      }
+      const date = new Date(end as string);
+      if (isValidDate(date)) endDate = date;
     }
 
     const filters = {

@@ -23,7 +23,10 @@ export default function Reports() {
   const { data: sales, isLoading } = useQuery<Sale[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const res = await fetch(`/api/sales?start=${dateRange.start}T00:00:00.000Z&end=${dateRange.end}T23:59:59.999Z`);
+      const start = dateRange.start ? `${dateRange.start}T00:00:00.000Z` : "";
+      const end = dateRange.end ? `${dateRange.end}T23:59:59.999Z` : "";
+      const res = await fetch(`/api/sales?start=${start}&end=${end}`);
+      if (!res.ok) return [];
       return res.json();
     }
   });
