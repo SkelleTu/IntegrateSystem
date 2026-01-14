@@ -11,6 +11,8 @@ import LandingPage from "@/pages/LandingPage";
 import AboutUs from "@/pages/AboutUs";
 import Solutions from "@/pages/Solutions";
 import SuccessCases from "@/pages/SuccessCases";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsOfService from "@/pages/TermsOfService";
 import Blog from "@/pages/Blog";
 import Contact from "@/pages/Contact";
 import Home from "@/pages/Home";
@@ -75,6 +77,8 @@ function Router() {
       <Route path="/quem-somos" component={AboutUs} />
       <Route path="/solucoes" component={Solutions} />
       <Route path="/casos-de-sucesso" component={SuccessCases} />
+      <Route path="/privacy" component={PrivacyPolicy} />
+      <Route path="/terms" component={TermsOfService} />
       <Route path="/blog" component={Blog} />
       <Route path="/contato" component={Contact} />
       <Route path="/app" component={Home} />
@@ -109,7 +113,7 @@ function Router() {
 
 function LandingNavigation() {
   const [location] = useLocation();
-  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato"].includes(location);
+  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
 
   if (!isLandingPage) return null;
 
