@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user, logoutMutation } = useAuth();
+  const { user, logout } = useAuth() as { user: any, logout: any };
   const { toast } = useToast();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -35,7 +35,7 @@ export default function Home() {
   ];
 
   const authOptions = user ? [
-    { label: "Sair", onClick: () => (logoutMutation as any).mutate(), icon: X, variant: "ghost" as const }
+    { label: "Sair", onClick: () => logout.mutate(), icon: X, variant: "ghost" as const }
   ] : [
     { label: "Entrar", href: "/login", icon: LogIn, variant: "ghost" as const },
     { label: "Assinar", href: "/register-institution", icon: UserPlus, variant: "default" as const }

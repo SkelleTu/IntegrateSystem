@@ -210,6 +210,7 @@ function LandingNavigation() {
 }
 
 import { Navbar } from "@/components/layout/Navbar";
+import { Button } from "@/components/ui/button";
 import { 
   Sheet,
   SheetContent,
