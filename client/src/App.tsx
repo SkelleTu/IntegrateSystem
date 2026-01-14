@@ -10,7 +10,7 @@ import { Loader2 } from "lucide-react";
 import LandingPage from "@/pages/LandingPage";
 import AboutUs from "@/pages/AboutUs";
 import Solutions from "@/pages/Solutions";
-import Testimonials from "@/pages/Testimonials";
+import SuccessCases from "@/pages/SuccessCases";
 import Blog from "@/pages/Blog";
 import Contact from "@/pages/Contact";
 import Home from "@/pages/Home";
@@ -74,7 +74,7 @@ function Router() {
       <Route path="/" component={LandingPage} />
       <Route path="/quem-somos" component={AboutUs} />
       <Route path="/solucoes" component={Solutions} />
-      <Route path="/depoimentos" component={Testimonials} />
+      <Route path="/casos-de-sucesso" component={SuccessCases} />
       <Route path="/blog" component={Blog} />
       <Route path="/contato" component={Contact} />
       <Route path="/app" component={Home} />
@@ -109,7 +109,7 @@ function Router() {
 
 function LandingNavigation() {
   const [location] = useLocation();
-  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/depoimentos", "/blog", "/contato"].includes(location);
+  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato"].includes(location);
 
   if (!isLandingPage) return null;
 
@@ -122,7 +122,7 @@ function LandingNavigation() {
         <a href="/" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
         <a href="/quem-somos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
         <a href="/solucoes" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Soluções</a>
-        <a href="/depoimentos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
+        <a href="/casos-de-sucesso" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Impacto Aura</a>
         <a href="/blog" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Blog</a>
         <a href="/contato" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Contato</a>
       </div>

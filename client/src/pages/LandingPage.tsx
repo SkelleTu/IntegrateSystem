@@ -94,7 +94,7 @@ export default function LandingPage() {
           <a href="/" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
           <a href="/quem-somos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
           <a href="/solucoes" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Soluções</a>
-          <a href="/depoimentos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
+          <a href="/casos-de-sucesso" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Impacto Aura</a>
           <a href="/blog" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Blog</a>
           <a href="/contato" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Contato</a>
         </div>
