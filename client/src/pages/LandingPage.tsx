@@ -87,16 +87,16 @@ export default function LandingPage() {
 
       {/* Top Menu */}
       <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
-        <div className="flex items-center gap-2">
-          <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto" />
+        <div className="flex items-center gap-2 pl-4">
+          <img src={auraLogo} alt="Aura Logo" className="h-12 w-auto" />
         </div>
         <div className="hidden md:flex items-center gap-8">
-          <a href="/" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Início</a>
-          <a href="/quem-somos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
-          <a href="/solucoes" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Soluções</a>
-          <a href="/depoimentos" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
-          <a href="/blog" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Blog</a>
-          <a href="/contato" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Contato</a>
+          <a href="/" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
+          <a href="/quem-somos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
+          <a href="/solucoes" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Soluções</a>
+          <a href="/depoimentos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Depoimentos</a>
+          <a href="/blog" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Blog</a>
+          <a href="/contato" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Contato</a>
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest" onClick={() => setLocation("/login")}>Entrar</Button>
