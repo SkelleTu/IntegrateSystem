@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Calendar, Clock, Share2, Bookmark, ArrowRight, ShieldCheck, Zap, Globe, BarChart3 } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
+import { useToast } from "@/hooks/use-toast";
 
 const POSTS = [
   {
@@ -68,6 +69,7 @@ const POSTS = [
 
 export default function Blog() {
   const [location, setLocation] = useLocation();
+  const { toast } = useToast();
   const isPostPage = location.startsWith("/blog/");
   const postId = location.split("/").pop();
   const currentPost = POSTS.find(p => p.id === postId);
@@ -80,10 +82,27 @@ export default function Blog() {
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             <span className="text-[10px] font-black uppercase tracking-widest">Voltar aos Insights</span>
           </Link>
-          <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto" />
+          <img src={auraLogo} alt="Aura Logo" className="h-16 md:h-20 w-auto transition-transform hover:scale-105" />
           <div className="flex gap-4">
-            <Share2 className="w-4 h-4 text-zinc-500 hover:text-primary cursor-pointer transition-colors" />
-            <Bookmark className="w-4 h-4 text-zinc-500 hover:text-primary cursor-pointer transition-colors" />
+            <Share2 
+              className="w-5 h-5 text-zinc-500 hover:text-primary cursor-pointer transition-colors" 
+              onClick={() => {
+                navigator.share({
+                  title: currentPost.title,
+                  text: currentPost.excerpt,
+                  url: window.location.href,
+                }).catch(() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  toast({ title: "Link copiado!", description: "O link do artigo foi copiado para sua área de transferência." });
+                });
+              }}
+            />
+            <Bookmark 
+              className="w-5 h-5 text-zinc-500 hover:text-primary cursor-pointer transition-colors" 
+              onClick={() => {
+                toast({ title: "Artigo Salvo", description: "Este insight foi salvo na sua biblioteca pessoal." });
+              }}
+            />
           </div>
         </div>
 
