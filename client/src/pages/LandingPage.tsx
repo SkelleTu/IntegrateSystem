@@ -80,7 +80,7 @@ export default function LandingPage() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-black relative overflow-hidden">
       {/* Background Image with Overlay */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20"
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
         style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
       />
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
