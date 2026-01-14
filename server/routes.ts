@@ -173,11 +173,21 @@ export async function registerRoutes(
 
   app.post("/api/admin/enterprises", async (req, res) => {
     try {
-      const enterprise = await storage.createEnterprise(req.body);
+      const { name, slug } = req.body;
+      
+      // Validação básica do slug se não for enviado
+      const finalSlug = slug || name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+      
+      const existing = await storage.getEnterpriseBySlug(finalSlug);
+      if (existing) {
+        return res.status(400).json({ message: "Uma instituição com este nome ou slug já existe." });
+      }
+
+      const enterprise = await storage.createEnterprise({ ...req.body, slug: finalSlug });
       res.status(201).json(enterprise);
     } catch (err) {
       console.error("Erro ao criar empresa:", err);
-      res.status(500).json({ message: "Erro ao criar empresa" });
+      res.status(500).json({ message: "Erro ao criar empresa. Verifique se os dados estão corretos." });
     }
   });
 
