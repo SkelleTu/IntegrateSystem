@@ -7,6 +7,7 @@ import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import auraLogo from "@assets/AURA_1768346008566.png";
+import luxuryBg from "@assets/stock_images/modern_luxury_barber_085648d3.jpg";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -77,6 +78,13 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-black relative overflow-hidden">
+      {/* Background Image with Overlay */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-40 scale-105"
+        style={{ backgroundImage: `url(${luxuryBg})` }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
+
       {/* Top Menu */}
       <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
         <div className="flex items-center gap-2">
@@ -95,8 +103,8 @@ export default function LandingPage() {
       </nav>
 
       {/* Decorative Neon Elements with Pulse */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[10000ms]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[10000ms] delay-1000" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[30000ms]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[30000ms] delay-1000" />
       
       {/* Hero Section */}
       {step === 1 && (
@@ -104,7 +112,7 @@ export default function LandingPage() {
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
           <div className="flex justify-center mb-8">
             <div className="relative group">
-              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse duration-[10000ms]" />
+              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse duration-[30000ms]" />
               <img 
                 src={auraLogo} 
                 alt="Aura System Logo" 
