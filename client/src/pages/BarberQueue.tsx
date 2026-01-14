@@ -102,7 +102,7 @@ export default function BarberQueue() {
     if (ticketResult) {
       const timer = setTimeout(() => {
         setTicketResult(null);
-        setLocation("/");
+        setLocation("/app");
       }, 5000);
       return () => clearTimeout(timer);
     }
@@ -161,7 +161,7 @@ export default function BarberQueue() {
           </Button>
           <Button 
             variant="ghost" 
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/app")}
             className="mt-10 text-white/40 hover:text-primary font-black uppercase tracking-[0.4em] text-[10px] transition-colors"
           >
             VOLTAR AO PAINEL INICIAL
@@ -180,7 +180,7 @@ export default function BarberQueue() {
           <Button 
             variant="outline" 
             size="icon"
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/app")}
             className="rounded-none border-zinc-800 hover:border-primary text-zinc-500 hover:text-primary transition-all bg-transparent w-12 h-12"
           >
             <ArrowLeft className="h-6 w-6" />
