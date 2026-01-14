@@ -38,15 +38,16 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-[100] w-full bg-black/60 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 h-20 flex items-center justify-between">
       <div className="flex items-center gap-8">
-        <Link href="/app" className="flex items-center gap-2 pl-10 -mt-3 group">
-          <div className="relative flex items-center">
-            <div className="absolute -inset-2 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto relative z-10" />
-            <span className="text-white font-black italic uppercase tracking-tighter hidden md:block ml-2">Aura <span className="text-primary">System</span></span>
-          </div>
-        </Link>
+        <div className="fixed left-0 top-0 z-[110] pointer-events-none">
+          <Link href="/app" className="pointer-events-auto">
+            <div className="relative group pl-10 -mt-3">
+              <div className="absolute -inset-2 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
+              <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto relative z-10" />
+            </div>
+          </Link>
+        </div>
 
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="pl-40 hidden lg:flex items-center gap-1">
           {filteredItems.map((item) => (
             <Button
               key={item.url}
