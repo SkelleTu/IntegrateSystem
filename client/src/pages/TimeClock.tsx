@@ -170,19 +170,21 @@ export default function TimeClock() {
                 {!user.fingerprintId ? (
                   <Button 
                     size="lg" 
-                    className="w-full h-16 font-black uppercase italic text-lg tracking-widest bg-primary hover:bg-primary/90 text-black shadow-[0_0_40px_rgba(0,229,255,0.3)] transition-all hover:scale-[1.02] active:scale-95" 
+                    className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_-5px_rgba(0,229,255,0.5)] group overflow-hidden relative"
                     onClick={() => registerFingerprintMutation.mutate()}
                   >
-                    Configurar Biometria
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    CONFIGURAR BIOMETRIA
                   </Button>
                 ) : (
                   <Button 
                     size="lg" 
-                    className="w-full h-16 font-black uppercase italic text-lg tracking-widest bg-primary hover:bg-primary/90 text-black flex items-center justify-center gap-4 shadow-[0_0_40px_rgba(0,229,255,0.3)] transition-all hover:scale-[1.02] active:scale-95" 
+                    className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_-5px_rgba(0,229,255,0.5)] group overflow-hidden relative"
                     onClick={() => registerClockMutation.mutate(currentAction.type)}
                   >
-                    <Fingerprint className="w-6 h-6" />
-                    Registrar Ponto
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    <Fingerprint className="w-6 h-6 mr-2" />
+                    REGISTRAR PONTO
                   </Button>
                 )}
 
