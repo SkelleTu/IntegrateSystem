@@ -400,16 +400,18 @@ export async function registerRoutes(
     let startDate: Date | undefined;
     let endDate: Date | undefined;
 
-    if (start) {
-      // Cria a data considerando o fuso horário local
+    if (start && start !== "undefined" && start !== "") {
       const startParts = (start as string).split('-');
-      startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+      if (startParts.length === 3) {
+        startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+      }
     }
 
-    if (end) {
-      // Cria a data considerando o fuso horário local
+    if (end && end !== "undefined" && end !== "") {
       const endParts = (end as string).split('-');
-      endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
+      if (endParts.length === 3) {
+        endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
+      }
     }
 
     const filters = { startDate, endDate };
@@ -511,14 +513,18 @@ export async function registerRoutes(
     let startDate: Date | undefined;
     let endDate: Date | undefined;
 
-    if (start) {
+    if (start && start !== "undefined" && start !== "") {
       const startParts = (start as string).split('-');
-      startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+      if (startParts.length === 3) {
+        startDate = new Date(Number(startParts[0]), Number(startParts[1]) - 1, Number(startParts[2]), 0, 0, 0, 0);
+      }
     }
 
-    if (end) {
+    if (end && end !== "undefined" && end !== "") {
       const endParts = (end as string).split('-');
-      endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
+      if (endParts.length === 3) {
+        endDate = new Date(Number(endParts[0]), Number(endParts[1]) - 1, Number(endParts[2]), 23, 59, 59, 999);
+      }
     }
 
     const filters = {
