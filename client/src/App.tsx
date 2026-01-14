@@ -8,6 +8,11 @@ import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import LandingPage from "@/pages/LandingPage";
+import AboutUs from "@/pages/AboutUs";
+import Solutions from "@/pages/Solutions";
+import Testimonials from "@/pages/Testimonials";
+import Blog from "@/pages/Blog";
+import Contact from "@/pages/Contact";
 import Home from "@/pages/Home";
 import BarberHome from "@/pages/BarberHome";
 import Login from "@/pages/Login";
@@ -67,6 +72,11 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      <Route path="/quem-somos" component={AboutUs} />
+      <Route path="/solucoes" component={Solutions} />
+      <Route path="/depoimentos" component={Testimonials} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/contato" component={Contact} />
       <Route path="/app" component={Home} />
       <Route path="/barber" component={BarberHome} />
       <Route path="/login" component={Login} />
