@@ -216,6 +216,17 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.put("/api/admin/enterprises/:id/status", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    const { status } = req.body;
+    if (!["active", "rejected", "pending"].includes(status)) {
+      return res.status(400).json({ message: "Status inválido" });
+    }
+    const updated = await storage.updateEnterprise(Number(req.params.id), { status });
+    res.json(updated);
+  });
+
   app.delete("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });

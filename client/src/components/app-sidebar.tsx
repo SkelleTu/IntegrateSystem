@@ -131,6 +131,17 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     }
   });
 
+  const updateEnterpriseStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const res = await apiRequest("PUT", `/api/admin/enterprises/${id}/status`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Sucesso", description: "Status da instituição atualizado!" });
+      refetchEnterprises();
+    }
+  });
+
   const deleteEnterpriseMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/admin/enterprises/${id}`);
@@ -642,23 +653,77 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
               </Button>
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-2">
+            <div className="max-h-[60vh] overflow-y-auto space-y-4 py-4">
               {enterprisesList?.map(ent => (
-                <div key={ent.id} className="flex items-center justify-between p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
-                  <div>
-                    <p className="font-bold text-sm">{ent.name}</p>
-                    <p className="text-[10px] uppercase text-zinc-500">slug: {ent.slug}</p>
+                <div key={ent.id} className="p-4 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-lg">{ent.name}</p>
+                      <p className="text-xs text-zinc-500 uppercase tracking-widest">{ent.taxId || "Sem Documento"}</p>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-[10px] font-black uppercase ${
+                      ent.status === 'active' ? 'bg-green-500/20 text-green-500' : 
+                      ent.status === 'pending' ? 'bg-yellow-500/20 text-yellow-500 animate-pulse' : 
+                      'bg-red-500/20 text-red-500'
+                    }`}>
+                      {ent.status}
+                    </div>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="text-zinc-500 hover:text-red-500"
-                    onClick={() => {
-                      if(confirm(`Deletar empresa ${ent.name}? Isso removerá todas as configurações dela.`)) deleteEnterpriseMutation.mutate(ent.id);
-                    }}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {ent.rgFrontUrl ? (
+                      <a href={ent.rgFrontUrl} target="_blank" rel="noreferrer" className="block p-2 bg-black border border-zinc-800 rounded-lg text-center hover:border-primary transition-colors group">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500 group-hover:text-primary">RG Frente</p>
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-black/20 border border-dashed border-zinc-800 rounded-lg text-center opacity-40">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500">Sem RG (F)</p>
+                      </div>
+                    )}
+
+                    {ent.rgBackUrl ? (
+                      <a href={ent.rgBackUrl} target="_blank" rel="noreferrer" className="block p-2 bg-black border border-zinc-800 rounded-lg text-center hover:border-primary transition-colors group">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500 group-hover:text-primary">RG Verso</p>
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-black/20 border border-dashed border-zinc-800 rounded-lg text-center opacity-40">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500">Sem RG (V)</p>
+                      </div>
+                    )}
+
+                    {ent.addressProofUrl ? (
+                      <a href={ent.addressProofUrl} target="_blank" rel="noreferrer" className="block p-2 bg-black border border-zinc-800 rounded-lg text-center hover:border-primary transition-colors group">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500 group-hover:text-primary">Comprovante</p>
+                      </a>
+                    ) : (
+                      <div className="p-2 bg-black/20 border border-dashed border-zinc-800 rounded-lg text-center opacity-40">
+                        <p className="text-[9px] uppercase font-bold text-zinc-500">Sem Endereço</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button 
+                      className="flex-1 bg-green-500 text-black font-bold h-8 text-xs hover:bg-green-400"
+                      onClick={() => {
+                        if(confirm(`Ativar instituição ${ent.name}?`)) {
+                          updateEnterpriseStatusMutation.mutate({ id: ent.id, status: 'active' });
+                        }
+                      }}
+                      disabled={ent.status === 'active' || updateEnterpriseStatusMutation.isPending}
+                    >
+                      {ent.status === 'active' ? 'Ativado' : 'Ativar'}
+                    </Button>
+                    <Button 
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-zinc-500 hover:text-red-500"
+                      onClick={() => {
+                        if(confirm(`Remover permanentemente ${ent.name}? Isso removerá todas as configurações dela.`)) deleteEnterpriseMutation.mutate(ent.id);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
