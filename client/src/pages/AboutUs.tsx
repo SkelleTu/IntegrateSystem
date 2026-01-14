@@ -97,15 +97,28 @@ export default function AboutUs() {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-white/10 py-12 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8 opacity-50">
-          <div className="flex items-center gap-2">
-            <img src={auraLogo} alt="Aura Logo" className="h-6 w-auto" />
-            <span className="font-black italic text-xs tracking-tighter">AURA SYSTEM © 2026</span>
+      <footer className="relative z-10 border-t border-white/10 py-16 px-6 bg-black/80 backdrop-blur-lg">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-12">
+          <div className="flex flex-col items-center gap-4 group transition-all">
+            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]" />
+            <span className="font-black italic text-sm tracking-widest text-zinc-500 uppercase">Aura System © 2026</span>
           </div>
-          <div className="flex gap-8 text-[10px] font-bold uppercase tracking-widest">
-            <a href="/privacy" className="hover:text-primary transition-colors">Privacidade</a>
-            <a href="/terms" className="hover:text-primary transition-colors">Termos</a>
+          
+          <div className="flex flex-wrap justify-center gap-12">
+            <a 
+              href="/privacy" 
+              className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300"
+            >
+              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Privacidade</span>
+              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
+            </a>
+            <a 
+              href="/terms" 
+              className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300"
+            >
+              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Termos</span>
+              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
+            </a>
           </div>
         </div>
       </footer>
