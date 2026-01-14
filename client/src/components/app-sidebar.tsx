@@ -200,7 +200,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
-      setLocation("/login");
+      setLocation("/");
     },
   });
 
