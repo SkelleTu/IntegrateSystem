@@ -88,8 +88,7 @@ export default function LandingPage() {
       {/* Top Menu */}
       <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
-          <span className="text-white font-black italic tracking-tighter">AURA</span>
+          <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto" />
         </div>
         <div className="hidden md:flex items-center gap-8">
           <a href="/" className="text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors">Início</a>
