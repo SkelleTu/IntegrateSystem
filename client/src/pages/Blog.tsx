@@ -1,6 +1,6 @@
 import { Calendar, ArrowRight } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
-import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
+import blogBg from "@assets/generated_images/minimalist_workspace_with_professional_journalism_aesthetic_and_digital_screen..png";
 
 export default function Blog() {
   const posts = [
@@ -28,8 +28,8 @@ export default function Blog() {
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
       {/* Background Image with Overlay */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
-        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[2px] scale-105"
+        style={{ backgroundImage: `url(${blogBg})`, backgroundSize: 'cover' }}
       />
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
 

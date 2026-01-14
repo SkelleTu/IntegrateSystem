@@ -3,15 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import auraLogo from "@assets/AURA_1768346008566.png";
-import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
+import contactBg from "@assets/generated_images/abstract_connection_network_with_glowing_communication_nodes..png";
 
 export default function Contact() {
   return (
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
       {/* Background Image with Overlay */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
-        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[2px] scale-105"
+        style={{ backgroundImage: `url(${contactBg})`, backgroundSize: 'cover' }}
       />
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
 
