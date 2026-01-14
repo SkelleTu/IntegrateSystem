@@ -19,7 +19,7 @@ export default function AboutUs() {
             <img src={auraLogo} alt="Aura Logo" className="w-32 md:w-48 h-auto drop-shadow-[0_0_30px_rgba(0,229,255,0.4)]" />
           </div>
           <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tighter leading-none">
-            A Revolução na <span className="text-primary">Gestão de Luxo</span>
+            A Revolução na <span className="text-primary">Gestão Empresarial</span>
           </h1>
           <p className="text-zinc-400 text-lg md:text-xl font-medium leading-relaxed">
             Nascemos da necessidade de elevar o padrão. O Aura não é apenas um software; é o sistema nervoso central dos estabelecimentos mais exclusivos do país.
