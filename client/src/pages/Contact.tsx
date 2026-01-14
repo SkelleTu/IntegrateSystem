@@ -29,7 +29,7 @@ export default function Contact() {
 
             <div className="space-y-8">
               {[
-                { icon: Mail, label: "E-mail Corporativo", value: "contato@aurasystem.com.br" },
+                { icon: Mail, label: "E-mail Corporativo", value: "vfdiogoseg@outlook.com" },
                 { icon: Phone, label: "Suporte Técnico", value: "(19) 99723-8298" },
                 { icon: MapPin, label: "Headquarters", value: "São Paulo, SP - Brasil" }
               ].map((item, i) => (
