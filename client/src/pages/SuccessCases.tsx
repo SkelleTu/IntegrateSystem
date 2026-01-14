@@ -1,4 +1,6 @@
 import { Star, TrendingUp, Shield, Zap, BarChart3, Users } from "lucide-react";
+import auraLogo from "@assets/AURA_1768346008566.png";
+import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 export default function SuccessCases() {
   const metrics = [
@@ -38,8 +40,15 @@ export default function SuccessCases() {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-black text-white pt-32 pb-20 overflow-x-hidden">
-      <div className="max-w-6xl mx-auto px-6">
+    <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
+      {/* Background Image with Overlay */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
+
+      <main className="relative z-10 pt-32 pb-20 px-6 max-w-6xl mx-auto">
         <div className="text-center mb-24 space-y-6">
           <h1 className="text-4xl md:text-7xl font-black uppercase tracking-tighter">
             O Impacto <span className="text-primary">Aura</span>
@@ -51,7 +60,7 @@ export default function SuccessCases() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-32">
           {metrics.map((m, i) => (
-            <div key={i} className="p-8 rounded-[2.5rem] bg-white/5 border border-white/10 relative group hover:border-primary/40 transition-all flex flex-col items-center text-center">
+            <div key={i} className="p-8 rounded-[2.5rem] bg-white/5 border border-white/10 relative group hover:border-primary/40 transition-all flex flex-col items-center text-center backdrop-blur-sm">
               <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                 <m.icon className="w-8 h-8 text-primary" />
               </div>
@@ -80,7 +89,7 @@ export default function SuccessCases() {
           </div>
         </div>
 
-        <div className="mt-32 p-12 rounded-[3rem] bg-primary/5 border border-primary/20 relative overflow-hidden text-center">
+        <div className="mt-32 p-12 rounded-[3rem] bg-primary/5 border border-primary/20 relative overflow-hidden text-center backdrop-blur-sm">
           <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
           <h2 className="text-2xl md:text-4xl font-black uppercase mb-6 tracking-tighter">Pronto para elevar o nível?</h2>
           <p className="text-zinc-400 mb-10 max-w-xl mx-auto font-medium">A transição para o Aura é o divisor de águas entre a gestão convencional e a excelência tecnológica.</p>
@@ -88,7 +97,28 @@ export default function SuccessCases() {
             SOLICITAR ACESSO
           </button>
         </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-white/10 py-16 px-6 bg-black/80 backdrop-blur-lg mt-20">
+        <div className="max-w-6xl mx-auto flex flex-col items-center gap-12">
+          <div className="flex flex-col items-center gap-4 group transition-all">
+            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]" />
+            <span className="font-black text-sm tracking-widest text-zinc-500 uppercase">Aura System © 2026</span>
+          </div>
+          
+          <div className="flex flex-wrap justify-center gap-12">
+            <a href="/privacy" className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300">
+              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Privacidade</span>
+              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
+            </a>
+            <a href="/terms" className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300">
+              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Termos</span>
+              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
