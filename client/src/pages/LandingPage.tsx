@@ -49,6 +49,24 @@ export default function LandingPage() {
   const handleRegister = async () => {
     setLoading(true);
     try {
+      // 1. Upload documents first if they exist
+      const uploadFile = async (file: File | null) => {
+        if (!file) return null;
+        const formData = new FormData();
+        formData.append("file", file);
+        const res = await fetch("/api/admin/upload", {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        return data.url;
+      };
+
+      const addressProofUrl = await uploadFile(formData.addressProof);
+      const rgFrontUrl = await uploadFile(formData.rgFront);
+      const rgBackUrl = await uploadFile(formData.rgBack);
+
+      // 2. Submit the registration with URLs
       await apiRequest("POST", "/api/admin/enterprises", {
         name: formData.name,
         taxId: formData.taxId,
@@ -57,7 +75,10 @@ export default function LandingPage() {
         address: formData.address,
         slug: formData.slug,
         username: formData.username,
-        password: formData.password
+        password: formData.password,
+        addressProofUrl,
+        rgFrontUrl,
+        rgBackUrl
       });
       setStep(3); // Vai para o pagamento
     } catch (err) {
