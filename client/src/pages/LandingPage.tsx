@@ -7,7 +7,7 @@ import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import auraLogo from "@assets/AURA_1768346008566.png";
-import luxuryBg from "@assets/stock_images/abstract_digital_cyb_cb12cca8.jpg";
+import luxuryBg from "@assets/stock_images/modern_business_offi_e8fefc3a.jpg";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
