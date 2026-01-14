@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Fingerprint, History, ArrowLeft, Clock, Calendar } from "lucide-react";
 import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
-import luxuryBg from "@assets/luxury-bg.jpg";
+import auraLogo from "@assets/AURA_1768346008566.png";
 
 export default function TimeClock() {
   const { data: user } = useUser();
@@ -116,7 +116,7 @@ export default function TimeClock() {
       {/* Background Image with matching effects */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 scale-[1.05] blur-[4px]"
-        style={{ backgroundImage: `url(${luxuryBg})` }}
+        style={{ backgroundImage: `url(https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=2564)` }}
       />
       
       {/* Dark Overlay Gradient */}
