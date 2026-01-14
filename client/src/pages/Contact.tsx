@@ -5,6 +5,8 @@ import { Textarea } from "@/components/ui/textarea";
 import auraLogo from "@assets/AURA_1768346008566.png";
 import contactBg from "@assets/generated_images/abstract_connection_network_with_glowing_communication_nodes..png";
 
+import { LandingFooter } from "@/components/layout/LandingFooter";
+
 export default function Contact() {
   return (
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
@@ -67,28 +69,8 @@ export default function Contact() {
             </div>
           </div>
         </div>
+        <LandingFooter />
       </main>
-
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-white/10 py-16 px-6 bg-black/80 backdrop-blur-lg mt-20">
-        <div className="max-w-6xl mx-auto flex flex-col items-center gap-12">
-          <div className="flex flex-col items-center gap-4 group transition-all">
-            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]" />
-            <span className="font-black text-sm tracking-widest text-zinc-500 uppercase">Aura System © 2026</span>
-          </div>
-          
-          <div className="flex flex-wrap justify-center gap-12">
-            <a href="/privacy" className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300">
-              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Privacidade</span>
-              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
-            </a>
-            <a href="/terms" className="group flex flex-col items-center gap-2 text-zinc-400 hover:text-primary transition-all duration-300">
-              <span className="text-xs font-black uppercase tracking-[0.4em] mb-1">Termos</span>
-              <div className="h-0.5 w-0 group-hover:w-full bg-primary transition-all duration-500 shadow-[0_0_10px_rgba(0,229,255,0.8)]" />
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

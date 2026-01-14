@@ -3,6 +3,8 @@ import { ArrowLeft, Calendar, Clock, Share2, Bookmark, ArrowRight, ShieldCheck, 
 import auraLogo from "@assets/AURA_1768346008566.png";
 import { useToast } from "@/hooks/use-toast";
 
+import { LandingFooter } from "@/components/layout/LandingFooter";
+
 const POSTS = [
   {
     id: "seguranca-dados-enterprise",
