@@ -40,7 +40,7 @@ export function Navbar() {
       <div className="flex items-center gap-8">
         <div className="fixed left-0 top-0 z-[110] pointer-events-none">
           <Link href="/app" className="pointer-events-auto">
-            <div className="relative pl-10 -mt-3 transition-transform duration-300 hover:scale-105 active:scale-95">
+            <div className="relative pl-24 -mt-3 transition-transform duration-300 hover:scale-105 active:scale-95">
               <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto relative z-10" />
             </div>
           </Link>
