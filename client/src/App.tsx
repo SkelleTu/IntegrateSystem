@@ -144,7 +144,7 @@ function LandingNavigation() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
+    <nav className="fixed top-0 left-0 w-full z-[100] px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
       <div className="flex items-center gap-2 pl-4 -mt-1">
         <img src={auraLogo} alt="Aura Logo" className="h-[4.33rem] w-auto" />
       </div>
@@ -169,11 +169,11 @@ function LandingNavigation() {
           
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 p-0 h-9 w-9">
                 <Menu className="w-6 h-6" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="bg-zinc-950 border-white/10 p-0 w-[280px]">
+            <SheetContent side="right" className="bg-zinc-950 border-white/10 p-0 w-[280px] z-[99999]">
               <SheetHeader className="p-6 border-b border-white/5">
                 <SheetTitle className="text-left">
                   <img src={auraLogo} alt="Aura Logo" className="h-12 w-auto" />
