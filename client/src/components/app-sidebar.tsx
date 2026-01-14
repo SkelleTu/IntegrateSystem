@@ -435,6 +435,15 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                       )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton 
+                      onClick={() => setLocation("/admin/monitoring")}
+                      className="hover:bg-green-500/10 hover:text-green-500 transition-colors py-6"
+                    >
+                      <BarChart3 className="w-5 h-5" />
+                      <span className="font-bold uppercase italic tracking-tighter">Monitoramento Global</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </>
               )}
 
