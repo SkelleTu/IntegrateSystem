@@ -43,11 +43,11 @@ export default function Home() {
     { label: "Assinar", href: "/register-institution", icon: UserPlus, variant: "default" as const }
   ];
 
-  const { data: menuItemsData } = useQuery<MenuItem[]>({
+  const menuItemsQuery = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"]
   });
 
-  const { data: categoriesData } = useQuery<Category[]>({
+  const categoriesQuery = useQuery<Category[]>({
     queryKey: ["/api/categories"]
   });
 
@@ -65,38 +65,50 @@ export default function Home() {
           <span className="text-white font-black tracking-tighter italic text-xl">AURA</span>
         </div>
 
-        {/* Desktop Nav */}
-        <nav className="hidden md:flex items-center gap-6">
-          {menuItemsList.map((item) => (
-            <Link key={item.label} href={item.href}>
-              <a className="text-white/60 hover:text-primary transition-colors font-medium text-sm uppercase tracking-widest">{item.label}</a>
-            </Link>
-          ))}
-          <div className="h-4 w-[1px] bg-white/10 mx-2" />
-          {authOptions.map((opt) => (
-            'href' in opt ? (
-              <Link key={opt.label} href={opt.href}>
-                <Button variant={opt.variant} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
+        {/* Combined Nav for Mobile and Desktop */}
+        <div className="flex items-center gap-4">
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-6">
+            {menuItemsList.map((item) => (
+              <Link key={item.label} href={item.href}>
+                <a className="text-white/60 hover:text-primary transition-colors font-medium text-sm uppercase tracking-widest">{item.label}</a>
+              </Link>
+            ))}
+            <div className="h-4 w-[1px] bg-white/10 mx-2" />
+            {authOptions.map((opt) => (
+              'href' in opt ? (
+                <Link key={opt.label} href={opt.href}>
+                  <Button variant={opt.variant} size="sm" className="font-bold uppercase tracking-widest text-[10px]">
+                    {opt.label}
+                  </Button>
+                </Link>
+              ) : (
+                <Button key={opt.label} variant={opt.variant} size="sm" onClick={opt.onClick} className="font-bold uppercase tracking-widest text-[10px]">
                   {opt.label}
                 </Button>
-              </Link>
-            ) : (
-              <Button key={opt.label} variant={opt.variant} size="sm" onClick={opt.onClick} className="font-bold uppercase tracking-widest text-[10px]">
-                {opt.label}
-              </Button>
-            )
-          ))}
-        </nav>
+              )
+            ))}
+          </nav>
 
-        {/* Mobile Toggle */}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="md:hidden text-white" 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-        >
-          {isMenuOpen ? <X /> : <Menu />}
-        </Button>
+          {/* Mobile Action Section: Assinar Button + Hamburger Toggle */}
+          <div className="flex md:hidden items-center gap-2">
+            {!user && (
+              <Link href="/register-institution">
+                <Button variant="default" size="sm" className="font-bold uppercase tracking-widest text-[10px] h-9 px-4">
+                  Assinar
+                </Button>
+              </Link>
+            )}
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white h-9 w-9 flex items-center justify-center" 
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </Button>
+          </div>
+        </div>
       </header>
 
       {/* Mobile Menu Overlay */}
@@ -106,7 +118,7 @@ export default function Home() {
             initial={{ opacity: 0, x: "100%" }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: "100%" }}
-            className="fixed inset-0 z-40 bg-background/95 backdrop-blur-xl md:hidden flex flex-col p-8 pt-24 gap-8"
+            className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-xl md:hidden flex flex-col p-8 pt-24 gap-8"
           >
             <div className="flex flex-col gap-6">
               <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Navegação</p>
@@ -155,6 +167,15 @@ export default function Home() {
                 )
               ))}
             </div>
+            
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-6 right-6 text-white h-10 w-10"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <X className="w-8 h-8" />
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
