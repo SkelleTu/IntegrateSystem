@@ -99,13 +99,13 @@ export default function BarberHome() {
 
       <div className="w-full max-w-6xl flex items-center justify-between mb-8 z-20">
         <button 
-          onClick={() => setLocation("/")}
+          onClick={() => setLocation("/app")}
           className="flex items-center gap-2 text-white/60 hover:text-primary transition-colors group"
         >
           <div className="p-2 rounded-full glass group-hover:bg-primary/10 transition-all">
             <ArrowLeft className="w-5 h-5" />
           </div>
-          <span className="font-medium uppercase tracking-widest text-xs">Sair</span>
+          <span className="font-medium uppercase tracking-widest text-xs">Voltar</span>
         </button>
 
         <div className="flex items-center gap-4 bg-zinc-900/50 p-2 border border-zinc-800 rounded-2xl backdrop-blur-md">
