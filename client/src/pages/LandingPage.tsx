@@ -104,9 +104,9 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Decorative Neon Elements with Pulse */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[30000ms]" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none animate-pulse duration-[30000ms] delay-1000" />
+      {/* Decorative Neon Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary/10 rounded-full blur-[120px] pointer-events-none" />
       
       {/* Hero Section */}
       {step === 1 && (
@@ -114,7 +114,7 @@ export default function LandingPage() {
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
           <div className="flex justify-center mb-8">
             <div className="relative group">
-              <div className="absolute -inset-8 bg-primary/40 rounded-full blur-[60px] group-hover:bg-primary/50 transition-all duration-1000" />
+              <div className="absolute -inset-24 bg-white/5 backdrop-blur-3xl rounded-full border border-white/5 shadow-2xl" />
               <img 
                 src={auraLogo} 
                 alt="Aura System Logo" 
@@ -126,7 +126,7 @@ export default function LandingPage() {
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none animate-pulse">
+            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase italic px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
               COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md">
