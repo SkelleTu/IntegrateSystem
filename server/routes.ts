@@ -47,12 +47,23 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Session & Auth Setup
+  const PostgresSessionStore = require("connect-pg-simple")(session);
+  const sessionStore = new PostgresSessionStore({
+    conString: process.env.DATABASE_URL,
+    tableName: "session",
+    createTableIfMissing: true,
+  });
+
   app.use(
     session({
+      store: sessionStore,
       secret: process.env.SESSION_SECRET || "barber_shop_secret",
       resave: false,
       saveUninitialized: false,
-      cookie: { secure: process.env.NODE_ENV === "production" },
+      cookie: { 
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+      },
     })
   );
 
