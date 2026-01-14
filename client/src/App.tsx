@@ -93,6 +93,7 @@ function Router() {
       <Route path="/privacy" component={PrivacyPolicy} />
       <Route path="/terms" component={TermsOfService} />
       <Route path="/blog" component={Blog} />
+      <Route path="/blog/:id" component={Blog} />
       <Route path="/contato" component={Contact} />
       <Route path="/app" component={Home} />
       <Route path="/barber" component={BarberHome} />
@@ -140,7 +141,7 @@ function LandingNavigation() {
     { href: "/quem-somos", label: "Quem Somos" },
     { href: "/solucoes", label: "Soluções" },
     { href: "/casos-de-sucesso", label: "Impacto Aura" },
-    { href: "/blog", label: "Blog" },
+    { href: "/blog", label: "Insights" },
     { href: "/contato", label: "Contato" },
   ];
 
