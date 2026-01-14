@@ -41,7 +41,7 @@ export function Navbar() {
         <Link href="/app" className="flex items-center gap-3 group">
           <div className="relative">
             <div className="absolute -inset-2 bg-primary/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-            <img src={auraLogo} alt="Aura Logo" className="w-[42px] h-auto relative z-10" />
+            <img src={auraLogo} alt="Aura Logo" className="w-14 h-auto relative z-10" />
           </div>
           <span className="text-white font-black italic uppercase tracking-tighter hidden md:block">Aura <span className="text-primary">System</span></span>
         </Link>
