@@ -7,7 +7,7 @@ import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import auraLogo from "@assets/AURA_1768346008566.png";
-import luxuryBg from "@assets/stock_images/abstract_cyber_techn_19f009d2.jpg";
+import luxuryBg from "@assets/stock_images/abstract_digital_cyb_cb12cca8.jpg";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -80,8 +80,8 @@ export default function LandingPage() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-black relative overflow-hidden">
       {/* Background Image with Overlay */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-40 scale-105"
-        style={{ backgroundImage: `url(${luxuryBg})` }}
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-30"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
       />
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
 
