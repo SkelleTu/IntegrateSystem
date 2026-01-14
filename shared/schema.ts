@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("barber"), // "admin" or "barber"
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
+  enterpriseId: integer("enterprise_id").references(() => enterprises.id),
 });
 
 export const services = pgTable("services", {
@@ -164,6 +165,7 @@ export const enterprises = pgTable("enterprises", {
   rgFrontUrl: text("rg_front_url"),
   rgBackUrl: text("rg_back_url"),
   slug: text("slug").notNull().unique(), // URL-friendly name
+  status: text("status").notNull().default("pending"), // "pending", "active", "rejected"
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
