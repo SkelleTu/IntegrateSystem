@@ -114,7 +114,7 @@ export default function LandingPage() {
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
           <div className="flex justify-center mb-8">
             <div className="relative group">
-              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl group-hover:bg-primary/30 transition-all duration-1000 animate-pulse duration-[30000ms]" />
+              <div className="absolute -inset-8 bg-primary/40 rounded-full blur-[60px] group-hover:bg-primary/50 transition-all duration-1000" />
               <img 
                 src={auraLogo} 
                 alt="Aura System Logo" 
