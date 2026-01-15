@@ -121,93 +121,96 @@ export default function Financeiro() {
   return (
     <div className="min-h-screen bg-black p-4 md:p-8 lg:p-12 space-y-8 max-w-[2400px] mx-auto overflow-x-hidden selection:bg-primary selection:text-black">
       <header className="flex flex-col xl:flex-row xl:items-center justify-between gap-8 bg-zinc-900/40 p-6 md:p-8 rounded-2xl border border-white/10 backdrop-blur-xl">
-        <div className="flex items-center gap-6">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:text-primary hover:bg-white/5 w-14 h-14 rounded-full"
-            onClick={() => setLocation("/")}
-          >
-            <ArrowLeft className="w-8 h-8" />
-          </Button>
-          <div className="flex flex-col">
-            <h1 className="text-white text-3xl md:text-5xl font-black italic uppercase tracking-tighter leading-none">Gestão <span className="text-primary">Financeira</span></h1>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.4em] mt-1">Analytics & Performance v2.0</p>
+        <div className="flex flex-col md:flex-row md:items-center gap-6">
+          <div className="flex items-center gap-6">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-white hover:text-primary hover:bg-white/5 w-14 h-14 rounded-full"
+              onClick={() => setLocation("/")}
+            >
+              <ArrowLeft className="w-8 h-8" />
+            </Button>
+            <div className="flex flex-col">
+              <h1 className="text-white text-3xl md:text-5xl font-black italic uppercase tracking-tighter leading-none">Gestão <span className="text-primary">Financeira</span></h1>
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.4em] mt-1">Analytics & Performance v2.0</p>
+            </div>
           </div>
+          
+          {/* Botão de Novo Lançamento em destaque */}
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="lg" className="bg-primary hover:bg-white text-black font-black uppercase italic h-14 px-8 rounded-xl shadow-[0_0_20px_rgba(0,255,102,0.3)] hover:shadow-[0_0_30px_rgba(0,255,102,0.5)] transition-all animate-in fade-in zoom-in duration-500">
+                <PlusCircle className="w-6 h-6 mr-2" /> Novo Lançamento
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md rounded-2xl p-8">
+              <DialogHeader>
+                <DialogTitle className="uppercase font-black italic text-2xl tracking-tighter mb-4">Lançamento Financeiro</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="type"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Tipo de Movimentação</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-black border-white/10 h-12 rounded-xl font-bold">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                            <SelectItem value="expense" className="font-bold uppercase italic text-xs">Despesa (Saída)</SelectItem>
+                            <SelectItem value="income" className="font-bold uppercase italic text-xs">Aporte (Entrada)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Descrição do Lançamento</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Ex: Pagamento de Fornecedor..." className="bg-black border-white/10 h-12 rounded-xl font-bold" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem className="space-y-2">
+                        <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Valor Monetário (R$)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01" 
+                            className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic tracking-tighter"
+                            onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value) * 100))}
+                            value={field.value ? field.value / 100 : ""}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full h-14 bg-primary text-black uppercase font-black italic text-lg rounded-xl shadow-xl transition-all" disabled={transactionMutation.isPending}>
+                    {transactionMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Lançamento"}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex flex-wrap items-center gap-4 bg-black/40 p-2 rounded-xl border border-white/5">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="lg" className="bg-primary hover:bg-white text-black font-black uppercase italic h-12 px-6 rounded-xl shadow-lg transition-all">
-                  <PlusCircle className="w-5 h-5 mr-2" /> Novo Lançamento
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md rounded-2xl p-8">
-                <DialogHeader>
-                  <DialogTitle className="uppercase font-black italic text-2xl tracking-tighter mb-4">Lançamento Financeiro</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Tipo de Movimentação</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-black border-white/10 h-12 rounded-xl font-bold">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                              <SelectItem value="expense" className="font-bold uppercase italic text-xs">Despesa (Saída)</SelectItem>
-                              <SelectItem value="income" className="font-bold uppercase italic text-xs">Aporte (Entrada)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Descrição do Lançamento</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Ex: Pagamento de Fornecedor..." className="bg-black border-white/10 h-12 rounded-xl font-bold" />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="amount"
-                      render={({ field }) => (
-                        <FormItem className="space-y-2">
-                          <FormLabel className="text-[10px] uppercase font-black tracking-widest text-white/40 pl-1">Valor Monetário (R$)</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              step="0.01" 
-                              className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic tracking-tighter"
-                              onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value) * 100))}
-                              value={field.value ? field.value / 100 : ""}
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit" className="w-full h-14 bg-primary text-black uppercase font-black italic text-lg rounded-xl shadow-xl transition-all" disabled={transactionMutation.isPending}>
-                      {transactionMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Lançamento"}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-
             <Select value={businessType} onValueChange={(v: any) => setBusinessType(v)}>
               <SelectTrigger className="w-[160px] bg-black border-white/10 text-white font-black uppercase italic text-xs h-12 rounded-xl">
                 <SelectValue placeholder="Negócio" />
