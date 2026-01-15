@@ -77,7 +77,9 @@ export default function Financeiro() {
       return res.json();
     },
     onSuccess: () => {
+      // Invalida tanto transações quanto vendas para garantir atualização total
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       setIsDialogOpen(false);
       form.reset();
       toast({ title: "Lançamento realizado com sucesso" });
@@ -95,11 +97,11 @@ export default function Financeiro() {
 
     const extraIncome = transactions
       .filter(t => t.type === "income")
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     const expenses = transactions
       .filter(t => t.type === "expense")
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+      .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     // O lucro líquido real é: Total de Vendas (Bruto) + Entradas Manuais - Despesas Manuais
     const totalNet = salesGross + extraIncome - expenses;
