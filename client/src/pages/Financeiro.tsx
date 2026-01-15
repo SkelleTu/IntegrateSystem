@@ -56,8 +56,10 @@ export default function Financeiro() {
     queryKey: ["/api/transactions", dateRange.start, dateRange.end, businessType],
     queryFn: async () => {
       const res = await fetch(`/api/transactions?start=${dateRange.start}&end=${dateRange.end}&businessType=${businessType}`);
+      if (!res.ok) throw new Error("Erro ao buscar transações");
       return res.json();
     },
+    refetchInterval: 3000, // Atualiza a cada 3 segundos para garantir
   });
 
   const form = useForm({
