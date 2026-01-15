@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout } = useAuth() as any;
   const { toast } = useToast();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 

@@ -26,7 +26,8 @@ import {
   Trash2,
   Plus,
   Fingerprint,
-  History
+  History,
+  X
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -38,6 +39,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
+import auraLogo from "@assets/AURA_1768346008566.png";
 
 export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const [, setLocation] = useLocation();
@@ -354,13 +356,17 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       return;
     }
     setLocation(url);
-    if (window.innerWidth < 768) {
-      setOpen(false);
-    }
+    setOpen(false);
   };
 
   return (
     <Sidebar side={side} collapsible="icon" className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}>
+      <div className="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-black/50">
+        <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
+        <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
+          <X className="w-6 h-6 text-white" />
+        </Button>
+      </div>
       <SidebarContent className="bg-transparent backdrop-blur-xl text-white">
         <SidebarGroup>
           <SidebarGroupLabel className="text-zinc-500 uppercase font-black italic tracking-widest text-[10px]">Menu Principal</SidebarGroupLabel>

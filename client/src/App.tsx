@@ -232,7 +232,26 @@ export default function App() {
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <LandingNavigation />
               <Navbar />
-              <Router />
+              <SidebarProvider>
+                <div className="flex h-screen w-full overflow-hidden">
+                  <AppSidebar />
+                  <div className="flex flex-col flex-1 overflow-hidden relative">
+                    <header className="flex items-center justify-between p-2 border-b border-white/5 bg-black/50 backdrop-blur-md relative z-50">
+                      <div className="flex items-center gap-2">
+                        <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden" />
+                        <div className="md:hidden">
+                          <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                      </div>
+                    </header>
+                    <main className="flex-1 overflow-y-auto relative">
+                      <Router />
+                    </main>
+                  </div>
+                </div>
+              </SidebarProvider>
             </main>
           </div>
         </div>
