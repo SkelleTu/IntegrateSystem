@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Calendar, Clock, Share2, Bookmark, ArrowRight, ShieldCheck, Zap, Globe, BarChart3 } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
+import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 import { useToast } from "@/hooks/use-toast";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
@@ -79,6 +80,12 @@ export default function Blog() {
   if (isPostPage && currentPost) {
     return (
       <div className="min-h-screen w-full bg-black text-white relative flex flex-col">
+        {/* Background Image with Overlay - Match Landing Page Style */}
+        <div 
+          className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
+          style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+        />
+        <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
         <div className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
           <Link href="/blog" className="flex items-center gap-2 text-zinc-400 hover:text-white transition-colors cursor-pointer group">
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -150,6 +157,12 @@ export default function Blog() {
 
   return (
     <div className="min-h-screen w-full bg-black text-white relative overflow-x-hidden">
+      {/* Background Image with Overlay - Match Landing Page Style */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
       <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
       
       <main className="relative z-10 pt-32 pb-20 px-6 max-w-7xl mx-auto">

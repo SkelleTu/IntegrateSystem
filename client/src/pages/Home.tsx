@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
-import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone } from "lucide-react";
+import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
+import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user, logout } = useAuth() as { user: any, logout: any };
+  const { user, logout } = useAuth();
   const { toast } = useToast();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -53,7 +54,13 @@ export default function Home() {
   const isInventoryLocked = user?.role !== "admin";
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-24">
+    <div className="min-h-screen bg-black flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-24">
+      {/* Background Image with Overlay - Match Landing Page Style */}
+      <div 
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
+        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+      />
+      <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
       <motion.div 
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}

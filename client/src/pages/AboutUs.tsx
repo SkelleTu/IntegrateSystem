@@ -9,7 +9,7 @@ export default function AboutUs() {
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden">
       {/* Background Image with Overlay - Match Landing Page Style */}
       <div 
-        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20"
+        className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-20 blur-[4px] scale-105"
         style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
       />
       <div className="absolute inset-0 z-0 bg-gradient-to-b from-black/80 via-black/40 to-black/90" />
