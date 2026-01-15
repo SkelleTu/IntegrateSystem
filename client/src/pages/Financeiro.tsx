@@ -95,13 +95,14 @@ export default function Financeiro() {
 
     const extraIncome = transactions
       .filter(t => t.type === "income")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
 
     const expenses = transactions
       .filter(t => t.type === "expense")
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + Number(t.amount), 0);
 
-    const totalNet = baseNet + extraIncome - expenses;
+    // O lucro líquido real é: Total de Vendas (Bruto) + Entradas Manuais - Despesas Manuais
+    const totalNet = salesGross + extraIncome - expenses;
 
     return { 
       gross: salesGross + extraIncome, 
@@ -247,17 +248,17 @@ export default function Financeiro() {
         {[
           { label: "Faturamento Bruto", value: financialData.gross, icon: TrendingUp, color: "text-primary", desc: "Volume total de entradas" },
           { label: "Despesas Totais", value: financialData.expenses, icon: MinusCircle, color: "text-red-500", desc: "Saídas e custos operacionais" },
-          { label: "Lucro Líquido", value: financialData.net, icon: DollarSign, color: "text-primary", desc: "Resultado operacional final", highlight: true },
+          { label: "Saldo em Caixa", value: financialData.net, icon: DollarSign, color: financialData.net < 0 ? "text-red-500" : "text-primary", desc: "Resultado financeiro atual", highlight: true },
           { label: "Volume de Vendas", value: financialData.count, icon: Wallet, color: "text-white/60", desc: "Atendimentos concluídos", isNumber: true },
         ].map((card, idx) => (
-          <Card key={idx} className={`bg-zinc-900/60 border-white/5 backdrop-blur-xl shadow-2xl transition-all hover:scale-[1.02] ${card.highlight ? 'border-primary/20 bg-primary/5' : ''}`}>
+          <Card key={idx} className={`bg-zinc-900/60 border-white/5 backdrop-blur-xl shadow-2xl transition-all hover:scale-[1.02] ${card.highlight ? (financialData.net < 0 ? 'border-red-500/20 bg-red-500/5' : 'border-primary/20 bg-primary/5') : ''}`}>
             <CardHeader className="flex flex-row items-center justify-between pb-4">
               <CardTitle className="text-white/40 text-[10px] font-black uppercase tracking-[0.2em]">{card.label}</CardTitle>
               <card.icon className={`w-5 h-5 ${card.color}`} />
             </CardHeader>
             <CardContent>
               <div className={`${card.color} text-3xl md:text-4xl font-black italic tracking-tighter leading-none`}>
-                {card.isNumber ? card.value : `R$ ${(card.value / 100).toFixed(2)}`}
+                {card.isNumber ? card.value : `${financialData.net < 0 && card.label === "Saldo em Caixa" ? "-" : ""} R$ ${(Math.abs(card.value) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
               </div>
               <p className="text-[10px] text-white/40 uppercase font-bold italic mt-2 tracking-wide">{card.desc}</p>
             </CardContent>
