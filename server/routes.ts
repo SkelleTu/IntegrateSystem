@@ -567,30 +567,37 @@ export async function registerRoutes(
   });
 
   app.get("/api/transactions", isAuthenticated, async (req, res) => {
-    const { start, end, businessType } = req.query;
-    
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
+    try {
+      const { start, end, businessType } = req.query;
+      console.log('API Request - GET /api/transactions:', { start, end, businessType });
+      
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
 
-    const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
+      const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
 
-    if (start && start !== "undefined" && start !== "") {
-      const date = new Date(start as string);
-      if (isValidDate(date)) startDate = date;
+      if (start && start !== "undefined" && start !== "") {
+        const date = new Date(start as string);
+        if (isValidDate(date)) startDate = date;
+      }
+
+      if (end && end !== "undefined" && end !== "") {
+        const date = new Date(end as string);
+        if (isValidDate(date)) endDate = date;
+      }
+
+      const filters = {
+        startDate,
+        endDate,
+        businessType: businessType as string,
+      };
+      const list = await storage.getTransactions(filters);
+      console.log('Storage returned transactions count:', list.length);
+      res.json(list);
+    } catch (err) {
+      console.error('Error in GET /api/transactions:', err);
+      res.status(500).json({ message: "Internal server error" });
     }
-
-    if (end && end !== "undefined" && end !== "") {
-      const date = new Date(end as string);
-      if (isValidDate(date)) endDate = date;
-    }
-
-    const filters = {
-      startDate,
-      endDate,
-      businessType: businessType as string,
-    };
-    const list = await storage.getTransactions(filters);
-    res.json(list);
   });
 
   app.post("/api/transactions", isAuthenticated, async (req, res) => {

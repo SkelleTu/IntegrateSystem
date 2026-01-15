@@ -55,11 +55,15 @@ export default function Financeiro() {
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions", dateRange.start, dateRange.end, businessType],
     queryFn: async () => {
-      const res = await fetch(`/api/transactions?start=${dateRange.start}&end=${dateRange.end}&businessType=${businessType}`);
+      const url = `/api/transactions?start=${dateRange.start}&end=${dateRange.end}&businessType=${businessType}`;
+      console.log('Fetching transactions from:', url);
+      const res = await fetch(url);
       if (!res.ok) throw new Error("Erro ao buscar transações");
-      return res.json();
+      const data = await res.json();
+      console.log('Transactions received:', data);
+      return data;
     },
-    refetchInterval: 3000, // Atualiza a cada 3 segundos para garantir
+    refetchInterval: 3000,
   });
 
   const form = useForm({
@@ -91,17 +95,14 @@ export default function Financeiro() {
   const financialData = useMemo(() => {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0 };
     
-    const completedSales = sales.filter(s => s.status === "completed");
-    const salesGross = completedSales.reduce((sum, s) => sum + s.totalAmount, 0);
+    const completedSales = (sales || []).filter(s => s.status === "completed");
+    const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     
-    const margin = businessType === "barbearia" ? 0.85 : 0.45;
-    const baseNet = Math.round(salesGross * margin);
-
-    const extraIncome = transactions
+    const extraIncome = (transactions || [])
       .filter(t => t.type === "income")
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
-    const expenses = transactions
+    const expenses = (transactions || [])
       .filter(t => t.type === "expense")
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
