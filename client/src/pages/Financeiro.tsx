@@ -103,12 +103,20 @@ export default function Financeiro() {
     
     // Filtro manual de vendas por unidade (se a API não filtrar por businessType)
     // Nota: Vendas na padaria vêm do Checkout/Caixa, Vendas na barbearia vêm dos Serviços
+    const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    
+    const inventoryValue = inventory
+      .filter(item => {
+        // Se o item do estoque não tiver vínculo claro, podemos assumir baseado no businessType selecionado
+        // ou deixar como está se o estoque for global
+        return true; 
+      })
+      .reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    
+    // Filtrar vendas por unidade (se houver campo na venda ou baseado no fluxo)
+    // Por enquanto, as vendas parecem ser filtradas pela API ou contextuais
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
-    
-    const extraIncome = (transactions || []).filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const expenses = (transactions || []).filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    
-    const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
     
     const totalNet = salesGross + extraIncome - expenses;
     return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue };
