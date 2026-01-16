@@ -1,10 +1,8 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Transaction, insertTransactionSchema } from "@shared/schema";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Calendar as CalendarIcon, ArrowLeft, TrendingUp, TrendingDown, DollarSign, PlusCircle, MinusCircle, Wallet, LayoutDashboard, Receipt, BarChartHorizontal } from "lucide-react";
+import { Loader2, ArrowLeft, TrendingUp, TrendingDown, DollarSign, PlusCircle, Wallet, LayoutDashboard, Receipt, BarChartHorizontal } from "lucide-react";
 import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -48,7 +46,6 @@ export default function Financeiro() {
     queryFn: async () => {
       const start = new Date(dateRange.start + 'T00:00:00');
       const end = new Date(dateRange.end + 'T23:59:59');
-      
       const res = await fetch(`/api/sales?start=${start.toISOString()}&end=${end.toISOString()}`);
       return res.json();
     },
@@ -101,36 +98,23 @@ export default function Financeiro() {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
     
-    // Filtro manual de vendas por unidade (se a API não filtrar por businessType)
-    // Nota: Vendas na padaria vêm do Checkout/Caixa, Vendas na barbearia vêm dos Serviços
     const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     
-    const inventoryValue = inventory
-      .filter(item => {
-        // Se o item do estoque não tiver vínculo claro, podemos assumir baseado no businessType selecionado
-        // ou deixar como está se o estoque for global
-        return true; 
-      })
-      .reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
     
-    // Filtrar vendas por unidade (se houver campo na venda ou baseado no fluxo)
-    // Por enquanto, as vendas parecem ser filtradas pela API ou contextuais
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     
     const totalNet = salesGross + extraIncome - expenses;
     return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue };
-  }, [sales, transactions, inventory]);
+  }, [sales, transactions, inventory, businessType]);
 
   const onSubmit = (data: any) => {
     transactionMutation.mutate(data);
   };
 
-  const isLoading = isLoadingSales || isLoadingTransactions;
-
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 flex flex-col lg:flex-row gap-0 overflow-hidden">
-      {/* NOVO DASHBOARD LATERAL DE KPI */}
       <aside className="w-full lg:w-96 bg-zinc-900/50 border-r border-white/5 p-6 flex flex-col gap-8 overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <Button 
@@ -145,6 +129,8 @@ export default function Financeiro() {
             Módulo Financeiro
           </Badge>
         </div>
+        
+        <div className="space-y-2">
           <h2 className="text-3xl font-black italic uppercase tracking-tighter">Performance Hub</h2>
           <p className="text-xs text-zinc-500 font-medium leading-relaxed">Acompanhamento em tempo real do fluxo de caixa e rentabilidade operacional.</p>
         </div>
@@ -253,6 +239,7 @@ export default function Financeiro() {
                         <FormControl>
                           <Input {...field} className="bg-black border-white/10 h-12 rounded-xl" />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -265,6 +252,7 @@ export default function Financeiro() {
                         <FormControl>
                           <Input type="number" step="0.01" className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic" onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value) * 100))} value={field.value ? field.value / 100 : ""} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -282,7 +270,6 @@ export default function Financeiro() {
         </div>
       </aside>
 
-      {/* CONTEÚDO PRINCIPAL EM TABS */}
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="p-6 border-b border-white/5 flex flex-wrap items-center justify-between gap-4 bg-zinc-900/20">
           <div className="flex items-center gap-4 bg-black/40 p-1.5 rounded-xl border border-white/5">
