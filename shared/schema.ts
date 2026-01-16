@@ -218,6 +218,8 @@ export const inventory = pgTable("inventory", {
   quantity: integer("quantity").notNull().default(0),
   unit: text("unit").notNull(), // e.g., "Bag", "Caixa", "Unidade"
   itemsPerUnit: integer("items_per_unit").notNull().default(1),
+  costPrice: integer("cost_price").notNull().default(0), // in cents
+  salePrice: integer("sale_price"), // in cents, optional for ingredients
   expiryDate: timestamp("expiry_date"),
   minStock: integer("min_stock").notNull().default(5),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -233,7 +235,10 @@ export const inventoryLogs = pgTable("inventory_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertInventorySchema = createInsertSchema(inventory).omit({ id: true, updatedAt: true });
+export const insertInventorySchema = createInsertSchema(inventory, {
+  costPrice: z.number().transform(v => Math.round(v * 100)),
+  salePrice: z.number().transform(v => Math.round(v * 100)).optional(),
+}).omit({ id: true, updatedAt: true });
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({ id: true, createdAt: true });
 
 export type Inventory = typeof inventory.$inferSelect;
