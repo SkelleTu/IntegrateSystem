@@ -328,6 +328,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(transactions.createdAt));
   }
 
+  // Inventory
   async getInventory(): Promise<Inventory[]> {
     return await db.select().from(inventory).orderBy(asc(inventory.expiryDate));
   }
@@ -356,13 +357,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
-    const [item] = await db.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
-    if (item) {
-      const [updated] = await db.update(inventory).set(data).where(eq(inventory.id, item.id)).returning();
-      return updated;
-    }
-    const [newInv] = await db.insert(inventory).values(data).returning();
-    return newInv;
+    return await db.transaction(async (tx) => {
+      const [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
+      
+      let result: Inventory;
+      if (item) {
+        [result] = await tx.update(inventory).set(data).where(eq(inventory.id, item.id)).returning();
+      } else {
+        [result] = await tx.insert(inventory).values(data).returning();
+      }
+
+      // Automatically create a financial transaction if it's an "in" entry with cost
+      if (data.costPrice && data.costPrice > 0 && data.quantity > 0) {
+        await tx.insert(transactions).values({
+          businessType: "padaria", // Default to padaria for inventory, adjust if needed
+          type: "expense",
+          category: "estoque",
+          description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ID ${data.itemId}`,
+          amount: data.costPrice * data.quantity,
+          createdAt: new Date()
+        });
+      }
+
+      return result;
+    });
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {

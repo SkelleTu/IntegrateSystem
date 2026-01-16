@@ -60,7 +60,7 @@ export default function InventoryPage() {
     );
   }
 
-  const isExpiringSoon = (date: string | null) => {
+  const isExpiringSoon = (date: any) => {
     if (!date) return false;
     const expiry = new Date(date);
     const warningDate = addDays(new Date(), 7);
@@ -72,6 +72,9 @@ export default function InventoryPage() {
     return item?.name || "Item desconhecido";
   };
 
+  const [costPrice, setCostPrice] = useState("");
+  const [salePrice, setSalePrice] = useState("");
+
   const handleUpsert = () => {
     if (!selectedItem || !quantity) return;
     upsertMutation.mutate({
@@ -80,6 +83,8 @@ export default function InventoryPage() {
       quantity: parseInt(quantity),
       unit,
       itemsPerUnit: parseInt(itemsPerUnit),
+      costPrice: parseFloat(costPrice),
+      salePrice: salePrice ? parseFloat(salePrice) : null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
     });
   };
@@ -120,6 +125,31 @@ export default function InventoryPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2.5">
+                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Preço Custo (R$)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={costPrice} 
+                  onChange={e => setCostPrice(e.target.value)} 
+                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="space-y-2.5">
+                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Preço Venda (R$)</Label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={salePrice} 
+                  onChange={e => setSalePrice(e.target.value)} 
+                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
+                  placeholder="Opcional"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -201,11 +231,12 @@ export default function InventoryPage() {
                 <Table className="min-w-[800px] w-full table-fixed">
                   <TableHeader>
                     <TableRow className="border-white/5 hover:bg-transparent bg-black/40">
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[30%] py-6 pl-8">Item</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[12%] py-6">Qtd</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[20%] py-6">Tipo/Embalagem</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[25%] py-6 pl-8">Item</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[10%] py-6">Qtd</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Preços (C/V)</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Tipo/Embalagem</TableHead>
                       <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Vencimento</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest text-right pr-8 w-[23%] py-6">Análise</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest text-right pr-8 w-[20%] py-6">Análise</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -223,6 +254,16 @@ export default function InventoryPage() {
                           </TableCell>
                           <TableCell className="text-primary font-black text-base lg:text-2xl italic tracking-tighter">
                             {inv.quantity}
+                          </TableCell>
+                          <TableCell className="text-white/60 text-xs lg:text-sm font-bold">
+                            <div className="flex flex-col">
+                              <span className="text-red-400">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
+                              {inv.salePrice ? (
+                                <span className="text-green-400">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>
+                              ) : (
+                                <span className="text-zinc-500 italic">Insumo</span>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-white/60 truncate text-xs lg:text-sm font-bold uppercase">
                             {inv.unit} <span className="text-white/40">/</span> {inv.itemsPerUnit} un

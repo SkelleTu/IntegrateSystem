@@ -93,15 +93,22 @@ export default function Financeiro() {
     }
   });
 
+  const { data: inventory = [] } = useQuery<any[]>({
+    queryKey: ["/api/inventory"],
+  });
+
   const financialData = useMemo(() => {
-    if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0 };
+    if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     const extraIncome = (transactions || []).filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const expenses = (transactions || []).filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    
+    const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    
     const totalNet = salesGross + extraIncome - expenses;
-    return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length };
-  }, [sales, transactions]);
+    return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue };
+  }, [sales, transactions, inventory]);
 
   const onSubmit = (data: any) => {
     transactionMutation.mutate({ ...data, businessType });
@@ -129,6 +136,16 @@ export default function Financeiro() {
             </div>
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.net >= 0 ? 'text-white' : 'text-red-500'}`}>
               R$ {(financialData.net / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-zinc-800/20 border border-white/5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center">
+              <Wallet className="w-5 h-5 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase font-bold text-zinc-500">Valor em Estoque</p>
+              <p className="font-bold text-blue-400">R$ {(financialData.inventoryValue / 100).toFixed(2)}</p>
             </div>
           </div>
 
