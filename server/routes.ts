@@ -5,7 +5,7 @@ import { api } from "@shared/routes";
 import { z } from "zod";
 import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";
 import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
+import createMemoryStore from "memorystore";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
@@ -48,10 +48,10 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Session & Auth Setup
-  const PostgresSessionStore = connectPgSimple(session);
-  const sessionStore = new PostgresSessionStore({
-    createTableIfMissing: true,
-  } as any);
+  const MemoryStore = createMemoryStore(session);
+  const sessionStore = new MemoryStore({
+    checkPeriod: 86400000 // prune expired entries every 24h
+  });
 
   app.use(
     session({
@@ -748,7 +748,7 @@ export async function registerRoutes(
     await storage.createTicket({
       ticketNumber: 20,
       status: "pending",
-      items: []
+      items: "[]"
     });
     console.log("Ticket 20 seeded for testing");
   }

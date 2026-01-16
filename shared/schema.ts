@@ -8,7 +8,7 @@ export const userSessions = pgTable("user_sessions", {
   type: text("type").notNull(), // "login", "logout"
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const users = pgTable("users", {
@@ -34,7 +34,7 @@ export const tickets = pgTable("tickets", {
   serviceId: integer("service_id"),
   status: text("status").default("pending").notNull(),
   items: text("items"), // Store as JSON string since SQLite doesn't have native arrays
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const queueState = pgTable("queue_state", {
@@ -90,7 +90,7 @@ export const sales = pgTable("sales", {
   fiscalError: text("fiscal_error"), 
   fiscalType: text("fiscal_type").default("NFCe"), 
   status: text("status").notNull().default("completed"), 
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const saleItems = pgTable("sale_items", {
@@ -108,7 +108,7 @@ export const payments = pgTable("payments", {
   saleId: integer("sale_id").notNull(),
   method: text("method").notNull(), // "cash", "card", "pix"
   amount: integer("amount").notNull(), // in cents
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const transactions = pgTable("transactions", {
@@ -118,16 +118,16 @@ export const transactions = pgTable("transactions", {
   category: text("category").notNull(), 
   description: text("description").notNull(),
   amount: integer("amount").notNull(), // in cents
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const timeClock = pgTable("time_clock", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
   type: text("type").notNull(), // "in", "break_start", "break_end", "out"
-  timestamp: integer("timestamp", { mode: 'timestamp' }).notNull().default(new Date()),
+  timestamp: integer("timestamp", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   fingerprintId: text("fingerprint_id"),
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const enterprises = pgTable("enterprises", {
@@ -142,7 +142,7 @@ export const enterprises = pgTable("enterprises", {
   rgBackUrl: text("rg_back_url"),
   slug: text("slug").notNull().unique(), 
   status: text("status").notNull().default("pending"), 
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const settings = pgTable("settings", {
@@ -170,7 +170,7 @@ export const inventory = pgTable("inventory", {
   salePrice: integer("sale_price"), // in cents
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
-  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const inventoryLogs = pgTable("inventory_logs", {
@@ -180,7 +180,7 @@ export const inventoryLogs = pgTable("inventory_logs", {
   quantity: integer("quantity").notNull(),
   reason: text("reason"),
   userId: integer("user_id").notNull(),
-  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().default(new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 // Helper types and schemas
@@ -196,7 +196,9 @@ export const insertCashRegisterSchema = createInsertSchema(cashRegisters, {
 export const insertSaleSchema = createInsertSchema(sales);
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ saleId: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ saleId: true });
-export const insertMenuItemSchema = createInsertSchema(menuItems);
+export const insertMenuItemSchema = createInsertSchema(menuItems, {
+  tags: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+});
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertTimeClockSchema = createInsertSchema(timeClock);
 export const insertEnterpriseSchema = createInsertSchema(enterprises);
