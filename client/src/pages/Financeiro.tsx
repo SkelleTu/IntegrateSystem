@@ -100,7 +100,11 @@ export default function Financeiro() {
   const financialData = useMemo(() => {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
+    
+    // Filtro manual de vendas por unidade (se a API não filtrar por businessType)
+    // Nota: Vendas na padaria vêm do Checkout/Caixa, Vendas na barbearia vêm dos Serviços
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
+    
     const extraIncome = (transactions || []).filter(t => t.type === "income").reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const expenses = (transactions || []).filter(t => t.type === "expense").reduce((sum, t) => sum + Number(t.amount || 0), 0);
     
@@ -111,7 +115,7 @@ export default function Financeiro() {
   }, [sales, transactions, inventory]);
 
   const onSubmit = (data: any) => {
-    transactionMutation.mutate({ ...data, businessType });
+    transactionMutation.mutate(data);
   };
 
   const isLoading = isLoadingSales || isLoadingTransactions;
@@ -183,6 +187,26 @@ export default function Financeiro() {
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="businessType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Unidade</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger className="bg-black border-white/10 h-12 rounded-xl">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent className="bg-zinc-900 border-white/10 text-white font-black italic">
+                            <SelectItem value="barbearia">Barbearia</SelectItem>
+                            <SelectItem value="padaria">Padaria</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="type"
