@@ -313,14 +313,10 @@ export class DatabaseStorage implements IStorage {
   async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
     let conditions = [];
     if (filters.startDate) {
-      const start = new Date(filters.startDate);
-      start.setUTCHours(0, 0, 0, 0);
-      conditions.push(gte(transactions.createdAt, start));
+      conditions.push(gte(transactions.createdAt, filters.startDate));
     }
     if (filters.endDate) {
-      const end = new Date(filters.endDate);
-      end.setUTCHours(23, 59, 59, 999);
-      conditions.push(lte(transactions.createdAt, end));
+      conditions.push(lte(transactions.createdAt, filters.endDate));
     }
     if (filters.businessType) {
       conditions.push(eq(transactions.businessType, filters.businessType));
