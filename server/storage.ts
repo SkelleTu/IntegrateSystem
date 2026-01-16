@@ -218,11 +218,29 @@ export class DatabaseStorage implements IStorage {
 
   async getTicketByNumber(number: number): Promise<Ticket | undefined> {
     const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
+    if (ticket && typeof ticket.items === 'string') {
+      try {
+        (ticket as any).items = JSON.parse(ticket.items);
+      } catch (e) {
+        (ticket as any).items = [];
+      }
+    } else if (ticket && !ticket.items) {
+      (ticket as any).items = [];
+    }
     return ticket;
   }
 
   async getLatestTicket(): Promise<Ticket | undefined> {
     const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
+    if (ticket && typeof ticket.items === 'string') {
+      try {
+        (ticket as any).items = JSON.parse(ticket.items);
+      } catch (e) {
+        (ticket as any).items = [];
+      }
+    } else if (ticket && !ticket.items) {
+      (ticket as any).items = [];
+    }
     return ticket;
   }
 
@@ -385,7 +403,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
     const [updated] = await db.update(tickets)
-      .set({ items })
+      .set({ items: JSON.stringify(items) })
       .where(eq(tickets.id, id))
       .returning();
     return updated;

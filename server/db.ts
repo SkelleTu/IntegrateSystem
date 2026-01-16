@@ -1,14 +1,16 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
 import * as schema from "@shared/schema";
+import path from "path";
 
-const { Pool } = pg;
+// Usando SQLite local para garantir que o banco de dados seja um arquivo do projeto
+// e migre junto com o código via GitHub ou qualquer outro meio.
+const sqlite = new Database(path.join(process.cwd(), "sqlite.db"));
+export const db = drizzle(sqlite, { schema });
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
-
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+// Helper para manter compatibilidade com o pool se necessário
+export const pool = {
+  connect: () => ({ release: () => {} }),
+  query: () => ({ rows: [] }),
+  end: () => {}
+} as any;

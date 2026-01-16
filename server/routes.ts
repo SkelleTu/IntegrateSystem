@@ -50,10 +50,8 @@ export async function registerRoutes(
   // Session & Auth Setup
   const PostgresSessionStore = connectPgSimple(session);
   const sessionStore = new PostgresSessionStore({
-    conString: process.env.DATABASE_URL,
-    tableName: "session",
     createTableIfMissing: true,
-  });
+  } as any);
 
   app.use(
     session({
@@ -362,12 +360,15 @@ export async function registerRoutes(
 
   // Digital Menu Routes
   app.get("/api/categories", async (req, res) => {
-    const categories = await storage.getCategories();
-    res.json(categories);
+    const categoriesList = await storage.getCategories();
+    res.json(categoriesList);
   });
 
   app.get("/api/menu-items", async (req, res) => {
-    const items = await storage.getMenuItems();
+    const items = (await storage.getMenuItems()).map(item => ({
+      ...item,
+      tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || [])
+    }));
     res.json(items);
   });
 
@@ -422,7 +423,8 @@ export async function registerRoutes(
       ...sale, 
       cashRegisterId: register.id, 
       userId: user.id,
-      fiscalStatus: sale.customerTaxId ? "pending" : "none" 
+      fiscalStatus: sale.customerTaxId ? "pending" : "none",
+      createdAt: new Date()
     });
     const parsedItems = items.map((item: any) => insertSaleItemSchema.parse(item));
     const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse(p));
