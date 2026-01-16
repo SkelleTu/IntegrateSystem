@@ -132,10 +132,19 @@ export default function Financeiro() {
     <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 flex flex-col lg:flex-row gap-0 overflow-hidden">
       {/* NOVO DASHBOARD LATERAL DE KPI */}
       <aside className="w-full lg:w-96 bg-zinc-900/50 border-r border-white/5 p-6 flex flex-col gap-8 overflow-y-auto">
-        <div className="space-y-2">
+        <div className="flex items-center justify-between mb-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setLocation("/")}
+            className="text-zinc-500 hover:text-white"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           <Badge variant="outline" className="text-primary border-primary/20 bg-primary/5 uppercase font-black text-[10px] tracking-[0.2em] px-3 py-1">
             Módulo Financeiro
           </Badge>
+        </div>
           <h2 className="text-3xl font-black italic uppercase tracking-tighter">Performance Hub</h2>
           <p className="text-xs text-zinc-500 font-medium leading-relaxed">Acompanhamento em tempo real do fluxo de caixa e rentabilidade operacional.</p>
         </div>
@@ -259,7 +268,11 @@ export default function Financeiro() {
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full h-14 bg-primary text-black uppercase font-black italic text-lg rounded-xl" disabled={transactionMutation.isPending}>
+                  <Button 
+                    type="submit" 
+                    className="w-full h-14 bg-primary text-black hover:bg-primary/90 uppercase font-black italic text-lg rounded-xl transition-colors" 
+                    disabled={transactionMutation.isPending}
+                  >
                     {transactionMutation.isPending ? <Loader2 className="animate-spin" /> : "Salvar Registro"}
                   </Button>
                 </form>
