@@ -314,12 +314,12 @@ export class DatabaseStorage implements IStorage {
     let conditions = [];
     if (filters.startDate) {
       const start = new Date(filters.startDate);
-      start.setHours(0, 0, 0, 0);
+      start.setUTCHours(0, 0, 0, 0);
       conditions.push(gte(transactions.createdAt, start));
     }
     if (filters.endDate) {
       const end = new Date(filters.endDate);
-      end.setHours(23, 59, 59, 999);
+      end.setUTCHours(23, 59, 59, 999);
       conditions.push(lte(transactions.createdAt, end));
     }
     if (filters.businessType) {

@@ -46,7 +46,7 @@ export default function Financeiro() {
   const { data: sales, isLoading: isLoadingSales } = useQuery<any[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const res = await fetch(`/api/sales?start=${dateRange.start}&end=${dateRange.end}`);
+      const res = await fetch(`/api/sales?start=${dateRange.start}T00:00:00.000Z&end=${dateRange.end}T23:59:59.999Z`);
       return res.json();
     },
     refetchInterval: 5000,
@@ -55,7 +55,7 @@ export default function Financeiro() {
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions", dateRange.start, dateRange.end, businessType],
     queryFn: async () => {
-      const url = `/api/transactions?start=${dateRange.start}&end=${dateRange.end}&businessType=${businessType}`;
+      const url = `/api/transactions?start=${dateRange.start}T00:00:00.000Z&end=${dateRange.end}T23:59:59.999Z&businessType=${businessType}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erro ao buscar transações");
       return res.json();
