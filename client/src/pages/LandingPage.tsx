@@ -128,7 +128,7 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-4">
           <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest hover:scale-105 transition-all" onClick={() => setLocation("/login")}>Entrar</Button>
-          <Button className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)]" onClick={() => setStep(2)}>Assinar</Button>
+          <Button className="bg-[#00e5ff] text-black font-black text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)] border-none" onClick={() => setStep(2)}>Assinar</Button>
         </div>
       </nav>
 
@@ -153,7 +153,7 @@ export default function LandingPage() {
             Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
-            <Button size="lg" onClick={() => setStep(2)} className="bg-primary text-white font-black uppercase px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
+            <Button size="lg" onClick={() => setStep(2)} className="bg-[#00e5ff] text-black font-black uppercase px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
               COMEÇAR AGORA <ArrowRight className="ml-2 w-6 h-6" />
             </Button>
             <Button size="lg" variant="outline" onClick={() => setLocation("/login")} className="border-primary/20 bg-white/5 text-white font-bold h-16 px-10 hover:bg-primary/10 hover:border-primary/40 backdrop-blur-md hover:scale-105 transition-all">
