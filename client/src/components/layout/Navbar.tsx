@@ -39,7 +39,6 @@ export function Navbar() {
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet", url: "/cart", icon: ShoppingCart },
-    { title: "Barbearia", url: "/barber", icon: Scissors },
   ];
 
   const filteredItems = navItems.filter(item => !item.adminOnly || user.role === "admin");

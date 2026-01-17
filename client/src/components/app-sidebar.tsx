@@ -341,7 +341,6 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
-    { title: "Barbearia", url: "/barber", icon: Scissors },
   ]
 
   if (!user) return null;
