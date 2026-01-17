@@ -181,7 +181,7 @@ export default function Cashier() {
               />
             </div>
             <Button
-              className="w-full bg-primary hover:bg-white text-black font-black uppercase italic h-14 text-lg rounded-xl transition-all shadow-xl"
+              className="w-full bg-[#00e5ff] hover:bg-white text-black font-black uppercase italic h-14 text-lg rounded-xl transition-all shadow-xl border-none"
               disabled={openMutation.isPending}
               onClick={() => openMutation.mutate(Number(openingAmount) * 100)}
             >

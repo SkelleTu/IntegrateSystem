@@ -156,13 +156,25 @@ export default function ClientCart() {
                     R$ {(cart.reduce((sum, i) => sum + (i.price * i.quantity), 0) / 100).toFixed(2)}
                   </span>
                 </div>
-                <Button 
-                  className="w-full h-12 font-black italic uppercase tracking-tighter text-white"
-                  onClick={saveCart}
-                  disabled={updateItemsMutation.isPending}
-                >
-                  {updateItemsMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Pedido"}
-                </Button>
+                <div className="flex flex-col gap-3">
+                  <Button 
+                    className="w-full h-12 font-black italic uppercase tracking-tighter text-lg text-white"
+                    onClick={saveCart}
+                    disabled={updateItemsMutation.isPending}
+                  >
+                    {updateItemsMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Pedido"}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="w-full h-12 font-black italic uppercase tracking-tighter text-lg border-primary text-primary hover:bg-primary hover:text-black"
+                    onClick={() => {
+                      saveCart();
+                      toast({ title: "Finalizando", description: "Dirija-se ao caixa para pagamento." });
+                    }}
+                  >
+                    Finalizar Venda
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
