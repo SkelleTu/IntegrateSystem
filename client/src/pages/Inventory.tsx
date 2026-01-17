@@ -10,9 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { Package, AlertTriangle, Plus, Loader2, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { format, addDays, isBefore } from "date-fns";
+import Fuse from "fuse.js";
 
 export default function InventoryPage() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function InventoryPage() {
   const [expiryDate, setExpiryDate] = useState("");
   const [unit, setUnit] = useState("Unidade");
   const [itemsPerUnit, setItemsPerUnit] = useState("1");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
@@ -30,6 +32,25 @@ export default function InventoryPage() {
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
   });
+
+  const inventoryWithNames = useMemo(() => {
+    return inventory.map(inv => ({
+      ...inv,
+      name: menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido"
+    }));
+  }, [inventory, menuItems]);
+
+  const filteredInventory = useMemo(() => {
+    if (!searchTerm) return inventoryWithNames;
+
+    const fuse = new Fuse(inventoryWithNames, {
+      keys: ["name"],
+      threshold: 0.4,
+      distance: 100,
+    });
+
+    return fuse.search(searchTerm).map(result => result.item);
+  }, [inventoryWithNames, searchTerm]);
 
   const upsertMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -210,17 +231,29 @@ export default function InventoryPage() {
         </Card>
 
         <Card className="xl:col-span-8 2xl:col-span-9 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden rounded-2xl">
-          <CardHeader className="border-b border-white/5 p-6 flex flex-row items-center justify-between bg-white/5">
+          <CardHeader className="border-b border-white/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white/5 gap-4">
             <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
               <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
             </CardTitle>
-            <div className="flex flex-col items-end">
-              <span className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-[0.2em]">
-                Status em Tempo Real
-              </span>
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest hidden sm:inline-block">
-                {inventory.length} SKUs Registrados
-              </span>
+            
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                <Input
+                  placeholder="BUSCAR PRODUTO..."
+                  className="bg-black/40 border-white/10 h-10 pl-10 text-white font-bold text-xs uppercase tracking-widest focus:border-primary/50 transition-all rounded-xl"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-[0.2em]">
+                  Status em Tempo Real
+                </span>
+                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest hidden sm:inline-block">
+                  {filteredInventory.length} SKUs Encontrados
+                </span>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0">
@@ -240,17 +273,17 @@ export default function InventoryPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {inventory.length === 0 ? (
+                    {filteredInventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-32 text-white/40 italic uppercase text-sm font-black tracking-[0.4em]">
-                          Base de dados vazia
+                        <TableCell colSpan={6} className="text-center py-32 text-white/40 italic uppercase text-sm font-black tracking-[0.4em]">
+                          {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
                         </TableCell>
                       </TableRow>
                     ) : (
-                      inventory.map((inv) => (
+                      filteredInventory.map((inv) => (
                         <TableRow key={inv.id} className="border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0">
                           <TableCell className="font-black italic text-white py-6 lg:py-8 pl-8 truncate text-base lg:text-xl group-hover:text-primary transition-colors tracking-tighter uppercase">
-                            {getItemName(inv)}
+                            {inv.name}
                           </TableCell>
                           <TableCell className="text-primary font-black text-base lg:text-2xl italic tracking-tighter">
                             {inv.quantity}
