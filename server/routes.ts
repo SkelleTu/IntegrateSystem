@@ -6,7 +6,12 @@ import { z } from "zod";
 import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
+import SQLiteStore from "better-sqlite3-session-store";
+import sqlite from "better-sqlite3";
 import passport from "passport";
+
+const SessionStore = SQLiteStore(session);
+const dbSession = new sqlite("sessions.db");
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -48,14 +53,15 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // Session & Auth Setup
-  const MemoryStore = createMemoryStore(session);
-  const sessionStore = new MemoryStore({
-    checkPeriod: 86400000 // prune expired entries every 24h
-  });
-
   app.use(
     session({
-      store: sessionStore,
+      store: new SessionStore({
+        client: dbSession,
+        expired: {
+          clear: true,
+          intervalMs: 900000 // 15 minutes
+        }
+      }),
       secret: process.env.SESSION_SECRET || "barber_shop_secret",
       resave: false,
       saveUninitialized: false,
