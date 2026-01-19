@@ -16,6 +16,17 @@ export default function FiscalConfig() {
     queryKey: ["/api/fiscal/settings"],
   });
 
+  const mutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/fiscal/settings", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/fiscal/settings"] });
+      toast({ title: "Sucesso", description: "Configurações fiscais salvas." });
+    },
+  });
+
   const [formData, setFormData] = useState<any>(null);
 
   if (isLoading) {
@@ -30,17 +41,6 @@ export default function FiscalConfig() {
   if (settings && !formData) {
     setFormData(settings);
   }
-
-  const mutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/fiscal/settings", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/fiscal/settings"] });
-      toast({ title: "Sucesso", description: "Configurações fiscais salvas." });
-    },
-  });
 
   const handleSave = () => {
     mutation.mutate(formData);
