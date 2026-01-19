@@ -184,6 +184,34 @@ export const inventoryLogs = pgTable("inventory_logs", {
 });
 
 // Helper types and schemas
+export const fiscalSettings = pgTable("fiscal_settings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  enterpriseId: integer("enterprise_id").notNull(),
+  razaoSocial: text("razao_social").notNull(),
+  nomeFantasia: text("nome_fantasia").notNull(),
+  cnpj: text("cnpj").notNull(),
+  inscricaoEstadual: text("inscricao_estadual").notNull(),
+  logradouro: text("logradouro").notNull(),
+  numero: text("numero").notNull(),
+  bairro: text("bairro").notNull(),
+  municipio: text("municipio").notNull(),
+  codigoIbge: text("codigo_ibge").notNull(),
+  uf: text("uf").notNull(),
+  cep: text("cep").notNull(),
+  regimeTributario: text("regime_tributario").notNull(), // "Simples Nacional", etc
+  cscToken: text("csc_token"),
+  cscId: text("csc_id"),
+  serieNfce: integer("serie_nfce").notNull().default(1),
+  ambiente: text("ambiente").notNull().default("homologacao"), // "homologacao" or "producao"
+  certificadoA1: text("certificado_a1"), // Base64 or path
+  certificadoSenha: text("certificado_senha"),
+  printerWidth: text("printer_width").default("58mm").notNull(), // "58mm" or "80mm"
+});
+
+export const insertFiscalSettingsSchema = createInsertSchema(fiscalSettings);
+export type FiscalSettings = typeof fiscalSettings.$inferSelect;
+export type InsertFiscalSettings = z.infer<typeof insertFiscalSettingsSchema>;
+
 export const insertUserSchema = createInsertSchema(users);
 export const insertServiceSchema = createInsertSchema(services);
 export const insertTicketSchema = createInsertSchema(tickets);
