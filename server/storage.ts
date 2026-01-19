@@ -307,6 +307,44 @@ export class DatabaseStorage implements IStorage {
       
       const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: newSale.id }));
       await tx.insert(payments).values(paymentsWithSaleId);
+
+      // Sincronização com Estoque e Financeiro
+      for (const item of items) {
+        // 1. Atualizar Estoque (Venda subtrai do estoque)
+        // Procurar no inventário pelo menuItemId (ou productId conforme schema)
+        const [inventoryItem] = await tx.select()
+          .from(inventory)
+          .where(and(eq(inventory.itemId, item.menuItemId), eq(inventory.itemType, 'product')))
+          .limit(1);
+
+        if (inventoryItem) {
+          await tx.update(inventory)
+            .set({ 
+              quantity: inventoryItem.quantity - item.quantity,
+              updatedAt: new Date()
+            })
+            .where(eq(inventory.id, inventoryItem.id));
+          
+          // Registrar log de movimentação
+          await tx.insert(inventoryLogs).values({
+            inventoryId: inventoryItem.id,
+            type: "out",
+            quantity: item.quantity,
+            reason: `Venda #${newSale.id}`,
+            createdAt: new Date()
+          });
+        }
+      }
+
+      // 2. Registrar Transação Financeira (Receita)
+      await tx.insert(transactions).values({
+        businessType: sale.businessType || "padaria",
+        type: "income",
+        category: "vendas",
+        description: `Venda PDV #${newSale.id}`,
+        amount: newSale.totalAmount,
+        createdAt: new Date()
+      });
       
       return newSale;
     });

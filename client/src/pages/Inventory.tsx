@@ -283,9 +283,14 @@ export default function InventoryPage() {
                       filteredInventory.map((inv) => (
                         <TableRow key={inv.id} className="border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0">
                           <TableCell className="font-black italic text-white py-6 lg:py-8 pl-8 truncate text-base lg:text-xl group-hover:text-primary transition-colors tracking-tighter uppercase">
-                            {inv.name}
+                            <div className="flex flex-col">
+                              <span>{inv.name}</span>
+                              {inv.quantity < 0 && (
+                                <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em] mt-1">Estoque Negativo</span>
+                              )}
+                            </div>
                           </TableCell>
-                          <TableCell className="text-primary font-black text-base lg:text-2xl italic tracking-tighter">
+                          <TableCell className={`${inv.quantity < 0 ? "text-red-500 animate-pulse" : "text-primary"} font-black text-base lg:text-2xl italic tracking-tighter`}>
                             {inv.quantity}
                           </TableCell>
                           <TableCell className="text-white/60 text-xs lg:text-sm font-bold">
