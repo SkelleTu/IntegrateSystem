@@ -3,7 +3,7 @@ import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, settings, enterprises, timeClock,
-  userSessions,
+  userSessions, fiscalSettings,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -20,7 +20,8 @@ import {
   type Settings,
   type Enterprise, type InsertEnterprise,
   type TimeClock, type InsertTimeClock,
-  type UserSession
+  type UserSession,
+  type FiscalSettings, type InsertFiscalSettings
 } from "@shared/schema";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
@@ -99,6 +100,12 @@ export interface IStorage {
     sessions: (UserSession & { username: string })[], 
     enterprises: Enterprise[] 
   }>;
+
+  // Fiscal
+  getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined>;
+  upsertFiscalSettings(settings: InsertFiscalSettings): Promise<FiscalSettings>;
+  getLogsFiscais(enterpriseId: number): Promise<any[]>;
+  updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -476,6 +483,34 @@ export class DatabaseStorage implements IStorage {
     const enterprisesList = await db.select().from(enterprises).orderBy(desc(enterprises.createdAt));
 
     return { sessions: sessionsList, enterprises: enterprisesList };
+  }
+
+  async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
+    const [updated] = await db.update(sales)
+      .set(update)
+      .where(eq(sales.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
+    const [item] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId)).limit(1);
+    return item;
+  }
+
+  async upsertFiscalSettings(data: InsertFiscalSettings): Promise<FiscalSettings> {
+    const existing = await this.getFiscalSettings(data.enterpriseId);
+    if (existing) {
+      const [updated] = await db.update(fiscalSettings).set(data).where(eq(fiscalSettings.id, existing.id)).returning();
+      return updated;
+    } else {
+      const [inserted] = await db.insert(fiscalSettings).values(data).returning();
+      return inserted;
+    }
+  }
+
+  async getLogsFiscais(enterpriseId: number): Promise<any[]> {
+    return [];
   }
 }
 

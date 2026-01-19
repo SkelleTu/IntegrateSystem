@@ -41,7 +41,7 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db } from "./db";
-import { tickets, users } from "@shared/schema";
+import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -262,6 +262,33 @@ export async function registerRoutes(
     if (req.isAuthenticated()) return next();
     res.status(401).json({ message: "Unauthorized" });
   }
+
+  // Fiscal Routes
+  app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const settings = await storage.getFiscalSettings(user.enterpriseId);
+    res.json(settings || {});
+  });
+
+  app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    try {
+      const data = insertFiscalSettingsSchema.parse({ ...req.body, enterpriseId: user.enterpriseId });
+      const settings = await storage.upsertFiscalSettings(data);
+      res.json(settings);
+    } catch (err) {
+      res.status(400).json({ message: "Dados fiscais inválidos" });
+    }
+  });
+
+  app.get("/api/fiscal/logs", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const logs = await storage.getLogsFiscais(user.enterpriseId);
+    res.json(logs);
+  });
 
   // Services Routes
   app.get(api.services.list.path, async (req, res) => {

@@ -27,7 +27,8 @@ import {
   Plus,
   Fingerprint,
   History,
-  X
+  X,
+  FileText
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -338,6 +339,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Ponto", url: "/ponto", icon: Fingerprint },
     { title: "Caixa", url: "/caixa", icon: ClipboardList },
     { title: "Financeiro", url: "/financeiro", icon: Landmark, adminOnly: true },
+    { title: "Fiscal / Impressão", url: "/fiscal", icon: FileText, adminOnly: true },
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },

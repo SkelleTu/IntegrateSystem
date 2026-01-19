@@ -27,6 +27,7 @@ import Reports from "@/pages/Reports";
 import Inventory from "@/pages/Inventory";
 import ClientCart from "@/pages/ClientCart";
 import TimeClock from "@/pages/TimeClock";
+import FiscalConfig from "@/pages/fiscal/FiscalConfig";
 import NotFound from "@/pages/not-found";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -117,6 +118,9 @@ function Router() {
       </Route>
       <Route path="/inventory">
         {() => <ProtectedRoute component={Inventory} />}
+      </Route>
+      <Route path="/fiscal">
+        {() => <ProtectedRoute component={FiscalConfig} />}
       </Route>
       <Route path="/cart" component={ClientCart} />
       
