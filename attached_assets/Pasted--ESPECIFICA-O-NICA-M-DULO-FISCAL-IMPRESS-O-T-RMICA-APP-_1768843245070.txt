@@ -1,0 +1,255 @@
+📌 ESPECIFICAÇÃO ÚNICA – MÓDULO FISCAL + IMPRESSÃO TÉRMICA + APP LOCAL WINDOWS
+
+1️⃣ NOVA SESSÃO NO DASHBOARD (PÓS-LOGIN – PERFIL DONO)
+
+Criar uma nova página acessível pelo menu expansível do dashboard, disponível após login do usuário DONO.
+
+Nome do menu:
+📄 Fiscal / Impressão
+
+Submenus:
+
+- Configuração Fiscal
+- Impressoras
+- Leitor de Código de Barras
+- Testes (Simulação Legítima)
+- Produção (Integração Legítima)
+- Logs Fiscais
+
+---
+
+2️⃣ ARQUITETURA GERAL DO SISTEMA
+
+Plataforma Web (Replit)
+
+Responsável por:
+
+- Cadastro de empresa
+- Cadastro fiscal completo
+- Geração de venda
+- Geração do XML fiscal
+- Controle de modo (Simulação / Produção)
+- Envio de comandos para o app local
+- Armazenamento de retornos da SEFAZ
+
+App Local Windows (Obrigatório)
+
+Responsável por:
+
+- Comunicação com impressora térmica via USB
+- Comunicação com leitor de código de barras (HID)
+- Impressão perfeita no papel térmico
+- Retorno de status para a plataforma web
+
+📌 O navegador não imprime diretamente.
+A plataforma envia o comando → app local imprime.
+
+---
+
+3️⃣ MODOS DE OPERAÇÃO (OBRIGATÓRIO)
+
+🔹 SIMULAÇÃO LEGÍTIMA
+
+- Usa TODOS os campos fiscais reais
+- Dados fictícios porém válidos em formato
+- XML gerado internamente
+- QR Code simulado
+- Impressão idêntica à real
+- Nenhum envio à SEFAZ
+
+🔹 INTEGRAÇÃO LEGÍTIMA
+
+- Usa certificado digital A1
+- Comunicação real com SEFAZ estadual
+- Recebe autorização, chave e protocolo
+- QR Code oficial SEFAZ
+- Nota fiscal válida juridicamente
+
+O sistema apenas alterna o modo, sem mudar layout nem fluxo.
+
+---
+
+4️⃣ DADOS FISCAIS (100% COMPLETO – DESDE JÁ)
+
+Dados da Empresa
+
+- Razão Social
+- Nome Fantasia
+- CNPJ
+- Inscrição Estadual
+- Endereço completo
+- Município + Código IBGE
+- UF
+- Regime Tributário
+- CSC Token (SEFAZ)
+- Série NFC-e
+- Ambiente (Homologação / Produção)
+
+Dados da Venda
+
+- Número da nota
+- Data e hora
+- Produtos:
+   - Código interno
+   - Descrição
+   - NCM
+   - CFOP
+   - Quantidade
+   - Valor unitário
+   - Valor total
+- Totais:
+   - Subtotal
+   - Descontos
+   - Tributos
+   - Total geral
+- Forma de pagamento
+- Troco (se houver)
+
+---
+
+5️⃣ SEFAZ – COMUNICAÇÃO AUTOMÁTICA
+
+Funcionamento
+
+- A cada venda finalizada:
+   1. Sistema gera XML NFC-e
+   2. Assina com certificado A1
+   3. Envia via WebService SEFAZ
+   4. Recebe:
+      - Autorização
+      - Chave de acesso (44 dígitos)
+      - Protocolo
+      - Dados do QR Code
+   5. Libera impressão automaticamente
+
+📌 Não é URL simples
+📌 Comunicação via WebService oficial SEFAZ
+
+---
+
+6️⃣ QR CODE NA NOTA
+
+- Gerado conforme padrão SEFAZ
+- Contém:
+   - Chave de acesso
+   - CSC Token
+   - URL oficial de consulta
+- Impressão obrigatória no rodapé
+
+---
+
+7️⃣ LEITOR DE CÓDIGO DE BARRAS (BIPADOR)
+
+- Funciona como dispositivo HID (teclado)
+- Ao bipar:
+   - Código entra automaticamente no campo de busca
+   - Sistema adiciona produto à venda
+- Compatível com EAN-13, EAN-8 e Code128
+- Nenhum driver especial no navegador
+- Tratamento feito pelo app local se necessário
+
+---
+
+8️⃣ IMPRESSORA TÉRMICA – PADRÃO MERCADO
+
+Papel
+
+- Largura: 58mm (principal)
+- Alternativo: 80mm
+- Papel térmico fino
+
+Fonte
+
+- Fonte térmica padrão ESC/POS
+- Monoespaçada
+- Alta legibilidade
+
+---
+
+9️⃣ LAYOUT DA IMPRESSÃO (OBRIGATÓRIO)
+
+Cabeçalho (Centralizado)
+
+- RAZÃO SOCIAL
+- CNPJ: XX.XXX.XXX/XXXX-XX
+- IE: XXXXXXXXX
+- ENDEREÇO COMPLETO
+
+---
+
+Corpo da Nota
+
+---
+
+DESC        QTD   VL UN   TOTAL
+
+Produto 1   1x    10,00   10,00
+Produto 2   2x     5,00   10,00
+
+Totais
+
+SUBTOTAL:        20,00
+DESCONTO:         0,00
+TOTAL:           20,00
+
+FORMA PGTO: DINHEIRO
+TROCO:            0,00
+
+---
+
+Dados Fiscais
+
+- NFC-e Nº: 000123
+- Série: 1
+- Data/Hora: DD/MM/AAAA HH:MM
+- Chave de Acesso:
+XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX XXXX
+
+---
+
+QR CODE
+
+[ QR CODE CENTRALIZADO ]
+
+---
+
+Rodapé
+
+Consulta via QR Code
+Documento fiscal válido
+Obrigado pela preferência
+
+---
+
+🔟 COMANDOS DE IMPRESSÃO
+
+- Corte automático de papel
+- Avanço de linha antes do corte
+- Impressão sem margens
+- Alinhamento central e esquerdo conforme seção
+
+---
+
+1️⃣1️⃣ LOGS E STATUS
+
+- Status da nota:
+   - Pendente
+   - Autorizada
+   - Rejeitada
+- Motivo de rejeição SEFAZ
+- Log de impressão
+- Log de comunicação app local
+
+---
+
+1️⃣2️⃣ RESULTADO FINAL ESPERADO
+
+- Impressão idêntica à de mercado
+- Sistema pronto para fiscalização
+- Zero retrabalho ao ativar produção
+- Troca apenas do modo:
+SIMULAÇÃO LEGÍTIMA ↔ INTEGRAÇÃO LEGÍTIMA
+
+---
+
+✅ ESTE MÓDULO É OBRIGATÓRIO SER DESENVOLVIDO COMO PADRÃO PROFISSIONAL DE SISTEMAS COMERCIAIS BRASILEIROS
