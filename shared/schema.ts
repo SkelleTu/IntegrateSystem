@@ -161,8 +161,9 @@ export const settings = pgTable("settings", {
 
 export const inventory = pgTable("inventory", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  itemId: integer("item_id").notNull(), 
-  itemType: text("item_type").notNull(), 
+  itemId: integer("item_id"), // Can be null for custom items
+  itemType: text("item_type").notNull(), // "product", "service", or "custom"
+  customName: text("custom_name"), // Name for custom items
   quantity: integer("quantity").notNull().default(0),
   unit: text("unit").notNull(), 
   itemsPerUnit: integer("items_per_unit").notNull().default(1),

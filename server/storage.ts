@@ -425,7 +425,10 @@ export class DatabaseStorage implements IStorage {
 
   async upsertInventory(data: any): Promise<Inventory> {
     return await db.transaction(async (tx) => {
-      const [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
+      let item;
+      if (data.itemId && data.itemType !== 'custom') {
+        [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
+      }
       
       let result: Inventory;
       if (item) {
