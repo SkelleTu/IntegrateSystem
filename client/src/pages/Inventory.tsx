@@ -164,181 +164,147 @@ export default function InventoryPage() {
         </Badge>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 md:gap-8 items-start">
-        <Card className="xl:col-span-4 2xl:col-span-3 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl h-fit sticky xl:top-8">
-          <CardHeader className="border-b border-white/5 pb-4 flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl">
-              <Plus className="h-6 w-6 text-primary" /> Entrada de Item
-            </CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsCustomMode(!isCustomMode)}
-              className="text-[10px] font-black uppercase italic border-primary/20 text-primary"
-            >
-              {isCustomMode ? "Vincular Produto" : "Novo do Zero"}
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-5 p-5 md:p-6 lg:p-8">
-            <div className="space-y-2.5">
-              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">
-                {isCustomMode ? "Nome do Produto Manual" : "Produto / Insumo Vincualdo"}
-              </Label>
-              {isCustomMode ? (
-                <Input
-                  value={customName}
-                  onChange={e => setCustomName(e.target.value)}
-                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl"
-                  placeholder="DIGITE O NOME DO PRODUTO..."
-                />
-              ) : (
-                <Select onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
-                  <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl">
-                    <SelectValue placeholder="Selecione para ajustar" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
-                    {menuItems.map(item => (
-                      <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-3 font-bold uppercase italic text-xs">
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2.5">
-                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Preço Custo (R$)</Label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={costPrice} 
-                  onChange={e => setCostPrice(e.target.value)} 
-                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
-                  placeholder="0.00"
-                />
+      <div className="grid grid-cols-1 gap-6 md:gap-8">
+        <Card className="bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden rounded-2xl">
+          <CardHeader className="border-b border-white/5 p-6 bg-white/5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="space-y-4">
+                <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
+                  <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
+                </CardTitle>
+                
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
+                  <div className="relative w-full sm:w-80">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                    <Input
+                      placeholder="BUSCAR PRODUTO..."
+                      className="bg-black/40 border-white/10 h-10 pl-10 text-white font-bold text-xs uppercase tracking-widest focus:border-primary/50 transition-all rounded-xl"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-[0.2em]">
+                      Status em Tempo Real
+                    </span>
+                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest hidden sm:inline-block">
+                      {filteredInventory.length} SKUs Encontrados
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-2.5">
-                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Preço Venda (R$)</Label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={salePrice} 
-                  onChange={e => setSalePrice(e.target.value)} 
-                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
-                  placeholder="Opcional"
-                />
-              </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2.5">
-                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd Atual</Label>
-                <Input 
-                  type="number" 
-                  value={quantity} 
-                  onChange={e => setQuantity(e.target.value)} 
-                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold text-lg focus:border-primary/50 transition-all rounded-xl"
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2.5">
-                <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Embalagem</Label>
-                <Select value={unit} onValueChange={setUnit}>
-                  <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
-                    <SelectItem value="Unidade" className="py-3 font-bold uppercase italic text-xs text-white">Unidade</SelectItem>
-                    <SelectItem value="Bag" className="py-3 font-bold uppercase italic text-xs text-white">Bag</SelectItem>
-                    <SelectItem value="Caixa" className="py-3 font-bold uppercase italic text-xs text-white">Caixa</SelectItem>
-                    <SelectItem value="Pacote" className="py-3 font-bold uppercase italic text-xs text-white">Pacote</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+              <div className="flex flex-col gap-4 bg-black/20 p-4 rounded-xl border border-white/5 max-w-2xl w-full">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-black uppercase italic text-primary tracking-widest">Adicionar / Atualizar Item</h3>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setIsCustomMode(!isCustomMode)}
+                    className="text-[9px] font-black uppercase italic border-primary/20 text-primary h-7"
+                  >
+                    {isCustomMode ? "Vincular Produto" : "Novo do Zero"}
+                  </Button>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+                      {isCustomMode ? "Nome Manual" : "Produto Vinculado"}
+                    </Label>
+                    {isCustomMode ? (
+                      <Input
+                        value={customName}
+                        onChange={e => setCustomName(e.target.value)}
+                        className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold transition-all focus:border-primary/50 rounded-lg"
+                        placeholder="NOME..."
+                      />
+                    ) : (
+                      <Select value={selectedItem?.id.toString()} onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold transition-all focus:border-primary/50 rounded-lg">
+                          <SelectValue placeholder="SELECIONE..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                          {menuItems.map(item => (
+                            <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-2 font-bold uppercase italic text-[10px]">
+                              {item.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
 
-            <div className="space-y-2.5">
-              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Itens p/ Unidade</Label>
-              <Input 
-                type="number" 
-                value={itemsPerUnit} 
-                onChange={e => setItemsPerUnit(e.target.value)} 
-                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
-              />
-            </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd</Label>
+                    <Input 
+                      type="number" 
+                      value={quantity} 
+                      onChange={e => setQuantity(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="0"
+                    />
+                  </div>
 
-            <div className="space-y-2.5">
-              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Data de Validade</Label>
-              <Input 
-                type="date" 
-                value={expiryDate} 
-                onChange={e => setExpiryDate(e.target.value)} 
-                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all [color-scheme:dark] rounded-xl"
-              />
-            </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Custo (R$)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={costPrice} 
+                      onChange={e => setCostPrice(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="0.00"
+                    />
+                  </div>
 
-            <div className="space-y-2.5">
-              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Código de Barras / ID Interno</Label>
-              <Input 
-                value={barcode} 
-                onChange={e => setBarcode(e.target.value)} 
-                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
-                placeholder="EX: 789123456..."
-              />
-            </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Código / ID</Label>
+                    <Input 
+                      value={barcode} 
+                      onChange={e => setBarcode(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="CÓDIGO..."
+                    />
+                  </div>
 
-            <Button 
-              className="w-full bg-primary hover:bg-white text-black font-black italic uppercase h-14 transition-all active:scale-[0.98] mt-6 shadow-[0_0_30px_rgba(0,255,102,0.2)] rounded-xl text-lg tracking-tighter" 
-              onClick={handleUpsert}
-              disabled={upsertMutation.isPending}
-            >
-              {upsertMutation.isPending ? <Loader2 className="animate-spin h-6 w-6" /> : (editingId ? "Salvar Alterações" : "Atualizar Inventário")}
-            </Button>
-            {editingId && (
-              <Button 
-                variant="ghost"
-                className="w-full text-white/40 hover:text-white mt-2 font-bold uppercase text-xs"
-                onClick={() => {
-                  setEditingId(null);
-                  setCustomName("");
-                  setBarcode("");
-                  setQuantity("");
-                  setCostPrice("");
-                  setSalePrice("");
-                  setExpiryDate("");
-                }}
-              >
-                Cancelar Edição
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Validade</Label>
+                    <Input 
+                      type="date" 
+                      value={expiryDate} 
+                      onChange={e => setExpiryDate(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all [color-scheme:dark] rounded-lg"
+                    />
+                  </div>
 
-        <Card className="xl:col-span-8 2xl:col-span-9 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl overflow-hidden rounded-2xl">
-          <CardHeader className="border-b border-white/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white/5 gap-4">
-            <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
-              <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
-            </CardTitle>
-            
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-                <Input
-                  placeholder="BUSCAR PRODUTO..."
-                  className="bg-black/40 border-white/10 h-10 pl-10 text-white font-bold text-xs uppercase tracking-widest focus:border-primary/50 transition-all rounded-xl"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] lg:text-xs font-black text-primary uppercase tracking-[0.2em]">
-                  Status em Tempo Real
-                </span>
-                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest hidden sm:inline-block">
-                  {filteredInventory.length} SKUs Encontrados
-                </span>
+                  <div className="flex items-end gap-2">
+                    <Button 
+                      className="flex-1 bg-primary hover:bg-white text-black font-black italic uppercase h-9 transition-all active:scale-[0.98] rounded-lg text-[10px] tracking-tighter" 
+                      onClick={handleUpsert}
+                      disabled={upsertMutation.isPending}
+                    >
+                      {upsertMutation.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : (editingId ? "Salvar" : "Adicionar")}
+                    </Button>
+                    {editingId && (
+                      <Button 
+                        variant="ghost"
+                        className="text-white/40 hover:text-white font-bold uppercase text-[9px] h-9"
+                        onClick={() => {
+                          setEditingId(null);
+                          setCustomName("");
+                          setBarcode("");
+                          setQuantity("");
+                          setCostPrice("");
+                          setSalePrice("");
+                          setExpiryDate("");
+                        }}
+                      >
+                        X
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           </CardHeader>
