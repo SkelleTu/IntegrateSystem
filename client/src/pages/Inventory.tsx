@@ -151,11 +151,7 @@ export default function InventoryPage() {
     setItemsPerUnit(inv.itemsPerUnit.toString());
     setCostPrice((inv.costPrice / 100).toString());
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString() : "");
-    if (inv.expiryDate) {
-      setExpiryDate(new Date(inv.expiryDate).toISOString().split('T')[0]);
-    } else {
-      setExpiryDate("");
-    }
+    setExpiryDate(inv.expiryDate ? new Date(inv.expiryDate).toISOString().split('T')[0] : "");
     if (inv.itemType !== "custom") {
       setSelectedItem({ id: inv.itemId, type: "product" });
     }
@@ -271,6 +267,18 @@ export default function InventoryPage() {
                       onChange={e => setCostPrice(e.target.value)} 
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Venda (R$)</Label>
+                    <Input 
+                      type="number" 
+                      step="0.01"
+                      value={salePrice} 
+                      onChange={e => setSalePrice(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="PREÇO..."
                     />
                   </div>
 
