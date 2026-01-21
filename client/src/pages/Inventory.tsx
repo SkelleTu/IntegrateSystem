@@ -24,6 +24,8 @@ export default function InventoryPage() {
   const [unit, setUnit] = useState("Unidade");
   const [itemsPerUnit, setItemsPerUnit] = useState("1");
   const [searchTerm, setSearchTerm] = useState("");
+  const [isCustomMode, setIsCustomMode] = useState(false);
+  const [customName, setCustomName] = useState("");
 
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
@@ -36,7 +38,7 @@ export default function InventoryPage() {
   const inventoryWithNames = useMemo(() => {
     return inventory.map(inv => ({
       ...inv,
-      name: menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido"
+      name: inv.itemType === "custom" ? inv.customName : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
     }));
   }, [inventory, menuItems]);
 
@@ -61,8 +63,12 @@ export default function InventoryPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       toast({ title: "Sucesso", description: "Estoque atualizado" });
       setSelectedItem(null);
+      setCustomName("");
+      setIsCustomMode(false);
       setQuantity("");
       setExpiryDate("");
+      setCostPrice("");
+      setSalePrice("");
     },
   });
 
@@ -97,10 +103,14 @@ export default function InventoryPage() {
   const [salePrice, setSalePrice] = useState("");
 
   const handleUpsert = () => {
-    if (!selectedItem || !quantity) return;
+    if (!isCustomMode && !selectedItem) return;
+    if (isCustomMode && !customName) return;
+    if (!quantity) return;
+
     upsertMutation.mutate({
-      itemId: selectedItem.id,
-      itemType: selectedItem.type,
+      itemId: isCustomMode ? null : selectedItem?.id,
+      itemType: isCustomMode ? "custom" : selectedItem?.type,
+      customName: isCustomMode ? customName : null,
       quantity: parseInt(quantity),
       unit,
       itemsPerUnit: parseInt(itemsPerUnit),
@@ -126,26 +136,45 @@ export default function InventoryPage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 md:gap-8 items-start">
         <Card className="xl:col-span-4 2xl:col-span-3 bg-black/40 backdrop-blur-xl border-white/10 shadow-2xl h-fit sticky xl:top-8">
-          <CardHeader className="border-b border-white/5 pb-4">
+          <CardHeader className="border-b border-white/5 pb-4 flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl">
               <Plus className="h-6 w-6 text-primary" /> Entrada de Item
             </CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setIsCustomMode(!isCustomMode)}
+              className="text-[10px] font-black uppercase italic border-primary/20 text-primary"
+            >
+              {isCustomMode ? "Vincular Produto" : "Novo do Zero"}
+            </Button>
           </CardHeader>
           <CardContent className="space-y-5 p-5 md:p-6 lg:p-8">
             <div className="space-y-2.5">
-              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Produto / Insumo</Label>
-              <Select onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
-                <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl">
-                  <SelectValue placeholder="Selecione para ajustar" />
-                </SelectTrigger>
-                <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
-                  {menuItems.map(item => (
-                    <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-3 font-bold uppercase italic text-xs">
-                      {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">
+                {isCustomMode ? "Nome do Produto Manual" : "Produto / Insumo Vincualdo"}
+              </Label>
+              {isCustomMode ? (
+                <Input
+                  value={customName}
+                  onChange={e => setCustomName(e.target.value)}
+                  className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl"
+                  placeholder="DIGITE O NOME DO PRODUTO..."
+                />
+              ) : (
+                <Select onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
+                  <SelectTrigger className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold transition-all focus:border-primary/50 rounded-xl">
+                    <SelectValue placeholder="Selecione para ajustar" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                    {menuItems.map(item => (
+                      <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-3 font-bold uppercase italic text-xs">
+                        {item.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

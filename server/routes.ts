@@ -397,6 +397,26 @@ export async function registerRoutes(
     res.json(categoriesList);
   });
 
+  // Inventory API
+  app.post("/api/inventory/upsert", isAuthenticated, async (req, res) => {
+    try {
+      const data = insertInventorySchema.parse(req.body);
+      const item = await storage.upsertInventory(data);
+      res.json(item);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.get("/api/inventory", isAuthenticated, async (req, res) => {
+    const items = await storage.getInventory();
+    res.json(items);
+  });
+
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,
