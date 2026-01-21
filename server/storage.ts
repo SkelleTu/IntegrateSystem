@@ -430,11 +430,18 @@ export class DatabaseStorage implements IStorage {
         [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
       }
       
+      // Ensure date objects are handled correctly for SQLite
+      const processedData = {
+        ...data,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+        updatedAt: new Date()
+      };
+
       let result: Inventory;
       if (item) {
-        [result] = await tx.update(inventory).set(data).where(eq(inventory.id, item.id)).returning();
+        [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, item.id)).returning();
       } else {
-        [result] = await tx.insert(inventory).values(data).returning();
+        [result] = await tx.insert(inventory).values(processedData).returning();
       }
 
       // Automatically create a financial transaction if it's an "in" entry with cost
