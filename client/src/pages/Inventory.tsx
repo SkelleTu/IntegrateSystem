@@ -78,6 +78,13 @@ export default function InventoryPage() {
       setCostPrice("");
       setSalePrice("");
     },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro", 
+        description: error.message || "Erro ao salvar no banco de dados. Verifique os campos.",
+        variant: "destructive"
+      });
+    }
   });
 
   if (user?.role !== "admin") {

@@ -435,6 +435,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Ensure data objects are handled correctly for SQLite
+      // Note: insertInventorySchema transformation already handles costPrice/salePrice conversion to cents
       const processedData = {
         itemId: data.itemId || null,
         itemType: data.itemType,
@@ -442,8 +443,8 @@ export class DatabaseStorage implements IStorage {
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit,
         itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
-        costPrice: typeof data.costPrice === 'number' ? data.costPrice : (Math.round(parseFloat(data.costPrice) * 100) || 0),
-        salePrice: data.salePrice ? (typeof data.salePrice === 'number' ? data.salePrice : Math.round(parseFloat(data.salePrice) * 100)) : null,
+        costPrice: data.costPrice,
+        salePrice: data.salePrice || null,
         barcode: data.barcode || null,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         updatedAt: new Date()
@@ -453,19 +454,21 @@ export class DatabaseStorage implements IStorage {
       if (data.id) {
         [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, data.id)).returning();
       } else if (item) {
-        [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, item.id)).returning();
+        // Update quantity by adding new quantity to existing
+        const newQuantity = (item.quantity || 0) + processedData.quantity;
+        [result] = await tx.update(inventory).set({ ...processedData, quantity: newQuantity }).where(eq(inventory.id, item.id)).returning();
       } else {
         [result] = await tx.insert(inventory).values(processedData).returning();
       }
 
       // Automatically create a financial transaction if it's an "in" entry with cost
-      if (data.costPrice && data.costPrice > 0 && data.quantity > 0) {
+      if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
         await tx.insert(transactions).values({
           businessType: "padaria", // Default to padaria for inventory, adjust if needed
           type: "expense",
           category: "estoque",
-          description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ID ${data.itemId}`,
-          amount: data.costPrice * data.quantity,
+          description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,
+          amount: processedData.costPrice * processedData.quantity,
           createdAt: new Date()
         });
       }

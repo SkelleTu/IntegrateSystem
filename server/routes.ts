@@ -398,16 +398,17 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.post("/api/inventory/upsert", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory", isAuthenticated, async (req, res) => {
     try {
       const data = insertInventorySchema.parse(req.body);
       const item = await storage.upsertInventory(data);
       res.json(item);
     } catch (err) {
+      console.error("Erro no upsert de inventário:", err);
       if (err instanceof z.ZodError) {
         res.status(400).json({ message: err.errors[0].message });
       } else {
-        res.status(500).json({ message: "Internal server error" });
+        res.status(500).json({ message: "Erro ao atualizar estoque" });
       }
     }
   });
