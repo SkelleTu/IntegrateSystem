@@ -426,13 +426,24 @@ export class DatabaseStorage implements IStorage {
   async upsertInventory(data: any): Promise<Inventory> {
     return await db.transaction(async (tx) => {
       let item;
+      // Use itemId and itemType to find existing items, but ignore for 'custom' type
       if (data.itemId && data.itemType !== 'custom') {
         [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
+      } else if (data.itemType === 'custom' && data.customName) {
+        // For custom items, try to find by name to avoid duplicates
+        [item] = await tx.select().from(inventory).where(and(eq(inventory.itemType, 'custom'), eq(inventory.customName, data.customName))).limit(1);
       }
       
-      // Ensure date objects are handled correctly for SQLite
+      // Ensure data objects are handled correctly for SQLite
       const processedData = {
-        ...data,
+        itemId: data.itemId || null,
+        itemType: data.itemType,
+        customName: data.customName || null,
+        quantity: parseInt(data.quantity) || 0,
+        unit: data.unit,
+        itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
+        costPrice: typeof data.costPrice === 'number' ? data.costPrice : (Math.round(parseFloat(data.costPrice) * 100) || 0),
+        salePrice: data.salePrice ? (typeof data.salePrice === 'number' ? data.salePrice : Math.round(parseFloat(data.salePrice) * 100)) : null,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         updatedAt: new Date()
       };
