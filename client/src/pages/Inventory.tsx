@@ -120,15 +120,14 @@ export default function InventoryPage() {
   const [salePrice, setSalePrice] = useState("");
 
   const handleUpsert = () => {
-    if (!isCustomMode && !selectedItem && !editingId) return;
-    if (isCustomMode && !customName) return;
+    if (!customName) return;
     if (!quantity) return;
 
     upsertMutation.mutate({
       id: editingId,
-      itemId: isCustomMode ? null : selectedItem?.id,
-      itemType: isCustomMode ? "custom" : selectedItem?.type,
-      customName: isCustomMode ? customName : null,
+      itemId: null,
+      itemType: "custom",
+      customName: customName,
       barcode: barcode || null,
       quantity: parseInt(quantity),
       unit: unit === "Outros" ? customUnit : unit,
@@ -145,11 +144,8 @@ export default function InventoryPage() {
     setCustomName(inv.customName || "");
     setBarcode(inv.barcode || "");
     setQuantity(inv.quantity.toString());
-    if (["Unidade", "Bag", "Caixa", "Pacote"].includes(inv.unit)) {
-      setUnit(inv.unit);
-      setCustomUnit("");
-    } else {
-      setUnit("Outros");
+    setUnit(inv.unit === "Unidade" || inv.unit === "Bag" || inv.unit === "Caixa" || inv.unit === "Pacote" ? inv.unit : "Outros");
+    if (inv.unit !== "Unidade" && inv.unit !== "Bag" && inv.unit !== "Caixa" && inv.unit !== "Pacote") {
       setCustomUnit(inv.unit);
     }
     setItemsPerUnit(inv.itemsPerUnit.toString());
@@ -212,42 +208,19 @@ export default function InventoryPage() {
               <div className="flex flex-col gap-4 bg-black/20 p-4 rounded-xl border border-white/5 max-w-2xl w-full">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs font-black uppercase italic text-primary tracking-widest">Adicionar / Atualizar Item</h3>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setIsCustomMode(!isCustomMode)}
-                    className="text-[9px] font-black uppercase italic border-primary/20 text-primary h-7"
-                  >
-                    {isCustomMode ? "Vincular Produto" : "Novo do Zero"}
-                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
-                      {isCustomMode ? "Nome Manual" : "Produto Vinculado"}
+                      Nome do Produto
                     </Label>
-                    {isCustomMode ? (
-                      <Input
-                        value={customName}
-                        onChange={e => setCustomName(e.target.value)}
-                        className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold transition-all focus:border-primary/50 rounded-lg"
-                        placeholder="NOME..."
-                      />
-                    ) : (
-                      <Select value={selectedItem?.id.toString()} onValueChange={(v) => setSelectedItem({ id: parseInt(v), type: "product" })}>
-                        <SelectTrigger className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold transition-all focus:border-primary/50 rounded-lg">
-                          <SelectValue placeholder="SELECIONE..." />
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
-                          {menuItems.map(item => (
-                            <SelectItem key={item.id} value={item.id.toString()} className="hover:bg-primary/20 transition-colors cursor-pointer py-2 font-bold uppercase italic text-[10px]">
-                              {item.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                    <Input
+                      value={customName}
+                      onChange={e => setCustomName(e.target.value)}
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold transition-all focus:border-primary/50 rounded-lg"
+                      placeholder="NOME..."
+                    />
                   </div>
 
                   <div className="space-y-1.5">
