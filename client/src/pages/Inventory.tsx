@@ -31,6 +31,8 @@ export default function InventoryPage() {
 
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
+    staleTime: 0,
+    refetchOnWindowFocus: true
   });
 
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
