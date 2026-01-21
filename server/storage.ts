@@ -450,7 +450,9 @@ export class DatabaseStorage implements IStorage {
       };
 
       let result: Inventory;
-      if (item) {
+      if (data.id) {
+        [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, data.id)).returning();
+      } else if (item) {
         [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, item.id)).returning();
       } else {
         [result] = await tx.insert(inventory).values(processedData).returning();

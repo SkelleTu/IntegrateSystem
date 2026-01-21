@@ -48,7 +48,7 @@ export default function InventoryPage() {
     if (!searchTerm) return inventoryWithNames;
 
     const fuse = new Fuse(inventoryWithNames, {
-      keys: ["name", "barcode"],
+      keys: ["name", "barcode", "customName"],
       threshold: 0.3,
       distance: 100,
     });
