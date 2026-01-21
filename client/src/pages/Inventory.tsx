@@ -41,9 +41,9 @@ export default function InventoryPage() {
     return inventory
       .map(inv => ({
         ...inv,
-        name: inv.itemType === "custom" ? inv.customName : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
+        name: inv.itemType === "custom" ? (inv.customName || "Item Custom") : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
       }))
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: 'base' }));
   }, [inventory, menuItems]);
 
   const filteredInventory = useMemo(() => {

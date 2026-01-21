@@ -397,7 +397,7 @@ export class DatabaseStorage implements IStorage {
 
   // Inventory
   async getInventory(): Promise<Inventory[]> {
-    return await db.select().from(inventory).orderBy(asc(inventory.expiryDate));
+    return await db.select().from(inventory);
   }
 
   async getInventoryItem(id: number): Promise<Inventory | undefined> {
