@@ -169,6 +169,7 @@ export const inventory = pgTable("inventory", {
   itemsPerUnit: integer("items_per_unit").notNull().default(1),
   costPrice: integer("cost_price").notNull().default(0), // in cents
   salePrice: integer("sale_price"), // in cents
+  barcode: text("barcode"), // Barcode or internal ID
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
   updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),

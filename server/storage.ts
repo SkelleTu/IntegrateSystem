@@ -444,6 +444,7 @@ export class DatabaseStorage implements IStorage {
         itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
         costPrice: typeof data.costPrice === 'number' ? data.costPrice : (Math.round(parseFloat(data.costPrice) * 100) || 0),
         salePrice: data.salePrice ? (typeof data.salePrice === 'number' ? data.salePrice : Math.round(parseFloat(data.salePrice) * 100)) : null,
+        barcode: data.barcode || null,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         updatedAt: new Date()
       };

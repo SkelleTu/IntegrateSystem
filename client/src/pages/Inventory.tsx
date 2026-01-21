@@ -26,6 +26,8 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isCustomMode, setIsCustomMode] = useState(false);
   const [customName, setCustomName] = useState("");
+  const [barcode, setBarcode] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
@@ -46,8 +48,8 @@ export default function InventoryPage() {
     if (!searchTerm) return inventoryWithNames;
 
     const fuse = new Fuse(inventoryWithNames, {
-      keys: ["name"],
-      threshold: 0.4,
+      keys: ["name", "barcode"],
+      threshold: 0.3,
       distance: 100,
     });
 
@@ -64,6 +66,8 @@ export default function InventoryPage() {
       toast({ title: "Sucesso", description: "Estoque atualizado" });
       setSelectedItem(null);
       setCustomName("");
+      setBarcode("");
+      setEditingId(null);
       setIsCustomMode(false);
       setQuantity("");
       setExpiryDate("");
@@ -103,14 +107,16 @@ export default function InventoryPage() {
   const [salePrice, setSalePrice] = useState("");
 
   const handleUpsert = () => {
-    if (!isCustomMode && !selectedItem) return;
+    if (!isCustomMode && !selectedItem && !editingId) return;
     if (isCustomMode && !customName) return;
     if (!quantity) return;
 
     upsertMutation.mutate({
+      id: editingId,
       itemId: isCustomMode ? null : selectedItem?.id,
       itemType: isCustomMode ? "custom" : selectedItem?.type,
       customName: isCustomMode ? customName : null,
+      barcode: barcode || null,
       quantity: parseInt(quantity),
       unit,
       itemsPerUnit: parseInt(itemsPerUnit),
@@ -118,6 +124,26 @@ export default function InventoryPage() {
       salePrice: salePrice ? parseFloat(salePrice) : null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
     });
+  };
+
+  const handleEdit = (inv: any) => {
+    setEditingId(inv.id);
+    setIsCustomMode(inv.itemType === "custom");
+    setCustomName(inv.customName || "");
+    setBarcode(inv.barcode || "");
+    setQuantity(inv.quantity.toString());
+    setUnit(inv.unit);
+    setItemsPerUnit(inv.itemsPerUnit.toString());
+    setCostPrice((inv.costPrice / 100).toString());
+    setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString() : "");
+    if (inv.expiryDate) {
+      setExpiryDate(new Date(inv.expiryDate).toISOString().split('T')[0]);
+    } else {
+      setExpiryDate("");
+    }
+    if (inv.itemType !== "custom") {
+      setSelectedItem({ id: inv.itemId, type: "product" });
+    }
   };
 
   return (
@@ -249,13 +275,40 @@ export default function InventoryPage() {
               />
             </div>
 
+            <div className="space-y-2.5">
+              <Label className="text-xs font-bold text-zinc-500 uppercase tracking-widest pl-1">Código de Barras / ID Interno</Label>
+              <Input 
+                value={barcode} 
+                onChange={e => setBarcode(e.target.value)} 
+                className="bg-black/40 border-white/10 h-12 md:h-14 text-white font-bold focus:border-primary/50 transition-all rounded-xl"
+                placeholder="EX: 789123456..."
+              />
+            </div>
+
             <Button 
               className="w-full bg-primary hover:bg-white text-black font-black italic uppercase h-14 transition-all active:scale-[0.98] mt-6 shadow-[0_0_30px_rgba(0,255,102,0.2)] rounded-xl text-lg tracking-tighter" 
               onClick={handleUpsert}
               disabled={upsertMutation.isPending}
             >
-              {upsertMutation.isPending ? <Loader2 className="animate-spin h-6 w-6" /> : "Atualizar Inventário"}
+              {upsertMutation.isPending ? <Loader2 className="animate-spin h-6 w-6" /> : (editingId ? "Salvar Alterações" : "Atualizar Inventário")}
             </Button>
+            {editingId && (
+              <Button 
+                variant="ghost"
+                className="w-full text-white/40 hover:text-white mt-2 font-bold uppercase text-xs"
+                onClick={() => {
+                  setEditingId(null);
+                  setCustomName("");
+                  setBarcode("");
+                  setQuantity("");
+                  setCostPrice("");
+                  setSalePrice("");
+                  setExpiryDate("");
+                }}
+              >
+                Cancelar Edição
+              </Button>
+            )}
           </CardContent>
         </Card>
 
@@ -293,7 +346,7 @@ export default function InventoryPage() {
                 <Table className="min-w-[800px] w-full table-fixed">
                   <TableHeader>
                     <TableRow className="border-white/5 hover:bg-transparent bg-black/40">
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[25%] py-6 pl-8">Item</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[25%] py-6 pl-8">Item / Cód</TableHead>
                       <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[10%] py-6">Qtd</TableHead>
                       <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Preços (C/V)</TableHead>
                       <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Tipo/Embalagem</TableHead>
@@ -314,9 +367,14 @@ export default function InventoryPage() {
                           <TableCell className="font-black italic text-white py-6 lg:py-8 pl-8 truncate text-base lg:text-xl group-hover:text-primary transition-colors tracking-tighter uppercase">
                             <div className="flex flex-col">
                               <span>{inv.name}</span>
-                              {inv.quantity < 0 && (
-                                <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em] mt-1">Estoque Negativo</span>
-                              )}
+                              <div className="flex items-center gap-2 mt-1">
+                                {inv.barcode && (
+                                  <span className="text-[10px] text-primary/60 font-black uppercase tracking-[0.1em]">ID: {inv.barcode}</span>
+                                )}
+                                {inv.quantity < 0 && (
+                                  <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em]">Estoque Negativo</span>
+                                )}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell className={`${inv.quantity < 0 ? "text-red-500 animate-pulse" : "text-primary"} font-black text-base lg:text-2xl italic tracking-tighter`}>
@@ -340,6 +398,14 @@ export default function InventoryPage() {
                           </TableCell>
                           <TableCell className="text-right pr-8 py-6 lg:py-8">
                             <div className="flex justify-end items-center gap-3">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-white/40 hover:text-primary"
+                                onClick={() => handleEdit(inv)}
+                              >
+                                Editar
+                              </Button>
                               {isExpiringSoon(inv.expiryDate) ? (
                                 <Badge variant="destructive" className="bg-red-500 text-black border-none gap-1.5 animate-pulse font-black italic uppercase text-[9px] lg:text-[11px] px-3 py-1 rounded-sm shadow-[0_0_15px_rgba(239,68,68,0.3)]">
                                   <AlertTriangle className="h-3.5 w-3.5" /> Atenção: Validade
