@@ -29,6 +29,8 @@ export default function InventoryPage() {
   const [barcode, setBarcode] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const [customUnit, setCustomUnit] = useState("");
+
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
     staleTime: 0,
@@ -129,7 +131,7 @@ export default function InventoryPage() {
       customName: isCustomMode ? customName : null,
       barcode: barcode || null,
       quantity: parseInt(quantity),
-      unit,
+      unit: unit === "Outros" ? customUnit : unit,
       itemsPerUnit: parseInt(itemsPerUnit),
       costPrice: parseFloat(costPrice),
       salePrice: salePrice ? parseFloat(salePrice) : null,
@@ -143,7 +145,13 @@ export default function InventoryPage() {
     setCustomName(inv.customName || "");
     setBarcode(inv.barcode || "");
     setQuantity(inv.quantity.toString());
-    setUnit(inv.unit);
+    if (["Unidade", "Bag", "Caixa", "Pacote"].includes(inv.unit)) {
+      setUnit(inv.unit);
+      setCustomUnit("");
+    } else {
+      setUnit("Outros");
+      setCustomUnit(inv.unit);
+    }
     setItemsPerUnit(inv.itemsPerUnit.toString());
     setCostPrice((inv.costPrice / 100).toString());
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString() : "");
@@ -241,6 +249,34 @@ export default function InventoryPage() {
                       </Select>
                     )}
                   </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Embalagem</Label>
+                    <Select value={unit} onValueChange={setUnit}>
+                      <SelectTrigger className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold rounded-lg">
+                        <SelectValue placeholder="TIPO..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                        <SelectItem value="Unidade" className="py-2 font-bold uppercase italic text-[10px] text-white">Unidade</SelectItem>
+                        <SelectItem value="Bag" className="py-2 font-bold uppercase italic text-[10px] text-white">Bag</SelectItem>
+                        <SelectItem value="Caixa" className="py-2 font-bold uppercase italic text-[10px] text-white">Caixa</SelectItem>
+                        <SelectItem value="Pacote" className="py-2 font-bold uppercase italic text-[10px] text-white">Pacote</SelectItem>
+                        <SelectItem value="Outros" className="py-2 font-bold uppercase italic text-[10px] text-white">Outros</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {unit === "Outros" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Especificar Embalagem</Label>
+                      <Input 
+                        value={customUnit} 
+                        onChange={e => setCustomUnit(e.target.value)} 
+                        className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                        placeholder="NOME DA EMBALAGEM..."
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd</Label>
