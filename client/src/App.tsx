@@ -236,7 +236,7 @@ export default function App() {
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <LandingNavigation />
               <Navbar />
-              <SidebarProvider>
+              <SidebarProvider defaultOpen={false}>
                 <div className="flex h-screen w-full overflow-hidden">
                   <AppSidebar />
                   <div className="flex flex-col flex-1 overflow-hidden relative">

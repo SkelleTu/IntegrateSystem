@@ -361,7 +361,13 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   };
 
   return (
-    <Sidebar side={side} collapsible="icon" className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}>
+    <Sidebar 
+      side={side} 
+      collapsible="icon" 
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}
+    >
       <div className="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-black/50">
         <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
         <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
