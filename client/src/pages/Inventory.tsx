@@ -38,10 +38,12 @@ export default function InventoryPage() {
   });
 
   const inventoryWithNames = useMemo(() => {
-    return inventory.map(inv => ({
-      ...inv,
-      name: inv.itemType === "custom" ? inv.customName : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
-    }));
+    return inventory
+      .map(inv => ({
+        ...inv,
+        name: inv.itemType === "custom" ? inv.customName : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
+      }))
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   }, [inventory, menuItems]);
 
   const filteredInventory = useMemo(() => {
