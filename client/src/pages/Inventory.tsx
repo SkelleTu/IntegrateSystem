@@ -204,6 +204,20 @@ export default function InventoryPage() {
               <div className="flex flex-col gap-4 bg-black/20 p-4 rounded-xl border border-white/5 max-w-2xl w-full">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs font-black uppercase italic text-primary tracking-widest">Adicionar / Atualizar Item</h3>
+                  <div className="flex items-center gap-2">
+                    <Select onValueChange={(v) => handleEdit(inventory.find(i => i.id === parseInt(v)))}>
+                      <SelectTrigger className="text-[9px] font-black uppercase italic border-primary/20 text-primary h-7 bg-transparent w-40">
+                        <SelectValue placeholder="EDITAR EXISTENTE" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
+                        {inventoryWithNames.map(inv => (
+                          <SelectItem key={inv.id} value={inv.id.toString()} className="py-2 font-bold uppercase italic text-[10px] text-white">
+                            {inv.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
