@@ -27,16 +27,16 @@
   --foreground: 210 20% 98%;          /* Near white */
   
   --primary: 190 100% 50%;         /* Cyber Blue Neon #00e5ff */
-  --primary-foreground: 220 25% 3%;
+  --primary-foreground: 210 20% 98%;
   
   --secondary: 190 100% 50%;        /* Electric Blue Neon instead of purple */
-  --secondary-foreground: 220 25% 3%;
+  --secondary-foreground: 210 20% 98%;
   
   --muted: 220 15% 10%;
   --muted-foreground: 210 10% 70%;
   
   --accent: 190 100% 50%;          
-  --accent-foreground: 220 25% 3%;
+  --accent-foreground: 210 20% 98%;
   
   --destructive: 0 100% 50%;
   --destructive-foreground: 210 20% 98%;

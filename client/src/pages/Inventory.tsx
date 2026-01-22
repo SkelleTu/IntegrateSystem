@@ -329,7 +329,7 @@ export default function InventoryPage() {
 
                   <div className="flex items-end gap-2">
                     <Button 
-                      className="flex-1 bg-primary hover:bg-white text-black font-black italic uppercase h-9 transition-all active:scale-[0.98] rounded-lg text-[10px] tracking-tighter shadow-[0_0_15px_rgba(0,229,255,0.3)]" 
+                      className="flex-1 bg-primary hover:bg-white text-white hover:text-black font-black italic uppercase h-9 transition-all active:scale-[0.98] rounded-lg text-[10px] tracking-tighter shadow-[0_0_15px_rgba(0,229,255,0.3)]" 
                       onClick={handleUpsert}
                       disabled={upsertMutation.isPending}
                     >
