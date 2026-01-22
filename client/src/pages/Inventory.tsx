@@ -262,13 +262,24 @@ export default function InventoryPage() {
                   )}
 
                   <div className="space-y-1.5">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd Embalagens</Label>
                     <Input 
                       type="number" 
                       value={quantity} 
                       onChange={e => setQuantity(e.target.value)} 
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Unidades por Embalagem</Label>
+                    <Input 
+                      type="number" 
+                      value={itemsPerUnit} 
+                      onChange={e => setItemsPerUnit(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="1"
                     />
                   </div>
 
