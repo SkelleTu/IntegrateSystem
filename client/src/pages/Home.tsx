@@ -79,10 +79,8 @@ export default function Home() {
         </p>
       </motion.div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6 w-full max-w-[2200px] z-10 mb-12 md:mb-20 px-2 auto-rows-fr">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-[1400px] z-10 mb-12 md:mb-20 px-2 auto-rows-fr justify-center mx-auto">
         {[
-          { id: 'barber', title: 'Barbearia', icon: Scissors, path: '/barber-queue', desc: 'Corte, Barba & Estilo Premium', locked: false },
-          { id: 'bakery', title: 'Padaria', icon: Croissant, path: '/menu?type=bakery', desc: 'Sabor, Tradição & Confeitaria', locked: false },
           { id: 'caixa', title: 'Caixa', icon: ClipboardList, path: '/caixa', desc: 'Gestão & Vendas', locked: false },
           { id: 'financeiro', title: 'Financeiro', icon: Landmark, path: '/financeiro', desc: 'Controle de Gastos', locked: isFinanceLocked, admin: true },
           { id: 'estoque', title: 'Estoque', icon: Search, path: '/inventory', desc: 'Gestão de Mercadorias', locked: isInventoryLocked, admin: true }
