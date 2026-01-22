@@ -178,7 +178,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       return res.json();
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Barbeiro cadastrado com sucesso!" });
+      toast({ title: "Sucesso", description: "Funcionário cadastrado com sucesso!" });
       setRegisterOpen(false);
       setNewBarber({ username: "", password: "" });
     },
@@ -409,7 +409,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                     className="hover:bg-primary/10 hover:text-primary transition-colors py-6"
                   >
                     <UserPlus className="w-5 h-5" />
-                    <span className="font-bold uppercase italic tracking-tighter">Cadastrar Barbeiro</span>
+                    <span className="font-bold uppercase italic tracking-tighter">Cadastrar Funcionário</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
@@ -478,7 +478,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter">Cadastrar Novo Barbeiro</DialogTitle>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter">Cadastrar Novo Funcionário</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
