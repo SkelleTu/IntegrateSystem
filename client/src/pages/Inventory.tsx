@@ -354,72 +354,54 @@ export default function InventoryPage() {
                 <Table className="min-w-[800px] w-full table-fixed">
                   <TableHeader>
                     <TableRow className="border-white/5 hover:bg-transparent bg-black/40">
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[25%] py-6 pl-8">Item / Cód</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[10%] py-6">Qtd</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Preços (C/V)</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Tipo/Embalagem</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest w-[15%] py-6">Vencimento</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] lg:text-xs tracking-widest text-right pr-8 w-[20%] py-6">Análise</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[35%] py-4 pl-4">Item</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[15%] py-4">Qtd</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[25%] py-4">Preços</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest text-right pr-4 w-[25%] py-4">Ação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredInventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-32 text-white/40 italic uppercase text-sm font-black tracking-[0.4em]">
+                        <TableCell colSpan={4} className="text-center py-20 text-white/40 italic uppercase text-xs font-black tracking-[0.4em]">
                           {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredInventory.map((inv) => (
                         <TableRow key={inv.id} className="border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0">
-                          <TableCell className="font-black italic text-white py-6 lg:py-8 pl-8 truncate text-base lg:text-xl group-hover:text-primary transition-colors tracking-tighter uppercase">
-                            <div className="flex flex-col">
-                              <span>{inv.name}</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                {inv.barcode && (
-                                  <span className="text-[10px] text-primary/60 font-black uppercase tracking-[0.1em]">ID: {inv.barcode}</span>
-                                )}
-                                {inv.quantity < 0 && (
-                                  <span className="text-[10px] text-red-500 font-black uppercase tracking-[0.2em]">Estoque Negativo</span>
-                                )}
-                              </div>
+                          <TableCell className="font-black italic text-white py-3 pl-4 group-hover:text-primary transition-colors tracking-tighter uppercase">
+                            <div className="flex flex-col min-w-0">
+                              <span className="truncate text-sm leading-tight">{inv.name}</span>
+                              <span className="text-[9px] text-white/40 font-bold truncate">
+                                {inv.unit} • {inv.barcode || "S/ CÓD"}
+                              </span>
                             </div>
                           </TableCell>
-                          <TableCell className={`${inv.quantity < 0 ? "text-red-500 animate-pulse" : "text-primary"} font-black text-base lg:text-2xl italic tracking-tighter`}>
+                          <TableCell className={`${inv.quantity < 0 ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
                             {inv.quantity}
                           </TableCell>
-                          <TableCell className="text-white/60 text-xs lg:text-sm font-bold">
-                            <div className="flex flex-col">
-                              <span className="text-red-400">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
-                              {inv.salePrice ? (
-                                <span className="text-green-400">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>
-                              ) : (
-                                <span className="text-zinc-500 italic">Insumo</span>
-                              )}
+                          <TableCell className="text-white/60 text-[10px] font-bold">
+                            <div className="flex flex-col leading-tight">
+                              <span className="text-red-400/80">C: {(inv.costPrice / 100).toFixed(2)}</span>
+                              {inv.salePrice && <span className="text-green-400/80">V: {(inv.salePrice / 100).toFixed(2)}</span>}
                             </div>
                           </TableCell>
-                          <TableCell className="text-white/60 truncate text-xs lg:text-sm font-bold uppercase">
-                            {inv.unit} <span className="text-white/40">/</span> {inv.itemsPerUnit} un
-                          </TableCell>
-                          <TableCell className="text-white/40 text-xs lg:text-sm font-bold">
-                            {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yyyy") : "PERMANENTE"}
-                          </TableCell>
-                          <TableCell className="text-right pr-8 py-6 lg:py-8">
-                            <div className="flex justify-end items-center gap-3">
+                          <TableCell className="text-right pr-4 py-3">
+                            <div className="flex justify-end items-center gap-2">
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
-                                className="text-white/40 hover:text-primary"
-                                onClick={() => handleEdit(inv)}
+                                className="h-7 px-2 text-[10px] font-black uppercase italic text-primary hover:bg-primary/10"
+                                onClick={() => {
+                                  handleEdit(inv);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
                               >
                                 Editar
                               </Button>
-                              {isExpiringSoon(inv.expiryDate) ? (
-                                <Badge variant="destructive" className="bg-red-500 text-black border-none gap-1.5 animate-pulse font-black italic uppercase text-[9px] lg:text-[11px] px-3 py-1 rounded-sm shadow-[0_0_15px_rgba(239,68,68,0.3)]">
-                                  <AlertTriangle className="h-3.5 w-3.5" /> Atenção: Validade
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="bg-primary/10 text-primary border border-primary/20 font-black italic uppercase text-[9px] lg:text-[11px] px-3 py-1 rounded-sm">Estoque OK</Badge>
+                              {isExpiringSoon(inv.expiryDate) && (
+                                <AlertTriangle className="h-3 w-3 text-red-500 animate-pulse" />
                               )}
                             </div>
                           </TableCell>
