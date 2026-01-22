@@ -112,6 +112,14 @@ export default function Cashier() {
   };
 
   const handlePayment = (method: "cash" | "card" | "pix") => {
+    if (cart.length === 0) {
+      toast({ 
+        title: "Carrinho Vazio", 
+        description: "Adicione pelo menos um item para realizar uma venda.",
+        variant: "destructive"
+      });
+      return;
+    }
     setPaymentMethod(method);
     setPaymentModalOpen(true);
   };
