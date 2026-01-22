@@ -29,8 +29,8 @@
   --primary: 190 100% 50%;         /* Cyber Blue Neon #00e5ff */
   --primary-foreground: 220 25% 3%;
   
-  --secondary: 260 80% 60%;        /* Electric Purple Neon */
-  --secondary-foreground: 210 20% 98%;
+  --secondary: 190 100% 50%;        /* Electric Blue Neon instead of purple */
+  --secondary-foreground: 220 25% 3%;
   
   --muted: 220 15% 10%;
   --muted-foreground: 210 10% 70%;
@@ -41,13 +41,13 @@
   --destructive: 0 100% 50%;
   --destructive-foreground: 210 20% 98%;
   
-  --border: 220 20% 12%;
+  --border: 190 100% 50% / 0.2;     /* Neon borders by default */
   --input: 220 20% 10%;
   --ring: 190 100% 50%;
   
   --card: 220 25% 5%;
   --card-foreground: 210 20% 100%;
-  --card-border: 220 20% 15%;
+  --card-border: 190 100% 50% / 0.1;
 
   --radius: 0.75rem;
   
@@ -153,6 +153,17 @@
   .neon-border-blue {
     @apply border-primary/40;
     box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+  }
+
+  /* Global Button Glow */
+  button:not(.ghost):not(.outline), .btn-neon {
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    transition: all 0.3s ease;
+  }
+  
+  button:not(.ghost):not(.outline):hover, .btn-neon:hover {
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+    transform: translateY(-1px);
   }
 }
 
