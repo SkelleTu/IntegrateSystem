@@ -58,6 +58,7 @@ export const menuItems = pgTable("menu_items", {
   price: integer("price").notNull(), // in cents
   imageUrl: text("image_url").notNull(),
   isAvailable: integer("is_available", { mode: 'boolean' }).default(true).notNull(),
+  barcode: text("barcode"), // Código de barras para busca
   tags: text("tags"), // Store as JSON string
 });
 

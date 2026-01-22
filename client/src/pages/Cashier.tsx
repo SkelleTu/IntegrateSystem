@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MenuItem, CashRegister } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -33,6 +33,31 @@ export default function Cashier() {
   const { data: menuItems } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
   });
+
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredMenuItems = useMemo(() => {
+    if (!menuItems) return [];
+    if (!searchTerm) return menuItems;
+
+    const term = searchTerm.toLowerCase();
+    return menuItems.filter(item => 
+      item.name.toLowerCase().includes(term) ||
+      item.id.toString() === term ||
+      (item.barcode && item.barcode.toLowerCase() === term)
+    );
+  }, [menuItems, searchTerm]);
+
+  // Efeito para adicionar automaticamente ao carrinho se houver apenas um resultado exato de código de barras
+  useEffect(() => {
+    if (searchTerm && filteredMenuItems.length === 1) {
+      const item = filteredMenuItems[0];
+      if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
+        addToCart(item);
+        setSearchTerm(""); // Limpa para o próximo bip
+      }
+    }
+  }, [searchTerm, filteredMenuItems]);
 
   const openMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -218,6 +243,18 @@ export default function Cashier() {
             <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] mt-1">Controle Transacional em Tempo Real</p>
           </div>
         </div>
+        <div className="flex items-center gap-4 flex-1 max-w-md mx-4">
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
+            <Input 
+              placeholder="BUSCAR PRODUTO (NOME, ID OU BARCODE)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="bg-black/60 border-white/10 text-white h-12 pl-10 font-black italic rounded-xl focus:border-primary/50 transition-all"
+              autoFocus
+            />
+          </div>
+        </div>
         <div className="flex items-center gap-4">
           <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-xs">
             Operador ID: {register.userId}
@@ -228,7 +265,7 @@ export default function Cashier() {
       <div className="flex flex-col lg:flex-row gap-8 items-start">
         <div className="flex-1 w-full space-y-8">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6">
-            {menuItems?.map((item) => (
+            {filteredMenuItems?.map((item) => (
               <motion.div
                 key={item.id}
                 whileHover={{ y: -5 }}
