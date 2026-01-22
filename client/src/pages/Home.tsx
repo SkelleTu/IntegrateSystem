@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
-import { Scissors, Croissant, ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon } from "lucide-react";
+import { ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";

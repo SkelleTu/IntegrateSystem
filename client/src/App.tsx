@@ -181,11 +181,6 @@ function LandingNavigation() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="bg-zinc-950 border-white/10 p-0 w-[280px] z-[99999]">
-              <SheetHeader className="p-6 border-b border-white/5">
-                <SheetTitle className="text-left">
-                  <img src={auraLogo} alt="Aura Logo" className="h-12 w-auto" />
-                </SheetTitle>
-              </SheetHeader>
               <div className="flex flex-col p-6 gap-6">
                 <div className="flex flex-col gap-4">
                   <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Navegação</p>
@@ -242,10 +237,9 @@ export default function App() {
                   <div className="flex flex-col flex-1 overflow-hidden relative">
                     <header className="flex items-center justify-between p-2 border-b border-white/5 bg-black/50 backdrop-blur-md relative z-50">
                       <div className="flex items-center gap-2">
-                        <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden" />
-                        <div className="md:hidden">
-                          <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
-                        </div>
+                        <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden">
+                           <Menu className="w-6 h-6" />
+                        </SidebarTrigger>
                       </div>
                       <div className="flex items-center gap-2">
                       </div>
