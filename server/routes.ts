@@ -3,7 +3,15 @@ import { createServer, type Server } from "http";
 import { DatabaseStorage, storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { insertCashRegisterSchema, insertSaleSchema, insertSaleItemSchema, insertPaymentSchema, insertTransactionSchema, insertTimeClockSchema } from "@shared/schema";
+import { 
+  insertCashRegisterSchema, 
+  insertSaleSchema, 
+  insertSaleItemSchema, 
+  insertPaymentSchema, 
+  insertTransactionSchema, 
+  insertTimeClockSchema,
+  insertInventorySchema
+} from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import SQLiteStore from "better-sqlite3-session-store";
