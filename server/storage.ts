@@ -318,10 +318,10 @@ export class DatabaseStorage implements IStorage {
       // Sincronização com Estoque e Financeiro
       for (const item of items) {
         // 1. Atualizar Estoque (Venda subtrai do estoque)
-        // Procurar no inventário pelo menuItemId (ou productId conforme schema)
+        // Procurar no inventário pelo itemId (que refere-se ao produto cadastrado no menu)
         const [inventoryItem] = await tx.select()
           .from(inventory)
-          .where(and(eq(inventory.itemId, item.menuItemId), eq(inventory.itemType, 'product')))
+          .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, 'product')))
           .limit(1);
 
         if (inventoryItem) {
@@ -338,6 +338,7 @@ export class DatabaseStorage implements IStorage {
             type: "out",
             quantity: item.quantity,
             reason: `Venda #${newSale.id}`,
+            userId: sale.userId || 0,
             createdAt: new Date()
           });
         }
