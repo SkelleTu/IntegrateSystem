@@ -346,7 +346,7 @@ export class DatabaseStorage implements IStorage {
 
       // 2. Registrar Transação Financeira (Receita)
       await tx.insert(transactions).values({
-        businessType: sale.businessType || "padaria",
+        businessType: "padaria",
         type: "income",
         category: "vendas",
         description: `Venda PDV #${newSale.id}`,
@@ -367,14 +367,6 @@ export class DatabaseStorage implements IStorage {
       .from(sales)
       .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(sales.createdAt));
-  }
-
-  async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
-    const [updated] = await db.update(sales)
-      .set(update)
-      .where(eq(sales.id, id))
-      .returning();
-    return updated;
   }
 
   async cancelSale(id: number): Promise<Sale> {
