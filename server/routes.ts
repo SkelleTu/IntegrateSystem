@@ -89,7 +89,8 @@ export async function registerRoutes(
   });
 
   // Label Printing Route
-  app.post("/api/labels/print", isAuthenticated, async (req, res) => {
+  app.post("/api/labels/print", async (req, res, next) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     if (user.username !== "SkelleTu") {
       return res.status(403).json({ error: "Acesso negado" });
@@ -107,7 +108,8 @@ export async function registerRoutes(
     res.json({ status: "ENVIADO" });
   });
 
-  app.get("/api/labels/status", isAuthenticated, (req, res) => {
+  app.get("/api/labels/status", async (req, res, next) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     if (user.username !== "SkelleTu") {
       return res.status(403).json({ error: "Acesso negado" });

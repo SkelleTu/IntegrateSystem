@@ -15,7 +15,7 @@ export default function LabelSystem() {
   const [bruto, setBruto] = useState("");
   const [tara, setTara] = useState("0.040");
   
-  const { data: status } = useQuery({
+  const { data: status } = useQuery<{ appConnected: boolean }>({
     queryKey: ["/api/labels/status"],
     refetchInterval: 3000
   });
@@ -202,7 +202,7 @@ export default function LabelSystem() {
           <CardContent className="p-6 font-mono text-[10px] text-zinc-500 space-y-1">
             <p>[SYSTEM] Iniciando monitoramento...</p>
             <p className={status?.appConnected ? 'text-primary' : 'text-red-500'}>
-              [WS] App Windows {status?.appConnected ? 'CONECTADO' : 'DISCONECTADO'}
+              [WS] App Windows {status?.appConnected ? 'CONECTADO' : 'DESCONECTADO'}
             </p>
             <p>[DB] Inventário carregado: {inventory.length} itens.</p>
             {printMutation.isSuccess && <p className="text-primary">[LOG] Etiqueta enviada com sucesso às {new Date().toLocaleTimeString()}</p>}
