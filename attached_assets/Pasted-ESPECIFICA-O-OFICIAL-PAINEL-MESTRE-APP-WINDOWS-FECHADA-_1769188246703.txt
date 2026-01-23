@@ -1,0 +1,355 @@
+ESPECIFICAÇÃO OFICIAL – PAINEL MESTRE + APP WINDOWS (FECHADA)
+
+Este documento define 100% do que o Replit deve criar, sem ambiguidades, cobrindo painel web, controle de acesso, comunicação em tempo real e geração do aplicativo Windows portátil (sem instalação).
+
+
+---
+
+1. CONTROLE DE ACESSO (REGRA ABSOLUTA)
+
+1.1 Usuário Mestre
+
+Usuário único: SkelleTu
+
+Tipo: OWNER / ROOT
+
+Apenas este usuário pode acessar o Painel Mestre
+
+Nenhum outro usuário, papel ou permissão pode visualizar ou inferir a existência deste painel
+
+
+1.2 Pós‑login
+
+Após o login do usuário SkelleTu:
+
+O menu principal deve exibir um item exclusivo chamado "Painel Mestre"
+
+Este item não existe para outros usuários
+
+Tentativas de acesso direto por URL devem retornar 403 + log de auditoria
+
+
+
+---
+
+2. PAINEL MESTRE (MENU ESTRUTURAL)
+
+O Painel Mestre deve conter um menu lateral fixo, com carregamento instantâneo, dividido nos seguintes setores:
+
+2.1 Visão Geral (Dashboard Global)
+
+Status geral do sistema (ONLINE / DEGRADED / OFFLINE)
+
+Quantidade de Apps Windows conectados
+
+Quantidade de impressoras ativas
+
+Quantidade de balanças ativas
+
+Fila global de impressão
+
+Alertas críticos em tempo real
+
+
+Atualização: tempo real (WebSocket)
+
+
+---
+
+2.2 Dispositivos Windows
+
+Para cada App Windows conectado:
+
+ID único
+
+Nome lógico
+
+Status (online/offline)
+
+Último ping (ms)
+
+Versão do app
+
+Sistema operacional
+
+Impressoras detectadas
+
+Balanças detectadas
+
+
+Ações:
+
+Desativar dispositivo remotamente
+
+Forçar reconexão
+
+Enviar comando de teste
+
+
+
+---
+
+2.3 Impressoras
+
+Cadastro e monitoramento de TODAS as impressoras:
+
+Associação com App Windows
+
+Porta (USB / COM / TCP)
+
+Linguagem (TSPL / ZPL / EPL / CPCL)
+
+DPI
+
+Largura da etiqueta
+
+Gap
+
+Densidade
+
+
+Ações:
+
+Teste RAW
+
+Recalibrar
+
+Definir como padrão
+
+Pausar / Retomar
+
+
+
+---
+
+2.4 Balanças
+
+Tipo (com etiqueta / sem etiqueta)
+
+Protocolo (RS232 / USB / TCP)
+
+Porta
+
+Status de leitura
+
+Último peso recebido
+
+
+Fallback:
+
+Entrada manual habilitável
+
+
+
+---
+
+2.5 Etiquetas (Templates)
+
+Templates em JSON declarativo
+
+Visualização lógica
+
+Versionamento
+
+Associação por produto/balança
+
+
+Estados:
+
+Ativo
+
+Em teste
+
+Desativado
+
+
+
+---
+
+2.6 Fila de Impressão
+
+Lista de todos os jobs
+
+Estados completos (criado, enviado, impresso, falha, reprocessado)
+
+Reimpressão manual
+
+Cancelamento
+
+
+
+---
+
+2.7 Logs e Auditoria
+
+Logs técnicos
+
+Logs operacionais
+
+Logs de segurança
+
+
+Filtros por:
+
+Data
+
+Dispositivo
+
+Impressora
+
+Operador
+
+
+
+---
+
+2.8 Configurações Avançadas
+
+Timeout de impressão
+
+Tentativas automáticas
+
+Estratégia de fallback
+
+Política offline
+
+
+
+---
+
+3. COMUNICAÇÃO REPLIT ↔ APP WINDOWS
+
+3.1 Canal
+
+WebSocket persistente
+
+Reconexão automática
+
+Heartbeat a cada 1s
+
+
+3.2 Autenticação do App Windows
+
+Token único por dispositivo
+
+Atrelado ao usuário SkelleTu
+
+Revogável remotamente
+
+
+
+---
+
+4. APP WINDOWS (REQUISITOS OBRIGATÓRIOS)
+
+4.1 Forma de Distribuição
+
+Arquivo único (.exe)
+
+Portátil (não exige instalação)
+
+Executa sem permissões administrativas
+
+Pode rodar a partir de qualquer pasta
+
+
+
+---
+
+4.2 Comportamento
+
+Executa em background
+
+Ícone na bandeja do sistema
+
+Interface técnica mínima
+
+
+
+---
+
+4.3 Funções Internas
+
+Detectar impressoras automaticamente
+
+Detectar balanças automaticamente
+
+Traduzir JSON → TSPL/ZPL/EPL/CPCL
+
+Enviar comandos RAW
+
+Manter fila local persistente
+
+
+
+---
+
+4.4 Modo Offline
+
+Impressão continua mesmo sem internet
+
+Jobs ficam em fila local
+
+Sincroniza automaticamente ao reconectar
+
+
+
+---
+
+4.5 Watchdog
+
+Monitora travamento
+
+Reinicia spool automaticamente
+
+Reporta falhas ao Replit
+
+
+
+---
+
+5. SEGURANÇA
+
+App Windows só funciona se autorizado
+
+Bloqueio remoto imediato
+
+Logs de tentativas inválidas
+
+
+
+---
+
+6. ATUALIZAÇÕES
+
+App verifica versão no Replit
+
+Atualização silenciosa
+
+Rollback automático em falha
+
+
+
+---
+
+7. RESULTADO FINAL ESPERADO
+
+Ao final da implementação:
+
+O usuário SkelleTu possui controle total
+
+O sistema funciona online ou offline
+
+Qualquer impressora térmica é suportada
+
+Qualquer balança comum é suportada
+
+Nenhuma falha impede a operação
+
+
+
+---
+
+REGRA FINAL
+
+Nada deve ser implementado fora desta especificação. Nenhuma decisão fica implícita. Este documento é a fonte única da verdade.

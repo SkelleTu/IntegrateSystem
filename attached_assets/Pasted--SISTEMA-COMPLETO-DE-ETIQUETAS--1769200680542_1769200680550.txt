@@ -1,0 +1,266 @@
+====================================================================
+SISTEMA COMPLETO DE ETIQUETAS – BALANÇA + PLATAFORMA WEB + APP WINDOWS
+MODELO BASEADO EM ETIQUETA REAL DE SUPERMERCADO
+====================================================================
+
+================================================
+1. VISÃO GERAL DO SISTEMA
+================================================
+
+Este sistema integra:
+
+- Plataforma Web (Replit / Vercel)
+- App Local Windows (executável sem instalação)
+- Balança (protocolo serial / USB / TCP)
+- Impressora térmica (texto, imagem, código de barras)
+- Usuário dono: SkelleTu (acesso exclusivo)
+
+Objetivo:
+Gerar etiquetas AUTOMATICAMENTE, com:
+- Peso vindo da balança
+- Cálculos automáticos (preço, validade, nutrição)
+- Layout fiel ao padrão de mercado
+- Impressão perfeita (texto + linhas + código de barras)
+
+================================================
+2. CONTROLE DE ACESSO (MENU EXCLUSIVO)
+================================================
+
+Após login:
+- O backend valida o usuário
+- Se usuário.role === "OWNER" e username === "SkelleTu"
+- O menu lateral exibe uma nova sessão:
+
+📁 "Sistema de Etiquetas (Avançado)"
+
+Somente este usuário vê:
+- Status da plataforma online
+- Status do App Windows
+- Status da balança
+- Status da impressora
+- Logs em tempo real
+- Editor visual
+- Monitor de impressão
+
+================================================
+3. PAINEL DE CONTROLE (DASHBOARD)
+================================================
+
+O painel mostra EM TEMPO REAL:
+
+[STATUS]
+- Plataforma Web: ONLINE / OFFLINE
+- App Windows: CONECTADO / DESCONECTADO
+- Balança: OK / SEM LEITURA
+- Impressora: PRONTA / ERRO / SEM PAPEL
+
+[FILA]
+- Etiquetas aguardando
+- Etiquetas impressas
+- Erros de impressão
+
+[EVENTOS]
+- Peso recebido
+- Cálculo executado
+- Etiqueta gerada
+- Impressão concluída
+
+Tudo via WebSocket.
+
+================================================
+4. FLUXO COMPLETO DE FUNCIONAMENTO
+================================================
+
+1) Produto é selecionado
+2) Balança envia o peso (ex: 0.474 kg)
+3) Sistema calcula:
+   - Preço total
+   - Dados nutricionais proporcionais
+4) Sistema gera estrutura da etiqueta
+5) Estrutura vai para o App Windows
+6) App renderiza layout
+7) Impressora imprime
+
+================================================
+5. MODELO LÓGICO DA ETIQUETA (DADOS)
+================================================
+
+Produto:
+- Nome: CATARINA BANANA
+- Preço por Kg: 35.90
+- TARA: 0.040 kg
+- Peso Líquido: 0.474 kg
+
+Cálculo:
+Peso líquido = peso bruto - tara
+Total = peso líquido × preço por kg
+
+Ex:
+0.474 × 35.90 = 17.02
+
+================================================
+6. CÁLCULO NUTRICIONAL PROPORCIONAL
+================================================
+
+Base nutricional (por 60g):
+- Energia: 209 kcal
+- Carboidratos: 39 g
+- Proteínas: 4.6 g
+- Gorduras Totais: 3.8 g
+- Sódio: 201 mg
+
+Peso real:
+0.474 kg = 474 g
+
+Fator:
+474 / 60 = 7.9
+
+Ex:
+Energia real = 209 × 7.9 ≈ 1651 kcal
+
+================================================
+7. BACKEND WEB (REPLIT – NODE.JS)
+================================================
+
+server.js
+---------
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+
+const app = express();
+app.use(express.json());
+
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+let windowsClient = null;
+
+wss.on("connection", ws => {
+  ws.on("message", msg => {
+    const data = JSON.parse(msg);
+    if (data.type === "WINDOWS_HELLO") {
+      windowsClient = ws;
+    }
+  });
+});
+
+app.post("/print", (req, res) => {
+  if (!windowsClient) {
+    return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+  }
+
+  windowsClient.send(JSON.stringify({
+    type: "PRINT_LABEL",
+    payload: req.body
+  }));
+
+  res.json({ status: "ENVIADO" });
+});
+
+server.listen(3000);
+
+================================================
+8. FORMATO UNIVERSAL DA ETIQUETA (JSON)
+================================================
+
+{
+  "produto": "CATARINA BANANA",
+  "peso": 0.474,
+  "tara": 0.040,
+  "precoKg": 35.90,
+  "total": 17.02,
+  "datas": {
+    "fabricacao": "20/01/26",
+    "validade": "23/01/26"
+  },
+  "barcode": "20378000170282301260",
+  "nutricao": {
+    "base": 60,
+    "energia": 209,
+    "carbo": 39,
+    "proteina": 4.6,
+    "gordura": 3.8,
+    "sodio": 201
+  }
+}
+
+================================================
+9. APP WINDOWS (NODE.JS – SEM INSTALAÇÃO)
+================================================
+
+app-windows.js
+--------------
+const WebSocket = require("ws");
+const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const bwipjs = require("bwip-js");
+const { exec } = require("child_process");
+
+const ws = new WebSocket("ws://localhost:3000");
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({ type: "WINDOWS_HELLO" }));
+});
+
+ws.on("message", async msg => {
+  const data = JSON.parse(msg);
+
+  if (data.type === "PRINT_LABEL") {
+    await gerarEtiqueta(data.payload);
+  }
+});
+
+async function gerarEtiqueta(info) {
+  const doc = new PDFDocument({ size: [300, 800] });
+  doc.pipe(fs.createWriteStream("etiqueta.pdf"));
+
+  doc.fontSize(16).text(info.produto, 20, 20);
+
+  doc.fontSize(10)
+     .text(`Peso: ${info.peso} kg`, 20, 60)
+     .text(`R$/Kg: ${info.precoKg}`, 20, 80)
+     .text(`TOTAL: R$ ${info.total}`, 20, 100);
+
+  const barcode = await bwipjs.toBuffer({
+    bcid: 'code128',
+    text: info.barcode,
+    scale: 2,
+    height: 10
+  });
+
+  doc.image(barcode, 20, 140);
+
+  doc.end();
+
+  exec("start etiqueta.pdf");
+}
+
+================================================
+10. CONFIGURAÇÕES DE IMPRESSÃO
+================================================
+
+TODAS ficam no App Windows:
+- Escurecimento
+- DPI
+- Largura do papel
+- Margens
+- Tipo de impressora
+- Teste de impressão
+
+A plataforma web NÃO controla hardware.
+
+================================================
+11. GARANTIA DE FUNCIONAMENTO
+================================================
+
+Se falhar:
+- Web → Windows: fila local
+- Impressora: PDF fallback
+- Balança: leitura manual
+
+Não existe ponto único de falha.
+
+================================================
+FIM – DOCUMENTO ÚNICO PARA O REPLIT
+================================================
