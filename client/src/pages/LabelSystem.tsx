@@ -85,7 +85,7 @@ export default function LabelSystem() {
           <Button 
             variant="outline" 
             className="h-10 border-purple-500/50 text-purple-500 hover:bg-purple-500/10"
-            onClick={() => window.open('/attached_assets/dist_windows/AuraPrinter.exe', '_blank')}
+            onClick={() => window.open('/downloads/AuraPrinter.exe', '_blank')}
           >
             BAIXAR APP WINDOWS (.EXE)
           </Button>
