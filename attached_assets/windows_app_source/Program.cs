@@ -11,8 +11,8 @@ namespace AuraLabelPrinter
 {
     class Program
     {
-        // Altere para o domínio real do seu app Replit
-        private static string wsUrl = "wss://aura-seu-domino.replit.app/ws/labels";
+        // URL configurada para o seu domínio real
+        private static string wsUrl = "wss://bbb42672-7fe2-4197-964e-f32951ce4490-00-d4lz4avucqpo.picard.replit.dev/ws/labels";
 
         static async Task Main(string[] args)
         {

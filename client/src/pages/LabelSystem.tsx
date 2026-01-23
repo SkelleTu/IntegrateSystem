@@ -82,6 +82,13 @@ export default function LabelSystem() {
           <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado SkelleTu</p>
         </div>
         <div className="flex gap-4">
+          <Button 
+            variant="outline" 
+            className="h-10 border-purple-500/50 text-purple-500 hover:bg-purple-500/10"
+            onClick={() => window.open('/attached_assets/dist_windows/AuraPrinter.exe', '_blank')}
+          >
+            BAIXAR APP WINDOWS (.EXE)
+          </Button>
           <Badge variant="outline" className={`h-10 px-4 gap-2 border-2 ${status?.appConnected ? 'border-primary/50 text-primary' : 'border-red-500/50 text-red-500'}`}>
             {status?.appConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             {status?.appConnected ? 'APP WINDOWS CONECTADO' : 'APP WINDOWS OFFLINE'}
