@@ -343,15 +343,24 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
+    { title: "Sistema de Etiquetas", url: "/admin/labels", icon: FileText, ownerOnly: true },
   ]
 
   if (!user) return null;
 
-  const handleNav = (url: string, adminOnly?: boolean) => {
-    if (adminOnly && user?.role !== "admin") {
+  const handleNav = (url: string, adminOnly?: boolean, ownerOnly?: boolean) => {
+    if (adminOnly && user?.role !== "admin" && user?.role !== "owner") {
       toast({
         title: "Acesso Negado",
         description: "Somente o administrador pode acessar esta área.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (ownerOnly && user?.username !== "SkelleTu") {
+      toast({
+        title: "Acesso Negado",
+        description: "Acesso exclusivo ao proprietário SkelleTu.",
         variant: "destructive"
       });
       return;
@@ -380,12 +389,12 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isLocked = item.adminOnly && user.role !== "admin";
+                const isLocked = (item.adminOnly && user.role !== "admin" && user.role !== "owner") || (item.ownerOnly && user.username !== "SkelleTu");
                 
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
-                      onClick={() => handleNav(item.url, item.adminOnly)}
+                      onClick={() => handleNav(item.url, item.adminOnly, item.ownerOnly)}
                       className={`transition-colors py-6 relative group ${
                         isLocked 
                           ? "opacity-40 grayscale cursor-not-allowed hover:bg-transparent" 

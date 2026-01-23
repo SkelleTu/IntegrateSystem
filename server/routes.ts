@@ -17,6 +17,7 @@ import createMemoryStore from "memorystore";
 import SQLiteStore from "better-sqlite3-session-store";
 import sqlite from "better-sqlite3";
 import passport from "passport";
+import { WebSocketServer, WebSocket } from "ws";
 
 const SessionStore = SQLiteStore(session);
 const dbSession = new sqlite("sessions.db");
@@ -60,6 +61,63 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // WebSocket for Label System
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws/labels' });
+  let windowsClient: WebSocket | null = null;
+
+  wss.on('connection', (ws) => {
+    console.log('WS Connection established for labels');
+
+    ws.on('message', (msg) => {
+      try {
+        const data = JSON.parse(msg.toString());
+        if (data.type === 'WINDOWS_HELLO') {
+          windowsClient = ws;
+          console.log('Windows Label App connected');
+        }
+      } catch (e) {
+        console.error('WS Message error:', e);
+      }
+    });
+
+    ws.on('close', () => {
+      if (ws === windowsClient) {
+        windowsClient = null;
+        console.log('Windows Label App disconnected');
+      }
+    });
+  });
+
+  // Label Printing Route
+  app.post("/api/labels/print", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
+      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+    }
+
+    windowsClient.send(JSON.stringify({
+      type: "PRINT_LABEL",
+      payload: req.body
+    }));
+
+    res.json({ status: "ENVIADO" });
+  });
+
+  app.get("/api/labels/status", isAuthenticated, (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    res.json({
+      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
+    });
+  });
+
   // Session & Auth Setup
   app.use(
     session({
