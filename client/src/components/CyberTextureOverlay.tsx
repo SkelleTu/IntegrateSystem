@@ -45,7 +45,7 @@ function generateIcons(count: number): FloatingIcon[] {
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: 20 + Math.random() * 32,
-    opacity: 0.06 + Math.random() * 0.1,
+    opacity: 0.15 + Math.random() * 0.15,
     duration: 12 + Math.random() * 20,
     delay: Math.random() * -15,
     rotateDirection: Math.random() > 0.5 ? 1 : -1,
@@ -93,7 +93,7 @@ export function CyberTextureOverlay({ iconCount = 35, className = "" }: CyberTex
         );
       })}
       
-      <svg className="absolute inset-0 w-full h-full opacity-[0.04]">
+      <svg className="absolute inset-0 w-full h-full opacity-[0.08]">
         <defs>
           <pattern id="cyber-circuit-overlay" x="0" y="0" width="120" height="120" patternUnits="userSpaceOnUse">
             <path 
@@ -114,7 +114,7 @@ export function CyberTextureOverlay({ iconCount = 35, className = "" }: CyberTex
       </svg>
 
       <div 
-        className="absolute inset-0 opacity-[0.025]"
+        className="absolute inset-0 opacity-[0.05]"
         style={{
           backgroundImage: `
             repeating-linear-gradient(
