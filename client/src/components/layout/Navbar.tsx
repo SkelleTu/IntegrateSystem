@@ -44,17 +44,15 @@ export function Navbar() {
   const filteredItems = navItems.filter(item => !item.adminOnly || user.role === "admin");
 
   return (
-    <nav className="sticky top-0 z-[100] w-full bg-black/60 backdrop-blur-xl border-b border-white/10 px-4 md:px-8 h-24 flex items-center justify-between">
+    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[95%] max-w-7xl bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl px-4 md:px-8 h-20 flex items-center justify-between shadow-2xl">
       <div className="flex items-center gap-8">
-        <div className="fixed left-0 top-0 z-[110] pointer-events-none">
-          <Link href="/app" className="pointer-events-auto">
-            <div className="relative pl-16 -mt-3 transition-transform duration-300 hover:scale-105 active:scale-95">
-              <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto relative z-10" />
-            </div>
+        <div className="relative">
+          <Link href="/app" className="flex items-center">
+            <img src={auraLogo} alt="Aura Logo" className="h-16 w-auto transition-transform duration-300 hover:scale-105 active:scale-95" />
           </Link>
         </div>
 
-        <div className="pl-40 hidden lg:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-1">
           {filteredItems.map((item) => (
             <Button
               key={item.url}

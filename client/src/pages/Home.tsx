@@ -54,7 +54,7 @@ export default function Home() {
   const isInventoryLocked = user?.role !== "admin";
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-24">
+    <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-32">
       {/* Background Image with Overlay - Match Landing Page Style */}
       <div 
         className="absolute inset-0 z-[-2] bg-center bg-no-repeat opacity-40 blur-[2px] bg-fixed"
