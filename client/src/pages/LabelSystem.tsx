@@ -76,7 +76,7 @@ export default function LabelSystem() {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl gap-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-800/20 p-6 rounded-2xl border border-white/10 backdrop-blur-sm gap-6">
         <div className="space-y-1">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white">Sistema de <span className="text-primary">Etiquetas</span></h1>
           <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado SkelleTu</p>
