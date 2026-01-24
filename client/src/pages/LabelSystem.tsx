@@ -94,6 +94,10 @@ export default function LabelSystem() {
     printMutation.mutate(labelData);
   };
 
+  if (inventory.length === 0 && !selectedItem) {
+     // Garantir que a interface renderize mesmo sem dados iniciais
+  }
+
   return (
     <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto min-h-screen bg-transparent">
       {/* Hero Section Sensacional */}
