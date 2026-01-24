@@ -189,11 +189,13 @@ export default function LabelSystem() {
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
           <Button 
-            variant="outline" 
-            className="h-12 px-6 border-purple-500/50 text-purple-500 hover:bg-purple-500/10 font-black uppercase italic tracking-widest text-sm shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
+            variant="ghost" 
+            className="h-12 px-6 border border-primary/30 text-primary hover:bg-primary/10 font-black uppercase italic tracking-widest text-sm shadow-[0_0_15px_rgba(0,229,255,0.1)] transition-all group overflow-hidden relative"
             onClick={() => window.open('/attached_assets/dist_windows/AuraPrinter.exe', '_blank')}
           >
-            BAIXAR APP WINDOWS (.EXE)
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+            <Download className="w-4 h-4 mr-2 group-hover:animate-bounce" />
+            MIRROR DOWNLOAD (.EXE)
           </Button>
           <div className="h-px w-full sm:h-12 sm:w-px bg-white/10" />
           <div className="flex items-center gap-3">
