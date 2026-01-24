@@ -57,8 +57,12 @@ export default function Home() {
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-24">
       {/* Background Image with Overlay - Match Landing Page Style */}
       <div 
-        className="absolute inset-0 z-[-2] bg-cover bg-center bg-no-repeat opacity-40 blur-[2px] scale-105"
-        style={{ backgroundImage: `url(${luxuryBg})`, backgroundSize: 'cover' }}
+        className="absolute inset-0 z-[-2] bg-center bg-no-repeat opacity-40 blur-[2px] bg-fixed"
+        style={{ 
+          backgroundImage: `url(${luxuryBg})`, 
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 20%'
+        }}
       />
       <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/40 via-transparent to-black/60" />
       <motion.div 
