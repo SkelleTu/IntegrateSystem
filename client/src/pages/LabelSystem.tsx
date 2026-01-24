@@ -76,20 +76,20 @@ export default function LabelSystem() {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex justify-between items-center bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl gap-4">
         <div className="space-y-1">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white">Sistema de <span className="text-primary">Etiquetas</span></h1>
           <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado SkelleTu</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-3 w-full sm:w-auto">
           <Button 
             variant="outline" 
-            className="h-10 border-purple-500/50 text-purple-500 hover:bg-purple-500/10"
-            onClick={() => window.open('/downloads/AuraPrinter.exe', '_blank')}
+            className="h-10 border-purple-500/50 text-purple-500 hover:bg-purple-500/10 font-bold uppercase italic tracking-tighter text-xs"
+            onClick={() => window.open('/attached_assets/dist_windows/AuraPrinter.exe', '_blank')}
           >
             BAIXAR APP WINDOWS (.EXE)
           </Button>
-          <Badge variant="outline" className={`h-10 px-4 gap-2 border-2 ${status?.appConnected ? 'border-primary/50 text-primary' : 'border-red-500/50 text-red-500'}`}>
+          <Badge variant="outline" className={`h-10 px-4 gap-2 border-2 ${status?.appConnected ? 'border-primary/50 text-primary bg-primary/5' : 'border-red-500/50 text-red-500 bg-red-500/5'}`}>
             {status?.appConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
             {status?.appConnected ? 'APP WINDOWS CONECTADO' : 'APP WINDOWS OFFLINE'}
           </Badge>
