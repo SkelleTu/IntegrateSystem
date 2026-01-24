@@ -84,6 +84,8 @@
     z-index: -9999 !important;
     background-color: #05070a !important;
     background-image: 
+      /* Cyber Symbols Texture */
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.05'%3E%3Cpath d='M10 10l2 2l-2 2l-2-2zM40 20h4v4h-4zM70 10l3 3l-3 3l-3-3zM20 50c0 2 1 3 3 3s3-1 3-3s-1-3-3-3s-3 1-3 3zM80 40h6v2h-6zM50 70l4-4l4 4l-4 4zM15 85h10v2H15zM85 85h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
       /* Grid Pattern */
       linear-gradient(rgba(0, 229, 255, 0.2) 1px, transparent 1px),
       linear-gradient(90deg, rgba(0, 229, 255, 0.2) 1px, transparent 1px),
@@ -92,13 +94,18 @@
       /* Radial Glows with Breathing Animation */
       radial-gradient(at 0% 0%, rgba(0, 229, 255, var(--glow-opacity, 0.35)) 0, transparent 70%),
       radial-gradient(at 100% 100%, rgba(147, 51, 234, var(--glow-opacity, 0.35)) 0, transparent 70%);
-    background-size: 40px 40px, 40px 40px, 100px 100px, 100% 100%, 100% 100% !important;
+    background-size: 200px 200px, 40px 40px, 40px 40px, 100px 100px, 100% 100%, 100% 100% !important;
     background-attachment: fixed !important;
-    background-position: center !important;
-    background-repeat: repeat, repeat, repeat, no-repeat, no-repeat !important;
+    background-position: 0 0, center, center, center, center, center !important;
+    background-repeat: repeat !important;
     pointer-events: none !important;
     display: block !important;
-    animation: glow-pulse 4s ease-in-out infinite;
+    animation: glow-pulse 4s ease-in-out infinite, cyber-float 60s linear infinite;
+  }
+
+  @keyframes cyber-float {
+    from { background-position: 0 0, center, center, center, center, center; }
+    to { background-position: 200px 200px, center, center, center, center, center; }
   }
 
   @keyframes glow-pulse {
@@ -110,15 +117,23 @@
   @media (max-width: 767px) {
     body::before {
       background-image: 
+        /* Cyber Symbols Texture Mobile */
+        url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.1'%3E%3Cpath d='M10 10l2 2l-2 2l-2-2zM40 20h4v4h-4zM70 10l3 3l-3 3l-3-3zM20 50c0 2 1 3 3 3s3-1 3-3s-1-3-3-3s-3 1-3 3zM80 40h6v2h-6zM50 70l4-4l4 4l-4 4zM15 85h10v2H15zM85 85h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
         linear-gradient(rgba(0, 229, 255, 0.3) 1.5px, transparent 1.5px),
         linear-gradient(90deg, rgba(0, 229, 255, 0.3) 1.5px, transparent 1.5px),
         url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.25'%3E%3Cpath d='M20 20l4 4l-4 4l-4-4z'/%3E%3Ccircle cx='100' cy='90' r='2'/%3E%3Cpath d='M90 50l4-4l4 4l-4 4z'/%3E%3Crect x='40' y='60' width='6' height='6' rx='1' /%3E%3C/g%3E%3C/svg%3E"),
         radial-gradient(at 0% 0%, rgba(0, 229, 255, var(--glow-opacity, 0.6)) 0, transparent 100%),
         radial-gradient(at 100% 100%, rgba(147, 51, 234, var(--glow-opacity, 0.6)) 0, transparent 100%);
-      background-size: 50px 50px, 50px 50px, 100px 100px, 100% 100%, 100% 100% !important;
+      background-size: 150px 150px, 50px 50px, 50px 50px, 100px 100px, 100% 100%, 100% 100% !important;
       background-attachment: fixed !important; 
-      background-position: center !important;
+      background-position: 0 0, center, center, center, center, center !important;
+      animation: glow-pulse 4s ease-in-out infinite, cyber-float-mobile 40s linear infinite;
     }
+  }
+
+  @keyframes cyber-float-mobile {
+    from { background-position: 0 0, center, center, center, center, center; }
+    to { background-position: 150px 150px, center, center, center, center, center; }
   }
 
   @property --glow-opacity {
