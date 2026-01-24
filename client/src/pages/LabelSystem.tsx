@@ -242,11 +242,29 @@ export default function LabelSystem() {
                 </h4>
                 <p className="text-zinc-500 text-xs leading-relaxed">Verifique a fila de impressão do Windows. Se houver documentos presos, cancele-os e reinicie o serviço de Spooler do Windows.</p>
               </div>
-              <div>
+              
+              <div className="space-y-4">
                 <h4 className="text-primary font-black uppercase text-xs mb-2 tracking-widest flex items-center gap-2">
-                  <Monitor className="w-3 h-3" /> Alerta de Firewall?
+                  <ShieldCheck className="w-3 h-3" /> Configuração Detalhada de Firewall (Windows)
                 </h4>
-                <p className="text-zinc-500 text-xs leading-relaxed">O Aura Printer precisa de permissão para tráfego via porta 443 (HTTPS) para o WebSocket. Permita o acesso nas redes Privadas e Públicas.</p>
+                <div className="space-y-3 pl-2 border-l border-primary/20">
+                  <div className="space-y-1">
+                    <p className="text-white text-[10px] font-bold uppercase">Passo 1: Acesso ao Painel</p>
+                    <p className="text-zinc-500 text-[11px]">Clique no menu <span className="text-white font-medium">Iniciar</span>, digite <span className="text-white italic">"Firewall"</span> e selecione <span className="text-white font-medium">"Firewall do Windows Defender"</span>.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-white text-[10px] font-bold uppercase">Passo 2: Regras de Entrada</p>
+                    <p className="text-zinc-500 text-[11px]">No menu à esquerda, clique em <span className="text-white font-medium">"Configurações Avançadas"</span>. Na nova janela, selecione <span className="text-white font-medium">"Regras de Entrada"</span>.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-white text-[10px] font-bold uppercase">Passo 3: Criar Exceção</p>
+                    <p className="text-zinc-500 text-[11px]">Clique em <span className="text-white font-medium">"Nova Regra..."</span> no lado direito. Selecione <span className="text-white font-medium">"Programa"</span>, aponte para o caminho do <span className="text-white italic">AuraPrinter.exe</span> e selecione <span className="text-white font-medium">"Permitir a conexão"</span>.</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-white text-[10px] font-bold uppercase">Passo 4: Perfil de Rede</p>
+                    <p className="text-zinc-500 text-[11px]">Marque <span className="text-white font-medium">"Domínio"</span>, <span className="text-white font-medium">"Particular"</span> e <span className="text-white font-medium">"Público"</span> para garantir que o app funcione em qualquer rede.</p>
+                  </div>
+                </div>
               </div>
             </div>
           </CardContent>
