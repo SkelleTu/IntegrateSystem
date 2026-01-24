@@ -138,7 +138,8 @@ export default function LabelSystem() {
             </div>
             <Button 
               size="lg"
-              className="bg-primary hover:bg-primary/90 text-black font-black uppercase px-8 py-6 text-lg rounded-2xl shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:scale-105 transition-all"
+              className="bg-primary hover:bg-white text-white font-black uppercase px-8 py-6 text-lg rounded-2xl shadow-[0_0_20px_rgba(0,229,255,0.4)] hover:scale-105 transition-all"
+              style={{ color: 'white' }}
               onClick={() => window.open("/attached_assets/dist_windows/AuraPrinter.exe", "_blank")}
             >
               BAIXAR AGORA
