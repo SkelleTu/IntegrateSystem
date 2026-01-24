@@ -10,6 +10,7 @@ import auraLogo from "@assets/AURA_1768346008566.png";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
+import { CyberTextureOverlay } from "@/components/CyberTextureOverlay";
 
 export default function LandingPage() {
   const [location, setLocation] = useLocation();
@@ -116,6 +117,9 @@ export default function LandingPage() {
         }}
       />
       <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+      
+      {/* Cybernetic Icons Texture Overlay */}
+      <CyberTextureOverlay iconCount={45} className="z-[1]" />
 
       {/* Top Menu */}
       <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
