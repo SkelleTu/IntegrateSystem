@@ -181,6 +181,78 @@ export default function LabelSystem() {
         ))}
       </div>
 
+      {/* Manual Completo e Instruções Detalhadas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+        <Card className="bg-zinc-900/50 border-white/10 rounded-[2rem] overflow-hidden">
+          <CardHeader className="p-8 border-b border-white/5 bg-primary/5">
+            <CardTitle className="text-white uppercase italic text-2xl font-black flex items-center gap-3">
+              <Settings className="w-6 h-6 text-primary" /> Guia de Configuração
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0 text-primary font-black text-xs">1</div>
+                <div>
+                  <h4 className="text-white font-bold uppercase text-sm mb-1 tracking-tighter">Execução do Gateway</h4>
+                  <p className="text-zinc-500 text-xs leading-relaxed">Abra o <span className="text-primary font-bold">AuraPrinter.exe</span>. O Windows pode exibir um alerta de segurança; clique em "Mais informações" e "Executar assim mesmo". O app não altera registros do sistema.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0 text-primary font-black text-xs">2</div>
+                <div>
+                  <h4 className="text-white font-bold uppercase text-sm mb-1 tracking-tighter">Handshake Automático</h4>
+                  <p className="text-zinc-500 text-xs leading-relaxed">Assim que aberto, o terminal exibirá "Conectando ao servidor...". Quando o status mudar para <span className="text-green-500 font-bold">ONLINE</span> nesta página, a ponte está ativa.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0 text-primary font-black text-xs">3</div>
+                <div>
+                  <h4 className="text-white font-bold uppercase text-sm mb-1 tracking-tighter">Seleção de Impressora</h4>
+                  <p className="text-zinc-500 text-xs leading-relaxed">O gateway utiliza a impressora de etiquetas padrão do Windows. Certifique-se de que sua Zebra, Elgin ou Argox esteja configurada como <span className="text-white italic">"Impressora Padrão"</span> no Painel de Controle.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl flex gap-3 items-start">
+              <AlertCircle className="w-5 h-5 text-primary shrink-0" />
+              <p className="text-[10px] text-zinc-400 leading-normal uppercase font-medium">
+                <span className="text-primary font-black">DICA VIP:</span> Mantenha o terminal aberto em segundo plano. Ele consome menos de 10MB de RAM e garante que cada pesagem seja impressa instantaneamente.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-zinc-900/50 border-white/10 rounded-[2rem] overflow-hidden">
+          <CardHeader className="p-8 border-b border-white/5 bg-primary/5">
+            <CardTitle className="text-white uppercase italic text-2xl font-black flex items-center gap-3">
+              <RefreshCw className="w-6 h-6 text-primary" /> Resolução de Problemas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-8 space-y-6">
+            <div className="space-y-6">
+              <div className="pb-4 border-b border-white/5">
+                <h4 className="text-primary font-black uppercase text-xs mb-2 tracking-widest flex items-center gap-2">
+                  <WifiOff className="w-3 h-3" /> Status Offline?
+                </h4>
+                <p className="text-zinc-500 text-xs leading-relaxed">Verifique se sua conexão com a internet está estável. Caso persista, feche o app no Windows e abra-o novamente para forçar uma nova sincronização.</p>
+              </div>
+              <div className="pb-4 border-b border-white/5">
+                <h4 className="text-primary font-black uppercase text-xs mb-2 tracking-widest flex items-center gap-2">
+                  <Printer className="w-3 h-3" /> Não imprime?
+                </h4>
+                <p className="text-zinc-500 text-xs leading-relaxed">Verifique a fila de impressão do Windows. Se houver documentos presos, cancele-os e reinicie o serviço de Spooler do Windows.</p>
+              </div>
+              <div>
+                <h4 className="text-primary font-black uppercase text-xs mb-2 tracking-widest flex items-center gap-2">
+                  <Monitor className="w-3 h-3" /> Alerta de Firewall?
+                </h4>
+                <p className="text-zinc-500 text-xs leading-relaxed">O Aura Printer precisa de permissão para tráfego via porta 443 (HTTPS) para o WebSocket. Permita o acesso nas redes Privadas e Públicas.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Status Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-800/20 p-6 rounded-2xl border border-white/10 backdrop-blur-sm gap-6 mt-12">
         <div className="space-y-1">
