@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { Inventory } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function LabelSystem() {
   const { toast } = useToast();
