@@ -143,8 +143,8 @@ export default function LandingPage() {
       {/* Hero Section */}
       {step === 1 && (
         <>
-        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-20">
-          <div className="flex justify-center mb-8">
+        <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-4 md:pt-8">
+          <div className="flex justify-center mb-6">
             <div className="relative group">
               <img 
                 src={auraLogo} 
