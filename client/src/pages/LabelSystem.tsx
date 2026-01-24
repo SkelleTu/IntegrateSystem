@@ -76,23 +76,31 @@ export default function LabelSystem() {
 
   return (
     <div className="p-8 space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl gap-6">
         <div className="space-y-1">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white">Sistema de <span className="text-primary">Etiquetas</span></h1>
           <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado SkelleTu</p>
         </div>
-        <div className="flex flex-wrap gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
           <Button 
             variant="outline" 
-            className="h-10 border-purple-500/50 text-purple-500 hover:bg-purple-500/10 font-bold uppercase italic tracking-tighter text-xs"
+            className="h-12 px-6 border-purple-500/50 text-purple-500 hover:bg-purple-500/10 font-black uppercase italic tracking-widest text-sm shadow-[0_0_20px_rgba(168,85,247,0.15)] transition-all"
             onClick={() => window.open('/attached_assets/dist_windows/AuraPrinter.exe', '_blank')}
           >
             BAIXAR APP WINDOWS (.EXE)
           </Button>
-          <Badge variant="outline" className={`h-10 px-4 gap-2 border-2 ${status?.appConnected ? 'border-primary/50 text-primary bg-primary/5' : 'border-red-500/50 text-red-500 bg-red-500/5'}`}>
-            {status?.appConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-            {status?.appConnected ? 'APP WINDOWS CONECTADO' : 'APP WINDOWS OFFLINE'}
-          </Badge>
+          <div className="h-px w-full sm:h-12 sm:w-px bg-white/10" />
+          <div className="flex items-center gap-3">
+            <div className={`w-3 h-3 rounded-full animate-pulse ${status?.appConnected ? 'bg-primary shadow-[0_0_10px_#00e5ff]' : 'bg-red-500 shadow-[0_0_10px_#ef4444]'}`} />
+            <div className="flex flex-col">
+              <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${status?.appConnected ? 'text-primary' : 'text-red-500'}`}>
+                Status de Conexão
+              </span>
+              <span className="text-white font-bold italic uppercase tracking-tighter text-sm">
+                {status?.appConnected ? 'App Windows Conectado' : 'App Windows Offline'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
