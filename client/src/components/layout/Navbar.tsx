@@ -11,7 +11,8 @@ import {
   ShoppingCart,
   Fingerprint,
   User,
-  ShieldAlert
+  ShieldAlert,
+  Menu
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -67,7 +68,36 @@ export function Navbar() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2">
+        {/* Menu móvel com ícone de 3 risquinhos */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              className="lg:hidden text-white hover:bg-white/10"
+              data-testid="button-mobile-menu"
+            >
+              <Menu className="w-5 h-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white z-[200]" align="end">
+            <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Menu</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/5" />
+            {filteredItems.map((item) => (
+              <DropdownMenuItem 
+                key={item.url}
+                className="cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors py-3"
+                onClick={() => setLocation(item.url)}
+              >
+                <item.icon className="mr-2 h-4 w-4" />
+                <span className="font-bold uppercase italic text-[10px] tracking-widest">{item.title}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Menu do usuário */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-all">
@@ -80,7 +110,7 @@ export function Navbar() {
               </div>
             </div>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white" align="end">
+          <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white z-[200]" align="end">
             <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Minha Conta</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-white/5" />
             {user.username === "SkelleTu" && (
