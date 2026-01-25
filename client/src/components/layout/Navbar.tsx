@@ -94,6 +94,25 @@ export function Navbar() {
                 <span className="font-bold uppercase italic text-[10px] tracking-widest">{item.title}</span>
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator className="bg-white/5" />
+            <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Minha Conta</DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-white/5" />
+            {user.username === "SkelleTu" && (
+              <DropdownMenuItem 
+                className="cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors py-3"
+                onClick={() => setLocation("/admin/master")}
+              >
+                <ShieldAlert className="mr-2 h-4 w-4" />
+                <span className="font-bold uppercase italic text-[10px] tracking-widest">Controle Mestre</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem 
+              className="cursor-pointer text-red-500 hover:bg-red-500/10 transition-colors py-3"
+              onClick={() => logout.mutate()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span className="font-bold uppercase italic text-[10px] tracking-widest">Sair do Sistema</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
