@@ -241,9 +241,7 @@ export default function App() {
                   <div className="flex flex-col flex-1 overflow-hidden relative">
                     <header className="flex items-center justify-between p-2 border-b border-white/5 bg-black/50 backdrop-blur-md relative z-50">
                       <div className="flex items-center gap-2">
-                        <SidebarTrigger data-testid="button-sidebar-toggle" className="md:hidden">
-                           <Menu className="w-6 h-6" />
-                        </SidebarTrigger>
+                        {/* Removido o SidebarTrigger duplicado que ficava atrás da Navbar */}
                       </div>
                       <div className="flex items-center gap-2">
                       </div>
