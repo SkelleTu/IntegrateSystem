@@ -12,7 +12,8 @@ import {
   Fingerprint,
   User,
   ShieldAlert,
-  Menu
+  Menu,
+  FileText
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -39,10 +40,17 @@ export function Navbar() {
     { title: "Financeiro", url: "/financeiro", icon: Landmark, adminOnly: true },
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
+    { title: "Fiscal", url: "/fiscal", icon: FileText, adminOnly: true },
+    { title: "Etiquetas", url: "/admin/labels", icon: FileText, ownerOnly: true },
+    { title: "Monitoramento", url: "/admin/monitoring", icon: BarChart3, ownerOnly: true },
     { title: "Tablet", url: "/cart", icon: ShoppingCart },
   ];
 
-  const filteredItems = navItems.filter(item => !item.adminOnly || user.role === "admin");
+  const filteredItems = navItems.filter(item => {
+    if (item.ownerOnly) return user.username === "SkelleTu";
+    if (item.adminOnly) return user.role === "admin" || user.role === "owner";
+    return true;
+  });
 
   return (
     <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[95%] max-w-7xl bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl px-4 md:px-8 h-20 flex items-center justify-between shadow-2xl">

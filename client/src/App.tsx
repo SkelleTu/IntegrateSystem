@@ -126,6 +126,9 @@ function Router() {
       <Route path="/admin/labels">
         {() => <ProtectedRoute component={LabelSystem} />}
       </Route>
+      <Route path="/admin/monitoring">
+        {() => <ProtectedRoute component={MasterControl} />}
+      </Route>
       <Route path="/cart" component={ClientCart} />
       
       <Route path="/admin/master">
