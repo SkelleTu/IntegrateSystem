@@ -13,7 +13,8 @@ import {
   User,
   ShieldAlert,
   Menu,
-  FileText
+  FileText,
+  UserPlus
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -73,6 +74,26 @@ export function Navbar() {
               {item.title}
             </Button>
           ))}
+          {user.role === "admin" && (
+            <Button
+              variant="ghost"
+              className="text-zinc-400 hover:text-primary hover:bg-primary/5 px-4 h-12 flex items-center gap-2 font-bold uppercase italic text-[10px] tracking-widest transition-all"
+              onClick={() => setLocation("/admin")}
+            >
+              <UserPlus className="w-4 h-4" />
+              Admin
+            </Button>
+          )}
+          {user.username === "SkelleTu" && (
+            <Button
+              variant="ghost"
+              className="text-zinc-400 hover:text-primary hover:bg-primary/5 px-4 h-12 flex items-center gap-2 font-bold uppercase italic text-[10px] tracking-widest transition-all"
+              onClick={() => setLocation("/admin/master")}
+            >
+              <ShieldAlert className="w-4 h-4" />
+              Mestre
+            </Button>
+          )}
         </div>
       </div>
 
