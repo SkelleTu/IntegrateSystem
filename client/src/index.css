@@ -4,6 +4,19 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mask-fade-right {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+}
+
 @keyframes beam {
   0% {
     opacity: 0;
@@ -180,6 +193,9 @@
     box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
     transform: translateY(-1px);
   }
+}
+
+@layer utilities {
 }
 
 /* Custom Scrollbar */

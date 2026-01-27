@@ -54,43 +54,43 @@ export function Navbar() {
   });
 
   return (
-    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[95%] max-w-7xl bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl px-4 md:px-8 h-20 flex items-center justify-between shadow-2xl">
-      <div className="flex items-center gap-8">
-        <div className="relative">
+    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1600px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl px-3 md:px-6 h-16 flex items-center justify-between shadow-2xl">
+      <div className="flex items-center gap-6 overflow-hidden">
+        <div className="relative shrink-0">
           <Link href="/app" className="flex items-center">
-            <img src={auraLogo} alt="Aura Logo" className="h-16 w-auto transition-transform duration-300 hover:scale-105 active:scale-95" />
+            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto transition-transform duration-300 hover:scale-105 active:scale-95" />
           </Link>
         </div>
 
-        <div className="hidden lg:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-0.5 overflow-x-auto no-scrollbar mask-fade-right pr-4">
           {filteredItems.map((item) => (
             <Button
               key={item.url}
               variant="ghost"
-              className="text-zinc-400 hover:text-primary hover:bg-primary/5 px-4 h-12 flex items-center gap-2 font-bold uppercase italic text-[10px] tracking-widest transition-all"
+              className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2.5 h-10 flex items-center gap-2 font-bold uppercase italic text-[9px] tracking-wider transition-all shrink-0 no-default-hover-elevate"
               onClick={() => setLocation(item.url)}
             >
-              <item.icon className="w-4 h-4" />
-              {item.title}
+              <item.icon className="w-3.5 h-3.5" />
+              <span>{item.title}</span>
             </Button>
           ))}
           {user.role === "admin" && (
             <Button
               variant="ghost"
-              className="text-zinc-400 hover:text-primary hover:bg-primary/5 px-4 h-12 flex items-center gap-2 font-bold uppercase italic text-[10px] tracking-widest transition-all"
+              className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2.5 h-10 flex items-center gap-2 font-bold uppercase italic text-[9px] tracking-wider transition-all shrink-0 no-default-hover-elevate"
               onClick={() => setLocation("/admin")}
             >
-              <UserPlus className="w-4 h-4" />
+              <UserPlus className="w-3.5 h-3.5" />
               Admin
             </Button>
           )}
           {user.username === "SkelleTu" && (
             <Button
               variant="ghost"
-              className="text-zinc-400 hover:text-primary hover:bg-primary/5 px-4 h-12 flex items-center gap-2 font-bold uppercase italic text-[10px] tracking-widest transition-all"
+              className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2.5 h-10 flex items-center gap-2 font-bold uppercase italic text-[9px] tracking-wider transition-all shrink-0 no-default-hover-elevate"
               onClick={() => setLocation("/admin/master")}
             >
-              <ShieldAlert className="w-4 h-4" />
+              <ShieldAlert className="w-3.5 h-3.5" />
               Mestre
             </Button>
           )}
