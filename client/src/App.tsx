@@ -31,7 +31,7 @@ import FiscalConfig from "@/pages/fiscal/FiscalConfig";
 import LabelSystem from "@/pages/LabelSystem";
 import NotFound from "@/pages/not-found";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
@@ -238,19 +238,11 @@ export default function App() {
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <LandingNavigation />
               <Navbar />
-              <div className="flex h-screen w-full overflow-hidden">
+              <div className="flex h-screen w-full overflow-hidden pt-24">
                 <div className="flex flex-col flex-1 overflow-hidden relative">
-                    <header className="flex items-center justify-between p-2 border-b border-white/5 bg-black/50 backdrop-blur-md relative z-50">
-                      <div className="flex items-center gap-2">
-                        {/* Removido o SidebarTrigger duplicado que ficava atrás da Navbar */}
-                      </div>
-                      <div className="flex items-center gap-2">
-                      </div>
-                    </header>
-                    <main className="flex-1 overflow-y-auto relative">
-                      <Router />
-                    </main>
-                  </div>
+                  <main className="flex-1 overflow-y-auto relative p-4">
+                    <Router />
+                  </main>
                 </div>
               </div>
             </main>
