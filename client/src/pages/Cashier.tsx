@@ -30,8 +30,32 @@ export default function Cashier() {
     retry: false,
   });
 
-  const { data: menuItems } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu-items"],
+  const { data: menuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
+    queryKey: ["/api/menu-items-combined"],
+    queryFn: async () => {
+      const [menuRes, inventoryRes] = await Promise.all([
+        fetch("/api/menu-items"),
+        fetch("/api/inventory")
+      ]);
+      const menuData = await menuRes.json();
+      const inventoryData = await inventoryRes.json();
+      
+      // Combine menu items with inventory items that aren't already in menu
+      const combined = [...menuData];
+      inventoryData.forEach((invItem: any) => {
+        if (!combined.find(m => m.barcode === invItem.barcode || m.id === invItem.itemId)) {
+          combined.push({
+            id: invItem.id,
+            name: invItem.customName || `Item #${invItem.id}`,
+            price: invItem.salePrice || invItem.costPrice * 1.3, // Fallback price
+            imageUrl: "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200",
+            barcode: invItem.barcode,
+            isAvailable: invItem.quantity > 0
+          });
+        }
+      });
+      return combined;
+    }
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -42,8 +66,8 @@ export default function Cashier() {
 
     const term = searchTerm.toLowerCase();
     return menuItems.filter(item => 
-      item.name.toLowerCase().includes(term) ||
-      item.id.toString() === term ||
+      (item.name && item.name.toLowerCase().includes(term)) ||
+      (item.id && item.id.toString() === term) ||
       (item.barcode && item.barcode.toLowerCase() === term)
     );
   }, [menuItems, searchTerm]);
