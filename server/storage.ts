@@ -435,7 +435,8 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Ensure data objects are handled correctly for SQLite
-      // Note: insertInventorySchema transformation already handles costPrice/salePrice conversion to cents
+      // Note: insertInventorySchema transformation already handles costPrice/salePrice conversion if used correctly,
+      // but here we are using the raw data passed from routes.
       const processedData = {
         itemId: data.itemId || null,
         itemType: data.itemType,
@@ -443,8 +444,8 @@ export class DatabaseStorage implements IStorage {
         quantity: parseInt(data.quantity) || 0,
         unit: data.unit,
         itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
-        costPrice: data.costPrice,
-        salePrice: data.salePrice || null,
+        costPrice: typeof data.costPrice === 'string' ? Math.round(parseFloat(data.costPrice) * 100) : data.costPrice,
+        salePrice: typeof data.salePrice === 'string' ? Math.round(parseFloat(data.salePrice) * 100) : (data.salePrice || null),
         barcode: data.barcode || null,
         expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
         updatedAt: new Date()
