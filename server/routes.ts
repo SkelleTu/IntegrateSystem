@@ -473,8 +473,16 @@ export async function registerRoutes(
       if (body.expiryDate && typeof body.expiryDate === 'string') {
         body.expiryDate = new Date(body.expiryDate);
       }
-      const data = insertInventorySchema.parse(body);
-      const item = await storage.upsertInventory(data);
+      
+      // Se costPrice ou salePrice vierem como string com vírgula ou ponto decimal, tratamos aqui
+      if (typeof body.costPrice === 'string') {
+        body.costPrice = Math.round(Number(body.costPrice.replace(',', '.')) * 100);
+      }
+      if (typeof body.salePrice === 'string') {
+        body.salePrice = Math.round(Number(body.salePrice.replace(',', '.')) * 100);
+      }
+
+      const item = await storage.upsertInventory(body);
       res.json(item);
     } catch (err) {
       console.error("Erro no upsert de inventário:", err);

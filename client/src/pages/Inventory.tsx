@@ -67,9 +67,22 @@ export default function InventoryPage() {
       const res = await apiRequest("POST", "/api/inventory", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Invalidate both inventory and menu items to ensure real-time update
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      toast({ title: "Sucesso", description: "Estoque atualizado" });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+      
+      // Update local cache immediately for instant UI feedback
+      queryClient.setQueryData(["/api/inventory"], (oldData: Inventory[] | undefined) => {
+        if (!oldData) return [data];
+        const exists = oldData.find(item => item.id === data.id);
+        if (exists) {
+          return oldData.map(item => item.id === data.id ? data : item);
+        }
+        return [...oldData, data];
+      });
+
+      toast({ title: "Sucesso", description: "Estoque atualizado em tempo real" });
       setSelectedItem(null);
       setCustomName("");
       setBarcode("");
