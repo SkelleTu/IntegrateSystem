@@ -132,8 +132,8 @@ export default function InventoryPage() {
       quantity: parseInt(quantity),
       unit: unit === "Outros" ? customUnit : unit,
       itemsPerUnit: parseInt(itemsPerUnit),
-      costPrice: parseFloat(costPrice),
-      salePrice: salePrice ? parseFloat(salePrice) : null,
+      costPrice: Math.round(parseFloat(costPrice) * 100) / 100,
+      salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) / 100 : null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
     });
   };
@@ -365,16 +365,17 @@ export default function InventoryPage() {
                 <Table className="min-w-[800px] w-full table-fixed">
                   <TableHeader>
                     <TableRow className="border-white/5 hover:bg-transparent bg-black/40">
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[35%] py-4 pl-4">Item</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[15%] py-4">Qtd</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[25%] py-4">Preços</TableHead>
-                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest text-right pr-4 w-[25%] py-4">Ação</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[30%] py-4 pl-4">Item</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[10%] py-4">Qtd</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[20%] py-4">Preços</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest w-[20%] py-4">Validade / Mín</TableHead>
+                      <TableHead className="text-white/40 font-black italic uppercase text-[10px] tracking-widest text-right pr-4 w-[20%] py-4">Ação</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredInventory.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center py-20 text-white/40 italic uppercase text-xs font-black tracking-[0.4em]">
+                        <TableCell colSpan={5} className="text-center py-20 text-white/40 italic uppercase text-xs font-black tracking-[0.4em]">
                           {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
                         </TableCell>
                       </TableRow>
@@ -389,13 +390,21 @@ export default function InventoryPage() {
                               </span>
                             </div>
                           </TableCell>
-                          <TableCell className={`${inv.quantity < 0 ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
+                          <TableCell className={`${inv.quantity < (inv.minStock || 0) ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
                             {inv.quantity}
                           </TableCell>
                           <TableCell className="text-white/60 text-[10px] font-bold">
                             <div className="flex flex-col leading-tight">
-                              <span className="text-red-400/80">C: {(inv.costPrice / 100).toFixed(2)}</span>
-                              {inv.salePrice && <span className="text-green-400/80">V: {(inv.salePrice / 100).toFixed(2)}</span>}
+                              <span className="text-red-400/80">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
+                              {inv.salePrice && <span className="text-green-400/80">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-white/60 text-[10px] font-bold">
+                            <div className="flex flex-col leading-tight">
+                              <span className={isExpiringSoon(inv.expiryDate) ? "text-red-500 animate-pulse" : ""}>
+                                VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}
+                              </span>
+                              <span className="text-white/40">MÍN: {inv.minStock || 5}</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-4 py-3">
@@ -411,9 +420,6 @@ export default function InventoryPage() {
                               >
                                 Editar
                               </Button>
-                              {isExpiringSoon(inv.expiryDate) && (
-                                <AlertTriangle className="h-3 w-3 text-red-500 animate-pulse" />
-                              )}
                             </div>
                           </TableCell>
                         </TableRow>
