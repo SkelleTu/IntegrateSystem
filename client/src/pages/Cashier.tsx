@@ -40,17 +40,23 @@ export default function Cashier() {
       const menuData = await menuRes.json();
       const inventoryData = await inventoryRes.json();
       
-      // Combine menu items with inventory items that aren't already in menu
       const combined = [...menuData];
       inventoryData.forEach((invItem: any) => {
-        if (!combined.find(m => m.barcode === invItem.barcode || m.id === invItem.itemId)) {
+        // Verifica se o item de inventário já existe no menu pelo ID ou código de barras
+        const exists = combined.find(m => 
+          (m.barcode && invItem.barcode && m.barcode === invItem.barcode) || 
+          (m.id === invItem.itemId)
+        );
+        
+        if (!exists) {
           combined.push({
-            id: invItem.id,
-            name: invItem.customName || `Item #${invItem.id}`,
-            price: invItem.salePrice || invItem.costPrice * 1.3, // Fallback price
+            id: invItem.id + 10000, // Offset para evitar colisão de ID com menu_items
+            name: invItem.customName || `Produto #${invItem.id}`,
+            price: invItem.salePrice || (invItem.costPrice * 1.3),
             imageUrl: "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200",
             barcode: invItem.barcode,
-            isAvailable: invItem.quantity > 0
+            isAvailable: invItem.quantity > 0,
+            inventoryId: invItem.id
           });
         }
       });
