@@ -132,8 +132,8 @@ export default function InventoryPage() {
       quantity: parseInt(quantity),
       unit: unit === "Outros" ? customUnit : unit,
       itemsPerUnit: parseInt(itemsPerUnit),
-      costPrice: Math.round(parseFloat(costPrice) * 100),
-      salePrice: salePrice ? Math.round(parseFloat(salePrice) * 100) : null,
+      costPrice: Math.round(Number(costPrice.replace(',', '.')) * 100),
+      salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
     });
   };
