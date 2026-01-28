@@ -468,7 +468,12 @@ export async function registerRoutes(
   // Inventory API
   app.post("/api/inventory", isAuthenticated, async (req, res) => {
     try {
-      const data = insertInventorySchema.parse(req.body);
+      const body = { ...req.body };
+      // Trata a conversão de string de data para objeto Date se necessário
+      if (body.expiryDate && typeof body.expiryDate === 'string') {
+        body.expiryDate = new Date(body.expiryDate);
+      }
+      const data = insertInventorySchema.parse(body);
       const item = await storage.upsertInventory(data);
       res.json(item);
     } catch (err) {
