@@ -62,8 +62,18 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   // WebSocket for Label System
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/labels' });
+  const wss = new WebSocketServer({ noServer: true });
   let windowsClient: WebSocket | null = null;
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url;
+
+    if (pathname === '/ws/labels') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
 
   wss.on('connection', (ws) => {
     console.log('WS Connection established for labels');
