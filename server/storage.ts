@@ -425,18 +425,13 @@ export class DatabaseStorage implements IStorage {
 
   async upsertInventory(data: any): Promise<Inventory> {
     return await db.transaction(async (tx) => {
-      let item;
-      // Use itemId and itemType to find existing items, but ignore for 'custom' type
-      if (data.itemId && data.itemType !== 'custom') {
-        [item] = await tx.select().from(inventory).where(and(eq(inventory.itemId, data.itemId), eq(inventory.itemType, data.itemType))).limit(1);
-      } else if (data.itemType === 'custom' && data.customName) {
-        // For custom items, try to find by name to avoid duplicates
-        [item] = await tx.select().from(inventory).where(and(eq(inventory.itemType, 'custom'), eq(inventory.customName, data.customName))).limit(1);
+      // Logic for "Delete-then-Create" as requested by user
+      // This ensures a clean slate for the edited item
+      if (data.id) {
+        await tx.delete(inventory).where(eq(inventory.id, data.id));
       }
-      
+
       // Ensure data objects are handled correctly for SQLite
-      // Note: insertInventorySchema transformation already handles costPrice/salePrice conversion if used correctly,
-      // but here we are using the raw data passed from routes.
       const processedData = {
         itemId: data.itemId || null,
         itemType: data.itemType,
@@ -451,21 +446,12 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date()
       };
 
-      let result: Inventory;
-      if (data.id) {
-        [result] = await tx.update(inventory).set(processedData).where(eq(inventory.id, data.id)).returning();
-      } else if (item) {
-        // Update quantity by adding new quantity to existing
-        const newQuantity = (item.quantity || 0) + processedData.quantity;
-        [result] = await tx.update(inventory).set({ ...processedData, quantity: newQuantity }).where(eq(inventory.id, item.id)).returning();
-      } else {
-        [result] = await tx.insert(inventory).values(processedData).returning();
-      }
+      const [result] = await tx.insert(inventory).values(processedData).returning();
 
       // Automatically create a financial transaction if it's an "in" entry with cost
       if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
         await tx.insert(transactions).values({
-          businessType: "padaria", // Default to padaria for inventory, adjust if needed
+          businessType: "padaria",
           type: "expense",
           category: "estoque",
           description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,

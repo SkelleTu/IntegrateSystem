@@ -68,21 +68,20 @@ export default function InventoryPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      // Invalidate both inventory and menu items to ensure real-time update
-      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
-      
-      // Update local cache immediately for instant UI feedback
+      // First, remove the item from local cache to show it "disappearing"
       queryClient.setQueryData(["/api/inventory"], (oldData: Inventory[] | undefined) => {
-        if (!oldData) return [data];
-        const exists = oldData.find(item => item.id === data.id);
-        if (exists) {
-          return oldData.map(item => item.id === data.id ? data : item);
-        }
-        return [...oldData, data];
+        if (!oldData) return [];
+        return oldData.filter(item => item.id !== editingId);
       });
 
-      toast({ title: "Sucesso", description: "Estoque atualizado em tempo real" });
+      // Wait a brief moment to show the "empty" state, then refetch
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+        
+        toast({ title: "Sucesso", description: "Item reinserido com sucesso para limpeza de dados" });
+      }, 800);
+
       setSelectedItem(null);
       setCustomName("");
       setBarcode("");
