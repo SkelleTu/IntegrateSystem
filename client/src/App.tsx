@@ -75,7 +75,7 @@ import MasterControl from "./pages/MasterControl";
 
 function Router() {
   const { data: user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
+  const [location] = useLocation();
 
   if (isLoading) {
     return (
@@ -85,58 +85,73 @@ function Router() {
     );
   }
 
+  // Routes that should be full screen without the main layout
+  const isAuthPage = ["/login", "/register"].includes(location);
+
+  if (isAuthPage) {
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={LandingPage} />
+        <Route component={NotFound} />
+      </Switch>
+    );
+  }
+
   return (
-    <Switch>
-      <Route path="/" component={LandingPage} />
-      <Route path="/register" component={LandingPage} />
-      <Route path="/quem-somos" component={AboutUs} />
-      <Route path="/solucoes" component={Solutions} />
-      <Route path="/casos-de-sucesso" component={SuccessCases} />
-      <Route path="/privacy" component={PrivacyPolicy} />
-      <Route path="/terms" component={TermsOfService} />
-      <Route path="/blog" component={Blog} />
-      <Route path="/blog/:id" component={Blog} />
-      <Route path="/contato" component={Contact} />
-      <Route path="/app" component={Home} />
-      <Route path="/barber" component={BarberHome} />
-      <Route path="/login" component={Login} />
-      <Route path="/menu" component={DigitalMenu} />
-      <Route path="/barber-queue" component={BarberQueue} />
-      <Route path="/ponto">
-        {() => <ProtectedRoute component={TimeClock} />}
-      </Route>
-      <Route path="/admin">
-        {() => <ProtectedRoute component={Admin} />}
-      </Route>
-      <Route path="/caixa">
-        {() => <ProtectedRoute component={Cashier} />}
-      </Route>
-      <Route path="/financeiro">
-        {() => <ProtectedRoute component={Financeiro} />}
-      </Route>
-      <Route path="/relatorios">
-        {() => <ProtectedRoute component={Reports} />}
-      </Route>
-      <Route path="/inventory">
-        {() => <ProtectedRoute component={Inventory} />}
-      </Route>
-      <Route path="/fiscal">
-        {() => <ProtectedRoute component={FiscalConfig} />}
-      </Route>
-      <Route path="/admin/labels">
-        {() => <ProtectedRoute component={LabelSystem} />}
-      </Route>
-      <Route path="/admin/monitoring">
-        {() => <ProtectedRoute component={MasterControl} />}
-      </Route>
-      <Route path="/cart" component={ClientCart} />
-      
-      <Route path="/admin/master">
-        {() => <ProtectedRoute component={MasterControl} />}
-      </Route>
-      
-      <Route component={NotFound} />
-    </Switch>
+    <div className="flex h-screen w-full overflow-hidden pt-24">
+      <div className="flex flex-col flex-1 overflow-hidden relative">
+        <main className="flex-1 overflow-y-auto relative p-4">
+          <Switch>
+            <Route path="/" component={LandingPage} />
+            <Route path="/quem-somos" component={AboutUs} />
+            <Route path="/solucoes" component={Solutions} />
+            <Route path="/casos-de-sucesso" component={SuccessCases} />
+            <Route path="/privacy" component={PrivacyPolicy} />
+            <Route path="/terms" component={TermsOfService} />
+            <Route path="/blog" component={Blog} />
+            <Route path="/blog/:id" component={Blog} />
+            <Route path="/contato" component={Contact} />
+            <Route path="/app" component={Home} />
+            <Route path="/barber" component={BarberHome} />
+            <Route path="/menu" component={DigitalMenu} />
+            <Route path="/barber-queue" component={BarberQueue} />
+            <Route path="/ponto">
+              {() => <ProtectedRoute component={TimeClock} />}
+            </Route>
+            <Route path="/admin">
+              {() => <ProtectedRoute component={Admin} />}
+            </Route>
+            <Route path="/caixa">
+              {() => <ProtectedRoute component={Cashier} />}
+            </Route>
+            <Route path="/financeiro">
+              {() => <ProtectedRoute component={Financeiro} />}
+            </Route>
+            <Route path="/relatorios">
+              {() => <ProtectedRoute component={Reports} />}
+            </Route>
+            <Route path="/inventory">
+              {() => <ProtectedRoute component={Inventory} />}
+            </Route>
+            <Route path="/fiscal">
+              {() => <ProtectedRoute component={FiscalConfig} />}
+            </Route>
+            <Route path="/admin/labels">
+              {() => <ProtectedRoute component={LabelSystem} />}
+            </Route>
+            <Route path="/admin/monitoring">
+              {() => <ProtectedRoute component={MasterControl} />}
+            </Route>
+            <Route path="/cart" component={ClientCart} />
+            <Route path="/admin/master">
+              {() => <ProtectedRoute component={MasterControl} />}
+            </Route>
+            <Route component={NotFound} />
+          </Switch>
+        </main>
+      </div>
+    </div>
   );
 }
 
@@ -238,13 +253,7 @@ export default function App() {
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <LandingNavigation />
               <Navbar />
-              <div className="flex h-screen w-full overflow-hidden pt-24">
-                <div className="flex flex-col flex-1 overflow-hidden relative">
-                  <main className="flex-1 overflow-y-auto relative p-4">
-                    <Router />
-                  </main>
-                </div>
-              </div>
+              <Router />
             </main>
           </div>
         </div>
