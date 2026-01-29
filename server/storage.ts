@@ -424,11 +424,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
-    return await db.transaction(async (tx) => {
+    return db.transaction((tx) => {
       // Logic for "Delete-then-Create" as requested by user
       // This ensures a clean slate for the edited item
       if (data.id) {
-        await tx.delete(inventory).where(eq(inventory.id, data.id));
+        tx.delete(inventory).where(eq(inventory.id, data.id)).run();
       }
 
       // Ensure data objects are handled correctly for SQLite
@@ -446,18 +446,18 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date()
       };
 
-      const [result] = await tx.insert(inventory).values(processedData).returning();
+      const [result] = tx.insert(inventory).values(processedData).returning().all();
 
       // Automatically create a financial transaction if it's an "in" entry with cost
       if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
-        await tx.insert(transactions).values({
+        tx.insert(transactions).values({
           businessType: "padaria",
           type: "expense",
           category: "estoque",
           description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,
           amount: processedData.costPrice * processedData.quantity,
           createdAt: new Date()
-        });
+        }).run();
       }
 
       return result;
