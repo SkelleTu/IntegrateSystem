@@ -41,6 +41,17 @@ export default function InventoryPage() {
     queryKey: ["/api/menu-items"],
   });
 
+  useEffect(() => {
+    if (searchTerm && filteredInventory.length === 1) {
+      const item = filteredInventory[0];
+      if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
+        handleEdit(item);
+        setSearchTerm("");
+        toast({ title: "Produto BIPADO", description: `${item.name} selecionado para edição.` });
+      }
+    }
+  }, [searchTerm, filteredInventory]);
+
   const inventoryWithNames = useMemo(() => {
     return inventory
       .map(inv => ({
@@ -102,6 +113,17 @@ export default function InventoryPage() {
   });
 
   if (user?.role !== "admin") {
+    useEffect(() => {
+      if (searchTerm && filteredInventory.length === 1) {
+        const item = filteredInventory[0];
+        if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
+          handleEdit(item);
+          setSearchTerm("");
+          toast({ title: "Produto BIPADO", description: `${item.name} selecionado para edição.` });
+        }
+      }
+    }, [searchTerm, filteredInventory]);
+
     return (
       <div className="flex items-center justify-center min-h-[80vh] p-4">
         <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">

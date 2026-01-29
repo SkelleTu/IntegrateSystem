@@ -84,6 +84,7 @@ export default function Cashier() {
       if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
         addToCart(item);
         setSearchTerm("");
+        toast({ title: "Item BIPADO", description: `${item.name} adicionado ao carrinho.` });
       }
     }
   }, [searchTerm, filteredMenuItems]);
