@@ -66,6 +66,18 @@ export default function Cashier() {
 
   const [searchTerm, setSearchTerm] = useState("");
 
+  const addToCart = useCallback((item: MenuItem) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.item.id === item.id);
+      if (existing) {
+        return prev.map((i) =>
+          i.item.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+        );
+      }
+      return [...prev, { item, quantity: 1 }];
+    });
+  }, []);
+
   const filteredMenuItems = useMemo(() => {
     if (!menuItems) return [];
     if (!searchTerm) return menuItems;
@@ -116,18 +128,6 @@ export default function Cashier() {
       toast({ title: "Venda realizada com sucesso!" });
     },
   });
-
-  const addToCart = useCallback((item: MenuItem) => {
-    setCart((prev) => {
-      const existing = prev.find((i) => i.item.id === item.id);
-      if (existing) {
-        return prev.map((i) =>
-          i.item.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
-        );
-      }
-      return [...prev, { item, quantity: 1 }];
-    });
-  }, []);
 
   const removeFromCart = (itemId: number) => {
     setCart((prev) =>
