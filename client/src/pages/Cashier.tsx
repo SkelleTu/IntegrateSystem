@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, CashRegister } from "@shared/schema";
+import { MenuItem, CashRegister, Inventory } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,7 +87,7 @@ export default function Cashier() {
         toast({ title: "Item BIPADO", description: `${item.name} adicionado ao carrinho.` });
       }
     }
-  }, [searchTerm, filteredMenuItems]);
+  }, [searchTerm, filteredMenuItems, addToCart, toast]);
 
   const openMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -117,7 +117,7 @@ export default function Cashier() {
     },
   });
 
-  const addToCart = (item: MenuItem) => {
+  const addToCart = useCallback((item: MenuItem) => {
     setCart((prev) => {
       const existing = prev.find((i) => i.item.id === item.id);
       if (existing) {
@@ -127,7 +127,7 @@ export default function Cashier() {
       }
       return [...prev, { item, quantity: 1 }];
     });
-  };
+  }, []);
 
   const removeFromCart = (itemId: number) => {
     setCart((prev) =>

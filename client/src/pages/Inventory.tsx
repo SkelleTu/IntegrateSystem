@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Package, AlertTriangle, Plus, Loader2, Search } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { format, addDays, isBefore } from "date-fns";
 import Fuse from "fuse.js";
 
@@ -40,38 +40,6 @@ export default function InventoryPage() {
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
   });
-
-  useEffect(() => {
-    if (searchTerm && filteredInventory.length === 1) {
-      const item = filteredInventory[0];
-      if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
-        handleEdit(item);
-        setSearchTerm("");
-        toast({ title: "Produto BIPADO", description: `${item.name} selecionado para edição.` });
-      }
-    }
-  }, [searchTerm, filteredInventory]);
-
-  const inventoryWithNames = useMemo(() => {
-    return inventory
-      .map(inv => ({
-        ...inv,
-        name: inv.itemType === "custom" ? (inv.customName || "Item Custom") : (menuItems.find(m => m.id === inv.itemId)?.name || "Item desconhecido")
-      }))
-      .sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: 'base' }));
-  }, [inventory, menuItems]);
-
-  const filteredInventory = useMemo(() => {
-    if (!searchTerm) return inventoryWithNames;
-
-    const fuse = new Fuse(inventoryWithNames, {
-      keys: ["name", "barcode", "customName"],
-      threshold: 0.3,
-      distance: 100,
-    });
-
-    return fuse.search(searchTerm).map(result => result.item);
-  }, [inventoryWithNames, searchTerm]);
 
   const upsertMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -112,46 +80,12 @@ export default function InventoryPage() {
     }
   });
 
-  if (user?.role !== "admin") {
-    useEffect(() => {
-      if (searchTerm && filteredInventory.length === 1) {
-        const item = filteredInventory[0];
-        if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
-          handleEdit(item);
-          setSearchTerm("");
-          toast({ title: "Produto BIPADO", description: `${item.name} selecionado para edição.` });
-        }
-      }
-    }, [searchTerm, filteredInventory]);
-
-    return (
-      <div className="flex items-center justify-center min-h-[80vh] p-4">
-        <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
-          <CardHeader>
-            <CardTitle className="text-destructive font-black italic uppercase tracking-tighter text-xl">Acesso Restrito</CardTitle>
-          </CardHeader>
-          <CardContent className="text-white/60 font-medium">
-            Somente o proprietário tem acesso ao controle de estoque.
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   const isExpiringSoon = (date: any) => {
     if (!date) return false;
     const expiry = new Date(date);
     const warningDate = addDays(new Date(), 7);
     return isBefore(expiry, warningDate);
   };
-
-  const getItemName = (inv: Inventory) => {
-    const item = menuItems.find(m => m.id === inv.itemId);
-    return item?.name || "Item desconhecido";
-  };
-
-  const [costPrice, setCostPrice] = useState("");
-  const [salePrice, setSalePrice] = useState("");
 
   const handleUpsert = () => {
     if (!customName) return;
@@ -172,24 +106,20 @@ export default function InventoryPage() {
     });
   };
 
-  const handleEdit = (inv: any) => {
-    setEditingId(inv.id);
-    setIsCustomMode(inv.itemType === "custom");
-    setCustomName(inv.customName || "");
-    setBarcode(inv.barcode || "");
-    setQuantity(inv.quantity.toString());
-    setUnit(inv.unit === "Unidade" || inv.unit === "Bag" || inv.unit === "Caixa" || inv.unit === "Pacote" ? inv.unit : "Outros");
-    if (inv.unit !== "Unidade" && inv.unit !== "Bag" && inv.unit !== "Caixa" && inv.unit !== "Pacote") {
-      setCustomUnit(inv.unit);
-    }
-    setItemsPerUnit(inv.itemsPerUnit.toString());
-    setCostPrice((inv.costPrice / 100).toString());
-    setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString() : "");
-    setExpiryDate(inv.expiryDate ? new Date(inv.expiryDate).toISOString().split('T')[0] : "");
-    if (inv.itemType !== "custom") {
-      setSelectedItem({ id: inv.itemId, type: "product" });
-    }
-  };
+  if (user?.role !== "admin") {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh] p-4">
+        <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
+          <CardHeader>
+            <CardTitle className="text-destructive font-black italic uppercase tracking-tighter text-xl">Acesso Restrito</CardTitle>
+          </CardHeader>
+          <CardContent className="text-white/60 font-medium">
+            Somente o proprietário tem acesso ao controle de estoque.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 min-h-screen bg-transparent relative z-10 max-w-[2400px] mx-auto overflow-x-hidden">
