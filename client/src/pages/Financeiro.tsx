@@ -106,7 +106,7 @@ export default function Financeiro() {
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     
     const totalNet = salesGross + extraIncome - expenses;
-    const finalNetBalance = salesGross + extraIncome - expenses + inventoryValue;
+    const finalNetBalance = salesGross + extraIncome - expenses - inventoryValue;
     return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
   }, [sales, transactions, inventory, businessType]);
 
@@ -155,7 +155,7 @@ export default function Financeiro() {
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.finalNetBalance >= 0 ? 'text-primary' : 'text-red-500'}`}>
               R$ {(financialData.finalNetBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-[9px] text-zinc-500 font-medium">Capital de giro total (vendas + entradas - despesas + estoque)</p>
+            <p className="text-[9px] text-zinc-500 font-medium">Capital de giro real (vendas + entradas - despesas - estoque)</p>
           </div>
 
           <div className="p-4 rounded-xl bg-zinc-800/20 border border-white/5 flex items-center gap-4">
