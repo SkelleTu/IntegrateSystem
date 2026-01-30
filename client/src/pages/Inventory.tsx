@@ -31,6 +31,9 @@ export default function InventoryPage() {
 
   const [customUnit, setCustomUnit] = useState("");
 
+  const [salePrice, setSalePrice] = useState("");
+  const [costPrice, setCostPrice] = useState("");
+
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
     staleTime: 0,
@@ -40,6 +43,38 @@ export default function InventoryPage() {
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
   });
+
+  const inventoryWithNames = useMemo(() => {
+    return inventory.map(item => {
+      if (item.itemType === "product") {
+        const menuItem = menuItems.find(m => m.id === item.itemId);
+        return { ...item, name: menuItem?.name || item.customName || "Item desconhecido" };
+      }
+      return { ...item, name: item.customName || "Item customizado" };
+    });
+  }, [inventory, menuItems]);
+
+  const filteredInventory = useMemo(() => {
+    if (!searchTerm) return inventoryWithNames;
+    const fuse = new Fuse(inventoryWithNames, {
+      keys: ["name", "barcode"],
+      threshold: 0.3,
+    });
+    return fuse.search(searchTerm).map(result => result.item);
+  }, [inventoryWithNames, searchTerm]);
+
+  const handleEdit = (inv: any) => {
+    if (!inv) return;
+    setEditingId(inv.id);
+    setCustomName(inv.name || inv.customName || "");
+    setBarcode(inv.barcode || "");
+    setQuantity(inv.quantity.toString());
+    setUnit(inv.unit || "Unidade");
+    setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
+    setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
+    setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
+    setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
+  };
 
   const upsertMutation = useMutation({
     mutationFn: async (data: any) => {
