@@ -22,7 +22,7 @@ export default function Financeiro() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user } = useAuth();
-  const [businessType, setBusinessType] = useState<"barbearia" | "padaria">("barbearia");
+  const [businessType, setBusinessType] = useState<"padaria">("padaria");
   const [dateRange, setDateRange] = useState({
     start: format(new Date(), "yyyy-MM-dd"),
     end: format(new Date(), "yyyy-MM-dd"),
@@ -215,7 +215,6 @@ export default function Financeiro() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="bg-zinc-900 border-white/10 text-white font-black italic">
-                            <SelectItem value="barbearia">Barbearia</SelectItem>
                             <SelectItem value="padaria">Padaria</SelectItem>
                           </SelectContent>
                         </Select>
@@ -295,7 +294,6 @@ export default function Financeiro() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-zinc-900 border-white/10 text-white font-black italic">
-              <SelectItem value="barbearia">Unidade Barbearia</SelectItem>
               <SelectItem value="padaria">Unidade Padaria</SelectItem>
             </SelectContent>
           </Select>

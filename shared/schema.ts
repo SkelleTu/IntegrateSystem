@@ -114,7 +114,7 @@ export const payments = pgTable("payments", {
 
 export const transactions = pgTable("transactions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  businessType: text("business_type").notNull(), // "barbearia", "padaria"
+  businessType: text("business_type").notNull(), // "padaria"
   type: text("type").notNull(), // "income", "expense"
   category: text("category").notNull(), 
   description: text("description").notNull(),
@@ -149,7 +149,7 @@ export const enterprises = pgTable("enterprises", {
 export const settings = pgTable("settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   enterpriseId: integer("enterprise_id"),
-  siteName: text("site_name").default("Barbearia & Padaria").notNull(),
+  siteName: text("site_name").default("Padaria").notNull(),
   logoUrl: text("logo_url").default(""),
   primaryColor: text("primary_color").default("#00FF66").notNull(), 
   secondaryColor: text("secondary_color").default("#10b981").notNull(),

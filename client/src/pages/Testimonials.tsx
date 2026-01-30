@@ -4,20 +4,20 @@ export default function Testimonials() {
   const testimonials = [
     {
       name: "Marcus Vinícius",
-      role: "Dono da Barber Elite",
-      content: "O Aura mudou completamente o patamar da minha barbearia. A agilidade no caixa e a segurança dos dados me dão a tranquilidade que eu nunca tive antes.",
+      role: "Dono de Padaria",
+      content: "O Aura mudou completamente o patamar da minha padaria. A agilidade no caixa e a segurança dos dados me dão a tranquilidade que eu nunca tive antes.",
       rating: 5
     },
     {
       name: "Ana Luísa",
-      role: "Gerente de Rede Estética",
+      role: "Gerente de Rede de Padarias",
       content: "Gerenciar 4 unidades se tornou simples. Os relatórios em tempo real são indispensáveis para o meu crescimento.",
       rating: 5
     },
     {
       name: "Ricardo Santos",
-      role: "Barbeiro Master",
-      content: "O sistema é intuitivo e extremamente rápido. Meus clientes elogiam a facilidade de agendamento e o profissionalismo.",
+      role: "Padeiro Master",
+      content: "O sistema é intuitivo e extremamente rápido. Meus clientes elogiam a facilidade no atendimento e o profissionalismo.",
       rating: 5
     }
   ];

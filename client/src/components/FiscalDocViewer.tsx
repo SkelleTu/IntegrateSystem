@@ -33,7 +33,7 @@ export function FiscalDocViewer({ sale, onClose }: FiscalDocProps) {
         <CardContent className="p-8 font-mono text-[10px] sm:text-xs">
           {/* Header */}
           <div className="text-center border-b pb-4 mb-4">
-            <h1 className="font-black uppercase text-base tracking-widest">Barbearia & Padaria SkelleTu</h1>
+            <h1 className="font-black uppercase text-base tracking-widest">Padaria SkelleTu</h1>
             <p>CNPJ: 00.000.000/0001-91</p>
             <p>Rua Exemplo, 123 - Centro, São Paulo - SP</p>
           </div>

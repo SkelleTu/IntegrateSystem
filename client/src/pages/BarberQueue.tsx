@@ -195,7 +195,7 @@ export default function BarberQueue() {
         <div className="flex flex-col items-end sm:items-end items-center">
           <div className="flex items-center gap-3 bg-primary/10 px-6 py-3 border border-primary/20 shadow-[0_0_20px_rgba(0,255,102,0.1)]">
             <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-black italic tracking-[0.2em] text-primary uppercase">Barbearia em Atendimento</span>
+            <span className="text-xs font-black italic tracking-[0.2em] text-primary uppercase">Em Atendimento</span>
           </div>
         </div>
       </header>
