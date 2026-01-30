@@ -81,6 +81,7 @@ export interface IStorage {
   getInventory(): Promise<Inventory[]>;
   getInventoryItem(id: number): Promise<Inventory | undefined>;
   updateInventory(id: number, quantity: number): Promise<Inventory>;
+  deleteInventoryItem(id: number): Promise<void>;
   upsertInventory(data: any): Promise<Inventory>;
   createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
   updateTicketItems(id: number, items: string[]): Promise<Ticket>;
@@ -412,6 +413,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(inventory.id, id))
       .returning();
     return updated;
+  }
+
+  async deleteInventoryItem(id: number): Promise<void> {
+    await db.delete(inventory).where(eq(inventory.id, id));
   }
 
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {

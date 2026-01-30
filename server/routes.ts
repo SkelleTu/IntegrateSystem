@@ -509,6 +509,16 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteInventoryItem(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      console.error("Erro ao deletar item do estoque:", err);
+      res.status(500).json({ message: "Erro ao deletar item do estoque" });
+    }
+  });
+
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,

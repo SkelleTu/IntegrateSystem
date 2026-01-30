@@ -115,6 +115,23 @@ export default function InventoryPage() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/inventory/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Sucesso", description: "Item removido do estoque" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro", 
+        description: error.message || "Erro ao deletar item.",
+        variant: "destructive"
+      });
+    }
+  });
+
   const isExpiringSoon = (date: any) => {
     if (!date) return false;
     const expiry = new Date(date);
@@ -418,6 +435,19 @@ export default function InventoryPage() {
                                 }}
                               >
                                 Editar
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-[10px] font-black uppercase italic text-red-500 hover:bg-red-500/10"
+                                onClick={() => {
+                                  if (window.confirm(`Você tem certeza que quer Deletar "${inv.name}" do estoque?`)) {
+                                    deleteMutation.mutate(inv.id);
+                                  }
+                                }}
+                                disabled={deleteMutation.isPending}
+                              >
+                                {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : "Deletar"}
                               </Button>
                             </div>
                           </TableCell>
