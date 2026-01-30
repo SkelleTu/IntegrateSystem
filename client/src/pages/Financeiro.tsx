@@ -1,9 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Transaction, insertTransactionSchema } from "@shared/schema";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, ArrowLeft, TrendingUp, TrendingDown, DollarSign, PlusCircle, Wallet, LayoutDashboard, Receipt, BarChartHorizontal } from "lucide-react";
+import { Loader2, ArrowLeft, TrendingUp, TrendingDown, DollarSign, PlusCircle, Wallet, LayoutDashboard, Receipt, BarChartHorizontal, Trash2 } from "lucide-react";
 import { format } from "date-fns";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -86,9 +86,37 @@ export default function Financeiro() {
       queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
       setIsDialogOpen(false);
       form.reset();
+      setAmountDisplay("");
       toast({ title: "Lançamento realizado com sucesso" });
     }
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/transactions/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      toast({ title: "Lançamento excluído com sucesso" });
+    }
+  });
+
+  const formatCurrency = useCallback((value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    const cents = parseInt(numbers || '0', 10);
+    const reais = cents / 100;
+    return reais.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }, []);
+
+  const [amountDisplay, setAmountDisplay] = useState("");
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>, fieldOnChange: (value: number) => void) => {
+    const rawValue = e.target.value.replace(/\D/g, '');
+    const cents = parseInt(rawValue || '0', 10);
+    setAmountDisplay(formatCurrency(rawValue));
+    fieldOnChange(cents);
+  };
 
   const { data: inventory = [] } = useQuery<any[]>({
     queryKey: ["/api/inventory"],
@@ -261,7 +289,17 @@ export default function Financeiro() {
                       <FormItem>
                         <FormLabel className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Valor (R$)</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic" onChange={(e) => field.onChange(Math.round(parseFloat(e.target.value) * 100))} value={field.value ? field.value / 100 : ""} />
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 font-black text-xl">R$</span>
+                            <Input 
+                              type="text" 
+                              inputMode="numeric"
+                              placeholder="0,00"
+                              className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic pl-14 text-right" 
+                              onChange={(e) => handleAmountChange(e, field.onChange)} 
+                              value={amountDisplay} 
+                            />
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -322,6 +360,7 @@ export default function Financeiro() {
                       <TableHead className="text-zinc-500 uppercase text-[10px] font-black italic p-6">Descrição</TableHead>
                       <TableHead className="text-zinc-500 uppercase text-[10px] font-black italic p-6">Tipo</TableHead>
                       <TableHead className="text-zinc-500 uppercase text-[10px] font-black italic p-6 text-right">Valor</TableHead>
+                      <TableHead className="text-zinc-500 uppercase text-[10px] font-black italic p-6 text-center w-20">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -337,11 +376,22 @@ export default function Financeiro() {
                         <TableCell className={`text-right p-6 font-black italic ${t.type === 'income' ? 'text-primary' : 'text-red-500'}`}>
                           {t.type === 'income' ? '+' : '-'} R$ {(t.amount / 100).toFixed(2)}
                         </TableCell>
+                        <TableCell className="p-6 text-center">
+                          <Button 
+                            size="icon" 
+                            variant="ghost" 
+                            className="h-8 w-8 text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
+                            onClick={() => deleteMutation.mutate(t.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                     {(!transactions || transactions.length === 0) && (
                       <TableRow>
-                        <TableCell colSpan={4} className="h-64 text-center text-zinc-500 font-black italic uppercase text-xs">Sem registros</TableCell>
+                        <TableCell colSpan={5} className="h-64 text-center text-zinc-500 font-black italic uppercase text-xs">Sem registros</TableCell>
                       </TableRow>
                     )}
                   </TableBody>

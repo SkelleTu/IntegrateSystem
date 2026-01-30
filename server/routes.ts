@@ -761,6 +761,16 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTransaction(id);
+      res.status(200).json({ message: "Transaction deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Inventory API
   app.get("/api/inventory", isAuthenticated, async (req, res) => {
     const items = await storage.getInventory();

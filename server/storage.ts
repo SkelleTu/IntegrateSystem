@@ -76,6 +76,7 @@ export interface IStorage {
   // Financial Transactions
   getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]>;
   createTransaction(transaction: any): Promise<Transaction>;
+  deleteTransaction(id: number): Promise<void>;
   // Inventory
   getInventory(): Promise<Inventory[]>;
   getInventoryItem(id: number): Promise<Inventory | undefined>;
@@ -421,6 +422,10 @@ export class DatabaseStorage implements IStorage {
   async createTransaction(transaction: any): Promise<Transaction> {
     const [newTransaction] = await db.insert(transactions).values(transaction).returning();
     return newTransaction;
+  }
+
+  async deleteTransaction(id: number): Promise<void> {
+    await db.delete(transactions).where(eq(transactions.id, id));
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
