@@ -120,6 +120,21 @@ export default function InventoryPage() {
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
   };
 
+  const handleDuplicate = (inv: any) => {
+    if (!inv) return;
+    setEditingId(null);
+    setCustomName(`${inv.name} (Cópia)`);
+    setBarcode("");
+    setQuantity(inv.quantity.toString());
+    setUnit(inv.unit || "Unidade");
+    setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
+    setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
+    setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
+    setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
+  };
+
   const upsertMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/inventory", data);
@@ -510,6 +525,14 @@ export default function InventoryPage() {
                                 }}
                               >
                                 Editar
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-[10px] font-black uppercase italic text-cyan-400 hover:bg-cyan-400/10"
+                                onClick={() => handleDuplicate(inv)}
+                              >
+                                Duplicar
                               </Button>
                               <Button 
                                 variant="ghost" 
