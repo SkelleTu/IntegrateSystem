@@ -519,6 +519,31 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/inventory/:id/restock", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
+
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+      }
+
+      const restockData = {
+        quantity: parseInt(quantity),
+        unit: unit || undefined,
+        itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit) : undefined,
+        costPrice: costPrice ? Math.round(Number(String(costPrice).replace(',', '.')) * 100) : undefined,
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined
+      };
+
+      const item = await storage.restockInventory(id, restockData);
+      res.json(item);
+    } catch (err: any) {
+      console.error("Erro na reposição de estoque:", err);
+      res.status(500).json({ message: err.message || "Erro ao fazer reposição de estoque" });
+    }
+  });
+
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,

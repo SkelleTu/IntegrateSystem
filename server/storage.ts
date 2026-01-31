@@ -433,6 +433,57 @@ export class DatabaseStorage implements IStorage {
     await db.delete(transactions).where(eq(transactions.id, id));
   }
 
+  async restockInventory(id: number, data: {
+    quantity: number;
+    unit?: string;
+    itemsPerUnit?: number;
+    costPrice?: number;
+    expiryDate?: Date | null;
+  }): Promise<Inventory> {
+    return db.transaction((tx) => {
+      // Buscar item existente
+      const [existingItem] = tx.select().from(inventory).where(eq(inventory.id, id)).all();
+      if (!existingItem) {
+        throw new Error(`Item com ID ${id} não encontrado no estoque`);
+      }
+
+      // Calcular nova quantidade (adiciona à existente)
+      const newQuantity = existingItem.quantity + data.quantity;
+      
+      // Preparar dados para atualização
+      const updateData: any = {
+        quantity: newQuantity,
+        updatedAt: new Date()
+      };
+
+      // Atualizar campos opcionais se fornecidos
+      if (data.unit) updateData.unit = data.unit;
+      if (data.itemsPerUnit) updateData.itemsPerUnit = data.itemsPerUnit;
+      if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
+
+      // Atualizar o item
+      const [result] = tx.update(inventory)
+        .set(updateData)
+        .where(eq(inventory.id, id))
+        .returning()
+        .all();
+
+      // Criar transação financeira para a reposição (se houver custo)
+      if (data.costPrice && data.costPrice > 0 && data.quantity > 0) {
+        tx.insert(transactions).values({
+          businessType: "padaria",
+          type: "expense",
+          category: "estoque",
+          description: `Reposição de estoque: ${existingItem.customName || 'Item'} (${data.quantity} ${data.unit || existingItem.unit})`,
+          amount: data.costPrice * data.quantity,
+          createdAt: new Date()
+        }).run();
+      }
+
+      return result;
+    });
+  }
+
   async upsertInventory(data: any): Promise<Inventory> {
     return db.transaction((tx) => {
       // Logic for "Delete-then-Create" as requested by user

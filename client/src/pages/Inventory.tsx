@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2, Search } from "lucide-react";
+import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { format, addDays, isBefore } from "date-fns";
 import Fuse from "fuse.js";
@@ -35,6 +36,14 @@ export default function InventoryPage() {
   const [costPrice, setCostPrice] = useState("");
   const [viewMode, setViewMode] = useState<"package" | "unit">("package");
   const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
+
+  const [restockModalOpen, setRestockModalOpen] = useState(false);
+  const [restockItem, setRestockItem] = useState<any>(null);
+  const [restockQuantity, setRestockQuantity] = useState("");
+  const [restockUnit, setRestockUnit] = useState("");
+  const [restockItemsPerUnit, setRestockItemsPerUnit] = useState("");
+  const [restockCostPrice, setRestockCostPrice] = useState("");
+  const [restockExpiryDate, setRestockExpiryDate] = useState("");
 
   const unitPrice = useMemo(() => {
     const cost = Number(costPrice.replace(',', '.'));
@@ -190,6 +199,54 @@ export default function InventoryPage() {
       });
     }
   });
+
+  const restockMutation = useMutation({
+    mutationFn: async (data: { id: number; quantity: number; unit?: string; itemsPerUnit?: number; costPrice?: number; expiryDate?: string }) => {
+      const res = await apiRequest("POST", `/api/inventory/${data.id}/restock`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      toast({ title: "Sucesso", description: "Reposição de estoque realizada com sucesso!" });
+      setRestockModalOpen(false);
+      setRestockItem(null);
+      setRestockQuantity("");
+      setRestockUnit("");
+      setRestockItemsPerUnit("");
+      setRestockCostPrice("");
+      setRestockExpiryDate("");
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Erro", 
+        description: error.message || "Erro ao fazer reposição de estoque.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const openRestockModal = (inv: any) => {
+    setRestockItem(inv);
+    setRestockUnit(inv.unit || "Unidade");
+    setRestockItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
+    setRestockQuantity("");
+    setRestockCostPrice("");
+    setRestockExpiryDate("");
+    setRestockModalOpen(true);
+  };
+
+  const handleRestock = () => {
+    if (!restockItem || !restockQuantity) return;
+    
+    restockMutation.mutate({
+      id: restockItem.id,
+      quantity: parseInt(restockQuantity),
+      unit: restockUnit || undefined,
+      itemsPerUnit: restockItemsPerUnit ? parseInt(restockItemsPerUnit) : undefined,
+      costPrice: restockCostPrice ? Number(restockCostPrice.replace(',', '.')) : undefined,
+      expiryDate: restockExpiryDate || undefined
+    });
+  };
 
   const isExpiringSoon = (date: any) => {
     if (!date) return false;
@@ -529,7 +586,17 @@ export default function InventoryPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-right pr-4 py-3">
-                            <div className="flex justify-end items-center gap-2">
+                            <div className="flex justify-end items-center gap-2 flex-wrap">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-7 px-2 text-[10px] font-black uppercase italic text-green-400 hover:bg-green-400/10"
+                                onClick={() => openRestockModal(inv)}
+                                data-testid={`button-restock-${inv.id}`}
+                              >
+                                <RefreshCw className="h-3 w-3 mr-1" />
+                                Repor
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
@@ -538,6 +605,7 @@ export default function InventoryPage() {
                                   handleEdit(inv);
                                   window.scrollTo({ top: 0, behavior: 'smooth' });
                                 }}
+                                data-testid={`button-edit-${inv.id}`}
                               >
                                 Editar
                               </Button>
@@ -546,6 +614,7 @@ export default function InventoryPage() {
                                 size="sm" 
                                 className="h-7 px-2 text-[10px] font-black uppercase italic text-cyan-400 hover:bg-cyan-400/10"
                                 onClick={() => handleDuplicate(inv)}
+                                data-testid={`button-duplicate-${inv.id}`}
                               >
                                 Duplicar
                               </Button>
@@ -559,6 +628,7 @@ export default function InventoryPage() {
                                   }
                                 }}
                                 disabled={deleteMutation.isPending}
+                                data-testid={`button-delete-${inv.id}`}
                               >
                                 {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : "Deletar"}
                               </Button>
@@ -574,6 +644,133 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={restockModalOpen} onOpenChange={setRestockModalOpen}>
+        <DialogContent className="bg-[#0a0f0f] border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary">
+              <RefreshCw className="inline-block h-5 w-5 mr-2" />
+              Reposição de Estoque
+            </DialogTitle>
+            <DialogDescription className="text-white/60 text-sm">
+              {restockItem?.name && (
+                <span className="font-bold text-white">{restockItem.name}</span>
+              )}
+              {restockItem?.barcode && (
+                <span className="block text-xs text-white/40 mt-1">ID: {restockItem.barcode}</span>
+              )}
+              <span className="block text-xs text-primary mt-2">
+                Estoque atual: {restockItem?.quantity} {restockItem?.unit}(s)
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                Quantidade de Embalagens a Adicionar *
+              </Label>
+              <Input
+                type="number"
+                value={restockQuantity}
+                onChange={(e) => setRestockQuantity(e.target.value)}
+                className="bg-black/40 border-white/10 h-10 text-white font-bold focus:border-primary/50"
+                placeholder="Ex: 10"
+                data-testid="input-restock-quantity"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  Tipo de Embalagem
+                </Label>
+                <Select value={restockUnit} onValueChange={setRestockUnit}>
+                  <SelectTrigger className="bg-black/40 border-white/10 h-10 text-white font-bold" data-testid="select-restock-unit">
+                    <SelectValue placeholder="Tipo..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#0a0f0f] border-white/10">
+                    <SelectItem value="Unidade">Unidade</SelectItem>
+                    <SelectItem value="Bag">Bag</SelectItem>
+                    <SelectItem value="Caixa">Caixa</SelectItem>
+                    <SelectItem value="Pacote">Pacote</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  Unidades por Embalagem
+                </Label>
+                <Input
+                  type="number"
+                  value={restockItemsPerUnit}
+                  onChange={(e) => setRestockItemsPerUnit(e.target.value)}
+                  className="bg-black/40 border-white/10 h-10 text-white font-bold focus:border-primary/50"
+                  placeholder="Ex: 12"
+                  data-testid="input-restock-items-per-unit"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  Custo por Embalagem (R$)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={restockCostPrice}
+                  onChange={(e) => setRestockCostPrice(e.target.value)}
+                  className="bg-black/40 border-white/10 h-10 text-white font-bold focus:border-primary/50"
+                  placeholder="Ex: 25.00"
+                  data-testid="input-restock-cost"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  Nova Validade
+                </Label>
+                <Input
+                  type="date"
+                  value={restockExpiryDate}
+                  onChange={(e) => setRestockExpiryDate(e.target.value)}
+                  className="bg-black/40 border-white/10 h-10 text-white font-bold focus:border-primary/50 [color-scheme:dark]"
+                  data-testid="input-restock-expiry"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="ghost"
+                className="flex-1 text-white/60 hover:text-white font-bold uppercase"
+                onClick={() => setRestockModalOpen(false)}
+                data-testid="button-restock-cancel"
+              >
+                Cancelar
+              </Button>
+              <Button
+                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-black italic uppercase shadow-[0_0_15px_rgba(34,197,94,0.3)]"
+                onClick={handleRestock}
+                disabled={!restockQuantity || restockMutation.isPending}
+                data-testid="button-restock-confirm"
+              >
+                {restockMutation.isPending ? (
+                  <Loader2 className="animate-spin h-4 w-4" />
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Confirmar Reposição
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
