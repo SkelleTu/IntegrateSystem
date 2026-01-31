@@ -33,6 +33,15 @@ export default function InventoryPage() {
 
   const [salePrice, setSalePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [viewMode, setViewMode] = useState<"package" | "unit">("package");
+  const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
+
+  const unitPrice = useMemo(() => {
+    const cost = Number(costPrice.replace(',', '.'));
+    const perUnit = parseInt(itemsPerUnit) || 1;
+    if (isNaN(cost) || perUnit <= 0) return 0;
+    return cost / perUnit;
+  }, [costPrice, itemsPerUnit]);
 
   const { data: inventory = [], isLoading: isLoadingInv } = useQuery<Inventory[]>({
     queryKey: ["/api/inventory"],
@@ -55,13 +64,48 @@ export default function InventoryPage() {
   }, [inventory, menuItems]);
 
   const filteredInventory = useMemo(() => {
-    if (!searchTerm) return inventoryWithNames;
-    const fuse = new Fuse(inventoryWithNames, {
-      keys: ["name", "barcode"],
-      threshold: 0.3,
+    let items = [...inventoryWithNames];
+
+    if (viewMode === "unit") {
+      // De-normalize: show each unit as a separate entry
+      const units: any[] = [];
+      items.forEach(item => {
+        const totalUnits = item.quantity * item.itemsPerUnit;
+        for (let i = 0; i < totalUnits; i++) {
+          units.push({
+            ...item,
+            id: `${item.id}-unit-${i}`,
+            originalId: item.id,
+            quantity: 1,
+            unit: "Unidade",
+            itemsPerUnit: 1,
+            costPrice: Math.round(item.costPrice / item.itemsPerUnit),
+            salePrice: item.salePrice ? Math.round(item.salePrice / item.itemsPerUnit) : null,
+            isUnitView: true
+          });
+        }
+      });
+      items = units;
+    }
+
+    if (searchTerm) {
+      const fuse = new Fuse(items, {
+        keys: ["name", "barcode"],
+        threshold: 0.3,
+      });
+      items = fuse.search(searchTerm).map(result => result.item);
+    }
+
+    // Sorting
+    items.sort((a, b) => {
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      if (sortBy === "price") return (a.salePrice || 0) - (b.salePrice || 0);
+      if (sortBy === "quantity") return a.quantity - b.quantity;
+      return 0;
     });
-    return fuse.search(searchTerm).map(result => result.item);
-  }, [inventoryWithNames, searchTerm]);
+
+    return items;
+  }, [inventoryWithNames, searchTerm, viewMode, sortBy]);
 
   const handleEdit = (inv: any) => {
     if (!inv) return;
@@ -197,6 +241,29 @@ export default function InventoryPage() {
                 </CardTitle>
                 
                 <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+                      <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest w-40 rounded-xl">
+                        <SelectValue placeholder="MODO VISTA" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0a0f0f] border-white/10">
+                        <SelectItem value="package">Por Embalagem</SelectItem>
+                        <SelectItem value="unit">Por Produto (Un.)</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                      <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest w-40 rounded-xl">
+                        <SelectValue placeholder="ORDENAR" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0a0f0f] border-white/10">
+                        <SelectItem value="name">Por Nome</SelectItem>
+                        <SelectItem value="price">Por Preço</SelectItem>
+                        <SelectItem value="quantity">Por Qtd</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="relative w-full sm:w-80">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                     <Input
@@ -309,6 +376,11 @@ export default function InventoryPage() {
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="0.00"
                     />
+                    {itemsPerUnit && parseInt(itemsPerUnit) > 1 && (
+                      <p className="text-[9px] text-primary font-bold uppercase tracking-tighter pl-1">
+                        Custo Unitário: R$ {unitPrice.toFixed(2)}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -412,6 +484,9 @@ export default function InventoryPage() {
                           <TableCell className="text-white/60 text-[10px] font-bold">
                             <div className="flex flex-col leading-tight">
                               <span className="text-red-400/80">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
+                              {inv.itemsPerUnit > 1 && (
+                                <span className="text-[9px] text-white/40">Un: R$ {(inv.costPrice / 100 / inv.itemsPerUnit).toFixed(2)}</span>
+                              )}
                               {inv.salePrice && <span className="text-green-400/80">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>}
                             </div>
                           </TableCell>
