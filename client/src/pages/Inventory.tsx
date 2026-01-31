@@ -202,6 +202,21 @@ export default function InventoryPage() {
     if (!customName) return;
     if (!quantity) return;
 
+    // Verificar se o barcode já existe na lista local antes de enviar
+    if (barcode) {
+      const existing = inventoryWithNames.find(item => 
+        item.barcode === barcode && item.id !== editingId
+      );
+      if (existing) {
+        toast({
+          title: "ID em uso",
+          description: `O código "${barcode}" já pertence ao item: ${existing.name}. Use um código diferente.`,
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
     upsertMutation.mutate({
       id: editingId,
       itemId: null,

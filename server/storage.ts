@@ -441,6 +441,16 @@ export class DatabaseStorage implements IStorage {
         tx.delete(inventory).where(eq(inventory.id, data.id)).run();
       }
 
+      // NOVO: Validar se já existe um item com o mesmo código de barras (ID personalizado)
+      // Se estiver editando (data.id presente), o delete acima já limpou o registro anterior
+      // Se for novo ou duplicado, precisamos garantir que o barcode não esteja em uso por OUTRO item
+      if (data.barcode) {
+        const [existing] = tx.select().from(inventory).where(eq(inventory.barcode, data.barcode)).all();
+        if (existing) {
+          throw new Error(`O ID/Código "${data.barcode}" já está em uso pelo item: ${existing.customName || 'Sem nome'}`);
+        }
+      }
+
       // Ensure data objects are handled correctly for SQLite
       const processedData = {
         itemId: data.itemId || null,
