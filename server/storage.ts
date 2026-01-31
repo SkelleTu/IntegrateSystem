@@ -2,7 +2,7 @@ import { db } from "./db";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
-  inventory, inventoryLogs, settings, enterprises, timeClock,
+  inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
@@ -17,6 +17,7 @@ import {
   type Transaction,
   type Inventory, type InsertInventory,
   type InventoryLog, type InsertInventoryLog,
+  type InventoryRestock, type InsertInventoryRestock,
   type Settings,
   type Enterprise, type InsertEnterprise,
   type TimeClock, type InsertTimeClock,
@@ -441,34 +442,37 @@ export class DatabaseStorage implements IStorage {
     expiryDate?: Date | null;
   }): Promise<Inventory> {
     return db.transaction((tx) => {
-      // Buscar item existente
       const [existingItem] = tx.select().from(inventory).where(eq(inventory.id, id)).all();
       if (!existingItem) {
         throw new Error(`Item com ID ${id} não encontrado no estoque`);
       }
 
-      // Calcular nova quantidade (adiciona à existente)
       const newQuantity = existingItem.quantity + data.quantity;
       
-      // Preparar dados para atualização
       const updateData: any = {
         quantity: newQuantity,
         updatedAt: new Date()
       };
 
-      // Atualizar campos opcionais se fornecidos
       if (data.unit) updateData.unit = data.unit;
       if (data.itemsPerUnit) updateData.itemsPerUnit = data.itemsPerUnit;
       if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
 
-      // Atualizar o item
       const [result] = tx.update(inventory)
         .set(updateData)
         .where(eq(inventory.id, id))
         .returning()
         .all();
 
-      // Criar transação financeira para a reposição (se houver custo)
+      tx.insert(inventoryRestocks).values({
+        inventoryId: id,
+        quantity: data.quantity,
+        unit: data.unit || existingItem.unit,
+        itemsPerUnit: data.itemsPerUnit || existingItem.itemsPerUnit,
+        costPrice: data.costPrice || 0,
+        expiryDate: data.expiryDate || null,
+      }).run();
+
       if (data.costPrice && data.costPrice > 0 && data.quantity > 0) {
         tx.insert(transactions).values({
           businessType: "padaria",
@@ -482,6 +486,17 @@ export class DatabaseStorage implements IStorage {
 
       return result;
     });
+  }
+
+  async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
+    return await db.select().from(inventoryRestocks)
+      .where(eq(inventoryRestocks.inventoryId, inventoryId))
+      .orderBy(desc(inventoryRestocks.createdAt));
+  }
+
+  async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
+    return await db.select().from(inventoryRestocks)
+      .orderBy(desc(inventoryRestocks.createdAt));
   }
 
   async upsertInventory(data: any): Promise<Inventory> {

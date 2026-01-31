@@ -186,6 +186,17 @@ export const inventoryLogs = pgTable("inventory_logs", {
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+export const inventoryRestocks = pgTable("inventory_restocks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  inventoryId: integer("inventory_id").notNull(),
+  quantity: integer("quantity").notNull(),
+  unit: text("unit").notNull(),
+  itemsPerUnit: integer("items_per_unit").notNull().default(1),
+  costPrice: integer("cost_price").notNull().default(0),
+  expiryDate: integer("expiry_date", { mode: 'timestamp' }),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
 // Helper types and schemas
 export const fiscalSettings = pgTable("fiscal_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -239,6 +250,7 @@ export const insertInventorySchema = createInsertSchema(inventory, {
   salePrice: z.number().transform(v => Math.round(v * 100)).optional(),
 }).omit({ id: true, updatedAt: true });
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({ id: true, createdAt: true });
+export const insertInventoryRestockSchema = createInsertSchema(inventoryRestocks).omit({ id: true, createdAt: true });
 
 export type User = typeof users.$inferSelect;
 export type Service = typeof services.$inferSelect;
@@ -256,6 +268,7 @@ export type Enterprise = typeof enterprises.$inferSelect;
 export type Settings = typeof settings.$inferSelect;
 export type Inventory = typeof inventory.$inferSelect;
 export type InventoryLog = typeof inventoryLogs.$inferSelect;
+export type InventoryRestock = typeof inventoryRestocks.$inferSelect;
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type InsertService = z.infer<typeof insertServiceSchema>;
@@ -273,6 +286,7 @@ export type InsertEnterprise = z.infer<typeof insertEnterpriseSchema>;
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type InsertInventory = z.infer<typeof insertInventorySchema>;
 export type InsertInventoryLog = z.infer<typeof insertInventoryLogSchema>;
+export type InsertInventoryRestock = z.infer<typeof insertInventoryRestockSchema>;
 export type UserSession = typeof userSessions.$inferSelect;
 export type CreateServiceRequest = Omit<InsertService, "id">;
 export type UpdateServiceRequest = Partial<CreateServiceRequest>;

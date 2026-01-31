@@ -544,6 +544,27 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/inventory/:id/restocks", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const restocks = await storage.getInventoryRestocks(id);
+      res.json(restocks);
+    } catch (err: any) {
+      console.error("Erro ao buscar reposições:", err);
+      res.status(500).json({ message: err.message || "Erro ao buscar reposições" });
+    }
+  });
+
+  app.get("/api/inventory-restocks", isAuthenticated, async (req, res) => {
+    try {
+      const restocks = await storage.getAllInventoryRestocks();
+      res.json(restocks);
+    } catch (err: any) {
+      console.error("Erro ao buscar todas as reposições:", err);
+      res.status(500).json({ message: err.message || "Erro ao buscar reposições" });
+    }
+  });
+
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,

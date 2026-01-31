@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Inventory, MenuItem, Category } from "@shared/schema";
+import { Inventory, MenuItem, Category, InventoryRestock } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -10,10 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw } from "lucide-react";
+import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { format, addDays, isBefore } from "date-fns";
+import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import Fuse from "fuse.js";
 
 export default function InventoryPage() {
@@ -44,6 +44,62 @@ export default function InventoryPage() {
   const [restockItemsPerUnit, setRestockItemsPerUnit] = useState("");
   const [restockCostPrice, setRestockCostPrice] = useState("");
   const [restockExpiryDate, setRestockExpiryDate] = useState("");
+
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+
+  const { data: allRestocks = [] } = useQuery<InventoryRestock[]>({
+    queryKey: ["/api/inventory-restocks"],
+    staleTime: 0,
+    refetchOnWindowFocus: true
+  });
+
+  const restocksByInventoryId = useMemo(() => {
+    const map: Record<number, InventoryRestock[]> = {};
+    allRestocks.forEach(r => {
+      if (!map[r.inventoryId]) map[r.inventoryId] = [];
+      map[r.inventoryId].push(r);
+    });
+    return map;
+  }, [allRestocks]);
+
+  const getExpiryUrgency = (date: any): "safe" | "blue" | "yellow" | "red" => {
+    if (!date) return "safe";
+    const expiry = new Date(date);
+    const today = new Date();
+    const daysUntilExpiry = differenceInDays(expiry, today);
+    
+    if (daysUntilExpiry <= 3) return "red";
+    if (daysUntilExpiry <= 7) return "yellow";
+    if (daysUntilExpiry <= 14) return "blue";
+    return "safe";
+  };
+
+  const getItemRestockUrgency = (inventoryId: number): "safe" | "blue" | "yellow" | "red" => {
+    const restocks = restocksByInventoryId[inventoryId] || [];
+    let worstUrgency: "safe" | "blue" | "yellow" | "red" = "safe";
+    const urgencyPriority = { safe: 0, blue: 1, yellow: 2, red: 3 };
+    
+    restocks.forEach(r => {
+      const urgency = getExpiryUrgency(r.expiryDate);
+      if (urgencyPriority[urgency] > urgencyPriority[worstUrgency]) {
+        worstUrgency = urgency;
+      }
+    });
+    
+    return worstUrgency;
+  };
+
+  const toggleExpanded = (id: number) => {
+    setExpandedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const unitPrice = useMemo(() => {
     const cost = Number(costPrice.replace(',', '.'));
@@ -555,87 +611,190 @@ export default function InventoryPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      filteredInventory.map((inv) => (
-                        <TableRow key={inv.id} className="border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0">
-                          <TableCell className="font-black italic text-white py-3 pl-4 group-hover:text-primary transition-colors tracking-tighter uppercase">
-                            <div className="flex flex-col min-w-0">
-                              <span className="truncate text-sm leading-tight">{inv.name}</span>
-                              <span className="text-[9px] text-white/40 font-bold truncate">
-                                {inv.unit} • {inv.barcode || "S/ CÓD"}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className={`${inv.quantity < (inv.minStock || 0) ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
-                            {inv.quantity}
-                          </TableCell>
-                          <TableCell className="text-white/60 text-[10px] font-bold">
-                            <div className="flex flex-col leading-tight">
-                              <span className="text-red-400/80">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
-                              {inv.itemsPerUnit > 1 && (
-                                <span className="text-[9px] text-white/40">Un: R$ {(inv.costPrice / 100 / inv.itemsPerUnit).toFixed(2)}</span>
-                              )}
-                              {inv.salePrice && <span className="text-green-400/80">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-white/60 text-[10px] font-bold">
-                            <div className="flex flex-col leading-tight">
-                              <span className={isExpiringSoon(inv.expiryDate) ? "text-red-500 animate-pulse" : ""}>
-                                VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}
-                              </span>
-                              <span className="text-white/40">MÍN: {inv.minStock || 5}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right pr-4 py-3">
-                            <div className="flex justify-end items-center gap-2 flex-wrap">
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 px-2 text-[10px] font-black uppercase italic text-green-400 hover:bg-green-400/10"
-                                onClick={() => openRestockModal(inv)}
-                                data-testid={`button-restock-${inv.id}`}
-                              >
-                                <RefreshCw className="h-3 w-3 mr-1" />
-                                Repor
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 px-2 text-[10px] font-black uppercase italic text-primary hover:bg-primary/10"
-                                onClick={() => {
-                                  handleEdit(inv);
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                data-testid={`button-edit-${inv.id}`}
-                              >
-                                Editar
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 px-2 text-[10px] font-black uppercase italic text-cyan-400 hover:bg-cyan-400/10"
-                                onClick={() => handleDuplicate(inv)}
-                                data-testid={`button-duplicate-${inv.id}`}
-                              >
-                                Duplicar
-                              </Button>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-7 px-2 text-[10px] font-black uppercase italic text-red-500 hover:bg-red-500/10"
-                                onClick={() => {
-                                  if (window.confirm(`Você tem certeza que quer Deletar "${inv.name}" do estoque?`)) {
-                                    deleteMutation.mutate(inv.id);
-                                  }
-                                }}
-                                disabled={deleteMutation.isPending}
-                                data-testid={`button-delete-${inv.id}`}
-                              >
-                                {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : "Deletar"}
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                      filteredInventory.map((inv) => {
+                        const restocks = restocksByInventoryId[inv.id] || [];
+                        const hasRestocks = restocks.length > 0;
+                        const isExpanded = expandedItems.has(inv.id);
+                        const itemUrgency = getItemRestockUrgency(inv.id);
+                        
+                        const urgencyColors = {
+                          safe: "",
+                          blue: "border-l-4 border-l-blue-400",
+                          yellow: "border-l-4 border-l-yellow-400",
+                          red: "border-l-4 border-l-red-500"
+                        };
+
+                        return (
+                          <>
+                            <TableRow 
+                              key={inv.id} 
+                              className={`border-white/5 hover:bg-primary/5 transition-all group border-b last:border-0 ${urgencyColors[itemUrgency]} ${hasRestocks ? 'cursor-pointer' : ''}`}
+                              onClick={() => hasRestocks && toggleExpanded(inv.id)}
+                            >
+                              <TableCell className="font-black italic text-white py-3 pl-4 group-hover:text-primary transition-colors tracking-tighter uppercase">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {hasRestocks && (
+                                    <div className="flex-shrink-0">
+                                      {isExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-white/40" />}
+                                    </div>
+                                  )}
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="truncate text-sm leading-tight">{inv.name}</span>
+                                      {itemUrgency !== "safe" && (
+                                        <Badge className={`text-[8px] px-1.5 py-0 ${
+                                          itemUrgency === "red" ? "bg-red-500/20 text-red-400 border-red-500/30" :
+                                          itemUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                                          "bg-blue-500/20 text-blue-400 border-blue-500/30"
+                                        }`}>
+                                          <Clock className="h-2 w-2 mr-1" />
+                                          {itemUrgency === "red" ? "URGENTE" : itemUrgency === "yellow" ? "ATENÇÃO" : "EM BREVE"}
+                                        </Badge>
+                                      )}
+                                      {hasRestocks && (
+                                        <Badge className="text-[8px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20">
+                                          {restocks.length} reposi{restocks.length > 1 ? "ções" : "ção"}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <span className="text-[9px] text-white/40 font-bold truncate">
+                                      {inv.unit} • {inv.barcode || "S/ CÓD"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className={`${inv.quantity < (inv.minStock || 0) ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
+                                {inv.quantity}
+                              </TableCell>
+                              <TableCell className="text-white/60 text-[10px] font-bold">
+                                <div className="flex flex-col leading-tight">
+                                  <span className="text-red-400/80">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
+                                  {inv.itemsPerUnit > 1 && (
+                                    <span className="text-[9px] text-white/40">Un: R$ {(inv.costPrice / 100 / inv.itemsPerUnit).toFixed(2)}</span>
+                                  )}
+                                  {inv.salePrice && <span className="text-green-400/80">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-white/60 text-[10px] font-bold">
+                                <div className="flex flex-col leading-tight">
+                                  <span className={isExpiringSoon(inv.expiryDate) ? "text-red-500 animate-pulse" : ""}>
+                                    VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}
+                                  </span>
+                                  <span className="text-white/40">MÍN: {inv.minStock || 5}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right pr-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="flex justify-end items-center gap-2 flex-wrap">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 px-2 text-[10px] font-black uppercase italic text-green-400 hover:bg-green-400/10"
+                                    onClick={() => openRestockModal(inv)}
+                                    data-testid={`button-restock-${inv.id}`}
+                                  >
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                    Repor
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 px-2 text-[10px] font-black uppercase italic text-primary hover:bg-primary/10"
+                                    onClick={() => {
+                                      handleEdit(inv);
+                                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                                    }}
+                                    data-testid={`button-edit-${inv.id}`}
+                                  >
+                                    Editar
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 px-2 text-[10px] font-black uppercase italic text-cyan-400 hover:bg-cyan-400/10"
+                                    onClick={() => handleDuplicate(inv)}
+                                    data-testid={`button-duplicate-${inv.id}`}
+                                  >
+                                    Duplicar
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 px-2 text-[10px] font-black uppercase italic text-red-500 hover:bg-red-500/10"
+                                    onClick={() => {
+                                      if (window.confirm(`Você tem certeza que quer Deletar "${inv.name}" do estoque?`)) {
+                                        deleteMutation.mutate(inv.id);
+                                      }
+                                    }}
+                                    disabled={deleteMutation.isPending}
+                                    data-testid={`button-delete-${inv.id}`}
+                                  >
+                                    {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : "Deletar"}
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            
+                            {isExpanded && restocks.map((restock, idx) => {
+                              const restockUrgency = getExpiryUrgency(restock.expiryDate);
+                              const restockUrgencyBg = {
+                                safe: "bg-black/20",
+                                blue: "bg-blue-500/10",
+                                yellow: "bg-yellow-500/10",
+                                red: "bg-red-500/10"
+                              };
+                              
+                              return (
+                                <TableRow 
+                                  key={`restock-${restock.id}`} 
+                                  className={`border-white/5 ${restockUrgencyBg[restockUrgency]} border-b last:border-0`}
+                                >
+                                  <TableCell className="py-2 pl-12" colSpan={5}>
+                                    <div className="flex items-center justify-between gap-4 text-[10px]">
+                                      <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3 text-white/40" />
+                                          <span className="text-white/60 font-bold">
+                                            {format(new Date(restock.createdAt), "dd/MM/yy HH:mm")}
+                                          </span>
+                                        </div>
+                                        <div className="text-white/60">
+                                          <span className="font-bold">{restock.quantity}</span> {restock.unit}(s)
+                                          {restock.itemsPerUnit > 1 && (
+                                            <span className="text-white/40"> ({restock.itemsPerUnit} un/emb)</span>
+                                          )}
+                                        </div>
+                                        <div className="text-red-400/80 font-bold">
+                                          C: R$ {(restock.costPrice / 100).toFixed(2)}
+                                          {restock.itemsPerUnit > 1 && (
+                                            <span className="text-white/40 ml-1">(R$ {(restock.costPrice / 100 / restock.itemsPerUnit).toFixed(2)}/un)</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {restock.expiryDate && (
+                                          <Badge className={`text-[8px] px-2 py-0.5 ${
+                                            restockUrgency === "red" ? "bg-red-500/20 text-red-400 border-red-500/30 animate-pulse" :
+                                            restockUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" :
+                                            restockUrgency === "blue" ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                                            "bg-green-500/20 text-green-400 border-green-500/30"
+                                          }`}>
+                                            VAL: {format(new Date(restock.expiryDate), "dd/MM/yy")}
+                                            {restockUrgency !== "safe" && (
+                                              <span className="ml-1">
+                                                ({differenceInDays(new Date(restock.expiryDate), new Date())}d)
+                                              </span>
+                                            )}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
