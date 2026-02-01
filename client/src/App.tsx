@@ -75,7 +75,14 @@ import MasterControl from "./pages/MasterControl";
 
 function Router() {
   const { data: user, isLoading } = useUser();
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    const publicPages = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms", "/login", "/register"];
+    if (!isLoading && !user && !publicPages.includes(location)) {
+      setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
+    }
+  }, [user, isLoading, location, setLocation]);
 
   if (isLoading) {
     return (
@@ -116,37 +123,17 @@ function Router() {
             <Route path="/barber" component={BarberHome} />
             <Route path="/menu" component={DigitalMenu} />
             <Route path="/barber-queue" component={BarberQueue} />
-            <Route path="/ponto">
-              {() => <ProtectedRoute component={TimeClock} />}
-            </Route>
-            <Route path="/admin">
-              {() => <ProtectedRoute component={Admin} />}
-            </Route>
-            <Route path="/caixa">
-              {() => <ProtectedRoute component={Cashier} />}
-            </Route>
-            <Route path="/financeiro">
-              {() => <ProtectedRoute component={Financeiro} />}
-            </Route>
-            <Route path="/relatorios">
-              {() => <ProtectedRoute component={Reports} />}
-            </Route>
-            <Route path="/inventory">
-              {() => <ProtectedRoute component={Inventory} />}
-            </Route>
-            <Route path="/fiscal">
-              {() => <ProtectedRoute component={FiscalConfig} />}
-            </Route>
-            <Route path="/admin/labels">
-              {() => <ProtectedRoute component={LabelSystem} />}
-            </Route>
-            <Route path="/admin/monitoring">
-              {() => <ProtectedRoute component={MasterControl} />}
-            </Route>
+            <Route path="/ponto" component={TimeClock} />
+            <Route path="/admin" component={Admin} />
+            <Route path="/caixa" component={Cashier} />
+            <Route path="/financeiro" component={Financeiro} />
+            <Route path="/relatorios" component={Reports} />
+            <Route path="/inventory" component={Inventory} />
+            <Route path="/fiscal" component={FiscalConfig} />
+            <Route path="/admin/labels" component={LabelSystem} />
+            <Route path="/admin/monitoring" component={MasterControl} />
             <Route path="/cart" component={ClientCart} />
-            <Route path="/admin/master">
-              {() => <ProtectedRoute component={MasterControl} />}
-            </Route>
+            <Route path="/admin/master" component={MasterControl} />
             <Route component={NotFound} />
           </Switch>
         </main>
@@ -243,7 +230,15 @@ function LandingNavigation() {
   );
 }
 
+function Router() {
+  // ... rest of the component
+}
+
 export default function App() {
+  const { data: user } = useUser();
+  const [location] = useLocation();
+  const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -252,7 +247,7 @@ export default function App() {
           <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
             <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
               <LandingNavigation />
-              <Navbar />
+              {user && !isLandingPage && <Navbar />}
               <Router />
             </main>
           </div>
