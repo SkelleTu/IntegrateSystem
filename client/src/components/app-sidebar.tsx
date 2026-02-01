@@ -378,7 +378,9 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}
     >
       <div className="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-black/50">
-        <img src={auraLogo} alt="Aura Logo" className="h-8 w-auto" />
+        <div className="flex items-center justify-center">
+          <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto object-contain" />
+        </div>
         <Button variant="ghost" size="icon" onClick={() => setOpen(false)}>
           <X className="w-6 h-6 text-white" />
         </Button>

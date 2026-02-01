@@ -55,10 +55,10 @@ export function Navbar() {
 
   return (
     <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl px-3 md:px-5 h-14 flex items-center justify-between shadow-2xl">
-      <div className="flex items-center gap-6 overflow-hidden flex-1 mr-4">
-        <div className="relative shrink-0">
+      <div className="flex items-center gap-3 overflow-hidden flex-1 mr-4">
+        <div className="relative shrink-0 flex items-center justify-center">
           <Link href="/app" className="flex items-center">
-            <img src={auraLogo} alt="Aura Logo" className="h-9 w-auto transition-transform duration-300 hover:scale-105 active:scale-95" />
+            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto object-contain transition-transform duration-300 hover:scale-105 active:scale-95" />
           </Link>
         </div>
 
