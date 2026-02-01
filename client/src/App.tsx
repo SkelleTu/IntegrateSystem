@@ -46,31 +46,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-function ProtectedRoute({ component: Component, ...rest }: any) {
-  const { data: user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
-    }
-  }, [user, isLoading, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-transparent flex items-center justify-center">
-        <Loader2 className="w-10 h-10 text-primary animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  return <Component {...rest} />;
-}
-
 import MasterControl from "./pages/MasterControl";
 
 function Router() {
@@ -230,37 +205,39 @@ function LandingNavigation() {
   );
 }
 
-function Router() {
-  // ... rest of the component
-}
-
-export default function App() {
+function AppContent() {
   const { data: user } = useUser();
   const [location] = useLocation();
   const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
 
   return (
+    <div className="relative min-h-screen w-full bg-black overflow-x-hidden pb-safe">
+      <BackgroundIcons />
+      <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
+        <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
+          <LandingNavigation />
+          {user && !isLandingPage && <Navbar />}
+          <Router />
+        </main>
+      </div>
+      <Toaster />
+      {/* Floating Mini Logo Overlay */}
+      <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
+        <img 
+          src={auraLogo} 
+          alt="Aura Logo Overlay" 
+          className="w-12 h-auto grayscale brightness-200"
+        />
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="relative min-h-screen w-full bg-black overflow-x-hidden pb-safe">
-          <BackgroundIcons />
-          <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
-            <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
-              <LandingNavigation />
-              {user && !isLandingPage && <Navbar />}
-              <Router />
-            </main>
-          </div>
-        </div>
-        <Toaster />
-        {/* Floating Mini Logo Overlay */}
-        <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
-          <img 
-            src={auraLogo} 
-            alt="Aura Logo Overlay" 
-            className="w-12 h-auto grayscale brightness-200"
-          />
-        </div>
+        <AppContent />
       </TooltipProvider>
     </QueryClientProvider>
   );
