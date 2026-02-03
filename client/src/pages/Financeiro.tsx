@@ -79,6 +79,10 @@ export default function Financeiro() {
   const transactionMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/transactions", data);
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Erro ao salvar transação");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -88,6 +92,13 @@ export default function Financeiro() {
       form.reset();
       setAmountDisplay("");
       toast({ title: "Lançamento realizado com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Erro ao realizar lançamento", 
+        description: error.message,
+        variant: "destructive" 
+      });
     }
   });
 
