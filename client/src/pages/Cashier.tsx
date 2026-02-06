@@ -158,7 +158,52 @@ export default function Cashier() {
     }
   });
 
-  const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closingAmount, setClosingAmount] = useState("");
+
+  const closeMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const res = await apiRequest("POST", "/api/cash-register/close", { closingAmount: amount });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
+      setCloseModalOpen(false);
+      setClosingAmount("");
+      
+      const diff = data.difference / 100;
+      const status = Math.abs(diff) <= 3 ? "Bateu Certinho" : diff > 0 ? "Sobra no Caixa" : "Quebra de Caixa";
+      
+      toast({ 
+        title: `Caixa Fechado: ${status}`,
+        description: `Diferença: R$ ${diff.toFixed(2)} (Tolerância R$ 3,00)`,
+        variant: Math.abs(diff) <= 3 ? "default" : "destructive"
+      });
+    },
+  });
+
+  const totalSales = useQuery<any[]>({
+    queryKey: ["/api/sales/current-register", register?.id],
+    queryFn: async () => {
+      if (!register) return [];
+      const res = await fetch(`/api/sales?registerId=${register.id}`);
+      return res.json();
+    },
+    enabled: !!register,
+  });
+
+  const expectedTotal = useMemo(() => {
+    if (!register || !totalSales.data) return 0;
+    const salesTotal = totalSales.data
+      .filter(s => s.status === "completed")
+      .reduce((sum, s) => sum + s.totalAmount, 0);
+    return (register.openingAmount || 0) + salesTotal;
+  }, [register, totalSales.data]);
+
+  const handleCloseRegister = () => {
+    const amount = Number(closingAmount.replace(",", ".")) * 100;
+    closeMutation.mutate(amount);
+  };
 
   const handleFiscalToggle = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -285,11 +330,19 @@ export default function Cashier() {
             />
           </div>
         </div>
-        <div className="flex items-center gap-4 shrink-0">
-          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">
-            Operador ID: {register.userId}
-          </Badge>
-        </div>
+          <div className="flex items-center gap-4 shrink-0">
+            <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">
+              Operador ID: {register.userId}
+            </Badge>
+            <Button 
+              variant="destructive"
+              size="sm"
+              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9"
+              onClick={() => setCloseModalOpen(true)}
+            >
+              Encerrar Expediente
+            </Button>
+          </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start flex-1 min-h-0 overflow-hidden">
@@ -513,6 +566,56 @@ export default function Cashier() {
                 {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR TRANSAÇÃO"}
               </Button>
             </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={closeModalOpen} onOpenChange={setCloseModalOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-2xl p-0 overflow-hidden rounded-2xl shadow-2xl border-t-4 border-t-red-500">
+          <div className="p-10 space-y-8">
+            <DialogHeader>
+              <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
+                FECHAMENTO DE <span className="text-red-500">CAIXA</span>
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-6 bg-black/60 rounded-2xl border border-white/5 space-y-1">
+                <span className="text-zinc-500 uppercase font-black tracking-widest text-[9px]">Saldo Inicial</span>
+                <p className="text-white text-xl font-black italic">R$ {((register?.openingAmount || 0) / 100).toFixed(2)}</p>
+              </div>
+              <div className="p-6 bg-black/60 rounded-2xl border border-white/5 space-y-1">
+                <span className="text-zinc-500 uppercase font-black tracking-widest text-[9px]">Vendas do Turno</span>
+                <p className="text-primary text-xl font-black italic">R$ {((expectedTotal - (register?.openingAmount || 0)) / 100).toFixed(2)}</p>
+              </div>
+              <div className="p-6 bg-white/5 rounded-2xl border border-white/10 col-span-2 space-y-1">
+                <span className="text-zinc-400 uppercase font-black tracking-widest text-[10px]">VALOR ESPERADO EM GAVETA</span>
+                <p className="text-white text-4xl font-black italic tracking-tighter">R$ {(expectedTotal / 100).toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <label className="text-zinc-500 text-xs uppercase font-black tracking-widest pl-1">VALOR REAL NA GAVETA (CONTAGEM FÍSICA)</label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
+                value={closingAmount}
+                onChange={(e) => setClosingAmount(e.target.value)}
+                className="bg-black border-white/10 text-white text-4xl h-24 font-black italic tracking-tighter rounded-2xl px-6 focus:border-red-500/50 transition-all text-center"
+                autoFocus
+              />
+              <p className="text-[10px] text-zinc-500 font-bold uppercase text-center tracking-widest">
+                Tolerância de diferença aceitável: <span className="text-white">R$ 3,00</span>
+              </p>
+            </div>
+
+            <Button
+              className="w-full h-16 bg-red-600 hover:bg-red-500 text-white font-black uppercase italic text-xl rounded-2xl transition-all shadow-xl"
+              onClick={handleCloseRegister}
+              disabled={closeMutation.isPending || !closingAmount}
+            >
+              {closeMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR FECHAMENTO E ENCERRAR"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
