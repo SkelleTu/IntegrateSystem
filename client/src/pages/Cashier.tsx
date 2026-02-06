@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, CashRegister, Inventory } from "@shared/schema";
+import { MenuItem, CashRegister, Inventory, Transaction } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -158,6 +158,8 @@ export default function Cashier() {
     }
   });
 
+  const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
+
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [closingAmount, setClosingAmount] = useState("");
 
@@ -241,7 +243,8 @@ export default function Cashier() {
         customerName: customerInfo.name || null,
         customerTaxId: cleanTaxId || null,
         customerEmail: customerInfo.email || null,
-        fiscalStatus: cleanTaxId ? "pending" : "none"
+        fiscalStatus: cleanTaxId ? "pending" : "none",
+        status: "completed"
       },
       items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
       payments: [{ method: paymentMethod, amount: total }]
@@ -353,7 +356,7 @@ export default function Cashier() {
                 key={item.id}
                 whileHover={{ y: -5 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => addToCart(item)}
+                onClick={() => addToCart(item as any)}
                 className="cursor-pointer group h-full"
               >
                 <Card className="h-full panel-translucent overflow-hidden group-hover:border-primary/50 transition-all flex flex-col">
@@ -428,7 +431,7 @@ export default function Cashier() {
                           <Minus className="w-3.5 h-3.5" />
                         </Button>
                         <span className="text-white font-black text-sm italic tracking-tighter w-5 text-center">{quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md text-primary hover:bg-primary/10" onClick={() => addToCart(item)}>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
                           <Plus className="w-3.5 h-3.5" />
                         </Button>
                       </div>
