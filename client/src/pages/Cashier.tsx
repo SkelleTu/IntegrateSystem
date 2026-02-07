@@ -197,7 +197,7 @@ export default function Cashier() {
   const expectedTotal = useMemo(() => {
     if (!register || !totalSales.data) return 0;
     const salesTotal = totalSales.data
-      .filter(s => s.status === "completed")
+      .filter(s => s.status === "completed" && s.paymentMethod === "cash")
       .reduce((sum, s) => sum + s.totalAmount, 0);
     return (register.openingAmount || 0) + salesTotal;
   }, [register, totalSales.data]);
@@ -305,8 +305,8 @@ export default function Cashier() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 selection:bg-primary selection:text-black max-w-7xl mx-auto overflow-x-hidden pt-24 w-full">
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0 w-full">
+    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 selection:bg-primary selection:text-black w-full max-w-[100vw] overflow-x-hidden pt-24 px-8 md:px-12 lg:px-16">
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0 w-full mb-4">
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 
