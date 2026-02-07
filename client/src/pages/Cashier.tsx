@@ -305,8 +305,8 @@ export default function Cashier() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 selection:bg-primary selection:text-black max-w-full mx-auto overflow-x-hidden pt-24">
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0">
+    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 selection:bg-primary selection:text-black max-w-7xl mx-auto overflow-x-hidden pt-24 w-full">
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0 w-full">
         <div className="flex items-center gap-4">
           <Button 
             variant="ghost" 
