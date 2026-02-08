@@ -609,7 +609,15 @@ export default function Cashier() {
       <Dialog open={closeModalOpen} onOpenChange={setCloseModalOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-2xl p-0 overflow-hidden rounded-2xl shadow-2xl border-t-4 border-t-red-500">
           <div className="p-10 space-y-8">
-            <DialogHeader>
+            <DialogHeader className="relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute -left-4 -top-2 text-zinc-500 hover:text-white hover:bg-white/5"
+                onClick={() => setCloseModalOpen(false)}
+              >
+                <ArrowLeft className="h-6 w-6" />
+              </Button>
               <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
                 FECHAMENTO DE <span className="text-red-500">CAIXA</span>
               </DialogTitle>
