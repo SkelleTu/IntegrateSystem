@@ -355,14 +355,15 @@ export default function Cashier() {
             />
           </div>
         </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">
-              Operador ID: {register.userId}
-            </Badge>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">
+            Operador ID: {register.userId}
+          </Badge>
+          <div className="flex flex-col gap-2 w-full">
             <Button 
               variant="destructive"
               size="sm"
-              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9"
+              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9 w-full"
               onClick={() => setCloseModalOpen(true)}
             >
               Encerrar Expediente
@@ -371,13 +372,14 @@ export default function Cashier() {
               <Button 
                 variant="outline"
                 size="sm"
-                className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9"
+                className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9 w-full"
                 onClick={() => setAdjustModalOpen(true)}
               >
                 Ajustar Gaveta
               </Button>
             )}
           </div>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 items-start flex-1 min-h-0 overflow-hidden">
