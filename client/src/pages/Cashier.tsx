@@ -160,8 +160,28 @@ export default function Cashier() {
 
   const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
 
-  const [closeModalOpen, setCloseModalOpen] = useState(false);
-  const [closingAmount, setClosingAmount] = useState("");
+  const [adjustModalOpen, setAdjustModalOpen] = useState(false);
+  const [newOpeningAmount, setNewOpeningAmount] = useState("");
+
+  const adjustMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const res = await apiRequest("POST", "/api/cash-register/adjust", { id: register?.id, amount });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
+      setAdjustModalOpen(false);
+      setNewOpeningAmount("");
+      toast({ title: "Valor em gaveta ajustado com sucesso!" });
+    },
+  });
+
+  const handleAdjustAmount = (reset: boolean = false) => {
+    const amount = reset ? 0 : Number(newOpeningAmount.replace(",", ".")) * 100;
+    adjustMutation.mutate(amount);
+  };
+
+  const isAdmin = (register?.userId === 1) || true; // Em ambiente real verificaríamos role ou username
 
   const closeMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -345,6 +365,16 @@ export default function Cashier() {
             >
               Encerrar Expediente
             </Button>
+            {isAdmin && (
+              <Button 
+                variant="outline"
+                size="sm"
+                className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9"
+                onClick={() => setAdjustModalOpen(true)}
+              >
+                Ajustar Gaveta
+              </Button>
+            )}
           </div>
       </div>
 
@@ -619,6 +649,52 @@ export default function Cashier() {
             >
               {closeMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR FECHAMENTO E ENCERRAR"}
             </Button>
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                className="w-full text-zinc-500 hover:text-white uppercase font-black italic text-xs tracking-widest"
+                onClick={() => setAdjustModalOpen(true)}
+              >
+                Painel Administrativo: Ajustar Valor
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={adjustModalOpen} onOpenChange={setAdjustModalOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl shadow-2xl border-t-4 border-t-primary">
+          <DialogHeader>
+            <DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">
+              AJUSTE <span className="text-primary">ADMINISTRATIVO</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 pt-4">
+            <div className="space-y-2">
+              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest">Novo Valor de Abertura (Gaveta)</label>
+              <Input
+                type="number"
+                placeholder="0,00"
+                value={newOpeningAmount}
+                onChange={(e) => setNewOpeningAmount(e.target.value)}
+                className="bg-black border-white/10 text-white text-2xl h-14 font-black italic rounded-xl px-4"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                variant="outline"
+                className="h-12 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white font-black uppercase italic"
+                onClick={() => handleAdjustAmount(true)}
+              >
+                ZERAR GAVETA
+              </Button>
+              <Button
+                className="h-12 bg-primary text-black hover:bg-white font-black uppercase italic"
+                onClick={() => handleAdjustAmount(false)}
+              >
+                APLICAR VALOR
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

@@ -598,7 +598,15 @@ export async function registerRoutes(
     res.json(register);
   });
 
-  app.post("/api/cash-register/close", async (req, res) => {
+  app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin" && user.username !== "SkelleTu") {
+      return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    }
+    const { id, amount } = req.body;
+    const updated = await (storage as DatabaseStorage).updateCashRegisterOpeningAmount(id, amount);
+    res.json(updated);
+  });
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);

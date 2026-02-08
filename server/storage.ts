@@ -300,7 +300,13 @@ export class DatabaseStorage implements IStorage {
     return newRegister;
   }
 
-  async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
+  async updateCashRegisterOpeningAmount(id: number, amount: number): Promise<CashRegister> {
+    const [updated] = await db.update(cashRegisters)
+      .set({ openingAmount: amount })
+      .where(eq(cashRegisters.id, id))
+      .returning();
+    return updated;
+  }
     const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id));
     if (!register) throw new Error("Caixa não encontrado");
 
