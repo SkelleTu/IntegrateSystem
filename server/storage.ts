@@ -307,12 +307,14 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return updated;
   }
+
+  async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id));
     if (!register) throw new Error("Caixa não encontrado");
 
-    // Cálculo da diferença: Valor Final Real - (Valor Inicial + Total de Vendas)
+    // Cálculo da diferença: Valor Final Real - (Valor Inicial + Total de Vendas em Dinheiro)
     const salesList = await db.select().from(sales).where(eq(sales.cashRegisterId, id));
-    const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
+    const totalSales = salesList.filter(s => s.status === "completed" && s.paymentMethod === "cash").reduce((sum, s) => sum + s.totalAmount, 0);
     const expectedAmount = (register.openingAmount || 0) + totalSales;
     const difference = closingAmount - expectedAmount;
 

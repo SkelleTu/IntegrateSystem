@@ -604,19 +604,17 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     }
     const { id, amount } = req.body;
-    const updated = await (storage as DatabaseStorage).updateCashRegisterOpeningAmount(id, amount);
+    const updated = await storage.updateCashRegisterOpeningAmount(id, amount);
     res.json(updated);
   });
+
+  app.post("/api/cash-register/close", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(404).json({ message: "No open register" });
     
-    const updated = await storage.closeCashRegister(register.id, {
-      ...req.body,
-      status: "closed",
-      closedAt: new Date()
-    });
+    const updated = await storage.closeCashRegister(register.id, req.body.closingAmount);
     res.json(updated);
   });
 
