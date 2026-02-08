@@ -160,6 +160,8 @@ export default function Cashier() {
 
   const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
 
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
+  const [closingAmount, setClosingAmount] = useState("");
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
 
