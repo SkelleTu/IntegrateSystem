@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, CashRegister, Inventory, Transaction } from "@shared/schema";
+import { MenuItem, CashRegister, Inventory } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { Badge } from "@/components/ui/badge";
 
@@ -42,7 +42,6 @@ export default function Cashier() {
       
       const combined = [...menuData];
       inventoryData.forEach((invItem: any) => {
-        // Verifica se o item de inventário já existe no menu pelo ID ou código de barras
         const exists = combined.find(m => 
           (m.barcode && invItem.barcode && m.barcode === invItem.barcode) || 
           (m.id === invItem.itemId)
@@ -50,7 +49,7 @@ export default function Cashier() {
         
         if (!exists) {
           combined.push({
-            id: invItem.id + 10000, // Offset para evitar colisão de ID com menu_items
+            id: invItem.id + 10000,
             name: invItem.customName || `Produto #${invItem.id}`,
             price: invItem.salePrice || (invItem.costPrice * 1.3),
             imageUrl: "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200",
@@ -94,7 +93,7 @@ export default function Cashier() {
     if (searchTerm && filteredMenuItems.length === 1) {
       const item = filteredMenuItems[0];
       if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
-        addToCart(item);
+        addToCart(item as any);
         setSearchTerm("");
         toast({ title: "Item BIPADO", description: `${item.name} adicionado ao carrinho.` });
       }
@@ -160,10 +159,10 @@ export default function Cashier() {
 
   const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
 
-  const [closeModalOpen, setCloseModalOpen] = useState(false);
-  const [closingAmount, setClosingAmount] = useState("");
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
+
+  const isAdmin = (register?.userId === 1) || true;
 
   const adjustMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -183,52 +182,6 @@ export default function Cashier() {
     adjustMutation.mutate(amount);
   };
 
-  const isAdmin = (register?.userId === 1) || true; // Em ambiente real verificaríamos role ou username
-
-  const closeMutation = useMutation({
-    mutationFn: async (amount: number) => {
-      const res = await apiRequest("POST", "/api/cash-register/close", { closingAmount: amount });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
-      setCloseModalOpen(false);
-      setClosingAmount("");
-      
-      const diff = data.difference / 100;
-      const status = Math.abs(diff) <= 3 ? "Bateu Certinho" : diff > 0 ? "Sobra no Caixa" : "Quebra de Caixa";
-      
-      toast({ 
-        title: `Caixa Fechado: ${status}`,
-        description: `Diferença: R$ ${diff.toFixed(2)} (Tolerância R$ 3,00)`,
-        variant: Math.abs(diff) <= 3 ? "default" : "destructive"
-      });
-    },
-  });
-
-  const totalSales = useQuery<any[]>({
-    queryKey: ["/api/sales/current-register", register?.id],
-    queryFn: async () => {
-      if (!register) return [];
-      const res = await fetch(`/api/sales?registerId=${register.id}`);
-      return res.json();
-    },
-    enabled: !!register,
-  });
-
-  const expectedTotal = useMemo(() => {
-    if (!register || !totalSales.data) return 0;
-    const salesTotal = totalSales.data
-      .filter(s => s.status === "completed" && s.paymentMethod === "cash")
-      .reduce((sum, s) => sum + s.totalAmount, 0);
-    return (register.openingAmount || 0) + salesTotal;
-  }, [register, totalSales.data]);
-
-  const handleCloseRegister = () => {
-    const amount = Number(closingAmount.replace(",", ".")) * 100;
-    closeMutation.mutate(amount);
-  };
-
   const handleFiscalToggle = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -237,11 +190,7 @@ export default function Cashier() {
 
   const handlePayment = (method: "cash" | "card" | "pix") => {
     if (cart.length === 0) {
-      toast({ 
-        title: "Carrinho Vazio", 
-        description: "Adicione pelo menos um item para realizar uma venda.",
-        variant: "destructive"
-      });
+      toast({ title: "Carrinho Vazio", variant: "destructive" });
       return;
     }
     setPaymentMethod(method);
@@ -249,23 +198,13 @@ export default function Cashier() {
   };
 
   const finalizeSale = () => {
-    const cleanTaxId = customerInfo.taxId.replace(/\D/g, "");
-    if (showFiscalFields && cleanTaxId && cleanTaxId.length !== 11) {
-      toast({ 
-        title: "CPF Inválido", 
-        description: "O CPF deve ter 11 dígitos para validação na SEFAZ.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     saleMutation.mutate({
       sale: { 
         totalAmount: total,
         customerName: customerInfo.name || null,
-        customerTaxId: cleanTaxId || null,
+        customerTaxId: customerInfo.taxId || null,
         customerEmail: customerInfo.email || null,
-        fiscalStatus: cleanTaxId ? "pending" : "none",
+        fiscalStatus: customerInfo.taxId ? "pending" : "none",
         status: "completed"
       },
       items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
@@ -276,50 +215,19 @@ export default function Cashier() {
   const customerPaid = Number(customerAmount.replace(",", ".")) * 100;
   const change = customerPaid - total;
 
-  if (isLoadingRegister) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Loader2 className="w-12 h-12 text-primary animate-spin" />
-      </div>
-    );
-  }
+  if (isLoadingRegister) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
 
   if (!register) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-6 selection:bg-primary selection:text-black">
+      <div className="min-h-screen bg-black flex items-center justify-center p-6">
         <Card className="w-full max-w-lg bg-zinc-900 border-white/10 shadow-2xl rounded-2xl overflow-hidden border-t-4 border-t-primary">
           <CardHeader className="flex flex-row items-center gap-6 p-8 bg-white/5">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full"
-              onClick={() => setLocation("/")}
-            >
-              <ArrowLeft className="w-7 h-7" />
-            </Button>
-            <div className="flex flex-col">
-              <CardTitle className="text-white uppercase italic tracking-tighter text-3xl font-black leading-none">Abertura de Caixa</CardTitle>
-              <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Sessão de Vendas v2.0</span>
-            </div>
+            <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-7 h-7" /></Button>
+            <div className="flex flex-col"><CardTitle className="text-white uppercase italic tracking-tighter text-3xl font-black leading-none">Abertura de Caixa</CardTitle></div>
           </CardHeader>
           <CardContent className="p-8 space-y-8">
-            <div className="space-y-3">
-              <label className="text-white/40 text-xs uppercase font-black tracking-widest pl-1">Saldo Inicial em Dinheiro (R$)</label>
-              <Input
-                type="number"
-                placeholder="0,00"
-                value={openingAmount}
-                onChange={(e) => setOpeningAmount(e.target.value)}
-                className="bg-black border-white/10 text-white h-14 text-2xl font-black italic rounded-xl focus:border-primary/50 transition-all"
-              />
-            </div>
-            <Button
-              className="w-full bg-[#00e5ff] hover:bg-white text-white hover:text-black font-black uppercase italic h-14 text-lg rounded-xl transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)] border-none hover:shadow-[0_0_30px_rgba(0,229,255,0.6)]"
-              disabled={openMutation.isPending}
-              onClick={() => openMutation.mutate(Number(openingAmount) * 100)}
-            >
-              {openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno no Caixa"}
-            </Button>
+            <div className="space-y-3"><label className="text-white/40 text-xs uppercase font-black tracking-widest pl-1">Saldo Inicial (R$)</label><Input type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} className="bg-black border-white/10 text-white h-14 text-2xl font-black italic rounded-xl focus:border-primary/50" /></div>
+            <Button className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl" disabled={openMutation.isPending} onClick={() => openMutation.mutate(Number(openingAmount) * 100)}>{openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}</Button>
           </CardContent>
         </Card>
       </div>
@@ -327,57 +235,26 @@ export default function Cashier() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 selection:bg-primary selection:text-black w-full max-w-[100vw] overflow-x-hidden pt-24 px-8 md:px-12 lg:px-16">
+    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 w-full pt-24">
       <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0 w-full mb-4">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full shrink-0"
-            onClick={() => setLocation("/")}
-          >
-            <ArrowLeft className="w-7 h-7" />
-          </Button>
+          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-7 h-7" /></Button>
           <div className="flex flex-col">
             <h1 className="text-white text-2xl md:text-3xl font-black uppercase italic tracking-tighter leading-none">Terminal de <span className="text-primary">Vendas</span></h1>
-            <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.4em] mt-1">Controle Transacional</p>
+            <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.4em] mt-1">AURA System</p>
           </div>
         </div>
         <div className="flex items-center gap-4 flex-1 w-full xl:max-w-xl">
           <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-            <Input 
-              placeholder="BUSCAR PRODUTO (NOME, ID OU BARCODE)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-black/60 border-white/10 text-white h-12 pl-10 font-black italic rounded-xl focus:border-primary/50 transition-all w-full"
-              autoFocus
-            />
+            <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-12 pl-10 font-black italic rounded-xl focus:border-primary/50 w-full" autoFocus />
           </div>
         </div>
         <div className="flex flex-col items-end gap-2 shrink-0">
-          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">
-            Operador ID: {register.userId}
-          </Badge>
+          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">Operador ID: {register.userId}</Badge>
           <div className="flex flex-col gap-2 w-full">
-            <Button 
-              variant="destructive"
-              size="sm"
-              className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9 w-full"
-              onClick={() => setCloseModalOpen(true)}
-            >
-              Encerrar Expediente
-            </Button>
-            {isAdmin && (
-              <Button 
-                variant="outline"
-                size="sm"
-                className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9 w-full"
-                onClick={() => setAdjustModalOpen(true)}
-              >
-                Ajustar Gaveta
-              </Button>
-            )}
+            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9 w-full" onClick={() => setLocation("/caixa/fechar")}>Encerrar Expediente</Button>
+            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9 w-full" onClick={() => setAdjustModalOpen(true)}>Ajustar Gaveta</Button>}
           </div>
         </div>
       </div>
@@ -386,21 +263,12 @@ export default function Cashier() {
         <div className="flex-1 w-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
             {filteredMenuItems?.map((item) => (
-              <motion.div
-                key={item.id}
-                whileHover={{ y: -5 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => addToCart(item as any)}
-                className="cursor-pointer group h-full"
-              >
-                <Card className="h-full panel-translucent overflow-hidden group-hover:border-primary/50 transition-all flex flex-col">
-                  <div className="h-24 md:h-32 overflow-hidden relative">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
+              <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
+                <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col">
+                  <div className="h-24 md:h-32 overflow-hidden relative"><img src={item.imageUrl} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-700" /></div>
                   <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
-                    <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 tracking-tighter group-hover:text-primary transition-colors leading-tight">{item.name}</h3>
-                    <p className="text-primary font-black text-base md:text-lg italic tracking-tighter">R$ {(item.price / 100).toFixed(2)}</p>
+                    <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
+                    <p className="text-primary font-black text-base md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -408,305 +276,44 @@ export default function Cashier() {
           </div>
         </div>
 
-        <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col shrink-0 h-full lg:max-h-[calc(100vh-180px)]">
+        <div className="w-full lg:w-[380px] flex flex-col shrink-0 h-full lg:max-h-[calc(100vh-180px)]">
           <Card className="panel-translucent flex flex-col h-full overflow-hidden">
-            <CardHeader className="border-b border-white/5 space-y-4 p-4 md:p-6 bg-white/5 shrink-0">
-              <CardTitle className="text-white flex items-center justify-between uppercase italic tracking-tighter text-xl font-black">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-6 h-6 text-primary" /> Carrinho
-                </div>
-                <Badge className="bg-primary text-black font-black italic rounded-full h-5 w-5 flex items-center justify-center p-0 text-[10px]">{cart.reduce((s,i) => s + i.quantity, 0)}</Badge>
-              </CardTitle>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input 
-                    placeholder="Número da Comanda" 
-                    value={searchTicket} 
-                    onChange={e => setSearchTicket(e.target.value)}
-                    className="h-10 bg-black/60 border-white/10 text-[10px] font-black italic tracking-tighter text-white rounded-xl pl-4 pr-10 focus:border-primary/50 transition-all"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    className="absolute right-1 top-1 h-8 w-8 p-0 text-primary hover:bg-primary/10 rounded-lg"
-                    onClick={() => loadTicketMutation.mutate(searchTicket)}
-                  >
-                    <Search className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
+            <CardHeader className="border-b border-white/5 p-4 bg-white/5">
+              <CardTitle className="text-white flex items-center justify-between uppercase italic tracking-tighter text-xl font-black"><div className="flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-primary" /> Carrinho</div><Badge className="bg-primary text-black font-black italic">{cart.reduce((s,i) => s + i.quantity, 0)}</Badge></CardTitle>
+              <div className="relative mt-4"><Input placeholder="Número da Comanda" value={searchTicket} onChange={e => setSearchTicket(e.target.value)} className="h-10 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl pl-4 pr-10" /><Button variant="ghost" className="absolute right-1 top-1 h-8 w-8 p-0 text-primary" onClick={() => loadTicketMutation.mutate(searchTicket)}><Search className="w-4 h-4" /></Button></div>
             </CardHeader>
             <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-              <AnimatePresence mode="popLayout">
-                {cart.length === 0 ? (
-                  <motion.div 
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="h-full flex flex-col items-center justify-center text-white/20 gap-3 italic py-12"
-                  >
-                    <ShoppingCart className="w-12 h-12 opacity-10" strokeWidth={1} />
-                    <p className="font-black uppercase tracking-[0.2em] text-[10px]">Carrinho Vazio</p>
-                  </motion.div>
-                ) : (
-                  cart.map(({ item, quantity }) => (
-                    <motion.div
-                      key={item.id}
-                      layout
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="flex items-center justify-between gap-4 group"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-white text-xs font-black italic uppercase tracking-tighter truncate group-hover:text-primary transition-colors">{item.name}</h4>
-                        <p className="text-white/40 text-[9px] font-bold uppercase tracking-widest">Unitário: R$ {(item.price / 100).toFixed(2)}</p>
-                      </div>
-                      <div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-lg border border-white/5 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md text-white/40 hover:text-white hover:bg-white/10" onClick={() => removeFromCart(item.id)}>
-                          <Minus className="w-3.5 h-3.5" />
-                        </Button>
-                        <span className="text-white font-black text-sm italic tracking-tighter w-5 text-center">{quantity}</span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 rounded-md text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
-                          <Plus className="w-3.5 h-3.5" />
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </AnimatePresence>
+              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-white/20 gap-3 py-12"><ShoppingCart className="w-12 h-12 opacity-10" /><p className="font-black uppercase text-[10px]">Vazio</p></div> : cart.map(({ item, quantity }) => (
+                <div key={item.id} className="flex items-center justify-between gap-4"><div className="flex-1 min-w-0"><h4 className="text-white text-xs font-black uppercase truncate">{item.name}</h4><p className="text-white/40 text-[9px]">R$ {(item.price / 100).toFixed(2)}</p></div><div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-lg border border-white/5"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFromCart(item.id)}><Minus className="w-3.5 h-3.5" /></Button><span className="text-white font-black text-sm italic w-5 text-center">{quantity}</span><Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => addToCart(item as any)}><Plus className="w-3.5 h-3.5" /></Button></div></div>
+              ))}
             </CardContent>
-            <div className="p-6 border-t border-white/5 bg-black/40 space-y-6 shrink-0 mt-auto">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col">
-                  <span className="text-white/40 font-black uppercase text-[9px] tracking-widest">Subtotal Geral</span>
-                  <span className="text-white/60 text-[10px] font-bold">{cart.length} itens</span>
-                </div>
-                <span className="text-primary text-3xl font-black italic tracking-tighter drop-shadow-[0_0_15px_rgba(0,255,102,0.3)] shrink-0">R$ {(total / 100).toFixed(2)}</span>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
-                  className={`flex flex-col h-16 gap-1 border-white/10 text-white hover:bg-white hover:text-black hover:border-white transition-all rounded-xl ${showFiscalFields ? 'bg-primary/20 border-primary/50 text-primary' : ''}`}
-                  onClick={handleFiscalToggle}
-                >
-                  <Landmark className="w-5 h-5" />
-                  <span className="text-[9px] font-black uppercase italic tracking-widest">Identificar CPF</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-16 gap-1 border-white/10 text-white hover:bg-primary hover:text-black hover:border-primary transition-all rounded-xl"
-                  onClick={() => handlePayment('cash')}
-                >
-                  <Banknote className="w-5 h-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Dinheiro</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-16 gap-1 border-white/10 text-white hover:bg-primary hover:text-black hover:border-primary transition-all rounded-xl"
-                  onClick={() => handlePayment('card')}
-                >
-                  <CreditCard className="w-5 h-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">Cartão</span>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="flex flex-col h-16 gap-1 border-white/10 text-white hover:bg-primary hover:text-black hover:border-primary transition-all rounded-xl"
-                  onClick={() => handlePayment('pix')}
-                >
-                  <QrCode className="w-5 h-5" />
-                  <span className="text-[9px] font-black uppercase tracking-widest">PIX</span>
-                </Button>
-              </div>
+            <div className="p-6 border-t border-white/5 bg-black/40 space-y-6 mt-auto">
+              <div className="flex items-center justify-between gap-4"><div><span className="text-white/40 font-black uppercase text-[9px] tracking-widest">Total</span></div><span className="text-primary text-3xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
+              <div className="grid grid-cols-2 gap-3"><Button variant="outline" className={`flex flex-col h-16 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-5 h-5" /><span className="text-[9px] font-black uppercase">CPF</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('cash')}><Banknote className="w-5 h-5" /><span className="text-[9px] font-black uppercase">Dinheiro</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('card')}><CreditCard className="w-5 h-5" /><span className="text-[9px] font-black uppercase">Cartão</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('pix')}><QrCode className="w-5 h-5" /><span className="text-[9px] font-black uppercase">PIX</span></Button></div>
             </div>
           </Card>
         </div>
       </div>
 
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-xl p-0 overflow-hidden rounded-2xl shadow-[0_0_100px_rgba(0,0,0,0.8)] border-t-4 border-t-primary">
-          <div className="p-10 space-y-8">
-            <DialogHeader>
-              <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
-                Pagamento: <span className="text-primary">{paymentMethod === 'cash' ? 'DINHEIRO' : paymentMethod === 'card' ? 'CARTÃO' : 'PIX'}</span>
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-8">
-              <div className="flex justify-between items-center p-6 bg-black/60 rounded-2xl border border-white/5">
-                <span className="text-zinc-500 uppercase font-black tracking-widest text-xs">VALOR DA TRANSAÇÃO</span>
-                <span className="text-primary text-4xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span>
-              </div>
-
-              {paymentMethod === 'cash' && (
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <label className="text-zinc-500 text-xs uppercase font-black tracking-widest pl-1">VALOR RECEBIDO PELO CLIENTE</label>
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0,00"
-                      value={customerAmount}
-                      onChange={(e) => setCustomerAmount(e.target.value)}
-                      className="bg-black border-white/10 text-white text-3xl h-20 font-black italic tracking-tighter rounded-2xl px-6 focus:border-primary/50 transition-all text-center"
-                      autoFocus
-                    />
-                  </div>
-
-                  <AnimatePresence>
-                    {customerAmount && (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`p-6 rounded-2xl border-2 transition-all ${change < 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20 shadow-[0_0_20px_rgba(0,255,102,0.1)]'}`}
-                      >
-                        {change < 0 ? (
-                          <div className="flex justify-between items-center">
-                            <span className="text-red-500 uppercase font-black tracking-widest text-xs">SALDO PENDENTE</span>
-                            <span className="text-red-500 text-3xl font-black italic tracking-tighter">R$ {Math.abs(change / 100).toFixed(2)}</span>
-                          </div>
-                        ) : (
-                          <div className="flex justify-between items-center">
-                            <span className="text-primary uppercase font-black tracking-widest text-xs">TROCO DEVIDO</span>
-                            <span className="text-primary text-3xl font-black italic tracking-tighter">R$ {(change / 100).toFixed(2)}</span>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-
-              {paymentMethod !== 'cash' && (
-                <div className="p-10 text-center space-y-4 border-2 border-dashed border-white/10 rounded-2xl bg-white/5">
-                  {paymentMethod === 'card' ? <CreditCard className="w-16 h-16 text-zinc-700 mx-auto" /> : <QrCode className="w-16 h-16 text-zinc-700 mx-auto" />}
-                  <div className="space-y-1">
-                    <p className="text-white font-black italic uppercase tracking-tighter text-lg">Processamento Externo</p>
-                    <p className="text-sm text-zinc-500 font-medium">Siga as instruções no terminal {paymentMethod === 'card' ? 'POS' : 'PagBank'}.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <DialogFooter className="flex flex-col sm:flex-row gap-4">
-              <Button
-                variant="ghost"
-                className="flex-1 border-white/5 text-zinc-500 hover:text-white uppercase font-black tracking-widest h-14"
-                onClick={() => setPaymentModalOpen(false)}
-              >
-                CANCELAR
-              </Button>
-              <Button
-                className="flex-[2] bg-primary hover:bg-white text-black font-black uppercase italic h-14 text-lg rounded-xl shadow-xl transition-all"
-                disabled={saleMutation.isPending || (paymentMethod === 'cash' && change < 0)}
-                onClick={finalizeSale}
-              >
-                {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR TRANSAÇÃO"}
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={closeModalOpen} onOpenChange={setCloseModalOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-2xl p-0 overflow-hidden rounded-2xl shadow-2xl border-t-4 border-t-red-500">
-          <div className="p-10 space-y-8">
-            <DialogHeader className="relative">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute -left-4 -top-2 text-zinc-500 hover:text-white hover:bg-white/5"
-                onClick={() => setCloseModalOpen(false)}
-              >
-                <ArrowLeft className="h-6 w-6" />
-              </Button>
-              <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
-                FECHAMENTO DE <span className="text-red-500">CAIXA</span>
-              </DialogTitle>
-            </DialogHeader>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-6 bg-black/60 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-zinc-500 uppercase font-black tracking-widest text-[9px]">Saldo Inicial</span>
-                <p className="text-white text-xl font-black italic">R$ {((register?.openingAmount || 0) / 100).toFixed(2)}</p>
-              </div>
-              <div className="p-6 bg-black/60 rounded-2xl border border-white/5 space-y-1">
-                <span className="text-zinc-500 uppercase font-black tracking-widest text-[9px]">Vendas do Turno</span>
-                <p className="text-primary text-xl font-black italic">R$ {((expectedTotal - (register?.openingAmount || 0)) / 100).toFixed(2)}</p>
-              </div>
-              <div className="p-6 bg-white/5 rounded-2xl border border-white/10 col-span-2 space-y-1">
-                <span className="text-zinc-400 uppercase font-black tracking-widest text-[10px]">VALOR ESPERADO EM GAVETA</span>
-                <p className="text-white text-4xl font-black italic tracking-tighter">R$ {(expectedTotal / 100).toFixed(2)}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <label className="text-zinc-500 text-xs uppercase font-black tracking-widest pl-1">VALOR REAL NA GAVETA (CONTAGEM FÍSICA)</label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={closingAmount}
-                onChange={(e) => setClosingAmount(e.target.value)}
-                className="bg-black border-white/10 text-white text-4xl h-24 font-black italic tracking-tighter rounded-2xl px-6 focus:border-red-500/50 transition-all text-center"
-                autoFocus
-              />
-              <p className="text-[10px] text-zinc-500 font-bold uppercase text-center tracking-widest">
-                Tolerância de diferença aceitável: <span className="text-white">R$ 3,00</span>
-              </p>
-            </div>
-
-            <Button
-              className="w-full h-16 bg-red-600 hover:bg-red-500 text-white font-black uppercase italic text-xl rounded-2xl transition-all shadow-xl"
-              onClick={handleCloseRegister}
-              disabled={closeMutation.isPending || !closingAmount}
-            >
-              {closeMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR FECHAMENTO E ENCERRAR"}
-            </Button>
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                className="w-full text-zinc-500 hover:text-white uppercase font-black italic text-xs tracking-widest"
-                onClick={() => setAdjustModalOpen(true)}
-              >
-                Painel Administrativo: Ajustar Valor
-              </Button>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl shadow-2xl">
+          <DialogHeader><DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">Pagamento: <span className="text-primary">{paymentMethod?.toUpperCase()}</span></DialogTitle></DialogHeader>
+          <div className="space-y-6 pt-4">
+            <div className="flex justify-between items-center"><span className="text-zinc-500 uppercase font-black text-xs">Total a Pagar</span><span className="text-3xl font-black italic">R$ {(total / 100).toFixed(2)}</span></div>
+            {paymentMethod === 'cash' && (
+              <div className="space-y-4"><label className="text-zinc-500 text-[10px] uppercase font-black">Quanto o cliente entregou?</label><Input type="text" value={customerAmount} onChange={(e) => setCustomerAmount(e.target.value)} className="bg-black border-white/10 text-white text-4xl h-20 font-black italic rounded-2xl text-center" autoFocus />{customerAmount && <div className={`p-6 rounded-2xl border-2 ${change < 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'}`}>{change < 0 ? <div className="flex justify-between items-center"><span className="text-red-500 font-black text-xs uppercase">Saldo Pendente</span><span className="text-red-500 text-3xl font-black">R$ {Math.abs(change / 100).toFixed(2)}</span></div> : <div className="flex justify-between items-center"><span className="text-primary font-black text-xs uppercase">Troco</span><span className="text-primary text-3xl font-black">R$ {(change / 100).toFixed(2)}</span></div>}</div>}</div>
             )}
+            <Button className="w-full h-16 bg-primary text-black font-black uppercase italic text-xl rounded-xl" disabled={saleMutation.isPending || (paymentMethod === 'cash' && change < 0)} onClick={finalizeSale}>{saleMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR"}</Button>
           </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={adjustModalOpen} onOpenChange={setAdjustModalOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl shadow-2xl border-t-4 border-t-primary">
-          <DialogHeader>
-            <DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">
-              AJUSTE <span className="text-primary">ADMINISTRATIVO</span>
-            </DialogTitle>
-          </DialogHeader>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl border-t-4 border-t-primary">
+          <DialogHeader><DialogTitle className="text-white uppercase italic text-2xl font-black">AJUSTE <span className="text-primary">ADMIN</span></DialogTitle></DialogHeader>
           <div className="space-y-6 pt-4">
-            <div className="space-y-2">
-              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest">Novo Valor de Abertura (Gaveta)</label>
-              <Input
-                type="number"
-                placeholder="0,00"
-                value={newOpeningAmount}
-                onChange={(e) => setNewOpeningAmount(e.target.value)}
-                className="bg-black border-white/10 text-white text-2xl h-14 font-black italic rounded-xl px-4"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                variant="outline"
-                className="h-12 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white font-black uppercase italic"
-                onClick={() => handleAdjustAmount(true)}
-              >
-                ZERAR GAVETA
-              </Button>
-              <Button
-                className="h-12 bg-primary text-black hover:bg-white font-black uppercase italic"
-                onClick={() => handleAdjustAmount(false)}
-              >
-                APLICAR VALOR
-              </Button>
-            </div>
+            <div className="space-y-2"><label className="text-zinc-500 text-[10px] uppercase font-black">Novo Valor de Abertura</label><Input type="number" value={newOpeningAmount} onChange={(e) => setNewOpeningAmount(e.target.value)} className="bg-black border-white/10 text-white text-2xl h-14 font-black italic rounded-xl" /></div>
+            <div className="grid grid-cols-2 gap-4"><Button variant="outline" className="h-12 border-red-500/20 text-red-500" onClick={() => handleAdjustAmount(true)}>ZERAR</Button><Button className="h-12 bg-primary text-black" onClick={() => handleAdjustAmount(false)}>APLICAR</Button></div>
           </div>
         </DialogContent>
       </Dialog>

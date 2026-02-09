@@ -101,6 +101,7 @@ function Router() {
             <Route path="/ponto" component={TimeClock} />
             <Route path="/admin" component={Admin} />
             <Route path="/caixa" component={Cashier} />
+            <Route path="/caixa/fechar" component={CashierClose} />
             <Route path="/financeiro" component={Financeiro} />
             <Route path="/relatorios" component={Reports} />
             <Route path="/inventory" component={Inventory} />
