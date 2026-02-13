@@ -81,6 +81,7 @@ export interface IStorage {
   // Inventory
   getInventory(): Promise<Inventory[]>;
   getInventoryItem(id: number): Promise<Inventory | undefined>;
+  getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined>;
   updateInventory(id: number, quantity: number): Promise<Inventory>;
   deleteInventoryItem(id: number): Promise<void>;
   upsertInventory(data: any): Promise<Inventory>;
@@ -427,6 +428,11 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryItem(id: number): Promise<Inventory | undefined> {
     const [item] = await db.select().from(inventory).where(eq(inventory.id, id));
+    return item;
+  }
+
+  async getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined> {
+    const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode));
     return item;
   }
 

@@ -200,6 +200,14 @@ export default function InventoryPage() {
     toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
   };
 
+  const handleBarcodeSubmit = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && barcode) {
+      e.preventDefault();
+      // Em scanners reais, o enter é enviado após o código
+      toast({ title: "Código Detectado", description: `Código: ${barcode}` });
+    }
+  };
+
   const upsertMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/inventory", data);
@@ -506,6 +514,17 @@ export default function InventoryPage() {
                       onChange={e => setItemsPerUnit(e.target.value)} 
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="1"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Código de Barras</Label>
+                    <Input 
+                      value={barcode} 
+                      onChange={e => setBarcode(e.target.value)} 
+                      onKeyDown={handleBarcodeSubmit}
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="BIPA O CÓDIGO..."
                     />
                   </div>
 
