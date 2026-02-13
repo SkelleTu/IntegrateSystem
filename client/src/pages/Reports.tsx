@@ -132,7 +132,11 @@ export default function Reports() {
                           variant="ghost" 
                           size="icon" 
                           className="text-zinc-500 hover:text-red-500 hover:bg-red-500/10"
-                          onClick={() => cancelMutation.mutate(sale.id)}
+                          onClick={() => {
+                            if (window.confirm("Tem certeza que deseja cancelar esta venda? Esta ação irá estornar o estoque e registrar o cancelamento no financeiro.")) {
+                              cancelMutation.mutate(sale.id);
+                            }
+                          }}
                           disabled={cancelMutation.isPending}
                         >
                           <XCircle className="w-4 h-4" />

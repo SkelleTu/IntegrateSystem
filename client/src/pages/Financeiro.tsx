@@ -378,10 +378,14 @@ export default function Financeiro() {
                     {transactions?.map((t) => (
                       <TableRow key={t.id} className="border-white/5 hover:bg-white/5">
                         <TableCell className="text-xs text-zinc-400 p-6">{format(new Date(t.createdAt), "dd/MM/yyyy")}</TableCell>
-                        <TableCell className="font-bold text-sm uppercase p-6">{t.description}</TableCell>
+                        <TableCell className="font-bold text-sm uppercase p-6">
+                          {t.description.includes("ESTORNO") ? (
+                            <span className="text-red-500 font-black tracking-tighter italic">VENDA CANCELADA</span>
+                          ) : t.description}
+                        </TableCell>
                         <TableCell className="p-6">
                           <Badge variant="outline" className={`text-[9px] border-0 p-0 uppercase font-black ${t.type === 'income' ? 'text-primary' : 'text-red-500'}`}>
-                            {t.type === 'income' ? 'Crédito' : 'Débito'}
+                            {t.type === 'income' ? 'Crédito' : (t.description.includes("ESTORNO") ? 'Cancelamento' : 'Débito')}
                           </Badge>
                         </TableCell>
                         <TableCell className={`text-right p-6 font-black italic ${t.type === 'income' ? 'text-primary' : 'text-red-500'}`}>

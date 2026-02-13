@@ -349,9 +349,15 @@ export class DatabaseStorage implements IStorage {
           // Sincronização com Estoque e Financeiro
           for (const item of items) {
             // 1. Atualizar Estoque (Venda subtrai do estoque)
+            // IMPORTANTE: Procuramos no inventário pelo barcode ou itemId
+            // Se for um produto cadastrado, usamos o itemId
             const [inventoryItem] = tx.select()
               .from(inventory)
-              .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, 'product')))
+              .where(
+                item.itemType === 'product' 
+                  ? eq(inventory.itemId, item.itemId)
+                  : eq(inventory.customName, item.itemId.toString()) // Fallback para custom
+              )
               .limit(1)
               .all();
 
@@ -407,11 +413,66 @@ export class DatabaseStorage implements IStorage {
   }
 
   async cancelSale(id: number): Promise<Sale> {
-    const [updated] = await db.update(sales)
-      .set({ status: "cancelled" })
-      .where(eq(sales.id, id))
-      .returning();
-    return updated;
+    return new Promise((resolve, reject) => {
+      try {
+        const result = db.transaction((tx) => {
+          const [sale] = tx.select().from(sales).where(eq(sales.id, id)).all();
+          if (!sale) throw new Error("Venda não encontrada");
+          if (sale.status === "cancelled") return sale;
+
+          // 1. Marcar venda como cancelada
+          const [updatedSale] = tx.update(sales)
+            .set({ status: "cancelled" })
+            .where(eq(sales.id, id))
+            .returning()
+            .all();
+
+          // 2. Estornar Estoque
+          const items = tx.select().from(saleItems).where(eq(saleItems.saleId, id)).all();
+          for (const item of items) {
+            const [inventoryItem] = tx.select()
+              .from(inventory)
+              .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, item.itemType === 'product' ? 'product' : 'service')))
+              .limit(1)
+              .all();
+
+            if (inventoryItem) {
+              tx.update(inventory)
+                .set({ 
+                  quantity: inventoryItem.quantity + item.quantity,
+                  updatedAt: new Date()
+                })
+                .where(eq(inventory.id, inventoryItem.id))
+                .run();
+              
+              tx.insert(inventoryLogs).values({
+                inventoryId: inventoryItem.id,
+                type: "in",
+                quantity: item.quantity,
+                reason: `Estorno Venda Cancelada #${id}`,
+                userId: sale.userId || 0,
+                createdAt: new Date()
+              }).run();
+            }
+          }
+
+          // 3. Registrar Transação Financeira (Estorno/Despesa para compensar a receita)
+          tx.insert(transactions).values({
+            businessType: "padaria",
+            type: "expense",
+            category: "vendas",
+            description: `ESTORNO: Venda PDV #${id} CANCELADA`,
+            amount: sale.totalAmount,
+            createdAt: new Date()
+          }).run();
+
+          return updatedSale;
+        });
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 
   async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
