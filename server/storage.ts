@@ -332,57 +332,67 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
-    const newSale = await db.transaction(async (tx) => {
-      const [insertedSale] = await tx.insert(sales).values(sale).returning();
-      
-      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
-      await tx.insert(saleItems).values(itemsWithSaleId);
-      
-      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
-      await tx.insert(payments).values(paymentsWithSaleId);
-
-      // Sincronização com Estoque e Financeiro
-      for (const item of items) {
-        // 1. Atualizar Estoque (Venda subtrai do estoque)
-        // Procurar no inventário pelo itemId (que refere-se ao produto cadastrado no menu)
-        const [inventoryItem] = await tx.select()
-          .from(inventory)
-          .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, 'product')))
-          .limit(1);
-
-        if (inventoryItem) {
-          await tx.update(inventory)
-            .set({ 
-              quantity: inventoryItem.quantity - item.quantity,
-              updatedAt: new Date()
-            })
-            .where(eq(inventory.id, inventoryItem.id));
+    // Para better-sqlite3, transações devem ser síncronas.
+    // Como a interface IStorage exige Promise, envolvemos em uma Promise,
+    // mas a execução interna da transação deve ser síncrona.
+    return new Promise((resolve, reject) => {
+      try {
+        const result = db.transaction((tx) => {
+          const [insertedSale] = tx.insert(sales).values(sale).returning().all();
           
-          // Registrar log de movimentação
-          await tx.insert(inventoryLogs).values({
-            inventoryId: inventoryItem.id,
-            type: "out",
-            quantity: item.quantity,
-            reason: `Venda #${insertedSale.id}`,
-            userId: sale.userId || 0,
-            createdAt: new Date()
-          });
-        }
-      }
+          const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
+          tx.insert(saleItems).values(itemsWithSaleId).run();
+          
+          const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
+          tx.insert(payments).values(paymentsWithSaleId).run();
 
-      // 2. Registrar Transação Financeira (Receita)
-      await tx.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "vendas",
-        description: `Venda PDV #${insertedSale.id}`,
-        amount: insertedSale.totalAmount,
-        createdAt: new Date()
-      });
-      
-      return insertedSale;
+          // Sincronização com Estoque e Financeiro
+          for (const item of items) {
+            // 1. Atualizar Estoque (Venda subtrai do estoque)
+            const [inventoryItem] = tx.select()
+              .from(inventory)
+              .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, 'product')))
+              .limit(1)
+              .all();
+
+            if (inventoryItem) {
+              tx.update(inventory)
+                .set({ 
+                  quantity: inventoryItem.quantity - item.quantity,
+                  updatedAt: new Date()
+                })
+                .where(eq(inventory.id, inventoryItem.id))
+                .run();
+              
+              // Registrar log de movimentação
+              tx.insert(inventoryLogs).values({
+                inventoryId: inventoryItem.id,
+                type: "out",
+                quantity: item.quantity,
+                reason: `Venda #${insertedSale.id}`,
+                userId: sale.userId || 0,
+                createdAt: new Date()
+              }).run();
+            }
+          }
+
+          // 2. Registrar Transação Financeira (Receita)
+          tx.insert(transactions).values({
+            businessType: "padaria",
+            type: "income",
+            category: "vendas",
+            description: `Venda PDV #${insertedSale.id}`,
+            amount: insertedSale.totalAmount,
+            createdAt: new Date()
+          }).run();
+          
+          return insertedSale;
+        });
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
     });
-    return newSale;
   }
 
   async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
