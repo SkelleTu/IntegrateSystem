@@ -383,29 +383,29 @@ export default function InventoryPage() {
                   <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
                 </CardTitle>
                 
-                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full sm:w-auto">
-                  <div className="flex items-center gap-2">
-                    <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
-                      <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest w-40 rounded-xl">
-                        <SelectValue placeholder="MODO VISTA" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0a0f0f] border-white/10">
-                        <SelectItem value="package">Por Embalagem</SelectItem>
-                        <SelectItem value="unit">Por Produto (Un.)</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                      <Select value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
+                        <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-wider w-full sm:w-auto sm:min-w-[220px] px-4 rounded-xl shrink-0">
+                          <SelectValue placeholder="MODO VISTA" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f0f] border-white/10">
+                          <SelectItem value="package">Por Embalagem</SelectItem>
+                          <SelectItem value="unit">Por Produto (Un.)</SelectItem>
+                        </SelectContent>
+                      </Select>
 
-                    <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
-                      <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-widest w-40 rounded-xl">
-                        <SelectValue placeholder="ORDENAR" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0a0f0f] border-white/10">
-                        <SelectItem value="name">Por Nome</SelectItem>
-                        <SelectItem value="price">Por Preço</SelectItem>
-                        <SelectItem value="quantity">Por Qtd</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <Select value={sortBy} onValueChange={(v: any) => setSortBy(v)}>
+                        <SelectTrigger className="h-10 bg-black/40 border-white/10 text-white font-bold text-[10px] uppercase tracking-wider w-full sm:w-auto sm:min-w-[160px] px-4 rounded-xl shrink-0">
+                          <SelectValue placeholder="ORDENAR" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f0f] border-white/10">
+                          <SelectItem value="name">Por Nome</SelectItem>
+                          <SelectItem value="price">Por Preço</SelectItem>
+                          <SelectItem value="quantity">Por Qtd</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
 
                   <div className="relative w-full sm:w-80">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
