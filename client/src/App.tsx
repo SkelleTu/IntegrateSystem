@@ -22,6 +22,7 @@ import Admin from "@/pages/Admin";
 import DigitalMenu from "@/pages/DigitalMenu";
 import BarberQueue from "@/pages/BarberQueue";
 import Cashier from "@/pages/Cashier";
+import CashierClose from "@/pages/CashierClose";
 import Financeiro from "@/pages/Financeiro";
 import Reports from "@/pages/Reports";
 import Inventory from "@/pages/Inventory";

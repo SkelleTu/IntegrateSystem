@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -137,7 +137,7 @@ export default function CashierClose() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Abertura</span>
               </div>
               <div>
-                <p className="text-3xl font-black italic tracking-tighter text-white">R$ {(register.openingAmount / 100).toFixed(2)}</p>
+                <p className="text-3xl font-black italic tracking-tighter text-white">R$ {((register.openingAmount || 0) / 100).toFixed(2)}</p>
                 <p className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest mt-1">Saldo inicial em gaveta</p>
               </div>
             </CardContent>
