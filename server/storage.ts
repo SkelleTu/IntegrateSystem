@@ -332,13 +332,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
-    return await db.transaction(async (tx) => {
-      const [newSale] = await tx.insert(sales).values(sale).returning();
+    const newSale = await db.transaction(async (tx) => {
+      const [insertedSale] = await tx.insert(sales).values(sale).returning();
       
-      const itemsWithSaleId = items.map(item => ({ ...item, saleId: newSale.id }));
+      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
       await tx.insert(saleItems).values(itemsWithSaleId);
       
-      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: newSale.id }));
+      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
       await tx.insert(payments).values(paymentsWithSaleId);
 
       // Sincronização com Estoque e Financeiro
@@ -363,7 +363,7 @@ export class DatabaseStorage implements IStorage {
             inventoryId: inventoryItem.id,
             type: "out",
             quantity: item.quantity,
-            reason: `Venda #${newSale.id}`,
+            reason: `Venda #${insertedSale.id}`,
             userId: sale.userId || 0,
             createdAt: new Date()
           });
@@ -375,13 +375,14 @@ export class DatabaseStorage implements IStorage {
         businessType: "padaria",
         type: "income",
         category: "vendas",
-        description: `Venda PDV #${newSale.id}`,
-        amount: newSale.totalAmount,
+        description: `Venda PDV #${insertedSale.id}`,
+        amount: insertedSale.totalAmount,
         createdAt: new Date()
       });
       
-      return newSale;
+      return insertedSale;
     });
+    return newSale;
   }
 
   async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
