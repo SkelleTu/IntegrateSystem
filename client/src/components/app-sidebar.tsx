@@ -41,12 +41,15 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
 import auraLogo from "@assets/AURA_1768346008566.png";
+import { MasterPasswordGuard } from "@/components/MasterPasswordGuard"
 
 export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   const [, setLocation] = useLocation();
   const { data: user } = useUser();
   const { toast } = useToast();
   const { setOpen } = useSidebar();
+  const [guardOpen, setGuardOpen] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -349,24 +352,24 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   if (!user) return null;
 
   const handleNav = (url: string, adminOnly?: boolean, ownerOnly?: boolean) => {
-    if (adminOnly && user?.role !== "admin" && user?.role !== "owner") {
-      toast({
-        title: "Acesso Negado",
-        description: "Somente o administrador pode acessar esta área.",
-        variant: "destructive"
-      });
-      return;
+    // Rotas liberadas para todos sem senha master
+    const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
+    
+    if (user?.username === "SkelleTu" || freeRoutes.includes(url)) {
+      setLocation(url);
+      setOpen(false);
+    } else {
+      setPendingUrl(url);
+      setGuardOpen(true);
     }
-    if (ownerOnly && user?.username !== "SkelleTu") {
-      toast({
-        title: "Acesso Negado",
-        description: "Acesso exclusivo ao proprietário SkelleTu.",
-        variant: "destructive"
-      });
-      return;
+  };
+
+  const handleAuthorizedNav = () => {
+    if (pendingUrl) {
+      setLocation(pendingUrl);
+      setPendingUrl(null);
+      setOpen(false);
     }
-    setLocation(url);
-    setOpen(false);
   };
 
   return (
@@ -391,23 +394,16 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isLocked = (item.adminOnly && user.role !== "admin" && user.role !== "owner") || (item.ownerOnly && user.username !== "SkelleTu");
+                const isLocked = false; // We use the guard now instead of total locking
                 
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
                       onClick={() => handleNav(item.url, item.adminOnly, item.ownerOnly)}
-                      className={`transition-colors py-6 relative group ${
-                        isLocked 
-                          ? "opacity-40 grayscale cursor-not-allowed hover:bg-transparent" 
-                          : "hover:bg-primary/10 hover:text-primary"
-                      }`}
+                      className={`transition-colors py-6 relative group hover:bg-primary/10 hover:text-primary`}
                     >
                       <item.icon className="w-5 h-5" />
                       <span className="font-bold uppercase italic tracking-tighter">{item.title}</span>
-                      {isLocked && (
-                        <Lock className="w-3 h-3 absolute right-2 top-2 text-zinc-500" />
-                      )}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );
@@ -485,6 +481,12 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
+      <MasterPasswordGuard 
+        open={guardOpen}
+        onOpenChange={setGuardOpen}
+        onSuccess={handleAuthorizedNav}
+      />
 
       <Dialog open={registerOpen} onOpenChange={setRegisterOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white">
