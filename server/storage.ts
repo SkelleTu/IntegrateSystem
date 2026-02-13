@@ -527,54 +527,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
-    return db.transaction(async (tx) => {
-      // Logic for "Delete-then-Create" as requested by user
-      // This ensures a clean slate for the edited item
-      if (data.id) {
-        await tx.delete(inventory).where(eq(inventory.id, data.id));
+    // Logic for "Delete-then-Create" as requested by user
+    // This ensures a clean slate for the edited item
+    if (data.id) {
+      await db.delete(inventory).where(eq(inventory.id, data.id));
+    }
+
+    // NOVO: Validar se já existe um item com o mesmo código de barras (ID personalizado)
+    // Se estiver editando (data.id presente), o delete acima já limpou o registro anterior
+    // Se for novo ou duplicado, precisamos garantir que o barcode não esteja em uso por OUTRO item
+    if (data.barcode) {
+      const [existing] = await db.select().from(inventory).where(eq(inventory.barcode, data.barcode));
+      if (existing) {
+        throw new Error(`O ID/Código "${data.barcode}" já está em uso pelo item: ${existing.customName || 'Sem nome'}`);
       }
+    }
 
-      // NOVO: Validar se já existe um item com o mesmo código de barras (ID personalizado)
-      // Se estiver editando (data.id presente), o delete acima já limpou o registro anterior
-      // Se for novo ou duplicado, precisamos garantir que o barcode não esteja em uso por OUTRO item
-      if (data.barcode) {
-        const [existing] = await tx.select().from(inventory).where(eq(inventory.barcode, data.barcode));
-        if (existing) {
-          throw new Error(`O ID/Código "${data.barcode}" já está em uso pelo item: ${existing.customName || 'Sem nome'}`);
-        }
-      }
+    // Ensure data objects are handled correctly for SQLite
+    const processedData = {
+      itemId: data.itemId || null,
+      itemType: data.itemType,
+      customName: data.customName || null,
+      quantity: parseInt(data.quantity) || 0,
+      unit: data.unit,
+      itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
+      costPrice: typeof data.costPrice === 'string' ? Math.round(Number(data.costPrice.replace(',', '.')) * 100) : data.costPrice,
+      salePrice: typeof data.salePrice === 'string' ? Math.round(Number(data.salePrice.replace(',', '.')) * 100) : (data.salePrice || null),
+      barcode: data.barcode || null,
+      expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+      updatedAt: new Date()
+    };
 
-      // Ensure data objects are handled correctly for SQLite
-      const processedData = {
-        itemId: data.itemId || null,
-        itemType: data.itemType,
-        customName: data.customName || null,
-        quantity: parseInt(data.quantity) || 0,
-        unit: data.unit,
-        itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
-        costPrice: typeof data.costPrice === 'string' ? Math.round(Number(data.costPrice.replace(',', '.')) * 100) : data.costPrice,
-        salePrice: typeof data.salePrice === 'string' ? Math.round(Number(data.salePrice.replace(',', '.')) * 100) : (data.salePrice || null),
-        barcode: data.barcode || null,
-        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-        updatedAt: new Date()
-      };
+    const [result] = await db.insert(inventory).values(processedData).returning();
 
-      const [result] = await tx.insert(inventory).values(processedData).returning();
+    // Automatically create a financial transaction if it's an "in" entry with cost
+    if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
+      await db.insert(transactions).values({
+        businessType: "padaria",
+        type: "expense",
+        category: "estoque",
+        description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,
+        amount: processedData.costPrice * processedData.quantity,
+        createdAt: new Date()
+      });
+    }
 
-      // Automatically create a financial transaction if it's an "in" entry with cost
-      if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
-        await tx.insert(transactions).values({
-          businessType: "padaria",
-          type: "expense",
-          category: "estoque",
-          description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,
-          amount: processedData.costPrice * processedData.quantity,
-          createdAt: new Date()
-        });
-      }
-
-      return result;
-    });
+    return result;
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
