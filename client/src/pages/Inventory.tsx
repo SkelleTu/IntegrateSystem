@@ -469,7 +469,12 @@ export default function InventoryPage() {
 
                   <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Embalagem</Label>
-                    <Select value={unit} onValueChange={setUnit}>
+                    <Select value={unit} onValueChange={(v) => {
+                      setUnit(v);
+                      if (v === "Unidade") {
+                        setItemsPerUnit("1");
+                      }
+                    }}>
                       <SelectTrigger className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold rounded-lg">
                         <SelectValue placeholder="TIPO..." />
                       </SelectTrigger>
@@ -496,7 +501,9 @@ export default function InventoryPage() {
                   )}
 
                   <div className="space-y-1.5">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Qtd Embalagens</Label>
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">
+                      {unit === "Unidade" ? "Quantidade" : "Qtd Embalagens"}
+                    </Label>
                     <Input 
                       type="number" 
                       value={quantity} 
@@ -506,16 +513,18 @@ export default function InventoryPage() {
                     />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Unidades por Embalagem</Label>
-                    <Input 
-                      type="number" 
-                      value={itemsPerUnit} 
-                      onChange={e => setItemsPerUnit(e.target.value)} 
-                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
-                      placeholder="1"
-                    />
-                  </div>
+                  {unit !== "Unidade" && (
+                    <div className="space-y-1.5">
+                      <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Unidades por Embalagem</Label>
+                      <Input 
+                        type="number" 
+                        value={itemsPerUnit} 
+                        onChange={e => setItemsPerUnit(e.target.value)} 
+                        className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                        placeholder="1"
+                      />
+                    </div>
+                  )}
 
                   <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Código de Barras</Label>
