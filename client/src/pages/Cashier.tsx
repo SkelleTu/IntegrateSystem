@@ -92,10 +92,19 @@ export default function Cashier() {
   useEffect(() => {
     if (searchTerm && filteredMenuItems.length === 1) {
       const item = filteredMenuItems[0];
-      if (item.barcode && item.barcode.toLowerCase() === searchTerm.toLowerCase()) {
+      const term = searchTerm.toLowerCase();
+      
+      // Se for um match exato de barcode ou se o termo for longo o suficiente para ser um scan
+      if (
+        (item.barcode && item.barcode.toLowerCase() === term) ||
+        (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
+      ) {
         addToCart(item as any);
         setSearchTerm("");
-        toast({ title: "Item BIPADO", description: `${item.name} adicionado ao carrinho.` });
+        toast({ 
+          title: "Produto BIPADO", 
+          description: `${item.name} adicionado ao carrinho.` 
+        });
       }
     }
   }, [searchTerm, filteredMenuItems, addToCart, toast]);

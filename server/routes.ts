@@ -509,6 +509,16 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.get("/api/inventory/barcode/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const item = await storage.getInventoryItemByBarcode(req.params.barcode);
+      if (!item) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar produto" });
+    }
+  });
+
   app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteInventoryItem(Number(req.params.id));
