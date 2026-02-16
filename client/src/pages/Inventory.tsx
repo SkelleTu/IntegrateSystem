@@ -34,6 +34,7 @@ export default function InventoryPage() {
 
   const [salePrice, setSalePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
+  const [imageUrl, setImageUrl] = useState(""); // Novo estado para imagem
   const [viewMode, setViewMode] = useState<"package" | "unit">("package");
   const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
 
@@ -182,6 +183,7 @@ export default function InventoryPage() {
     setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
     setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
+    setImageUrl(inv.imageUrl || ""); // Carregar imagem ao editar
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
   };
 
@@ -195,6 +197,7 @@ export default function InventoryPage() {
     setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
     setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
+    setImageUrl(inv.imageUrl || ""); // Carregar imagem ao duplicar
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
@@ -237,6 +240,7 @@ export default function InventoryPage() {
       setExpiryDate("");
       setCostPrice("");
       setSalePrice("");
+      setImageUrl(""); // Limpar imagem após salvar
     },
     onError: (error: any) => {
       toast({ 
@@ -349,6 +353,7 @@ export default function InventoryPage() {
       itemsPerUnit: parseInt(itemsPerUnit),
       costPrice: Math.round(Number(costPrice.replace(',', '.')) * 100),
       salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
+      imageUrl: imageUrl || null, // Enviar URL da imagem
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
     });
   };
@@ -510,6 +515,16 @@ export default function InventoryPage() {
                       onChange={e => setQuantity(e.target.value)} 
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="0"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">URL da Foto</Label>
+                    <Input 
+                      value={imageUrl} 
+                      onChange={e => setImageUrl(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="https://..."
                     />
                   </div>
 

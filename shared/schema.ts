@@ -173,6 +173,7 @@ export const inventory = pgTable("inventory", {
   barcode: text("barcode"), // Barcode or internal ID
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
+  imageUrl: text("image_url"), // Campo de imagem adicionado
   updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
