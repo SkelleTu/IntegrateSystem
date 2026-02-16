@@ -674,6 +674,33 @@ export async function registerRoutes(
     res.json(newSale);
   });
 
+  app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const filters: any = {};
+      if (start) filters.startDate = new Date(start as string);
+      if (end) filters.endDate = new Date(end as string);
+
+      const registers = await storage.getCashRegisters(filters);
+      
+      // For each register, fetch its sales with items
+      const enrichedRegisters = await Promise.all(registers.map(async (reg) => {
+        const regSales = await storage.getSalesByRegisterId(reg.id);
+        const enrichedSales = await Promise.all(regSales.map(async (sale) => {
+          const items = await storage.getSaleItems(sale.id);
+          const payments = await storage.getPayments(sale.id);
+          return { ...sale, items, payments };
+        }));
+        return { ...reg, sales: enrichedSales };
+      }));
+
+      res.json(enrichedRegisters);
+    } catch (err) {
+      console.error("Error fetching register history:", err);
+      res.status(500).json({ message: "Erro ao buscar histórico de caixas" });
+    }
+  });
+
   app.get("/api/sales", isAuthenticated, async (req, res) => {
     const { start, end } = req.query;
     

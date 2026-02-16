@@ -110,6 +110,12 @@ export interface IStorage {
   upsertFiscalSettings(settings: InsertFiscalSettings): Promise<FiscalSettings>;
   getLogsFiscais(enterpriseId: number): Promise<any[]>;
   updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale>;
+  
+  // New Methods for Reports
+  getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]>;
+  getSalesByRegisterId(registerId: number): Promise<Sale[]>;
+  getSaleItems(saleId: number): Promise<SaleItem[]>;
+  getPayments(saleId: number): Promise<Payment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -744,8 +750,31 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getLogsFiscais(enterpriseId: number): Promise<any[]> {
-    return [];
+  async getLogsFiscais(enterprise_id: number): Promise<any[]> {
+    return await db.select().from(inventoryLogs).limit(50);
+  }
+
+  async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
+    let conditions = [];
+    if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
+    if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
+    
+    return await db.select()
+      .from(cashRegisters)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(cashRegisters.openedAt));
+  }
+
+  async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
+    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
+  }
+
+  async getSaleItems(saleId: number): Promise<SaleItem[]> {
+    return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+  }
+
+  async getPayments(saleId: number): Promise<Payment[]> {
+    return await db.select().from(payments).where(eq(payments.saleId, saleId));
   }
 }
 
