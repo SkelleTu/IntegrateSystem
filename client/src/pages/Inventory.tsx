@@ -220,19 +220,11 @@ export default function InventoryPage() {
     },
     onSuccess: (data) => {
       console.log("Upsert success, received data:", data);
-      // First, update local cache with the new/updated item
-      queryClient.setQueryData(["/api/inventory"], (oldData: Inventory[] | undefined) => {
-        if (!oldData) return [data];
-        const exists = oldData.some(item => item.id === data.id);
-        if (exists) {
-          return oldData.map(item => item.id === data.id ? data : item);
-        }
-        return [...oldData, data];
-      });
-
-      // Also invalidate to be sure
+      
+      // Invalidar as queries para garantir que o cache do TanStack Query seja atualizado
       queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
       queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items-combined"] });
         
       toast({ title: "Sucesso", description: "Item salvo com sucesso" });
 

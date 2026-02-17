@@ -750,31 +750,33 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getLogsFiscais(enterprise_id: number): Promise<any[]> {
-    return await db.select().from(inventoryLogs).limit(50);
+  async upsertInventory(data: Partial<Inventory>, id?: number): Promise<Inventory> {
+    if (id) {
+      const [updated] = await db.update(inventory)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(inventory.id, id))
+        .returning();
+      if (!updated) {
+        const [inserted] = await db.insert(inventory).values({ ...data, id } as any).returning();
+        return inserted;
+      }
+      return updated;
+    }
+    const [inserted] = await db.insert(inventory).values(data as any).returning();
+    return inserted;
   }
 
-  async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
-    let conditions = [];
-    if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
-    if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
-    
-    return await db.select()
-      .from(cashRegisters)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(cashRegisters.openedAt));
+  async updateInventory(id: number, quantity: number): Promise<Inventory> {
+    const [updated] = await db.update(inventory)
+      .set({ quantity, updatedAt: new Date() })
+      .where(eq(inventory.id, id))
+      .returning();
+    return updated;
   }
 
-  async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
-    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
-  }
-
-  async getSaleItems(saleId: number): Promise<SaleItem[]> {
-    return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
-  }
-
-  async getPayments(saleId: number): Promise<Payment[]> {
-    return await db.select().from(payments).where(eq(payments.saleId, saleId));
+  async getInventoryItem(id: number): Promise<Inventory | undefined> {
+    const [item] = await db.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+    return item;
   }
 }
 

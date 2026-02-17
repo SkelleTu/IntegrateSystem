@@ -880,13 +880,15 @@ export async function registerRoutes(
       if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
       
       const { id, ...data } = req.body;
-      const item = await storage.upsertInventory(data, id);
+      // Ensure id is a number if it exists
+      const inventoryId = id ? Number(id) : undefined;
+      const item = await storage.upsertInventory(data, inventoryId);
       
       await storage.createInventoryLog({
         inventoryId: item.id,
         type: "in",
-        quantity: data.quantity,
-        reason: id ? "Update" : "Initial Stock",
+        quantity: data.quantity || 0,
+        reason: inventoryId ? "Update" : "Initial Stock",
         userId: user.id
       });
       
