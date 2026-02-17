@@ -336,8 +336,6 @@ export async function registerRoutes(
   });
 
   app.post("/api/admin/upload", isAuthenticated, upload.single("file"), (req: any, res) => {
-    const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito" });
     if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
     res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
   });

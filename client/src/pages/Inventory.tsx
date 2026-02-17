@@ -10,15 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock } from "lucide-react";
+import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import Fuse from "fuse.js";
 
 export default function InventoryPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [selectedItem, setSelectedItem] = useState<{ id: number, type: "product" | "service" } | null>(null);
   const [quantity, setQuantity] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -316,6 +318,37 @@ export default function InventoryPage() {
     });
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setIsUploading(true);
+    try {
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Falha no upload");
+
+      const data = await res.json();
+      setImageUrl(data.url);
+      toast({ title: "Sucesso", description: "Foto enviada com sucesso!" });
+    } catch (err) {
+      toast({ 
+        title: "Erro", 
+        description: "Não foi possível enviar a imagem.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const isExpiringSoon = (date: any) => {
     if (!date) return false;
     const expiry = new Date(date);
@@ -520,12 +553,31 @@ export default function InventoryPage() {
 
                   <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">URL da Foto</Label>
-                    <Input 
-                      value={imageUrl} 
-                      onChange={e => setImageUrl(e.target.value)} 
-                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
-                      placeholder="https://..."
-                    />
+                    <div className="flex gap-2">
+                      <Input 
+                        value={imageUrl} 
+                        onChange={e => setImageUrl(e.target.value)} 
+                        className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                        placeholder="https://..."
+                      />
+                      <input
+                        type="file"
+                        className="hidden"
+                        ref={fileInputRef}
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                      />
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        className="h-9 w-9 border-white/10 bg-black/40 hover:bg-white/5 rounded-lg shrink-0"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        type="button"
+                      >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <Upload className="h-4 w-4 text-primary" />}
+                      </Button>
+                    </div>
                   </div>
 
                   {unit !== "Unidade" && (
