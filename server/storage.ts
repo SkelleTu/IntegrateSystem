@@ -622,16 +622,17 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Ensure data objects are handled correctly for SQLite
-    const processedData = {
+    const processedData: any = {
       itemId: data.itemId || null,
       itemType: data.itemType,
       customName: data.customName || null,
       quantity: parseInt(data.quantity) || 0,
       unit: data.unit,
       itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
-      costPrice: typeof data.costPrice === 'string' ? Math.round(Number(data.costPrice.replace(',', '.')) * 100) : data.costPrice,
+      costPrice: typeof data.costPrice === 'string' ? Math.round(Number(data.costPrice.replace(',', '.')) * 100) : (data.costPrice || 0),
       salePrice: typeof data.salePrice === 'string' ? Math.round(Number(data.salePrice.replace(',', '.')) * 100) : (data.salePrice || null),
       barcode: data.barcode || null,
+      imageUrl: data.imageUrl || null,
       expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
       updatedAt: new Date()
     };

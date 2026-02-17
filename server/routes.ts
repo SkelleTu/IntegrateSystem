@@ -882,7 +882,7 @@ export async function registerRoutes(
       const { id, ...data } = req.body;
       // Ensure id is a number if it exists and is not null/empty
       const inventoryId = (id !== undefined && id !== null && id !== "") ? Number(id) : undefined;
-      const item = await storage.upsertInventory(data, inventoryId);
+      const item = await storage.upsertInventory({ ...data, id: inventoryId });
       
       await storage.createInventoryLog({
         inventoryId: item.id,
