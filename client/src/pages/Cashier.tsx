@@ -79,10 +79,17 @@ export default function Cashier() {
 
   const filteredMenuItems = useMemo(() => {
     if (!menuItems) return [];
-    if (!searchTerm) return menuItems;
+    
+    // Mapear primeiro para garantir que imageUrl e image_url sejam tratados consistentemente
+    const normalizedItems = menuItems.map(item => ({
+      ...item,
+      imageUrl: (item as any).imageUrl || (item as any).image_url
+    }));
+
+    if (!searchTerm) return normalizedItems;
 
     const term = searchTerm.toLowerCase();
-    return menuItems.filter(item => 
+    return normalizedItems.filter(item => 
       (item.name && item.name.toLowerCase().includes(term)) ||
       (item.id && item.id.toString() === term) ||
       (item.barcode && item.barcode.toLowerCase() === term)
