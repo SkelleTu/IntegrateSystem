@@ -2,12 +2,21 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import path from "path";
+import fs from "fs";
 
 // Configurar fuso horário para Brasília
 process.env.TZ = 'America/Sao_Paulo';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Serve attached assets/uploads
+const uploadsPath = path.join(process.cwd(), "attached_assets", "uploads");
+if (!fs.existsSync(uploadsPath)) {
+  fs.mkdirSync(uploadsPath, { recursive: true });
+}
+app.use("/attached_assets/uploads", express.static(uploadsPath));
 
 declare module "http" {
   interface IncomingMessage {

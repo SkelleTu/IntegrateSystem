@@ -296,15 +296,19 @@ export default function Cashier() {
                         src={item.imageUrl} 
                         alt={item.name} 
                         className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
+                        onLoad={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          console.log("Image loaded successfully:", target.src);
+                        }}
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
+                          console.error("Image failed to load:", target.src);
                           target.onerror = null;
                           target.style.display = 'none';
-                          // Mostra o fallback de ícone se a imagem falhar
                           const parent = target.parentElement;
                           if (parent) {
                             const fallback = parent.querySelector('.fallback-icon');
-                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
                           }
                         }}
                       />
