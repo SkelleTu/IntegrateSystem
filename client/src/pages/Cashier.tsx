@@ -81,10 +81,19 @@ export default function Cashier() {
     if (!menuItems) return [];
     
     // Mapear primeiro para garantir que imageUrl e image_url sejam tratados consistentemente
-    const normalizedItems = menuItems.map(item => ({
-      ...item,
-      imageUrl: (item as any).imageUrl || (item as any).image_url
-    }));
+    const normalizedItems = menuItems.map(item => {
+      let img = (item as any).imageUrl || (item as any).image_url;
+      
+      // Se a imagem for a lupinha do Unsplash (placeholder de erro), tentamos limpar para mostrar o ícone de pacote
+      if (img && img.includes("images.unsplash.com") && img.includes("photo-1586769852836-bc069f19e1b6")) {
+        img = null;
+      }
+      
+      return {
+        ...item,
+        imageUrl: img
+      };
+    });
 
     if (!searchTerm) return normalizedItems;
 
@@ -281,23 +290,28 @@ export default function Cashier() {
             {filteredMenuItems?.map((item: any) => (
               <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
                 <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col">
-                  <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-white/5 flex items-center justify-center border-b border-white/5">
+                  <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-zinc-800 flex items-center justify-center border-b border-white/5 relative group">
                     {item.imageUrl ? (
                       <img 
                         src={item.imageUrl} 
                         alt={item.name} 
-                        className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-700"
+                        className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
                           target.onerror = null;
-                          target.src = "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200";
+                          target.style.display = 'none';
+                          // Mostra o fallback de ícone se a imagem falhar
+                          const parent = target.parentElement;
+                          if (parent) {
+                            const fallback = parent.querySelector('.fallback-icon');
+                            if (fallback) (fallback as HTMLElement).style.display = 'flex';
+                          }
                         }}
                       />
-                    ) : (
-                      <div className="flex items-center justify-center w-full h-full bg-white/5">
-                        <ImageIcon className="h-10 w-10 text-white/20" />
-                      </div>
-                    )}
+                    ) : null}
+                    <div className={`flex items-center justify-center w-full h-full bg-zinc-900 fallback-icon ${item.imageUrl ? 'hidden' : ''}`}>
+                      <Package className="h-10 w-10 text-white/10" />
+                    </div>
                   </div>
                   <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
                     <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>

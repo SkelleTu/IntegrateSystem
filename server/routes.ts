@@ -504,7 +504,12 @@ export async function registerRoutes(
 
   app.get("/api/inventory", isAuthenticated, async (req, res) => {
     const items = await storage.getInventory();
-    res.json(items);
+    // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
+    const normalizedItems = items.map(item => ({
+      ...item,
+      imageUrl: item.imageUrl || (item as any).image_url
+    }));
+    res.json(normalizedItems);
   });
 
   app.get("/api/inventory/barcode/:barcode", isAuthenticated, async (req, res) => {
@@ -871,7 +876,12 @@ export async function registerRoutes(
   // Inventory API
   app.get("/api/inventory", isAuthenticated, async (req, res) => {
     const items = await storage.getInventory();
-    res.json(items);
+    // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
+    const normalizedItems = items.map(item => ({
+      ...item,
+      imageUrl: item.imageUrl || (item as any).image_url
+    }));
+    res.json(normalizedItems);
   });
 
   app.post("/api/inventory", isAuthenticated, async (req, res) => {
