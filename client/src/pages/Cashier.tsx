@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
@@ -271,10 +271,27 @@ export default function Cashier() {
       <div className="flex flex-col lg:flex-row gap-6 items-start flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 w-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
-            {filteredMenuItems?.map((item) => (
+            {filteredMenuItems?.map((item: any) => (
               <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
                 <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col">
-                  <div className="h-24 md:h-32 overflow-hidden relative"><img src={item.imageUrl} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-700" /></div>
+                  <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-white/5 flex items-center justify-center border-b border-white/5">
+                    {item.imageUrl ? (
+                      <img 
+                        src={item.imageUrl} 
+                        alt={item.name} 
+                        className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-all duration-700"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.onerror = null;
+                          target.src = "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full bg-white/5">
+                        <Package className="h-10 w-10 text-white/20" />
+                      </div>
+                    )}
+                  </div>
                   <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
                     <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
                     <p className="text-primary font-black text-base md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>

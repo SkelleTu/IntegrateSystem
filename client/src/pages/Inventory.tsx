@@ -219,19 +219,22 @@ export default function InventoryPage() {
       return res.json();
     },
     onSuccess: (data) => {
-      // First, remove the item from local cache to show it "disappearing"
+      console.log("Upsert success, received data:", data);
+      // First, update local cache with the new/updated item
       queryClient.setQueryData(["/api/inventory"], (oldData: Inventory[] | undefined) => {
-        if (!oldData) return [];
-        return oldData.filter(item => item.id !== editingId);
+        if (!oldData) return [data];
+        const exists = oldData.some(item => item.id === data.id);
+        if (exists) {
+          return oldData.map(item => item.id === data.id ? data : item);
+        }
+        return [...oldData, data];
       });
 
-      // Wait a brief moment to show the "empty" state, then refetch
-      setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
+      // Also invalidate to be sure
+      queryClient.invalidateQueries({ queryKey: ["/api/inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items"] });
         
-        toast({ title: "Sucesso", description: "Item reinserido com sucesso para limpeza de dados" });
-      }, 800);
+      toast({ title: "Sucesso", description: "Item salvo com sucesso" });
 
       setSelectedItem(null);
       setCustomName("");
@@ -242,7 +245,7 @@ export default function InventoryPage() {
       setExpiryDate("");
       setCostPrice("");
       setSalePrice("");
-      setImageUrl(""); // Limpar imagem após salvar
+      setImageUrl("");
     },
     onError: (error: any) => {
       toast({ 
@@ -375,7 +378,7 @@ export default function InventoryPage() {
       }
     }
 
-    upsertMutation.mutate({
+    const itemData = {
       id: editingId,
       itemId: null,
       itemType: "custom",
@@ -386,9 +389,12 @@ export default function InventoryPage() {
       itemsPerUnit: parseInt(itemsPerUnit),
       costPrice: Math.round(Number(costPrice.replace(',', '.')) * 100),
       salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
-      imageUrl: imageUrl || null, // Enviar URL da imagem
+      imageUrl: imageUrl || null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-    });
+    };
+
+    console.log("Saving inventory item:", itemData);
+    upsertMutation.mutate(itemData);
   };
 
   if (user?.role !== "admin") {
