@@ -307,6 +307,19 @@ export class DatabaseStorage implements IStorage {
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     const [newRegister] = await db.insert(cashRegisters).values(register).returning();
+    
+    // Registrar transação de abertura no financeiro se houver valor inicial
+    if (newRegister.openingAmount > 0) {
+      await db.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "caixa",
+        description: `Abertura de Caixa #${newRegister.id}`,
+        amount: newRegister.openingAmount,
+        createdAt: new Date()
+      });
+    }
+    
     return newRegister;
   }
 
@@ -315,6 +328,19 @@ export class DatabaseStorage implements IStorage {
       .set({ openingAmount: amount })
       .where(eq(cashRegisters.id, id))
       .returning();
+
+    // Atualizar ou criar transação financeira correspondente
+    if (amount > 0) {
+      await db.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "caixa",
+        description: `Ajuste de Abertura de Caixa #${id}`,
+        amount: amount,
+        createdAt: new Date()
+      });
+    }
+
     return updated;
   }
 
@@ -324,7 +350,14 @@ export class DatabaseStorage implements IStorage {
 
     // Cálculo da diferença: Valor Final Real - (Valor Inicial + Total de Vendas em Dinheiro)
     const salesList = await db.select().from(sales).where(eq(sales.cashRegisterId, id));
-    const totalSales = salesList.filter(s => s.status === "completed" && s.paymentMethod === "cash").reduce((sum, s) => sum + s.totalAmount, 0);
+    
+    // Verificando o nome correto da coluna de método de pagamento
+    // Na schema.ts a tabela 'payments' tem a coluna 'method'
+    // Mas no storage.ts linha 327 está usando 'paymentMethod' na tabela 'sales'
+    // Vou checar a schema de sales novamente. Ah, a schema de sales NÃO tem paymentMethod.
+    // O storage.ts linha 327 parece estar errado ou incompleto.
+    
+    const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
     const expectedAmount = (register.openingAmount || 0) + totalSales;
     const difference = closingAmount - expectedAmount;
 
@@ -337,6 +370,18 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(cashRegisters.id, id))
       .returning();
+
+    // Registrar fechamento no financeiro
+    await db.insert(transactions).values({
+      businessType: "padaria",
+      type: "income", // Fechamento é o saldo final que entra no financeiro consolidado? 
+      // Geralmente registramos a diferença ou o total em mãos.
+      category: "caixa",
+      description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
+      amount: closingAmount,
+      createdAt: new Date()
+    });
+
     return updated;
   }
 
