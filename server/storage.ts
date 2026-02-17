@@ -756,11 +756,9 @@ export class DatabaseStorage implements IStorage {
         .set({ ...data, updatedAt: new Date() })
         .where(eq(inventory.id, id))
         .returning();
-      if (!updated) {
-        const [inserted] = await db.insert(inventory).values({ ...data, id } as any).returning();
-        return inserted;
+      if (updated) {
+        return updated;
       }
-      return updated;
     }
     const [inserted] = await db.insert(inventory).values(data as any).returning();
     return inserted;
