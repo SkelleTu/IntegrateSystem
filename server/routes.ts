@@ -507,7 +507,7 @@ export async function registerRoutes(
     // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
     const normalizedItems = items.map(item => ({
       ...item,
-      imageUrl: item.imageUrl || (item as any).image_url
+      imageUrl: item.imageUrl || (item as any).image_url || null
     }));
     res.json(normalizedItems);
   });
@@ -879,7 +879,7 @@ export async function registerRoutes(
     // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
     const normalizedItems = items.map(item => ({
       ...item,
-      imageUrl: item.imageUrl || (item as any).image_url
+      imageUrl: item.imageUrl || (item as any).image_url || null
     }));
     res.json(normalizedItems);
   });

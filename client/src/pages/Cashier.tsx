@@ -85,7 +85,7 @@ export default function Cashier() {
       let img = (item as any).imageUrl || (item as any).image_url;
       
       // Se a imagem for a lupinha do Unsplash (placeholder de erro), tentamos limpar para mostrar o ícone de pacote
-      if (img && img.includes("images.unsplash.com") && img.includes("photo-1586769852836-bc069f19e1b6")) {
+      if (img && typeof img === 'string' && (img.includes("images.unsplash.com") || img.includes("photo-1586769852836-bc069f19e1b6"))) {
         img = null;
       }
       
