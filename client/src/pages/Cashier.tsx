@@ -52,7 +52,7 @@ export default function Cashier() {
             id: invItem.id + 10000,
             name: invItem.customName || `Produto #${invItem.id}`,
             price: invItem.salePrice || (invItem.costPrice * 1.3),
-            imageUrl: invItem.imageUrl || "https://images.unsplash.com/photo-1586769852836-bc069f19e1b6?w=200",
+            imageUrl: invItem.imageUrl,
             barcode: invItem.barcode,
             isAvailable: invItem.quantity > 0,
             inventoryId: invItem.id
