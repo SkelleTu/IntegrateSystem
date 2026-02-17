@@ -309,7 +309,7 @@ export class DatabaseStorage implements IStorage {
     const [newRegister] = await db.insert(cashRegisters).values(register).returning();
     
     // Registrar transação de abertura no financeiro se houver valor inicial
-    if (newRegister.openingAmount > 0) {
+    if (newRegister.openingAmount && newRegister.openingAmount > 0) {
       await db.insert(transactions).values({
         businessType: "padaria",
         type: "income",
@@ -317,7 +317,7 @@ export class DatabaseStorage implements IStorage {
         description: `Abertura de Caixa #${newRegister.id}`,
         amount: newRegister.openingAmount,
         createdAt: new Date()
-      });
+      } as any);
     }
     
     return newRegister;
@@ -338,7 +338,7 @@ export class DatabaseStorage implements IStorage {
         description: `Ajuste de Abertura de Caixa #${id}`,
         amount: amount,
         createdAt: new Date()
-      });
+      } as any);
     }
 
     return updated;
@@ -350,12 +350,6 @@ export class DatabaseStorage implements IStorage {
 
     // Cálculo da diferença: Valor Final Real - (Valor Inicial + Total de Vendas em Dinheiro)
     const salesList = await db.select().from(sales).where(eq(sales.cashRegisterId, id));
-    
-    // Verificando o nome correto da coluna de método de pagamento
-    // Na schema.ts a tabela 'payments' tem a coluna 'method'
-    // Mas no storage.ts linha 327 está usando 'paymentMethod' na tabela 'sales'
-    // Vou checar a schema de sales novamente. Ah, a schema de sales NÃO tem paymentMethod.
-    // O storage.ts linha 327 parece estar errado ou incompleto.
     
     const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
     const expectedAmount = (register.openingAmount || 0) + totalSales;
@@ -380,7 +374,7 @@ export class DatabaseStorage implements IStorage {
       description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
       amount: closingAmount,
       createdAt: new Date()
-    });
+    } as any);
 
     return updated;
   }

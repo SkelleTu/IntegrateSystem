@@ -385,7 +385,7 @@ export default function Financeiro() {
                         </TableCell>
                         <TableCell className="p-6">
                           <Badge variant="outline" className={`text-[9px] border-0 p-0 uppercase font-black ${t.type === 'income' ? 'text-primary' : 'text-red-500'}`}>
-                            {t.type === 'income' ? 'Crédito' : (t.description.includes("ESTORNO") ? 'Cancelamento' : 'Débito')}
+                            {t.category === 'caixa' ? 'Caixa' : (t.type === 'income' ? 'Crédito' : (t.description.includes("ESTORNO") ? 'Cancelamento' : 'Débito'))}
                           </Badge>
                         </TableCell>
                         <TableCell className={`text-right p-6 font-black italic ${t.type === 'income' ? 'text-primary' : 'text-red-500'}`}>
