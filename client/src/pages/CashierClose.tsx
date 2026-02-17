@@ -53,6 +53,7 @@ export default function CashierClose() {
       return res.json();
     },
     onSuccess: () => {
+      queryClient.setQueryData(["/api/cash-register/open"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
       toast({ title: "Caixa encerrado com sucesso!" });
       setLocation("/caixa");
