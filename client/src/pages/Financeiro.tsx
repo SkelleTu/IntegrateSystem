@@ -126,6 +126,7 @@ export default function Financeiro() {
     const rawValue = e.target.value.replace(/\D/g, '');
     const cents = parseInt(rawValue || '0', 10);
     setAmountDisplay(formatCurrency(rawValue));
+    // A schema de transação no backend não tem transform * 100, então enviamos centavos
     fieldOnChange(cents);
   };
 

@@ -61,7 +61,7 @@ export default function CashierClose() {
   });
 
   const handleClose = () => {
-    const amount = Math.round(Number(closingAmount.replace(",", ".")) * 100);
+    const amount = Number(closingAmount.replace(",", "."));
     if (isNaN(amount)) return;
     closeMutation.mutate(amount);
   };

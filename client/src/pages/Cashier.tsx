@@ -252,7 +252,7 @@ export default function Cashier() {
           </CardHeader>
           <CardContent className="p-8 space-y-8">
             <div className="space-y-3"><label className="text-white/40 text-xs uppercase font-black tracking-widest pl-1">Saldo Inicial (R$)</label><Input type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} className="bg-black border-white/10 text-white h-14 text-2xl font-black italic rounded-xl focus:border-primary/50" /></div>
-            <Button className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl" disabled={openMutation.isPending} onClick={() => openMutation.mutate(Number(openingAmount) * 100)}>{openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}</Button>
+            <Button className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl" disabled={openMutation.isPending} onClick={() => openMutation.mutate(Number(openingAmount.replace(",", ".")))}>{openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}</Button>
           </CardContent>
         </Card>
       </div>

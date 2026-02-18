@@ -627,7 +627,9 @@ export async function registerRoutes(
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(404).json({ message: "No open register" });
     
-    const updated = await storage.closeCashRegister(register.id, req.body.closingAmount);
+    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
+    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
+    const updated = await storage.closeCashRegister(register.id, closingAmount);
     res.json(updated);
   });
 
