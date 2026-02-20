@@ -260,66 +260,46 @@ export default function Cashier() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col p-4 md:p-6 lg:p-8 gap-6 w-full pt-24">
-      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 panel-translucent p-6 shrink-0 w-full mb-4">
+    <div className="h-screen bg-transparent flex flex-col p-2 md:p-4 gap-2 w-full pt-16 overflow-hidden">
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-2 panel-translucent p-3 shrink-0 w-full mb-1">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-7 h-7" /></Button>
+          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-10 h-10 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-6 h-6" /></Button>
           <div className="flex flex-col">
-            <h1 className="text-white text-2xl md:text-3xl font-black uppercase italic tracking-tighter leading-none">Terminal de <span className="text-primary">Vendas</span></h1>
-            <p className="text-[9px] font-bold text-white/40 uppercase tracking-[0.4em] mt-1">AURA System</p>
+            <h1 className="text-white text-xl md:text-2xl font-black uppercase italic tracking-tighter leading-none">Terminal de <span className="text-primary">Vendas</span></h1>
+            <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.4em] mt-1">AURA System</p>
           </div>
         </div>
-        <div className="flex items-center gap-4 flex-1 w-full xl:max-w-xl">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/40" />
-            <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-12 pl-10 font-black italic rounded-xl focus:border-primary/50 w-full" autoFocus />
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-4 py-2 font-black italic uppercase tracking-wider text-[10px]">Operador ID: {register.userId}</Badge>
-          <div className="flex flex-col gap-2 w-full">
-            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[10px] h-9 w-full" onClick={() => setLocation("/caixa/fechar")}>Encerrar Expediente</Button>
-            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[10px] h-9 w-full" onClick={() => setAdjustModalOpen(true)}>Ajustar Gaveta</Button>}
+        
+        <div className="flex flex-row items-center gap-4 shrink-0 ml-auto xl:ml-0">
+          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-3 py-1 font-black italic uppercase tracking-wider text-[9px]">Operador ID: {register.userId}</Badge>
+          <div className="flex items-center gap-2">
+            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[9px] h-8 px-3" onClick={() => setAdjustModalOpen(true)}>Ajustar</Button>}
+            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[9px] h-8 px-3" onClick={() => setLocation("/caixa/fechar")}>Encerrar</Button>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6 items-start flex-1 min-h-0 overflow-hidden">
-        <div className="flex-1 w-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-4">
+      <div className="flex flex-col lg:flex-row gap-4 items-start flex-1 min-h-0 overflow-hidden">
+        <div className="flex-1 w-full h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-4">
             {filteredMenuItems?.map((item: any) => (
               <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
                 <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col">
-                  <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-zinc-800 flex items-center justify-center border-b border-white/5 relative group">
+                  <div className="h-20 md:h-24 overflow-hidden rounded-t-lg bg-zinc-800 flex items-center justify-center border-b border-white/5 relative group">
                     {item.imageUrl ? (
                       <img 
                         src={item.imageUrl} 
                         alt={item.name} 
                         className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
-                        onLoad={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          console.log("Image loaded successfully:", target.src);
-                        }}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          console.error("Image failed to load:", target.src);
-                          target.onerror = null;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            const fallback = parent.querySelector('.fallback-icon');
-                            if (fallback) (fallback as HTMLElement).classList.remove('hidden');
-                          }
-                        }}
                       />
                     ) : null}
                     <div className={`flex items-center justify-center w-full h-full bg-zinc-900 fallback-icon ${item.imageUrl ? 'hidden' : ''}`}>
-                      <Package className="h-10 w-10 text-white/10" />
+                      <Package className="h-8 w-8 text-white/10" />
                     </div>
                   </div>
-                  <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
-                    <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
-                    <p className="text-primary font-black text-base md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>
+                  <CardContent className="p-2 flex flex-col flex-1 justify-between gap-1">
+                    <h3 className="text-white font-black text-[9px] md:text-[10px] uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
+                    <p className="text-primary font-black text-sm md:text-md italic">R$ {(item.price / 100).toFixed(2)}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -327,20 +307,31 @@ export default function Cashier() {
           </div>
         </div>
 
-        <div className="w-full lg:w-[380px] flex flex-col shrink-0 h-full lg:max-h-[calc(100vh-180px)]">
+        <div className="w-full lg:w-[360px] flex flex-col shrink-0 h-full min-h-0 overflow-hidden">
           <Card className="panel-translucent flex flex-col h-full overflow-hidden">
-            <CardHeader className="border-b border-white/5 p-4 bg-white/5">
-              <CardTitle className="text-white flex items-center justify-between uppercase italic tracking-tighter text-xl font-black"><div className="flex items-center gap-2"><ShoppingCart className="w-6 h-6 text-primary" /> Carrinho</div><Badge className="bg-primary text-black font-black italic">{cart.reduce((s,i) => s + i.quantity, 0)}</Badge></CardTitle>
-              <div className="relative mt-4"><Input placeholder="Número da Comanda" value={searchTicket} onChange={e => setSearchTicket(e.target.value)} className="h-10 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl pl-4 pr-10" /><Button variant="ghost" className="absolute right-1 top-1 h-8 w-8 p-0 text-primary" onClick={() => loadTicketMutation.mutate(searchTicket)}><Search className="w-4 h-4" /></Button></div>
+            <CardHeader className="border-b border-white/5 p-2 bg-white/5 space-y-2">
+              <CardTitle className="text-white flex items-center justify-between uppercase italic tracking-tighter text-md font-black"><div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-primary" /> Carrinho</div><Badge className="bg-primary text-black font-black italic text-[10px] h-5">{cart.reduce((s,i) => s + i.quantity, 0)}</Badge></CardTitle>
+              
+              <div className="space-y-1">
+                <div className="relative">
+                  <Input placeholder="Número da Comanda" value={searchTicket} onChange={e => setSearchTicket(e.target.value)} className="h-10 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl pl-4 pr-10" />
+                  <Button variant="ghost" className="absolute right-1 top-1 h-8 w-8 p-0 text-primary" onClick={() => loadTicketMutation.mutate(searchTicket)}><Search className="w-4 h-4" /></Button>
+                </div>
+                
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-10 pl-9 text-[10px] font-black italic rounded-xl focus:border-primary/50 w-full" />
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-white/20 gap-3 py-12"><ShoppingCart className="w-12 h-12 opacity-10" /><p className="font-black uppercase text-[10px]">Vazio</p></div> : cart.map(({ item, quantity }) => (
-                <div key={item.id} className="flex items-center justify-between gap-4"><div className="flex-1 min-w-0"><h4 className="text-white text-xs font-black uppercase truncate">{item.name}</h4><p className="text-white/40 text-[9px]">R$ {(item.price / 100).toFixed(2)}</p></div><div className="flex items-center gap-2 bg-black/40 p-1.5 rounded-lg border border-white/5"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => removeFromCart(item.id)}><Minus className="w-3.5 h-3.5" /></Button><span className="text-white font-black text-sm italic w-5 text-center">{quantity}</span><Button size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => addToCart(item as any)}><Plus className="w-3.5 h-3.5" /></Button></div></div>
+            <CardContent className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-0">
+              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-white/20 gap-2 py-6"><ShoppingCart className="w-8 h-8 opacity-10" /><p className="font-black uppercase text-[8px]">Vazio</p></div> : cart.map(({ item, quantity }) => (
+                <div key={item.id} className="flex items-center justify-between gap-2"><div className="flex-1 min-w-0"><h4 className="text-white text-[10px] font-black uppercase truncate">{item.name}</h4><p className="text-white/40 text-[8px]">R$ {(item.price / 100).toFixed(2)}</p></div><div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5"><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeFromCart(item.id)}><Minus className="w-3 h-3" /></Button><span className="text-white font-black text-xs italic w-4 text-center">{quantity}</span><Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={() => addToCart(item as any)}><Plus className="w-3 h-3" /></Button></div></div>
               ))}
             </CardContent>
-            <div className="p-6 border-t border-white/5 bg-black/40 space-y-6 mt-auto">
-              <div className="flex items-center justify-between gap-4"><div><span className="text-white/40 font-black uppercase text-[9px] tracking-widest">Total</span></div><span className="text-primary text-3xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
-              <div className="grid grid-cols-2 gap-3"><Button variant="outline" className={`flex flex-col h-16 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-5 h-5" /><span className="text-[9px] font-black uppercase">CPF</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('cash')}><Banknote className="w-5 h-5" /><span className="text-[9px] font-black uppercase">Dinheiro</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('card')}><CreditCard className="w-5 h-5" /><span className="text-[9px] font-black uppercase">Cartão</span></Button><Button variant="outline" className="flex flex-col h-16 border-white/10" onClick={() => handlePayment('pix')}><QrCode className="w-5 h-5" /><span className="text-[9px] font-black uppercase">PIX</span></Button></div>
+            <div className="p-3 border-t border-white/5 bg-black/40 space-y-3 mt-auto shrink-0">
+              <div className="flex items-center justify-between gap-2"><div><span className="text-white/40 font-black uppercase text-[8px] tracking-widest">Total</span></div><span className="text-primary text-xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
+              <div className="grid grid-cols-2 gap-2"><Button variant="outline" className={`flex flex-col h-12 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-4 h-4" /><span className="text-[8px] font-black uppercase">CPF</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('cash')}><Banknote className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Dinheiro</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('card')}><CreditCard className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Cartão</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('pix')}><QrCode className="w-4 h-4" /><span className="text-[8px] font-black uppercase">PIX</span></Button></div>
             </div>
           </Card>
         </div>

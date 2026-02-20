@@ -82,9 +82,9 @@ function Router() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden pt-24">
+    <div className="flex h-screen w-full overflow-hidden">
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        <main className="flex-1 overflow-y-auto relative p-4">
+        <main className="flex-1 overflow-hidden relative">
           <Switch>
             <Route path="/" component={LandingPage} />
             <Route path="/quem-somos" component={AboutUs} />
