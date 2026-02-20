@@ -60,7 +60,6 @@ export function Navbar() {
     { title: "Fiscal", url: "/fiscal", icon: FileText },
     { title: "Etiquetas", url: "/admin/labels", icon: FileText },
     { title: "Monitoramento", url: "/admin/monitoring", icon: BarChart3 },
-    { title: "Tablet", url: "/cart", icon: ShoppingCart },
   ];
 
   return (
@@ -84,14 +83,6 @@ export function Navbar() {
               <span>{item.title}</span>
             </Button>
           ))}
-          <Button
-            variant="ghost"
-            className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate"
-            onClick={() => handleNavigation("/admin")}
-          >
-            <UserPlus className="w-3 h-3" />
-            Admin
-          </Button>
           <Button
             variant="ghost"
             className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate mr-2"
