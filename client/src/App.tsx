@@ -81,10 +81,12 @@ function Router() {
     );
   }
 
+  const isCashierPage = location === "/caixa";
+
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className={`flex h-screen w-full ${isCashierPage ? "overflow-hidden" : ""}`}>
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        <main className="flex-1 overflow-hidden relative">
+        <main className={`flex-1 relative ${isCashierPage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"}`}>
           <Switch>
             <Route path="/" component={LandingPage} />
             <Route path="/quem-somos" component={AboutUs} />
@@ -211,12 +213,13 @@ function AppContent() {
   const { data: user } = useUser();
   const [location] = useLocation();
   const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
+  const isCashierPage = location === "/caixa";
 
   return (
-    <div className="relative min-h-screen w-full bg-black overflow-x-hidden pb-safe">
+    <div className={`relative min-h-screen w-full bg-black pb-safe ${isCashierPage ? "overflow-hidden" : "overflow-x-hidden"}`}>
       <BackgroundIcons />
       <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
-        <main className="flex-1 relative bg-transparent flex flex-col mb-12 sm:mb-0">
+        <main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage && !isCashierPage ? "mb-12 sm:mb-0" : ""}`}>
           <LandingNavigation />
           {user && !isLandingPage && <Navbar />}
           <Router />
