@@ -81,7 +81,7 @@ function Router() {
     );
   }
 
-  const isCashierPage = location === "/caixa";
+  const isCashierPage = location === "/caixa" || location === "/financeiro" || location === "/relatorios";
 
   return (
     <div className={`flex h-screen w-full ${isCashierPage ? "overflow-hidden" : ""}`}>
@@ -102,7 +102,6 @@ function Router() {
             <Route path="/menu" component={DigitalMenu} />
             <Route path="/barber-queue" component={BarberQueue} />
             <Route path="/ponto" component={TimeClock} />
-            <Route path="/admin" component={Admin} />
             <Route path="/caixa" component={Cashier} />
             <Route path="/caixa/fechar" component={CashierClose} />
             <Route path="/financeiro" component={Financeiro} />
@@ -213,7 +212,7 @@ function AppContent() {
   const { data: user } = useUser();
   const [location] = useLocation();
   const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
-  const isCashierPage = location === "/caixa";
+  const isCashierPage = location === "/caixa" || location === "/financeiro" || location === "/relatorios";
 
   return (
     <div className={`relative min-h-screen w-full bg-black pb-safe ${isCashierPage ? "overflow-hidden" : "overflow-x-hidden"}`}>

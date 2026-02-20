@@ -98,7 +98,7 @@ export default function Reports() {
   const totalCompleted = sales?.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0) || 0;
 
   return (
-    <div className="min-h-screen bg-black p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto">
+    <div className="h-full bg-black p-4 md:p-8 space-y-8 max-w-[1600px] mx-auto overflow-y-auto custom-scrollbar">
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-900/50 p-6 rounded-2xl border border-white/10 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <Button 

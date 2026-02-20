@@ -155,8 +155,8 @@ export default function Financeiro() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-zinc-100 flex flex-col lg:flex-row gap-0 overflow-hidden">
-      <aside className="w-full lg:w-96 bg-zinc-900/50 border-r border-white/5 p-6 flex flex-col gap-8 overflow-y-auto">
+    <div className="h-full bg-[#0a0a0a] text-zinc-100 flex flex-col lg:flex-row gap-0 overflow-hidden">
+      <aside className="w-full lg:w-96 bg-zinc-900/50 border-r border-white/5 p-6 flex flex-col gap-8 overflow-y-auto custom-scrollbar">
         <div className="flex items-center justify-between mb-4">
           <Button 
             variant="ghost" 
