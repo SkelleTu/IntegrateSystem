@@ -260,21 +260,21 @@ export default function Cashier() {
   }
 
   return (
-    <div className="h-screen bg-transparent flex flex-col p-2 md:p-4 gap-2 w-full pt-4 overflow-hidden">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 panel-translucent p-3 shrink-0 w-full mb-1">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-9 h-9 rounded-full shrink-0" onClick={() => setLocation("/")}><ArrowLeft className="w-5 h-5" /></Button>
+    <div className="h-screen bg-transparent flex flex-col p-2 md:p-4 gap-2 w-full pt-2 overflow-hidden">
+      <div className="flex flex-row items-center justify-between gap-2 panel-translucent p-2 shrink-0 w-full mb-1">
+        <div className="flex items-center gap-2 min-w-0">
+          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-8 h-8 rounded-full shrink-0" onClick={() => setLocation("/")}><ArrowLeft className="w-4 h-4" /></Button>
           <div className="flex flex-col min-w-0">
-            <h1 className="text-white text-lg md:text-xl font-black uppercase italic tracking-tighter leading-none truncate">Terminal de <span className="text-primary">Vendas</span></h1>
-            <p className="text-[7px] font-bold text-white/40 uppercase tracking-[0.3em] mt-0.5">AURA System</p>
+            <h1 className="text-white text-sm md:text-lg font-black uppercase italic tracking-tighter leading-none truncate">Terminal de <span className="text-primary">Vendas</span></h1>
+            <p className="text-[6px] md:text-[7px] font-bold text-white/40 uppercase tracking-[0.2em] mt-0.5 truncate">AURA System</p>
           </div>
         </div>
         
-        <div className="flex flex-row items-center gap-3 shrink-0 ml-auto sm:ml-0">
-          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-2 py-0.5 font-black italic uppercase tracking-wider text-[8px] hidden xs:inline-flex">ID: {register.userId}</Badge>
-          <div className="flex items-center gap-1.5">
-            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[8px] h-7 px-2" onClick={() => setAdjustModalOpen(true)}>Ajustar</Button>}
-            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[8px] h-7 px-2" onClick={() => setLocation("/caixa/fechar")}>Sair</Button>
+        <div className="flex flex-row items-center gap-2 shrink-0">
+          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-1.5 py-0 font-black italic uppercase tracking-wider text-[7px] md:text-[8px] hidden sm:inline-flex">ID: {register.userId}</Badge>
+          <div className="flex items-center gap-1">
+            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[7px] md:text-[8px] h-7 px-2" onClick={() => setAdjustModalOpen(true)}>Ajustar</Button>}
+            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[7px] md:text-[8px] h-7 px-2" onClick={() => setLocation("/caixa/fechar")}>Sair</Button>
           </div>
         </div>
       </div>
