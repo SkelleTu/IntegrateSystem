@@ -18,7 +18,8 @@ export default function Cashier() {
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number }[]>([]);
   const [openingAmount, setOpeningAmount] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card" | "pix" | null>(null);
+  const [payments, setPayments] = useState<{ method: "cash" | "card" | "pix"; amount: number }[]>([]);
+  const [currentMethod, setCurrentMethod] = useState<"cash" | "card" | "pix" | null>(null);
   const [customerAmount, setCustomerAmount] = useState("");
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [searchTicket, setSearchTicket] = useState("");
@@ -146,7 +147,8 @@ export default function Cashier() {
       setPaymentModalOpen(false);
       setConfirmModalOpen(false);
       setCustomerAmount("");
-      setPaymentMethod(null);
+      setPayments([]);
+      setCurrentMethod(null);
       setCustomerInfo({ name: "", taxId: "", email: "" });
       setShowFiscalFields(false);
       toast({ title: "Venda realizada com sucesso!" });
@@ -218,11 +220,44 @@ export default function Cashier() {
       toast({ title: "Carrinho Vazio", variant: "destructive" });
       return;
     }
-    setPaymentMethod(method);
+    
+    const remaining = total - payments.reduce((sum, p) => sum + p.amount, 0);
+    if (remaining <= 0) return;
+
+    setCurrentMethod(method);
+    setCustomerAmount((remaining / 100).toFixed(2));
     setPaymentModalOpen(true);
   };
 
+  const addPayment = () => {
+    const amount = Math.round(Number(customerAmount.replace(",", ".")) * 100);
+    if (isNaN(amount) || amount <= 0) {
+      toast({ title: "Valor Inválido", variant: "destructive" });
+      return;
+    }
+
+    const remaining = total - payments.reduce((sum, p) => sum + p.amount, 0);
+    const finalAmount = Math.min(amount, remaining);
+
+    if (currentMethod) {
+      setPayments(prev => [...prev, { method: currentMethod, amount: finalAmount }]);
+      setCustomerAmount("");
+      setCurrentMethod(null);
+      setPaymentModalOpen(false);
+    }
+  };
+
+  const removePayment = (index: number) => {
+    setPayments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const finalizeSale = () => {
+    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    if (totalPaid < total) {
+      toast({ title: "Pagamento Incompleto", description: `Faltam R$ ${((total - totalPaid) / 100).toFixed(2)}`, variant: "destructive" });
+      return;
+    }
+
     saleMutation.mutate({
       sale: { 
         totalAmount: total,
@@ -233,12 +268,12 @@ export default function Cashier() {
         status: "completed"
       },
       items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
-      payments: [{ method: paymentMethod, amount: total }]
+      payments: payments
     });
   };
 
-  const customerPaid = Number(customerAmount.replace(",", ".")) * 100;
-  const change = customerPaid - total;
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const remainingTotal = total - totalPaid;
 
   if (isLoadingRegister) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
 
@@ -330,8 +365,40 @@ export default function Cashier() {
               ))}
             </CardContent>
             <div className="p-3 border-t border-white/5 bg-black/40 space-y-3 mt-auto shrink-0">
+              {payments.length > 0 && (
+                <div className="space-y-1 py-1 border-b border-white/5">
+                  <p className="text-[8px] font-black uppercase text-zinc-500">Pagamentos</p>
+                  {payments.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-white/5 px-2 py-1 rounded text-[9px]">
+                      <span className="text-white/60 uppercase font-bold italic">{p.method}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-primary font-black">R$ {(p.amount / 100).toFixed(2)}</span>
+                        <Button variant="ghost" size="icon" className="h-4 w-4 text-red-500 p-0" onClick={() => removePayment(idx)}>
+                          <Minus className="w-2 h-2" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {remainingTotal > 0 && (
+                    <div className="flex justify-between items-center px-2 py-1">
+                      <span className="text-red-500/60 uppercase font-black text-[9px] italic">Restante</span>
+                      <span className="text-red-500 font-black text-[9px]">R$ {(remainingTotal / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between gap-2"><div><span className="text-white/40 font-black uppercase text-[8px] tracking-widest">Total</span></div><span className="text-primary text-xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
-              <div className="grid grid-cols-2 gap-2"><Button variant="outline" className={`flex flex-col h-12 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-4 h-4" /><span className="text-[8px] font-black uppercase">CPF</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('cash')}><Banknote className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Dinheiro</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('card')}><CreditCard className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Cartão</span></Button><Button variant="outline" className="flex flex-col h-12 border-white/10" onClick={() => handlePayment('pix')}><QrCode className="w-4 h-4" /><span className="text-[8px] font-black uppercase">PIX</span></Button></div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" className={`flex flex-col h-12 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-4 h-4" /><span className="text-[8px] font-black uppercase">CPF</span></Button>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}><Banknote className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Dinheiro</span></Button>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}><CreditCard className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Cartão</span></Button>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}><QrCode className="w-4 h-4" /><span className="text-[8px] font-black uppercase">PIX</span></Button>
+              </div>
+              {remainingTotal <= 0 && total > 0 && (
+                <Button className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-xl" onClick={finalizeSale} disabled={saleMutation.isPending}>
+                  {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "FINALIZAR VENDA"}
+                </Button>
+              )}
             </div>
           </Card>
         </div>
@@ -339,13 +406,22 @@ export default function Cashier() {
 
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl shadow-2xl">
-          <DialogHeader><DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">Pagamento: <span className="text-primary">{paymentMethod?.toUpperCase()}</span></DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">Pagamento: <span className="text-primary">{currentMethod?.toUpperCase()}</span></DialogTitle></DialogHeader>
           <div className="space-y-6 pt-4">
-            <div className="flex justify-between items-center"><span className="text-zinc-500 uppercase font-black text-xs">Total a Pagar</span><span className="text-3xl font-black italic">R$ {(total / 100).toFixed(2)}</span></div>
-            {paymentMethod === 'cash' && (
-              <div className="space-y-4"><label className="text-zinc-500 text-[10px] uppercase font-black">Quanto o cliente entregou?</label><Input type="text" value={customerAmount} onChange={(e) => setCustomerAmount(e.target.value)} className="bg-black border-white/10 text-white text-4xl h-20 font-black italic rounded-2xl text-center" autoFocus />{customerAmount && <div className={`p-6 rounded-2xl border-2 ${change < 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-primary/5 border-primary/20'}`}>{change < 0 ? <div className="flex justify-between items-center"><span className="text-red-500 font-black text-xs uppercase">Saldo Pendente</span><span className="text-red-500 text-3xl font-black">R$ {Math.abs(change / 100).toFixed(2)}</span></div> : <div className="flex justify-between items-center"><span className="text-primary font-black text-xs uppercase">Troco</span><span className="text-primary text-3xl font-black">R$ {(change / 100).toFixed(2)}</span></div>}</div>}</div>
-            )}
-            <Button className="w-full h-16 bg-primary text-black font-black uppercase italic text-xl rounded-xl" disabled={saleMutation.isPending || (paymentMethod === 'cash' && change < 0)} onClick={finalizeSale}>{saleMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR"}</Button>
+            <div className="flex justify-between items-center"><span className="text-zinc-500 uppercase font-black text-xs">Total Restante</span><span className="text-3xl font-black italic text-red-500">R$ {(remainingTotal / 100).toFixed(2)}</span></div>
+            <div className="space-y-4">
+              <label className="text-zinc-500 text-[10px] uppercase font-black">Valor a Pagar</label>
+              <Input 
+                type="text" 
+                value={customerAmount} 
+                onChange={(e) => setCustomerAmount(e.target.value)} 
+                className="bg-black border-white/10 text-white text-4xl h-20 font-black italic rounded-2xl text-center" 
+                autoFocus 
+              />
+            </div>
+            <Button className="w-full h-16 bg-primary text-black font-black uppercase italic text-xl rounded-xl" onClick={addPayment}>
+              ADICIONAR PAGAMENTO
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
