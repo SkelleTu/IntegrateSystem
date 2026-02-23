@@ -671,7 +671,7 @@ export async function registerRoutes(
         body: JSON.stringify({
           message: `💰 Nova Venda: R$ ${(newSale.totalAmount / 100).toFixed(2)}`,
           saleId: newSale.id,
-          method: payments[0]?.method
+          methods: payments.map((p: any) => p.method).join(", ")
         })
       }).catch(err => console.error("Erro ao enviar notificação:", err));
     }
