@@ -1,0 +1,106 @@
+PROBLEMA:
+Ao acessar o link da Vercel em WebView, em vez de abrir o app,
+o navegador está baixando um arquivo (tipo executável / disco local).
+
+CAUSA:
+A Vercel não está entregando um index.html válido.
+Ela está servindo:
+- Arquivo errado
+- Bundle bruto
+- Backend como arquivo
+- Ou saída de build incorreta
+
+CORREÇÕES (verifique qual é o seu caso):
+
+────────────────────────────
+CASO 1 — PROJETO VITE
+────────────────────────────
+
+1) Confirme que o build gera a pasta:
+dist/
+
+2) No painel da Vercel configure:
+
+Framework Preset: Vite
+Build Command: npm run build
+Output Directory: dist
+
+3) Se quiser garantir, crie vercel.json na raiz:
+
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist"
+}
+
+────────────────────────────
+CASO 2 — PROJETO NEXT.JS
+────────────────────────────
+
+1) No painel da Vercel:
+Framework Preset: Next.js
+
+2) NÃO defina Output Directory manualmente.
+Deixe padrão.
+
+3) Não use vercel.json customizado a menos que saiba o que está fazendo.
+
+────────────────────────────
+CASO 3 — EXPRESS / NODE PURO
+────────────────────────────
+
+Problema comum:
+Você fez deploy apenas do backend.
+
+Solução:
+
+1) Crie uma pasta:
+public/
+
+2) Dentro dela coloque:
+index.html
+
+3) No servidor:
+
+app.use(express.static("public"))
+
+OU
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public/index.html"))
+})
+
+────────────────────────────
+CASO 4 — HEADER ERRADO FORÇANDO DOWNLOAD
+────────────────────────────
+
+Verifique se NÃO existe algo como:
+
+res.setHeader("Content-Type", "application/octet-stream")
+
+OU
+
+res.download(...)
+
+Se existir, remova ou ajuste para:
+
+res.setHeader("Content-Type", "text/html")
+
+────────────────────────────
+CHECK FINAL
+────────────────────────────
+
+✔ Existe index.html no build?
+✔ Output Directory está correto?
+✔ Framework Preset está correto?
+✔ Não está subindo apenas backend?
+✔ Não está retornando binário?
+
+Se qualquer um desses estiver errado,
+o navegador baixa arquivo em vez de abrir app.
+
+Se ainda continuar, envie:
+- Estrutura de pastas
+- package.json
+- Configuração da Vercel
+
+Que eu identifico exatamente o ponto falho.
