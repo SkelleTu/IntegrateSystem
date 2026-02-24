@@ -60,6 +60,10 @@ export const menuItems = pgTable("menu_items", {
   isAvailable: integer("is_available", { mode: 'boolean' }).default(true).notNull(),
   barcode: text("barcode"), // Código de barras para busca
   tags: text("tags"), // Store as JSON string
+  ncm: text("ncm"), // Nomenclatura Comum do Mercosul
+  cfop: text("cfop"), // Código Fiscal de Operações e Prestações
+  icmsOrigem: integer("icms_origem").default(0), // 0-Nacional, 1-Estrangeira, etc
+  icmsSituacaoTributaria: text("icms_st"), // CSOSN ou CST
 });
 
 export const cashRegisters = pgTable("cash_register", {

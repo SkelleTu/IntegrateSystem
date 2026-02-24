@@ -383,6 +383,8 @@ export default function InventoryPage() {
       salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
       imageUrl: imageUrl || null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
+      ncm: newItem.ncm || null,
+      cfop: newItem.cfop || null,
     };
 
     console.log("Saving inventory item:", itemData);
@@ -629,6 +631,31 @@ export default function InventoryPage() {
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="PREÇO..."
                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-primary/5 rounded-xl border border-primary/10 mt-2">
+                    <div className="col-span-2 flex items-center gap-2 mb-1">
+                      <Landmark className="w-3 h-3 text-primary" />
+                      <span className="text-primary font-black uppercase text-[8px] tracking-widest">Fiscal</span>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">NCM</Label>
+                      <Input 
+                        value={newItem.ncm || ""} 
+                        onChange={e => setNewItem({...newItem, ncm: e.target.value})}
+                        className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
+                        placeholder="22021000"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">CFOP</Label>
+                      <Input 
+                        value={newItem.cfop || ""} 
+                        onChange={e => setNewItem({...newItem, cfop: e.target.value})}
+                        className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
+                        placeholder="5102"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">

@@ -115,38 +115,145 @@ export default function FiscalConfig() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Inscrição Estadual</Label>
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">UF</Label>
+                  <Select value={formData?.uf} onValueChange={v => setFormData({...formData, uf: v})}>
+                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
+                      <SelectValue placeholder="UF" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                      {["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"].map(uf => (
+                        <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Município</Label>
                   <Input 
-                    value={formData?.inscricaoEstadual || ""} 
-                    onChange={e => setFormData({...formData, inscricaoEstadual: e.target.value})}
+                    value={formData?.municipio || ""} 
+                    onChange={e => setFormData({...formData, municipio: e.target.value})}
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Regime Tributário</Label>
-                  <Select value={formData?.regimeTributario} onValueChange={v => setFormData({...formData, regimeTributario: v})}>
-                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
-                      <SelectValue placeholder="Selecione..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
-                      <SelectItem value="1">Simples Nacional</SelectItem>
-                      <SelectItem value="3">Regime Normal</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Código IBGE</Label>
+                  <Input 
+                    value={formData?.codigoIbge || ""} 
+                    onChange={e => setFormData({...formData, codigoIbge: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Logradouro</Label>
+                  <Input 
+                    value={formData?.logradouro || ""} 
+                    onChange={e => setFormData({...formData, logradouro: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Ambiente</Label>
-                  <Select value={formData?.ambiente} onValueChange={v => setFormData({...formData, ambiente: v})}>
-                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
-                      <SelectItem value="homologacao">Homologação (Simulação)</SelectItem>
-                      <SelectItem value="producao">Produção (Real)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Número</Label>
+                  <Input 
+                    value={formData?.numero || ""} 
+                    onChange={e => setFormData({...formData, numero: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Bairro</Label>
+                  <Input 
+                    value={formData?.bairro || ""} 
+                    onChange={e => setFormData({...formData, bairro: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CEP</Label>
+                  <Input 
+                    value={formData?.cep || ""} 
+                    onChange={e => setFormData({...formData, cep: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CSC Token (NFC-e)</Label>
+                  <Input 
+                    value={formData?.cscToken || ""} 
+                    onChange={e => setFormData({...formData, cscToken: e.target.value})}
+                    placeholder="Ex: 0123456789ABCDEF"
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CSC ID</Label>
+                  <Input 
+                    value={formData?.cscId || ""} 
+                    onChange={e => setFormData({...formData, cscId: e.target.value})}
+                    placeholder="Ex: 000001"
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Série NFC-e</Label>
+                  <Input 
+                    type="number"
+                    value={formData?.serieNfce || 1} 
+                    onChange={e => setFormData({...formData, serieNfce: parseInt(e.target.value)})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/5 rounded-2xl border border-white/10">
+                <div className="space-y-4">
+                  <Label className="text-primary uppercase font-black text-xs tracking-widest flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4" /> Certificado Digital (A1)
+                  </Label>
+                  <div className="flex flex-col gap-2">
+                    <Input 
+                      type="file" 
+                      accept=".pfx,.p12"
+                      className="hidden" 
+                      id="cert-upload"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const base64 = event.target?.result as string;
+                            setFormData({...formData, certificadoA1: base64});
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                    />
+                    <label 
+                      htmlFor="cert-upload"
+                      className="flex items-center justify-center gap-2 w-full h-12 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl cursor-pointer border border-dashed border-white/20 transition-all"
+                    >
+                      {formData?.certificadoA1 ? "✅ Certificado Carregado" : "Clique para selecionar o arquivo .pfx"}
+                    </label>
+                    <p className="text-[9px] text-white/30 uppercase font-bold text-center">Apenas arquivos .pfx ou .p12 (Certificado A1)</p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <Label className="text-primary uppercase font-black text-xs tracking-widest flex items-center gap-2">
+                    Senha do Certificado
+                  </Label>
+                  <Input 
+                    type="password"
+                    value={formData?.certificadoSenha || ""} 
+                    onChange={e => setFormData({...formData, certificadoSenha: e.target.value})}
+                    placeholder="Digite a senha do certificado"
+                    className="bg-black border-white/20 text-white font-bold h-12 rounded-xl"
+                  />
                 </div>
               </div>
 

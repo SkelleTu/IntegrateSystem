@@ -667,6 +667,16 @@ export class DatabaseStorage implements IStorage {
         .set(processedData)
         .where(eq(inventory.id, data.id))
         .returning();
+      
+      if (updated && updated.itemId && updated.itemType === 'product') {
+        await db.update(menuItems).set({
+          ncm: data.ncm || null,
+          cfop: data.cfop || null,
+          icmsOrigem: data.icmsOrigem || 0,
+          icmsSituacaoTributaria: data.icmsSituacaoTributaria || null
+        }).where(eq(menuItems.id, updated.itemId));
+      }
+      
       if (updated) return updated;
     }
 
