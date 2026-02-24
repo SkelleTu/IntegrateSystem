@@ -20,7 +20,7 @@ import passport from "passport";
 import { WebSocketServer, WebSocket } from "ws";
 
 const SessionStore = SQLiteStore(session);
-const dbSession = new sqlite("sessions.db");
+const dbSession = new sqlite(process.env.NODE_ENV === "production" ? "/tmp/sessions.db" : "sessions.db");
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
