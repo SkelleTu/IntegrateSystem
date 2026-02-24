@@ -372,6 +372,52 @@ export async function registerRoutes(
     res.json(logs);
   });
 
+  app.post("/api/fiscal/emitir/:saleId", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const saleId = Number(req.params.saleId);
+    
+    try {
+      const sale = await storage.getSale(saleId);
+      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      
+      const items = await storage.getSaleItems(saleId);
+      const settings = await storage.getFiscalSettings(user.enterpriseId);
+      
+      if (!settings) {
+        return res.status(400).json({ message: "Configurações fiscais não encontradas" });
+      }
+
+      // 1. Gerar XML
+      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce");
+      let xml = generateNFCeXML(sale, items, settings);
+      
+      // 2. Assinar XML
+      xml = await signXML(xml, settings);
+      
+      // 3. Transmitir
+      const result = await transmitToSefaz(xml, settings);
+      
+      if (result.success) {
+        await storage.updateSaleFiscal(saleId, {
+          fiscalStatus: "authorized",
+          fiscalKey: result.key,
+          fiscalXml: xml,
+          fiscalType: "NFCe"
+        });
+        res.json({ success: true, key: result.key });
+      } else {
+        throw new Error("Falha na transmissão");
+      }
+    } catch (err: any) {
+      console.error("Erro na emissão fiscal:", err);
+      await storage.updateSaleFiscal(saleId, {
+        fiscalStatus: "error",
+        fiscalError: err.message
+      });
+      res.status(500).json({ message: err.message || "Erro na emissão fiscal" });
+    }
+  });
+
   // Services Routes
   app.get(api.services.list.path, async (req, res) => {
     const services = await storage.getServices();

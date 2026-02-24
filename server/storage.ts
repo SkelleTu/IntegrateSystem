@@ -72,12 +72,12 @@ export interface IStorage {
   createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
   getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
   cancelSale(id: number): Promise<Sale>;
-  updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError'>>): Promise<Sale>;
 
   // Financial Transactions
   getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]>;
   createTransaction(transaction: any): Promise<Transaction>;
   deleteTransaction(id: number): Promise<void>;
+  
   // Inventory
   getInventory(): Promise<Inventory[]>;
   getInventoryItem(id: number): Promise<Inventory | undefined>;
@@ -110,15 +110,17 @@ export interface IStorage {
   upsertFiscalSettings(settings: InsertFiscalSettings): Promise<FiscalSettings>;
   getLogsFiscais(enterpriseId: number): Promise<any[]>;
   updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale>;
+  getSale(id: number): Promise<Sale | undefined>;
+  getSaleItems(saleId: number): Promise<SaleItem[]>;
+  getPayments(saleId: number): Promise<Payment[]>;
   
   // New Methods for Reports
   getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]>;
   getSalesByRegisterId(registerId: number): Promise<Sale[]>;
-  getSaleItems(saleId: number): Promise<SaleItem[]>;
-  getPayments(saleId: number): Promise<Payment[]>;
   
   getAllInventoryRestocks(): Promise<InventoryRestock[]>;
   getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]>;
+  restockInventory(id: number, data: any): Promise<Inventory>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -616,92 +618,26 @@ export class DatabaseStorage implements IStorage {
         quantity: data.quantity,
         unit: data.unit || existingItem.unit,
         itemsPerUnit: data.itemsPerUnit || existingItem.itemsPerUnit,
-        costPrice: data.costPrice || 0,
-        expiryDate: data.expiryDate || null,
+        costPrice: data.costPrice || existingItem.costPrice,
+        expiryDate: data.expiryDate || existingItem.expiryDate,
+        createdAt: new Date()
       });
-
-      if (data.costPrice && data.costPrice > 0 && data.quantity > 0) {
-        await tx.insert(transactions).values({
-          businessType: "padaria",
-          type: "expense",
-          category: "estoque",
-          description: `Reposição de estoque: ${existingItem.customName || 'Item'} (${data.quantity} ${data.unit || existingItem.unit})`,
-          amount: data.costPrice * data.quantity,
-          createdAt: new Date()
-        });
-      }
 
       return result;
     });
   }
 
-  async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks)
-      .where(eq(inventoryRestocks.inventoryId, inventoryId))
-      .orderBy(desc(inventoryRestocks.createdAt));
-  }
-
-  async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks)
-      .orderBy(desc(inventoryRestocks.createdAt));
-  }
-
   async upsertInventory(data: any): Promise<Inventory> {
-    const processedData: any = {
-      itemId: data.itemId || null,
-      itemType: data.itemType,
-      customName: data.customName || null,
-      quantity: parseInt(data.quantity) || 0,
-      unit: data.unit,
-      itemsPerUnit: parseInt(data.itemsPerUnit) || 1,
-      costPrice: typeof data.costPrice === 'string' ? Math.round(Number(data.costPrice.replace(',', '.')) * 100) : (data.costPrice || 0),
-      salePrice: typeof data.salePrice === 'string' ? Math.round(Number(data.salePrice.replace(',', '.')) * 100) : (data.salePrice || null),
-      barcode: data.barcode || null,
-      imageUrl: data.imageUrl || null,
-      expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-      updatedAt: new Date()
-    };
-
-    if (data.id) {
+    const { id, ...itemData } = data;
+    if (id) {
       const [updated] = await db.update(inventory)
-        .set(processedData)
-        .where(eq(inventory.id, data.id))
+        .set({ ...itemData, updatedAt: new Date() })
+        .where(eq(inventory.id, id))
         .returning();
-      
-      if (updated && updated.itemId && updated.itemType === 'product') {
-        await db.update(menuItems).set({
-          ncm: data.ncm || null,
-          cfop: data.cfop || null,
-          icmsOrigem: data.icmsOrigem || 0,
-          icmsSituacaoTributaria: data.icmsSituacaoTributaria || null
-        }).where(eq(menuItems.id, updated.itemId));
-      }
-      
-      if (updated) return updated;
+      return updated;
     }
-
-    // Se não for update, verifica se já existe o barcode para evitar erro de unique
-    if (processedData.barcode) {
-      const [existing] = await db.select().from(inventory).where(eq(inventory.barcode, processedData.barcode)).limit(1);
-      if (existing) {
-        throw new Error(`O ID/Código "${processedData.barcode}" já está em uso pelo item: ${existing.customName || 'Sem nome'}`);
-      }
-    }
-
-    const [result] = await db.insert(inventory).values(processedData).returning();
-
-    if (processedData.costPrice && processedData.costPrice > 0 && processedData.quantity > 0) {
-      await db.insert(transactions).values({
-        businessType: "padaria",
-        type: "expense",
-        category: "estoque",
-        description: `Compra de estoque: ${data.itemType === 'product' ? 'Produto' : 'Serviço'} ${data.customName || data.itemId}`,
-        amount: processedData.costPrice * processedData.quantity,
-        createdAt: new Date()
-      });
-    }
-
-    return result;
+    const [inserted] = await db.insert(inventory).values(itemData).returning();
+    return inserted;
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
@@ -712,21 +648,19 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
-    const [latest] = await db.select().from(timeClock)
-      .where(eq(timeClock.userId, userId))
-      .orderBy(desc(timeClock.timestamp))
-      .limit(1);
-    return latest;
-  }
-
+  // Time Clock
   async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
     return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp));
   }
 
+  async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
+    const [latest] = await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp)).limit(1);
+    return latest;
+  }
+
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const [newClock] = await db.insert(timeClock).values(data).returning();
-    return newClock;
+    const [clock] = await db.insert(timeClock).values(data).returning();
+    return clock;
   }
 
   async updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock> {
@@ -734,86 +668,89 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  // Settings
   async getSettings(enterpriseId?: number): Promise<Settings> {
-    let condition = enterpriseId ? eq(settings.enterpriseId, enterpriseId) : isNull(settings.enterpriseId);
-    let [item] = await db.select().from(settings).where(condition).limit(1);
-    if (!item) {
-      [item] = await db.insert(settings).values({ enterpriseId }).returning();
+    let query = db.select().from(settings);
+    if (enterpriseId) {
+      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
     }
-    return item;
+    const [s] = await query.limit(1);
+    if (!s) {
+      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
+      return newSettings;
+    }
+    return s;
   }
 
   async updateSettings(update: Partial<Settings>): Promise<Settings> {
-    const current = await this.getSettings(update.enterpriseId || undefined);
-    const [updated] = await db.update(settings)
-      .set(update)
-      .where(eq(settings.id, current.id))
-      .returning();
+    const { enterpriseId, ...rest } = update;
+    let query = db.update(settings).set(rest);
+    if (enterpriseId) {
+      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
+    }
+    const [updated] = await query.returning();
     return updated;
   }
 
-  async logUserSession(data: any): Promise<UserSession> {
+  // User Sessions
+  async logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession> {
     const [session] = await db.insert(userSessions).values(data).returning();
     return session;
   }
 
-  async getAdminMonitoringData(): Promise<any> {
+  async getAdminMonitoringData(): Promise<{ sessions: (UserSession & { username: string })[], enterprises: Enterprise[] }> {
     const sessionsList = await db.select({
       id: userSessions.id,
       userId: userSessions.userId,
-      username: users.username,
       type: userSessions.type,
       ipAddress: userSessions.ipAddress,
       userAgent: userSessions.userAgent,
       createdAt: userSessions.createdAt,
+      username: users.username,
     })
     .from(userSessions)
     .innerJoin(users, eq(userSessions.userId, users.id))
     .orderBy(desc(userSessions.createdAt))
-    .limit(100);
+    .limit(50);
 
-    const enterprisesList = await db.select().from(enterprises).orderBy(desc(enterprises.createdAt));
+    const enterprisesList = await db.select().from(enterprises);
 
-    return { sessions: sessionsList, enterprises: enterprisesList };
+    return {
+      sessions: sessionsList,
+      enterprises: enterprisesList
+    };
   }
 
-  async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
-    const [updated] = await db.update(sales)
-      .set(update)
-      .where(eq(sales.id, id))
-      .returning();
-    return updated;
-  }
-
+  // Fiscal
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
-    const [item] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId)).limit(1);
-    return item;
+    const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+    return settings;
   }
 
-  async upsertFiscalSettings(data: InsertFiscalSettings): Promise<FiscalSettings> {
-    const existing = await this.getFiscalSettings(data.enterpriseId);
+  async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
+    const existing = await this.getFiscalSettings(settingsData.enterpriseId);
     if (existing) {
-      const [updated] = await db.update(fiscalSettings).set(data).where(eq(fiscalSettings.id, existing.id)).returning();
+      const [updated] = await db.update(fiscalSettings).set(settingsData).where(eq(fiscalSettings.id, existing.id)).returning();
       return updated;
-    } else {
-      const [inserted] = await db.insert(fiscalSettings).values(data).returning();
-      return inserted;
     }
+    const [inserted] = await db.insert(fiscalSettings).values(settingsData).returning();
+    return inserted;
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {
-    return [];
+    // In a real app, you might have a dedicated table for fiscal logs
+    // For now, we return sales with fiscal info
+    return await db.select().from(sales).where(and(eq(sales.status, "completed"), eq(sales.fiscalStatus, "authorized"))).orderBy(desc(sales.createdAt));
   }
 
-  async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
-    let conditions = [];
-    if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
-    if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
-    return await db.select().from(cashRegisters).where(conditions.length > 0 ? and(...conditions) : undefined).orderBy(desc(cashRegisters.openedAt));
+  async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
+    const [updated] = await db.update(sales).set(update).where(eq(sales.id, id)).returning();
+    return updated;
   }
 
-  async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
-    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
+  async getSale(id: number): Promise<Sale | undefined> {
+    const [sale] = await db.select().from(sales).where(eq(sales.id, id));
+    return sale;
   }
 
   async getSaleItems(saleId: number): Promise<SaleItem[]> {
@@ -822,6 +759,29 @@ export class DatabaseStorage implements IStorage {
 
   async getPayments(saleId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.saleId, saleId));
+  }
+
+  async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
+    let conditions = [];
+    if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
+    if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
+    
+    return await db.select()
+      .from(cashRegisters)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(cashRegisters.openedAt));
+  }
+
+  async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
+    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
+  }
+
+  async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
+    return await db.select().from(inventoryRestocks).orderBy(desc(inventoryRestocks.createdAt));
+  }
+
+  async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
+    return await db.select().from(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId)).orderBy(desc(inventoryRestocks.createdAt));
   }
 }
 

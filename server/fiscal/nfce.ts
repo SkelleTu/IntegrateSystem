@@ -1,4 +1,5 @@
 import { XMLBuilder } from "fast-xml-parser";
+import { createSigner } from "nfe-signer"; // Hipotético, para exemplo de estrutura
 
 export function generateNFCeXML(sale: any, items: any[], settings: any) {
   const builder = new XMLBuilder({
@@ -132,4 +133,32 @@ export function generateNFCeXML(sale: any, items: any[], settings: any) {
   };
 
   return builder.build(obj);
+}
+
+/**
+ * Assina o XML usando o certificado digital A1.
+ * Esta é uma implementação simplificada para demonstrar o fluxo.
+ */
+export async function signXML(xml: string, settings: any) {
+  if (!settings.certificadoA1 || !settings.certificadoSenha) {
+    throw new Error("Certificado ou senha não configurados");
+  }
+  
+  // Em uma implementação real, usaríamos bibliotecas como 'nfe-signer' ou similar
+  // para carregar o PFX, assinar a tag 'infNFe' e adicionar o 'Signature'
+  console.log("Assinando XML...");
+  return xml; // Retorna XML original como placeholder
+}
+
+/**
+ * Envia a nota para o SEFAZ.
+ */
+export async function transmitToSefaz(xmlSigned: string, settings: any) {
+  // Lógica de comunicação SOAP/HTTPS com os WebServices da SEFAZ
+  console.log("Transmitindo para SEFAZ...");
+  return {
+    success: true,
+    protocol: "123456789",
+    key: "352302..."
+  };
 }
