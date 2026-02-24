@@ -1,0 +1,69 @@
+20:38:33.890 Running build in Washington, D.C., USA (East) – iad1
+20:38:33.891 Build machine configuration: 2 cores, 8 GB
+20:38:34.084 Cloning github.com/SkelleTu/IntegrateSystem (Branch: main, Commit: 3a6e813)
+20:38:34.085 Previous build caches not available.
+20:38:43.472 Cloning completed: 9.386s
+20:38:43.966 Running "vercel build"
+20:38:46.167 Vercel CLI 50.23.0
+20:38:46.765 Installing dependencies...
+20:38:57.929 
+20:38:57.930 added 526 packages in 11s
+20:38:57.930 
+20:38:57.930 76 packages are looking for funding
+20:38:57.930   run `npm fund` for details
+20:38:58.089 
+20:38:58.090 > rest-express@1.0.0 vercel-build
+20:38:58.090 > npm run build && mv dist/public dist/static && cp vercel.json dist/
+20:38:58.090 
+20:38:58.190 
+20:38:58.190 > rest-express@1.0.0 build
+20:38:58.190 > npx tsx script/build.ts
+20:38:58.190 
+20:38:59.284 building client...
+20:38:59.366 [36mvite v7.3.0 [32mbuilding client environment for production...[36m[39m
+20:38:59.627 transforming...
+20:39:00.871 
+20:39:00.872 [1m[33mwarn[39m[22m - The class `duration-[10000ms]` is ambiguous and matches multiple utilities.
+20:39:00.872 [1m[33mwarn[39m[22m - If this is content and not a class, replace it with `duration-&lsqb;10000ms&rsqb;` to silence this warning.
+20:39:05.533 [32m✓[39m 3031 modules transformed.
+20:39:06.080 rendering chunks...
+20:39:06.100 computing gzip size...
+20:39:06.141 [2m../dist/public/[22m[32mindex.html                                                                                    [39m[1m[2m    2.01 kB[22m[1m[22m[2m │ gzip:   0.77 kB[22m
+20:39:06.142 [2m../dist/public/[22m[2massets/[22m[32mAURA_1768346008566-CkoCS7Nu.png                                                        [39m[1m[2m   77.19 kB[22m[1m[22m
+20:39:06.142 [2m../dist/public/[22m[2massets/[22m[32mprofessional_busines_cc21c314-D1Q9kQtJ.jpg                                             [39m[1m[2m  376.00 kB[22m[1m[22m
+20:39:06.143 [2m../dist/public/[22m[2massets/[22m[32mabstract_connection_network_with_glowing_communication_nodes.-BsL_Yt70.png             [39m[1m[2m1,111.42 kB[22m[1m[22m
+20:39:06.143 [2m../dist/public/[22m[2massets/[22m[32mdigital_dashboard_with_floating_data_analytics_and_cyan_glowing_metrics.-D0dBqPDk.png  [39m[1m[2m1,204.91 kB[22m[1m[22m
+20:39:06.143 [2m../dist/public/[22m[2massets/[22m[35mindex-CunEecfu.css                                                                     [39m[1m[2m  145.09 kB[22m[1m[22m[2m │ gzip:  21.30 kB[22m
+20:39:06.143 [2m../dist/public/[22m[2massets/[22m[36mindex-BrJX8k4m.js                                                                      [39m[1m[33m  899.14 kB[39m[22m[2m │ gzip: 263.84 kB[22m
+20:39:06.143 [32m✓ built in 6.55s[39m
+20:39:06.144 building server...
+20:39:06.144 [33m
+20:39:06.144 (!) Some chunks are larger than 500 kB after minification. Consider:
+20:39:06.144 - Using dynamic import() to code-split the application
+20:39:06.144 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+20:39:06.144 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+20:39:06.256 ✘ [ERROR] Could not resolve "fast-xml-parser"
+20:39:06.257 
+20:39:06.257     server/fiscal/nfce.ts:1:27:
+20:39:06.257       1 │ import { XMLBuilder } from "fast-xml-parser";
+20:39:06.257         ╵                            ~~~~~~~~~~~~~~~~~
+20:39:06.258 
+20:39:06.258   You can mark the path "fast-xml-parser" as external to exclude it from the bundle, which will remove this error and leave the unresolved path in the bundle.
+20:39:06.258 
+20:39:06.320 1 error
+20:39:06.324 Error: Build failed with 1 error:
+20:39:06.325 server/fiscal/nfce.ts:1:27: ERROR: Could not resolve "fast-xml-parser"
+20:39:06.325     at failureErrorWithLog (/vercel/path0/node_modules/esbuild/lib/main.js:1467:15)
+20:39:06.326     at /vercel/path0/node_modules/esbuild/lib/main.js:926:25
+20:39:06.326     at /vercel/path0/node_modules/esbuild/lib/main.js:878:52
+20:39:06.326     at buildResponseToResult (/vercel/path0/node_modules/esbuild/lib/main.js:924:7)
+20:39:06.326     at /vercel/path0/node_modules/esbuild/lib/main.js:951:16
+20:39:06.326     at responseCallbacks.<computed> (/vercel/path0/node_modules/esbuild/lib/main.js:603:9)
+20:39:06.327     at handleIncomingPacket (/vercel/path0/node_modules/esbuild/lib/main.js:658:12)
+20:39:06.327     at Socket.readFromStdout (/vercel/path0/node_modules/esbuild/lib/main.js:581:7)
+20:39:06.328     at Socket.emit (node:events:508:28)
+20:39:06.328     at addChunk (node:internal/streams/readable:559:12) {
+20:39:06.328   errors: [Getter/Setter],
+20:39:06.328   warnings: [Getter/Setter]
+20:39:06.328 }
+20:39:06.400 Error: Command "npm run vercel-build" exited with 1
