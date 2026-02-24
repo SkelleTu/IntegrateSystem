@@ -134,7 +134,10 @@ export default function Home() {
           variant="outline" 
           size="sm" 
           className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 text-white/60"
-          onClick={() => window.location.href = "/api/download/app"}
+          onClick={() => toast({
+            title: "App em Breve",
+            description: "A versão completa para Windows está em desenvolvimento. Use a versão Web por enquanto.",
+          })}
           data-testid="button-download-app"
         >
           <Download className="h-4 w-4" />
