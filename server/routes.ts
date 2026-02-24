@@ -352,7 +352,7 @@ export async function registerRoutes(
 
   // Fiscal Routes
   app.get("/api/download/app", (req, res) => {
-    const filePath = path.resolve("public/attached_assets/dist_windows/AuraSystem.exe");
+    const filePath = path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe");
     if (!fs.existsSync(filePath)) {
       console.error("Arquivo não encontrado em:", filePath);
       return res.status(404).json({ message: "Arquivo de download não encontrado" });
