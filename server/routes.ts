@@ -352,8 +352,9 @@ export async function registerRoutes(
 
   // Fiscal Routes
   app.get("/api/download/app", (req, res) => {
-    const filePath = path.resolve("public/downloads/AuraPrinter.exe");
+    const filePath = path.resolve("public/attached_assets/dist_windows/AuraPrinter.exe");
     if (!fs.existsSync(filePath)) {
+      console.error("Arquivo não encontrado em:", filePath);
       return res.status(404).json({ message: "Arquivo de download não encontrado" });
     }
     res.download(filePath, "AuraPrinter.exe");
