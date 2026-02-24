@@ -111,10 +111,10 @@ export default function LabelSystem() {
               <Zap className="w-3 h-3" /> Tecnologia de Ponta
             </div>
             <h1 className="text-5xl md:text-7xl font-black italic uppercase tracking-tighter text-white leading-none">
-              Aura <span className="text-primary drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]">Printer</span>
+              Aura <span className="text-primary drop-shadow-[0_0_15px_rgba(0,229,255,0.5)]">System</span>
             </h1>
             <p className="text-zinc-400 text-lg md:text-xl font-medium max-w-xl leading-relaxed">
-              O <span className="text-white font-bold">Aura Label Gateway</span> é a ponte definitiva entre a inteligência da nuvem e a precisão do seu hardware. Velocidade instantânea, precisão cirúrgica.
+              O <span className="text-white font-bold">Aura Desktop Gateway</span> é a ponte definitiva entre a inteligência da nuvem e a precisão do seu hardware. Velocidade instantânea, precisão cirúrgica.
             </p>
             <div className="flex flex-wrap gap-4 pt-4 justify-center md:justify-start">
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 border border-white/10">
@@ -154,7 +154,7 @@ export default function LabelSystem() {
           { 
             step: "01", 
             title: "DOWNLOAD & START", 
-            desc: "Baixe o Aura Printer e execute no seu Windows. Ele é leve, portátil e não precisa de instalação complexa.",
+            desc: "Baixe o Aura System e execute no seu Windows. Ele é leve, portátil e não precisa de instalação complexa.",
             icon: Download 
           },
           { 
@@ -165,8 +165,8 @@ export default function LabelSystem() {
           },
           { 
             step: "03", 
-            title: "MAGIC PRINT", 
-            desc: "Ao clicar em imprimir no Aura Web, o comando viaja pela nuvem e sai direto na sua impressora física.",
+            title: "MAGIC SYSTEM", 
+            desc: "Ao clicar em imprimir ou realizar ações no Aura Web, o comando viaja pela nuvem e reflete direto no seu app físico.",
             icon: Printer 
           }
         ].map((item, i) => (
