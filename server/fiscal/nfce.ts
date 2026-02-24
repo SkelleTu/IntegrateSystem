@@ -1,5 +1,5 @@
 import { XMLBuilder } from "fast-xml-parser";
-import { createSigner } from "nfe-signer"; // Hipotético, para exemplo de estrutura
+import { signer } from "nfe-signer"; 
 
 export function generateNFCeXML(sale: any, items: any[], settings: any) {
   const builder = new XMLBuilder({
