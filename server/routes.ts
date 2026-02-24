@@ -75,15 +75,20 @@ export async function registerRoutes(
     }
   });
 
-  wss.on('connection', (ws) => {
+  wss.on('connection', (ws, req) => {
     console.log('WS Connection established for labels');
+    
+    // Enviar mensagem de boas-vindas para confirmar conexão
+    ws.send(JSON.stringify({ type: 'SERVER_HELLO', message: 'Conectado ao Aura System' }));
 
     ws.on('message', (msg) => {
       try {
         const data = JSON.parse(msg.toString());
+        console.log('WS Message received:', data);
         if (data.type === 'WINDOWS_HELLO') {
           windowsClient = ws;
           console.log('Windows Label App connected');
+          ws.send(JSON.stringify({ type: 'HELLO_ACK', message: 'Registrado com sucesso' }));
         }
       } catch (e) {
         console.error('WS Message error:', e);
