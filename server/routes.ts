@@ -357,7 +357,7 @@ export async function registerRoutes(
       console.error("Arquivo não encontrado em:", filePath);
       return res.status(404).json({ message: "Arquivo de download não encontrado" });
     }
-    res.download(filePath, "AuraPrinter.exe");
+    res.download(filePath, "AuraSystem.exe");
   });
 
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {

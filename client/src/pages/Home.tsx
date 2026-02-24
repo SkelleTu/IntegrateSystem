@@ -140,7 +140,7 @@ export default function Home() {
           data-testid="button-download-app"
         >
           <Download className="h-4 w-4" />
-          Baixar Aura System (Físico)
+          Baixar Aura System (Windows)
         </Button>
         <div className="text-[10px] md:text-xs tracking-[0.4em] text-white/40 uppercase font-black opacity-30">
           Aura Premium System v2.0
