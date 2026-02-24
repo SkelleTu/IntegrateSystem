@@ -346,6 +346,14 @@ export async function registerRoutes(
   }
 
   // Fiscal Routes
+  app.get("/api/download/app", (req, res) => {
+    const filePath = path.resolve("public/downloads/AuraPrinter.exe");
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "Arquivo de download não encontrado" });
+    }
+    res.download(filePath, "AuraPrinter.exe");
+  });
+
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });

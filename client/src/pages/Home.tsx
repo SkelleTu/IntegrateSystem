@@ -1,6 +1,6 @@
 import { useLocation, Link } from "wouter";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
-import { ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon } from "lucide-react";
+import { ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
@@ -128,9 +128,21 @@ export default function Home() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
-        className="text-[10px] md:text-xs tracking-[0.4em] text-white/40 uppercase font-black opacity-30 pb-8"
+        className="flex flex-col items-center gap-4 pb-8"
       >
-        Aura Premium System v2.0
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 text-white/60"
+          onClick={() => window.location.href = "/api/download/app"}
+          data-testid="button-download-app"
+        >
+          <Download className="h-4 w-4" />
+          Baixar Versão Windows
+        </Button>
+        <div className="text-[10px] md:text-xs tracking-[0.4em] text-white/40 uppercase font-black opacity-30">
+          Aura Premium System v2.0
+        </div>
       </motion.div>
     </div>
   );
