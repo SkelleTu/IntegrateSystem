@@ -17,8 +17,8 @@ export const dbLocal = drizzleSqlite(localSqlite, { schema });
 let remoteDb: any = null;
 
 if (process.env.DATABASE_URL) {
-  // Remote DB disabled temporarily to avoid Neon template literal issues
-  // The user should use drizzle-kit push for remote database management
+  const sql = neon(process.env.DATABASE_URL);
+  remoteDb = drizzleNeon(sql, { schema });
 } else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
     url: process.env.TURSO_URL, 
