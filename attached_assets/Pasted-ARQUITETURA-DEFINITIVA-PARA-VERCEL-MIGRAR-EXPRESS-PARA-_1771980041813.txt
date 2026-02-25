@@ -1,0 +1,234 @@
+ARQUITETURA DEFINITIVA PARA VERCEL — MIGRAR EXPRESS PARA SERVERLESS (OPÇÃO 2)
+
+OBJETIVO:
+Converter o backend Express atual para o modelo serverless nativo da Vercel,
+eliminando FUNCTION_INVOCATION_FAILED e alinhando a arquitetura ao ambiente correto.
+
+====================================================================
+
+1) ENTENDIMENTO ARQUITETURAL (O QUE PRECISA MUDAR)
+
+Hoje o projeto está estruturado como servidor tradicional:
+
+- Express cria app
+- app.listen() inicia servidor
+- Processo fica rodando continuamente
+
+Isso funciona em VPS.
+Mas a Vercel NÃO mantém servidor ativo.
+
+Na Vercel:
+- Cada requisição invoca uma função isolada
+- A função precisa EXPORTAR um handler
+- NÃO pode usar app.listen()
+- NÃO pode manter processo aberto
+
+Portanto:
+Precisamos transformar o Express em handler serverless.
+
+====================================================================
+
+2) ESTRUTURA CORRETA
+
+Estrutura recomendada:
+
+/api/index.ts        ← função serverless
+/server/app.ts       ← configuração do express
+/server/routes.ts    ← rotas
+package.json
+vercel.json
+
+====================================================================
+
+3) PASSO 1 — INSTALAR DEPENDÊNCIA NECESSÁRIA
+
+Instalar:
+
+npm install serverless-http
+
+Essa lib adapta Express para o formato que a Vercel exige.
+
+====================================================================
+
+4) PASSO 2 — SEPARAR A CRIAÇÃO DO APP DO LISTEN
+
+Criar arquivo:
+
+server/app.ts
+
+Conteúdo:
+
+------------------------------------------------------------
+
+import express from "express"
+import routes from "./routes.js"
+
+const app = express()
+
+app.use(express.json())
+app.use(routes)
+
+export default app
+
+------------------------------------------------------------
+
+IMPORTANTE:
+NÃO colocar app.listen aqui.
+
+====================================================================
+
+5) PASSO 3 — CRIAR HANDLER SERVERLESS
+
+Criar arquivo:
+
+api/index.ts
+
+Conteúdo:
+
+------------------------------------------------------------
+
+import serverless from "serverless-http"
+import app from "../server/app.js"
+
+export default serverless(app)
+
+------------------------------------------------------------
+
+Agora:
+Cada requisição da Vercel chamará essa função.
+Ela executa o Express internamente.
+Sem servidor persistente.
+
+====================================================================
+
+6) PASSO 4 — REMOVER COMPLETAMENTE
+
+Remover qualquer:
+
+app.listen(...)
+createServer(...)
+http.createServer(...)
+
+NÃO pode existir listen em ambiente serverless.
+
+====================================================================
+
+7) PASSO 5 — CRIAR vercel.json CORRETO
+
+Na raiz:
+
+------------------------------------------------------------
+
+{
+  "functions": {
+    "api/index.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.ts"
+    }
+  ]
+}
+
+------------------------------------------------------------
+
+Isso diz para a Vercel:
+Toda requisição → api/index.ts
+
+====================================================================
+
+8) PASSO 6 — AJUSTAR package.json
+
+Manter:
+
+"type": "module"
+
+Remover dependência de start com dist/index.cjs
+Pois agora quem executa é a Vercel diretamente.
+
+Scripts podem ficar:
+
+{
+  "scripts": {
+    "dev": "tsx server/app.ts"
+  }
+}
+
+Mas produção será totalmente controlada pela Vercel.
+
+====================================================================
+
+9) RAIZ DO ERRO FUNCTION_INVOCATION_FAILED
+
+Esse erro acontece quando:
+
+- A função lança exceção não tratada
+- O runtime quebra antes de responder
+- O processo tenta abrir servidor (listen)
+- Import falha no bundle
+
+Antes:
+O código tentava abrir servidor permanente.
+A Vercel encerrava o processo.
+Crash → 500.
+
+Agora:
+A função apenas exporta handler.
+Sem processo persistente.
+Sem conflito.
+
+====================================================================
+
+10) MODELO MENTAL CORRETO
+
+Servidor tradicional:
+Processo sobe → fica rodando → responde requisições.
+
+Serverless:
+Requisição chega → função executa → retorna resposta → encerra.
+
+Cada request é isolado.
+
+====================================================================
+
+11) SINAIS DE ALERTA FUTUROS
+
+Se existir:
+
+- app.listen()
+- conexão global persistente mal configurada
+- variáveis de estado globais mutáveis
+- timers permanentes
+- WebSocket sem adaptação
+
+Provavelmente vai quebrar em serverless.
+
+====================================================================
+
+12) VANTAGENS DESSA ARQUITETURA
+
+✔ Escalabilidade automática
+✔ Cold start otimizado
+✔ Sem conflitos de runtime
+✔ Sem FUNCTION_INVOCATION_FAILED estrutural
+✔ Arquitetura alinhada com Vercel
+
+====================================================================
+
+RESULTADO FINAL
+
+Depois de aplicar:
+
+git add .
+git commit -m "migrate to serverless architecture"
+git push
+
+Redeploy automático.
+
+A aplicação passa a rodar no modelo correto da plataforma.
+Sem hack.
+Sem gambiarra.
+Arquitetura definitiva.
