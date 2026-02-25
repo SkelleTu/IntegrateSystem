@@ -1,0 +1,166 @@
+ERRO: Function Runtimes must have a valid version
+
+CAUSA REAL (100% objetiva):
+
+O problema está no seu vercel.json.
+
+Você definiu runtime assim:
+
+"runtime": "nodejs18.x"
+
+Esse formato NÃO é mais aceito na versão atual da Vercel CLI (50+).
+
+A Vercel mudou o modelo de definição de runtime.
+Agora ela NÃO aceita mais essa string simples.
+
+Ela espera:
+
+1) Runtime automático baseado em Node version do projeto
+OU
+2) Runtime com versão explícita no formato interno (ex: @vercel/node@X.X.X)
+
+Você misturou o modelo antigo com o novo sistema de Functions.
+
+Por isso o build falha antes mesmo de compilar.
+
+--------------------------------------------------------------------
+
+A SOLUÇÃO DEFINITIVA
+
+Remova COMPLETAMENTE a seção "functions" do vercel.json.
+
+Ela não é mais necessária para Node moderno.
+
+Deixe o vercel.json assim:
+
+{
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.ts"
+    }
+  ]
+}
+
+Somente isso.
+
+Sem "functions".
+Sem "runtime".
+
+--------------------------------------------------------------------
+
+POR QUE ISSO FUNCIONA
+
+A Vercel detecta automaticamente:
+
+- Projeto Node
+- Arquivos dentro de /api
+- Usa runtime padrão Node 18 ou 20 conforme o projeto
+
+Ela já sabe como rodar serverless TypeScript.
+
+Você só precisa:
+
+✔ Ter /api/index.ts
+✔ Export default handler
+✔ Não usar app.listen()
+
+Nada mais.
+
+--------------------------------------------------------------------
+
+SE QUISER FORÇAR VERSÃO NODE CORRETA
+
+No package.json adicione:
+
+{
+  "engines": {
+    "node": "18.x"
+  }
+}
+
+Isso define o runtime Node corretamente sem precisar mexer no vercel.json.
+
+--------------------------------------------------------------------
+
+POR QUE ESSE ERRO EXISTE
+
+A Vercel migrou para novo sistema de builders.
+O campo "runtime": "nodejs18.x" era do modelo antigo.
+
+Agora:
+
+- Ou você usa runtime automático
+- Ou usa formato interno versionado (@vercel/node@...)
+
+Como você usou formato antigo,
+o CLI rejeitou com:
+
+Function Runtimes must have a valid version
+
+Ele nem chegou a compilar.
+
+--------------------------------------------------------------------
+
+MODELO CORRETO FINAL (ESTÁVEL)
+
+Estrutura:
+
+/api/index.ts
+/server/app.ts
+/server/routes.ts
+vercel.json
+package.json
+
+vercel.json:
+
+{
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.ts"
+    }
+  ]
+}
+
+package.json:
+
+"type": "module",
+"engines": {
+  "node": "18.x"
+}
+
+api/index.ts:
+
+import serverless from "serverless-http"
+import app from "../server/app.js"
+
+export default serverless(app)
+
+Sem listen.
+Sem runtime manual.
+Sem dist.
+Sem build custom.
+
+--------------------------------------------------------------------
+
+Depois disso:
+
+git add .
+git commit -m "fix runtime config"
+git push
+
+A build vai passar.
+
+--------------------------------------------------------------------
+
+CONCLUSÃO
+
+O erro não é do Express.
+Não é do serverless.
+Não é do código.
+
+É conflito entre modelo antigo de runtime
+e o novo sistema de Functions da Vercel.
+
+Removendo o bloco "functions", resolve definitivamente.
