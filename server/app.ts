@@ -84,7 +84,8 @@ export async function initApp() {
     res.status(status).json({ message });
   });
 
-  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL;
+  if (isProduction) {
     serveStatic(app);
   } else {
     try {

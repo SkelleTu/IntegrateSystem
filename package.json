@@ -7,8 +7,8 @@
     "node": "24.x"
   },
   "scripts": {
-    "dev": "NODE_ENV=development npx tsx server/index.ts",
-    "build": "npx tsx script/build.ts",
+    "dev": "tsx server/index.ts",
+    "build": "tsx script/build.ts",
     "vercel-build": "npm run build && mv dist/public dist/static && cp vercel.json dist/",
     "start": "node dist/index.cjs",
     "check": "tsc",

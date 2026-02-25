@@ -18,8 +18,7 @@ let remoteDb: any = null;
 
 if (process.env.DATABASE_URL) {
   // Remote DB disabled temporarily to avoid Neon template literal issues
-  // const sql = neon(process.env.DATABASE_URL);
-  // remoteDb = drizzleNeon(sql, { schema });
+  // The user should use drizzle-kit push for remote database management
 } else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
     url: process.env.TURSO_URL, 
@@ -253,9 +252,9 @@ export async function setupDatabase() {
 
   for (const table of tables) {
     if (isRemoteEnabled && process.env.DATABASE_URL) {
-       // Sincronização remota desativada temporariamente para evitar erros de sintaxe entre SQLite e Postgres no startup
-       // O ideal é usar migrations reais (drizzle-kit push) para o banco remoto
-       console.log("Migration remota pulada para evitar conflitos de sintaxe. Use drizzle-kit push.");
+       // Sincronização remota via raw SQL é arriscada devido a diferenças de sintaxe.
+       // Em produção/preview, as tabelas devem ser gerenciadas via drizzle-kit push.
+       console.log("Aviso: Pulando criação automática de tabela no banco remoto. Use 'npm run db:push'.");
     } else {
        localSqlite.prepare(table).run();
        if (isRemoteEnabled && (targetDb as any).prepare) {
