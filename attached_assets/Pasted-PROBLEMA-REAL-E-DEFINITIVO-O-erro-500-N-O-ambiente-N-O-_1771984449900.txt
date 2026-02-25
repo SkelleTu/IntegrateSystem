@@ -1,0 +1,128 @@
+PROBLEMA REAL E DEFINITIVO
+
+O erro 500 NÃO é ambiente.
+NÃO é produção.
+NÃO é Vercel.
+NÃO é Node 24.
+
+É exclusivamente isto:
+
+Error [ERR_MODULE_NOT_FOUND]:
+Cannot find module '/var/task/shared/schema'
+imported from /var/task/shared/routes.js
+
+O Node está tentando carregar:
+
+/var/task/shared/schema
+
+Mas no modo ESM (Node 24), ele exige o arquivo com EXTENSÃO EXATA.
+Ele NÃO adiciona ".js" automaticamente.
+Ele NÃO resolve ".ts".
+Ele NÃO faz fallback.
+
+Isso é comportamento padrão do ESM.
+
+
+CAUSA TÉCNICA
+
+Você provavelmente trocou o alias:
+
+@shared/schema
+
+por:
+
+../shared/schema
+
+Mas deixou sem a extensão .js.
+
+No TypeScript isso compila.
+No runtime da Vercel (Node ESM), explode.
+
+
+REGRA ABSOLUTA DO NODE 24 ESM
+
+Todo import relativo DEVE terminar com .js
+
+Mesmo que o arquivo original seja .ts.
+
+
+CORREÇÃO DEFINITIVA
+
+Procurar no projeto inteiro por imports assim:
+
+import { algo } from "../shared/schema"
+import { algo } from "./schema"
+import { algo } from "../../shared/schema"
+
+E transformar TODOS em:
+
+import { algo } from "../shared/schema.js"
+import { algo } from "./schema.js"
+import { algo } from "../../shared/schema.js"
+
+Sem exceção.
+
+
+EXEMPLO PRÁTICO
+
+Estrutura:
+
+shared/schema.ts
+shared/routes.ts
+
+Dentro de shared/routes.ts:
+
+ERRADO:
+import { x } from "./schema"
+
+CORRETO:
+import { x } from "./schema.js"
+
+
+OUTRO EXEMPLO
+
+server/db.ts importando shared:
+
+ERRADO:
+import { schema } from "../shared/schema"
+
+CORRETO:
+import { schema } from "../shared/schema.js"
+
+
+POR QUE CONTINUA QUEBRANDO
+
+Porque basta UM único import sem .js
+para a função inteira falhar.
+
+Serverless não tolera erro de resolução.
+
+
+AÇÃO IMEDIATA
+
+1) Buscar globalmente por:
+   shared/schema
+   "../shared/
+   "./schema
+   "../../shared/
+
+2) Garantir que TODOS terminem com .js
+
+3) Commit
+4) Push
+5) Deploy
+
+
+MODELO MENTAL CORRETO
+
+CommonJS resolve extensão automaticamente.
+ESM NÃO resolve.
+
+Vercel usa Node ESM.
+Node ESM exige extensão explícita.
+
+Sem .js = quebra.
+Com .js = funciona.
+
+
+Isso resolve definitivamente o 500.

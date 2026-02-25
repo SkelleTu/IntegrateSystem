@@ -54,7 +54,7 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db } from "./db";
+import { db } from "./db.js";
 import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema.js";
 
 export async function registerRoutes(
