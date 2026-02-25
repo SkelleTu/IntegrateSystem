@@ -1,0 +1,110 @@
+ERRO: Found invalid or discontinued Node.js Version: "18.x"
+
+CAUSA REAL
+
+A Vercel descontinuou oficialmente o Node 18 no ambiente padrão
+e agora exige Node 24.x como runtime válido.
+
+Seu package.json ainda está com:
+
+"engines": {
+  "node": "18.x"
+}
+
+Por isso o build está abortando antes mesmo de rodar.
+
+Isso NÃO é erro do seu código.
+É política de runtime da Vercel atualizada.
+
+--------------------------------------------------------------------
+
+CORREÇÃO DEFINITIVA
+
+1) Abra o package.json
+2) Substitua COMPLETAMENTE a seção engines por:
+
+"engines": {
+  "node": "24.x"
+}
+
+Se não existir engines, adicione.
+
+Exemplo correto:
+
+{
+  "name": "integratesystem",
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  ...
+}
+
+--------------------------------------------------------------------
+
+IMPORTANTE
+
+Não use:
+"node": ">=18"
+Não use:
+"node": "20.x"
+Não use:
+"node": "^24"
+
+Tem que ser exatamente:
+
+"24.x"
+
+Porque a Vercel agora valida explicitamente.
+
+--------------------------------------------------------------------
+
+POR QUE ISSO ACONTECEU
+
+Antes:
+Node 18 era LTS padrão.
+
+Agora:
+A Vercel migrou para Node 24 como runtime default.
+
+Quando o CLI detecta engines incompatível,
+ele cancela o build por segurança.
+
+Isso evita:
+- inconsistência de runtime
+- bugs de ESM
+- diferenças de API do Node
+
+--------------------------------------------------------------------
+
+O QUE FAZER AGORA
+
+1) Atualizar package.json
+2) Commit
+3) Push
+4) Deploy automático
+
+--------------------------------------------------------------------
+
+CHECAGEM EXTRA (RECOMENDADO)
+
+Certifique-se de que:
+
+- Não existe .nvmrc forçando versão antiga
+- Não existe NODE_VERSION definido nas env vars
+- Não existe runtime manual no vercel.json
+
+Tudo deve estar automático.
+
+--------------------------------------------------------------------
+
+RESUMO
+
+O erro não é mais estrutural.
+É apenas política de versão Node da Vercel.
+
+Troque para:
+
+"engines": { "node": "24.x" }
+
+E o build vai continuar normalmente.
