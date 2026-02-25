@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, Category, Ticket } from "../../shared/schema.js";
+import { MenuItem, Category, Ticket } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";

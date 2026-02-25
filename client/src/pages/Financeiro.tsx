@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Transaction, insertTransactionSchema } from "../../shared/schema.js";
+import { Transaction, insertTransactionSchema } from "@shared/schema";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2, ArrowLeft, TrendingUp, TrendingDown, DollarSign, PlusCircle, Wallet, LayoutDashboard, Receipt, BarChartHorizontal, Trash2 } from "lucide-react";
 import { format } from "date-fns";

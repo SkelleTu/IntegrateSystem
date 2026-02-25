@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../../shared/routes.js";
-import type { LoginRequest } from "../../../shared/schema.js";
+import { api } from "@shared/routes";
+import type { LoginRequest } from "@shared/schema";
 
 export function useAuth() {
   const { data: user, isLoading, error } = useUser();

@@ -18,7 +18,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { CashRegister, Sale } from "../../shared/schema.js";
+import type { CashRegister, Sale } from "@shared/schema";
 
 export default function CashierClose() {
   const [, setLocation] = useLocation();
