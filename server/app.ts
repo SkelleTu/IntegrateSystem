@@ -12,7 +12,10 @@ const app = express();
 const httpServer = createServer(app);
 
 // Serve attached assets/uploads
-const uploadsPath = path.join(process.cwd(), "attached_assets", "uploads");
+const uploadsPath = process.env.VERCEL 
+  ? path.join('/tmp', "uploads")
+  : path.join(process.cwd(), "attached_assets", "uploads");
+
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }

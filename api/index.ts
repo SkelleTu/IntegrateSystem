@@ -1,9 +1,9 @@
-import serverless from "serverless-http";
-import { initApp } from "../server/app.js";
+import serverless from 'serverless-http';
+import { initApp } from '../server/app.js';
 
-let handler: any;
+let handler;
 
-export default async (req: any, res: any) => {
+export default async (req, res) => {
   if (!handler) {
     const { app } = await initApp();
     handler = serverless(app);
