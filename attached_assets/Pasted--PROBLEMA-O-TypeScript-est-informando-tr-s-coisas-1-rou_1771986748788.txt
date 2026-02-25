@@ -1,0 +1,164 @@
+
+PROBLEMA
+
+O TypeScript está informando três coisas:
+
+1) routes.ts está chamando:
+   storage.upsertInventory(...)
+
+   Mas o método NÃO existe dentro da classe DatabaseStorage.
+
+2) A classe DatabaseStorage implementa a interface IStorage,
+   porém NÃO implementa todos os métodos obrigatórios.
+
+3) Portanto, o contrato da interface está quebrado.
+
+------------------------------------------------------------
+CAUSA REAL
+
+Você declarou algo assim:
+
+interface IStorage {
+  getInventory(...)
+  upsertInventory(...)
+  ...
+}
+
+Mas na classe:
+
+class DatabaseStorage implements IStorage {
+  getInventory(...) { ... }
+}
+
+E NÃO existe:
+
+upsertInventory(...)
+
+Isso viola o contrato da interface.
+
+------------------------------------------------------------
+SOLUÇÃO ESTRUTURAL CORRETA
+
+Você tem DUAS opções.
+
+------------------------------------------------------------
+OPÇÃO A (RECOMENDADA)
+Implementar o método upsertInventory corretamente
+------------------------------------------------------------
+
+Dentro de server/storage.ts,
+na classe DatabaseStorage,
+adicionar o método que está faltando.
+
+Estrutura padrão:
+
+async upsertInventory(item: InventoryItem): Promise<InventoryItem> {
+  
+  const existing = await this.db
+    .select()
+    .from(inventory)
+    .where(eq(inventory.productId, item.productId))
+    .limit(1);
+
+  if (existing.length > 0) {
+    const updated = await this.db
+      .update(inventory)
+      .set({
+        quantity: item.quantity,
+        updatedAt: new Date()
+      })
+      .where(eq(inventory.productId, item.productId))
+      .returning();
+
+    return updated[0];
+  }
+
+  const inserted = await this.db
+    .insert(inventory)
+    .values({
+      ...item,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    })
+    .returning();
+
+  return inserted[0];
+}
+
+OBS:
+Ajustar nomes conforme seu schema real.
+
+O importante é:
+- Método precisa existir
+- Assinatura precisa bater exatamente com a interface
+
+------------------------------------------------------------
+OPÇÃO B (SE O MÉTODO NÃO DEVERIA EXISTIR)
+------------------------------------------------------------
+
+Se você NÃO quer usar upsertInventory,
+então:
+
+1) Remover ele da interface IStorage
+2) Remover chamadas dele em routes.ts
+3) Substituir por updateInventory ou createInventory
+
+Mas isso só se o design mudou.
+
+------------------------------------------------------------
+IMPORTANTE SOBRE O ERRO TS2420
+
+Esse erro:
+
+Class 'DatabaseStorage' incorrectly implements interface 'IStorage'
+
+Significa:
+
+Algum método obrigatório da interface está faltando.
+
+Faça o seguinte:
+
+1) Vá na interface IStorage
+2) Liste TODOS os métodos
+3) Confirme que TODOS existem na classe DatabaseStorage
+
+Nenhum pode faltar.
+Nenhum pode ter assinatura diferente.
+
+Exemplo de erro comum:
+
+Interface:
+upsertInventory(item: InventoryItem): Promise<InventoryItem>
+
+Classe:
+upsertInventory(item: any): any
+
+Isso já quebra tipagem.
+
+------------------------------------------------------------
+PASSO FINAL
+
+Depois de corrigir:
+
+1) Verifique se não há métodos duplicados
+2) Verifique se todos imports (eq, inventory, etc) estão corretos
+3) Rode build local antes de subir para Vercel
+
+------------------------------------------------------------
+RESUMO
+
+O erro não é de ambiente.
+Não é de produção.
+Não é da Vercel.
+
+É quebra de contrato entre interface e implementação.
+
+Implemente o método que está faltando
+ou ajuste a interface para refletir a realidade do código.
+
+Se quiser, me manda:
+
+- A interface IStorage
+- A classe DatabaseStorage
+
+Que eu te devolvo exatamente o método compatível com sua estrutura atual.

@@ -544,6 +544,41 @@ export class DatabaseStorage implements IStorage {
     await db.delete(inventory).where(eq(inventory.id, id));
   }
 
+  async upsertInventory(data: any): Promise<Inventory> {
+    return await dualWrite(async (database) => {
+      const { id, ...itemData } = data;
+      if (id) {
+        const [existing] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+        if (existing) {
+          const [updated] = await database.update(inventory)
+            .set({ ...itemData, updatedAt: new Date() })
+            .where(eq(inventory.id, id))
+            .returning();
+          return updated;
+        }
+      }
+      
+      // If no ID or item doesn't exist, try to find by itemId and itemType
+      if (itemData.itemId && itemData.itemType) {
+        const [existing] = await database.select()
+          .from(inventory)
+          .where(and(eq(inventory.itemId, itemData.itemId), eq(inventory.itemType, itemData.itemType)))
+          .limit(1);
+          
+        if (existing) {
+          const [updated] = await database.update(inventory)
+            .set({ ...itemData, updatedAt: new Date() })
+            .where(eq(inventory.id, existing.id))
+            .returning();
+          return updated;
+        }
+      }
+
+      const [inserted] = await database.insert(inventory).values({ ...itemData, updatedAt: new Date() }).returning();
+      return inserted;
+    });
+  }
+
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     return await dualWrite(async (database) => {
       const [newLog] = await database.insert(inventoryLogs).values(log).returning();
