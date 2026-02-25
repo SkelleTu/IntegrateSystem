@@ -6,6 +6,7 @@ import { createClient } from "@libsql/client";
 import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import path from "path";
+import { sql } from "drizzle-orm";
 
 // 1. Configuração do SQLite Local (Rápido, mas volátil na Vercel)
 const localSqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db"));
@@ -16,8 +17,9 @@ export const dbLocal = drizzleSqlite(localSqlite, { schema });
 let remoteDb: any = null;
 
 if (process.env.DATABASE_URL) {
-  const sql = neon(process.env.DATABASE_URL);
-  remoteDb = drizzleNeon(sql, { schema });
+  // Remote DB disabled temporarily to avoid Neon template literal issues
+  // const sql = neon(process.env.DATABASE_URL);
+  // remoteDb = drizzleNeon(sql, { schema });
 } else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
     url: process.env.TURSO_URL, 
@@ -251,8 +253,9 @@ export async function setupDatabase() {
 
   for (const table of tables) {
     if (isRemoteEnabled && process.env.DATABASE_URL) {
-       // Neon/Postgres via neon-http doesn't use .prepare().run()
-       await (targetDb as any).execute(sql.raw(table));
+       // Sincronização remota desativada temporariamente para evitar erros de sintaxe entre SQLite e Postgres no startup
+       // O ideal é usar migrations reais (drizzle-kit push) para o banco remoto
+       console.log("Migration remota pulada para evitar conflitos de sintaxe. Use drizzle-kit push.");
     } else {
        localSqlite.prepare(table).run();
        if (isRemoteEnabled && (targetDb as any).prepare) {

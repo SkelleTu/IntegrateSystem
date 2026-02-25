@@ -155,7 +155,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
-    return await db.transaction(async (tx) => {
+    return await db.transaction(async (tx: any) => {
       const [newEnterprise] = await tx.insert(enterprises).values(enterprise).returning();
       // Initialize settings for new enterprise
       await tx.insert(settings).values({ enterpriseId: newEnterprise.id });
@@ -307,9 +307,9 @@ export class DatabaseStorage implements IStorage {
     const inv = await db.select().from(inventory);
     
     // Only return items that exist in inventory OR are 'Coca-Cola'
-    return items.filter(item => 
+    return (items as any[]).filter((item: any) => 
       item.name === 'Coca-Cola' || 
-      inv.some(i => i.itemId === item.id && i.itemType === 'product')
+      (inv as any[]).some((i: any) => i.itemId === item.id && i.itemType === 'product')
     );
   }
 
@@ -359,7 +359,7 @@ export class DatabaseStorage implements IStorage {
       if (!register) throw new Error("Caixa não encontrado");
 
       const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
-      const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
+      const totalSales = salesList.filter((s: any) => s.status === "completed").reduce((sum: number, s: any) => sum + s.totalAmount, 0);
       const expectedAmount = (register.openingAmount || 0) + totalSales;
       const difference = closingAmount - expectedAmount;
 
@@ -545,29 +545,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
-    const [newLog] = await db.insert(inventoryLogs).values(log).returning();
-    return newLog;
-  }
-
-  async upsertInventory(data: any): Promise<Inventory> {
-    return await dualWrite(async (database) => {
-      const { id, ...itemData } = data;
-      if (id) {
-        const [updated] = await database.update(inventory)
-          .set({ ...itemData, updatedAt: new Date() })
-          .where(eq(inventory.id, id))
-          .returning();
-        return updated;
-      }
-      const [inserted] = await database.insert(inventory).values({ ...itemData, updatedAt: new Date() }).returning();
-      return inserted;
-    });
-  }
-
-  async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     return await dualWrite(async (database) => {
       const [newLog] = await database.insert(inventoryLogs).values(log).returning();
       return newLog;
+    });
+  }
+
+  async updateCashRegisterOpeningAmount(id: number, amount: number) {
+    return await dualWrite(async (database) => {
+      return await database
+        .update(cashRegisters)
+        .set({ openingAmount: amount })
+        .where(eq(cashRegisters.id, id));
+    });
+  }
+
+  async restockInventory(id: number, data: any): Promise<Inventory> {
+    return await dualWrite(async (database) => {
+      const [item] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+      if (!item) throw new Error("Item de inventário não encontrado");
+
+      const [updated] = await database.update(inventory)
+        .set({ 
+          quantity: item.quantity + data.quantity,
+          updatedAt: new Date()
+        })
+        .where(eq(inventory.id, id))
+        .returning();
+
+      await database.insert(inventoryRestocks).values({
+        inventoryId: id,
+        quantity: data.quantity,
+        unit: data.unit || item.unit,
+        itemsPerUnit: data.itemsPerUnit || item.itemsPerUnit,
+        costPrice: data.costPrice || 0,
+        expiryDate: data.expiryDate,
+        createdAt: new Date()
+      });
+
+      return updated;
     });
   }
 
