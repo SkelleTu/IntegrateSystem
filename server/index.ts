@@ -1,5 +1,7 @@
 import { initApp, log } from "./app.js";
 
+console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
+
 (async () => {
   const { httpServer } = await initApp();
   

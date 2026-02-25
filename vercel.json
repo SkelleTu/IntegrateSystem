@@ -1,18 +1,6 @@
 {
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.ts"
-    },
-    {
-      "src": "/attached_assets/(.*)",
-      "dest": "/attached_assets/$1"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/static/assets/$1"
-    },
-    {
       "src": "/(.*)",
       "dest": "/api/index.ts"
     }
