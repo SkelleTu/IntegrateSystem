@@ -1,0 +1,149 @@
+STATUS ATUAL: ✅ BUILD ESTÁ FUNCIONANDO
+
+Importante:
+Não existe mais erro.
+Só existem WARNINGS.
+
+O deploy está completando normalmente:
+"Build Completed in /vercel/output"
+"Deploying outputs..."
+
+Ou seja:
+Arquitetura resolvida.
+Runtime resolvido.
+TypeScript resolvido.
+Serverless resolvido.
+
+Agora vamos tratar os avisos.
+
+====================================================================
+
+AVISO 1 — Tailwind
+
+warn - The class `duration-[10000ms]` is ambiguous and matches multiple utilities.
+
+CAUSA:
+
+Tailwind detectou que "duration-[10000ms]" pode conflitar
+com múltiplas regras internas.
+
+Isso NÃO quebra nada.
+É apenas aviso de ambiguidade.
+
+CORREÇÃO CORRETA:
+
+Se você realmente quer essa classe dinâmica,
+troque:
+
+duration-[10000ms]
+
+por:
+
+duration-[10000ms!important]
+
+OU
+
+Use diretamente no style:
+
+style={{ transitionDuration: "10000ms" }}
+
+OU
+
+Silencie corretamente usando escape:
+
+duration-\[10000ms\]
+
+Se estiver vindo como string dinâmica,
+garanta que não esteja sendo montada incorretamente.
+
+Mas reforçando:
+Isso não quebra o build.
+
+====================================================================
+
+AVISO 2 — Chunk maior que 500kb
+
+(!) Some chunks are larger than 500 kB after minification.
+
+index-BrJX8k4m.js → 899kb
+
+CAUSA:
+
+Seu bundle frontend está grande.
+Provavelmente você tem:
+
+- Muitas dependências pesadas
+- Bibliotecas de UI grandes
+- Alguma lib fiscal ou PDF indo pro client
+- Ou tudo está indo para um único chunk
+
+Isso NÃO impede deploy.
+É apenas alerta de performance.
+
+====================================================================
+
+COMO RESOLVER O CHUNK GRANDE (FORMA CORRETA)
+
+No vite.config.ts:
+
+Adicionar:
+
+build: {
+  chunkSizeWarningLimit: 1000,
+  rollupOptions: {
+    output: {
+      manualChunks: {
+        vendor: ['react', 'react-dom']
+      }
+    }
+  }
+}
+
+OU melhor ainda:
+
+Usar import dinâmico:
+
+const ComponentePesado = lazy(() => import('./ComponentePesado'))
+
+Isso divide o bundle.
+
+====================================================================
+
+AVISO 3 — dist/index.cjs 1.1mb ⚠️
+
+Isso é apenas aviso de tamanho do backend bundle.
+1.1mb é totalmente aceitável para serverless.
+
+Só seria problema se passasse de 50mb.
+
+====================================================================
+
+RESUMO TÉCNICO
+
+✔ Build está saudável
+✔ Deploy está concluindo
+✔ Não há erro estrutural
+✔ São apenas avisos de otimização
+
+====================================================================
+
+DIAGNÓSTICO FINAL
+
+Sua aplicação agora está:
+
+- Rodando Node 24
+- Compilando TypeScript corretamente
+- Estruturada como serverless
+- Deployando sem crash
+- Sem FUNCTION_INVOCATION_FAILED
+
+O sistema está estável.
+
+Agora o foco passa a ser otimização de performance,
+não correção de erro.
+
+====================================================================
+
+Se quiser, posso analisar sua estratégia de bundle
+e te dizer exatamente o que está inflando 900kb
+e como dividir isso cirurgicamente.

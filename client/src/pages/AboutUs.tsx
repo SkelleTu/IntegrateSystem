@@ -72,7 +72,7 @@ export default function AboutUs() {
             </div>
           </div>
           <div className="relative">
-             <div className="absolute -inset-4 bg-primary/20 rounded-full blur-3xl animate-pulse duration-[10000ms]" />
+             <div className="absolute -inset-4 bg-primary/20 rounded-full blur-3xl animate-pulse duration-\[10000ms\]" />
              <div className="relative bg-white/5 border border-white/10 p-12 rounded-[3rem] backdrop-blur-3xl overflow-hidden">
                 <ShieldCheck className="w-24 h-24 text-primary opacity-20 absolute top-4 right-4" />
                 <div className="space-y-8">
