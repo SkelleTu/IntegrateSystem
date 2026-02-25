@@ -3,8 +3,17 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
+  const distPath = path.resolve(process.cwd(), "dist", "public");
   if (!fs.existsSync(distPath)) {
+    // Tentar fallback para public se dist/public não existir (comum em builds customizados)
+    const fallbackPath = path.resolve(process.cwd(), "public");
+    if (fs.existsSync(fallbackPath) && fs.existsSync(path.join(fallbackPath, "index.html"))) {
+       app.use(express.static(fallbackPath));
+       app.use("*", (_req, res) => {
+         res.sendFile(path.resolve(fallbackPath, "index.html"));
+       });
+       return;
+    }
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
