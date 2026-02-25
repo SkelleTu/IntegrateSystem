@@ -73,6 +73,8 @@ app.use((req, res, next) => {
 
 // Wrapper function to initialize routes and static serving
 export async function initApp() {
+  const { setupDatabase } = await import("./db.js");
+  await setupDatabase();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
