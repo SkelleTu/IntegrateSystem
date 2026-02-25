@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Inventory, MenuItem, Category, InventoryRestock } from "@shared/schema";
+import { Inventory, MenuItem, Category, InventoryRestock } from "../../shared/schema.js";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";

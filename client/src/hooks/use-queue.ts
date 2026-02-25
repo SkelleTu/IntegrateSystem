@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, type QueueState, type Ticket } from "@shared/routes";
+import { api, type QueueState, type Ticket } from "../../../shared/routes.js";
 
 // GET /api/queue/state - Polled hook
 export function useQueueState(pollInterval = 0) {

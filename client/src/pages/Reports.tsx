@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Sale, CashRegister, SaleItem, Payment } from "@shared/schema";
+import { Sale, CashRegister, SaleItem, Payment } from "../../shared/schema.js";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

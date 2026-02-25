@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, ArrowLeft, Scissors, Eraser } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { motion, AnimatePresence } from "framer-motion";
-import type { Service, Category, MenuItem } from "@shared/schema";
+import type { Service, Category, MenuItem } from "../../shared/schema.js";
 import { useLocation } from "wouter";
 
 const ServiceGrid = ({ services, categories, onSelect }: { services: MenuItem[], categories: Category[], onSelect: (s: MenuItem) => void }) => {

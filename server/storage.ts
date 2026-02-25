@@ -23,7 +23,7 @@ import {
   type TimeClock, type InsertTimeClock,
   type UserSession,
   type FiscalSettings, type InsertFiscalSettings
-} from "@shared/schema";
+} from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
 export interface IStorage {

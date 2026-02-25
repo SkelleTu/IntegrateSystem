@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, buildUrl } from "@shared/routes";
-import type { InsertService, Service } from "@shared/schema";
+import { api, buildUrl } from "../../../shared/routes.js";
+import type { InsertService, Service } from "../../../shared/schema.js";
 
 // GET /api/services
 export function useServices() {

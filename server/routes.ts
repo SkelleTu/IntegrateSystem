@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { DatabaseStorage, storage } from "./storage.js";
-import { api } from "@shared/routes";
+import { api } from "../shared/routes.js";
 import { z } from "zod";
 import { 
   insertCashRegisterSchema, 
@@ -11,7 +11,7 @@ import {
   insertTransactionSchema, 
   insertTimeClockSchema,
   insertInventorySchema
-} from "@shared/schema";
+} from "../shared/schema.js";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import SQLiteStore from "better-sqlite3-session-store";
@@ -55,7 +55,7 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db } from "./db";
-import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "@shared/schema";
+import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema.js";
 
 export async function registerRoutes(
   httpServer: Server,

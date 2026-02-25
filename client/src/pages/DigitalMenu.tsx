@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Category, MenuItem, Ticket } from "@shared/schema";
+import { Category, MenuItem, Ticket } from "../../shared/schema.js";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Loader2, Utensils, Info, QrCode } from "lucide-react";

@@ -3,7 +3,7 @@ import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 import { ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
-import { MenuItem, Category } from "@shared/schema";
+import { MenuItem, Category } from "../../shared/schema.js";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";

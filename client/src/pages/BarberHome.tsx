@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Ticket, MenuItem } from "@shared/schema";
+import type { Ticket, MenuItem } from "../../shared/schema.js";
 
 export default function BarberHome() {
   const [, setLocation] = useLocation();
