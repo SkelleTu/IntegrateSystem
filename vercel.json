@@ -1,8 +1,8 @@
 {
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*)",
-      "dest": "/api/index.ts"
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
     }
   ]
 }

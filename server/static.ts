@@ -3,9 +3,9 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(process.cwd(), "dist", "public");
+  const distPath = path.resolve(process.cwd(), "dist");
   if (!fs.existsSync(distPath)) {
-    // Tentar fallback para public se dist/public não existir (comum em builds customizados)
+    // Tentar fallback para public se dist não existir
     const fallbackPath = path.resolve(process.cwd(), "public");
     if (fs.existsSync(fallbackPath) && fs.existsSync(path.join(fallbackPath, "index.html"))) {
        app.use(express.static(fallbackPath));

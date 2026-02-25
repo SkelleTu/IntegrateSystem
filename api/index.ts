@@ -1,12 +1,12 @@
 import serverless from 'serverless-http';
 import { initApp } from '../server/app.js';
 
-let handler;
+let appInstance;
 
 export default async (req, res) => {
-  if (!handler) {
+  if (!appInstance) {
     const { app } = await initApp();
-    handler = serverless(app);
+    appInstance = serverless(app);
   }
-  return handler(req, res);
+  return appInstance(req, res);
 };

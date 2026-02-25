@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "tsx server/index.ts",
-    "build": "tsx script/build.ts",
-    "vercel-build": "npm run build && mv dist/public dist/static",
+    "build": "tsx script/build.ts && tsc",
+    "vercel-build": "npm run build",
     "start": "node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push"
