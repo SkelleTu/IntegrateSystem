@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { DatabaseStorage, storage } from "./storage";
+import { DatabaseStorage, storage } from "./storage.js";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { 
@@ -402,7 +402,7 @@ export async function registerRoutes(
       }
 
       // 1. Gerar XML
-      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce");
+      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce.js");
       let xml = generateNFCeXML(sale, items, settings);
       
       // 2. Assinar XML

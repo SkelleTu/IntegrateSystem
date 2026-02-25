@@ -1,0 +1,98 @@
+ERRO IDENTIFICADO
+=================
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find module '/var/task/server/routes'
+Code: ERR_MODULE_NOT_FOUND
+
+Isso significa que o Vercel está conseguindo fazer o deploy,
+mas na execução da função serverless ele não encontra:
+
+server/routes
+
+
+CORREÇÃO COMPLETA
+=================
+
+1) VERIFICAR SE O ARQUIVO EXISTE NO GITHUB
+
+Confirme que este arquivo realmente existe no repositório:
+
+server/routes.ts
+
+Se não existir, crie.
+Se estiver no .gitignore, remova do ignore.
+Se estiver fora da pasta server, mova para dentro.
+
+
+------------------------------------------------------------
+
+2) CORRIGIR IMPORT NO server/index.ts
+
+Se você estiver usando ESM (package.json com "type": "module"):
+
+ERRADO:
+import routes from "./routes"
+
+CERTO:
+import routes from "./routes.js"
+
+⚠ Em ambiente ESM no Vercel, a extensão .js é obrigatória.
+
+
+------------------------------------------------------------
+
+3) VERIFICAR MAIÚSCULAS E MINÚSCULAS
+
+Linux (Vercel) diferencia:
+
+routes.ts  ≠  Routes.ts
+
+Se o arquivo é:
+routes.ts
+
+O import DEVE ser:
+"./routes.js"
+
+Se estiver:
+"./Routes.js"
+
+Vai quebrar em produção.
+
+
+------------------------------------------------------------
+
+4) SE ESTIVER USANDO TYPESCRIPT
+
+Garanta que o arquivo está sendo compilado para .js.
+
+No tsconfig.json verifique:
+
+"module": "ESNext"
+"moduleResolution": "Node"
+"outDir": "dist"  (ou equivalente)
+
+Se você estiver rodando direto .ts no Vercel,
+confirme que está configurado corretamente no vercel.json.
+
+
+------------------------------------------------------------
+
+5) APÓS CORRIGIR
+
+Execute:
+
+git add .
+git commit -m "fix: corrige import routes"
+git push
+
+A Vercel fará novo deploy automaticamente.
+
+
+------------------------------------------------------------
+
+RESULTADO ESPERADO
+
+O erro 500 desaparece.
+A função serverless para de crashar.
+O preview volta a abrir normalmente.
+O WebView deixa de baixar arquivo estranho.
