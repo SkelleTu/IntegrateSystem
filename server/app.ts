@@ -85,8 +85,13 @@ export async function initApp() {
   if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
     serveStatic(app);
   } else {
-    const { setupVite } = await import("./vite.js");
-    await setupVite(httpServer, app);
+    try {
+      const { setupVite } = await import("./vite.js");
+      await setupVite(httpServer, app);
+    } catch (e) {
+      // Vite might not be available in production/serverless environment
+      log("Vite setup skipped or failed");
+    }
   }
   
   return { app, httpServer };

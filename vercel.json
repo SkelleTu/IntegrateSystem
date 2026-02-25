@@ -1,7 +1,8 @@
 {
   "functions": {
     "api/index.ts": {
-      "runtime": "nodejs18.x"
+      "runtime": "nodejs18.x",
+      "maxDuration": 10
     }
   },
   "routes": [
@@ -12,6 +13,10 @@
     {
       "src": "/attached_assets/(.*)",
       "dest": "/attached_assets/$1"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/static/assets/$1"
     },
     {
       "src": "/(.*)",
