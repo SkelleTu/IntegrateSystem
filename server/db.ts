@@ -1,13 +1,41 @@
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
+import { drizzle as drizzleLibsql } from "drizzle-orm/libsql";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import Database from "better-sqlite3";
+import { createClient } from "@libsql/client";
+import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import path from "path";
-import { sql } from "drizzle-orm";
 
-// Usando SQLite local para garantir que o banco de dados seja um arquivo do projeto
-// e migre junto com o código via GitHub ou qualquer outro meio.
-const sqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : (process.env.NODE_ENV === "production" ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db")));
-export const db = drizzle(sqlite, { schema });
+// 1. Configuração do SQLite Local (Rápido, mas volátil na Vercel)
+const localSqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db"));
+export const dbLocal = drizzleSqlite(localSqlite, { schema });
+
+// 2. Configuração do Banco Persistente (Turso ou Neon/Postgres)
+// Se houver DATABASE_URL (Postgres) ou TURSO_URL, usamos como mestre.
+let remoteDb: any = null;
+
+if (process.env.DATABASE_URL) {
+  const sql = neon(process.env.DATABASE_URL);
+  remoteDb = drizzleNeon(sql, { schema });
+} else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
+  const client = createClient({ 
+    url: process.env.TURSO_URL, 
+    authToken: process.env.TURSO_AUTH_TOKEN 
+  });
+  remoteDb = drizzleLibsql(client, { schema });
+}
+
+// Exportamos o db que tenta usar o remoto, caindo no local se não configurado
+export const db = remoteDb || dbLocal;
+export const isRemoteEnabled = !!remoteDb;
+
+// Função para sincronizar dados do Local para o Remoto (Backup)
+export async function syncToRemote() {
+  if (!isRemoteEnabled) return;
+  // Lógica de sincronização simplificada: No mundo real, usaríamos Change Data Capture ou Filas.
+  // Para este MVP, garantimos que as escritas no storage tentem ambos.
+}
 
 // Auto-migration for SQLite in ephemeral environments like Vercel
 export async function setupDatabase() {
@@ -219,8 +247,18 @@ export async function setupDatabase() {
     )`
   ];
 
+  const targetDb = isRemoteEnabled ? db : dbLocal;
+
   for (const table of tables) {
-    sqlite.prepare(table).run();
+    if (isRemoteEnabled && process.env.DATABASE_URL) {
+       // Neon/Postgres via neon-http doesn't use .prepare().run()
+       await (targetDb as any).execute(sql.raw(table));
+    } else {
+       localSqlite.prepare(table).run();
+       if (isRemoteEnabled && (targetDb as any).prepare) {
+         (targetDb as any).prepare(table).run();
+       }
+    }
   }
 }
 

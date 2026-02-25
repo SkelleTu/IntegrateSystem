@@ -1,4 +1,4 @@
-import { db } from "./db.js";
+import { db, dbLocal, isRemoteEnabled } from "./db.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
@@ -25,6 +25,22 @@ import {
   type FiscalSettings, type InsertFiscalSettings
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
+
+// Helper para escrita dupla (Garante persistência)
+async function dualWrite(operation: (database: any) => Promise<any>) {
+  const result = await operation(db); // Escreve no principal (Remoto se disponível)
+  
+  // Se o principal for o remoto, tentamos espelhar no local como cache/backup
+  if (isRemoteEnabled) {
+    try {
+      await operation(dbLocal).catch(() => {}); 
+    } catch (e) {
+      console.error("Falha no espelhamento local:", e);
+    }
+  }
+  
+  return result;
+}
 
 export interface IStorage {
   // Enterprise
@@ -177,8 +193,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    const [newUser] = await db.insert(users).values(user).returning();
-    return newUser;
+    return await dualWrite(async (database) => {
+      const [newUser] = await database.insert(users).values(user).returning();
+      return newUser;
+    });
   }
 
   async getServices(): Promise<Service[]> {
@@ -191,18 +209,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createService(service: InsertService): Promise<Service> {
-    const [newService] = await db.insert(services).values(service).returning();
-    return newService;
+    return await dualWrite(async (database) => {
+      const [newService] = await database.insert(services).values(service).returning();
+      return newService;
+    });
   }
 
   async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
-    const [updated] = await db.update(services).set(update).where(eq(services.id, id)).returning();
-    return updated;
+    return await dualWrite(async (database) => {
+      const [updated] = await database.update(services).set(update).where(eq(services.id, id)).returning();
+      return updated;
+    });
   }
 
   async deleteService(id: number): Promise<void> {
-    // Soft delete
-    await db.update(services).set({ isActive: false }).where(eq(services.id, id));
+    await dualWrite(async (database) => {
+      await database.update(services).set({ isActive: false }).where(eq(services.id, id));
+    });
   }
 
   async getUsers(): Promise<User[]> {
@@ -234,8 +257,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
-    const [newTicket] = await db.insert(tickets).values(ticket).returning();
-    return newTicket;
+    return await dualWrite(async (database) => {
+      const [newTicket] = await database.insert(tickets).values(ticket).returning();
+      return newTicket;
+    });
   }
 
   async getTicketByNumber(number: number): Promise<Ticket | undefined> {
@@ -271,8 +296,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
-    const [newCategory] = await db.insert(categories).values(category).returning();
-    return newCategory;
+    return await dualWrite(async (database) => {
+      const [newCategory] = await database.insert(categories).values(category).returning();
+      return newCategory;
+    });
   }
 
   async getMenuItems(): Promise<MenuItem[]> {
@@ -308,146 +335,106 @@ export class DatabaseStorage implements IStorage {
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
-    const [newRegister] = await db.insert(cashRegisters).values(register).returning();
-    
-    // Registrar transação de abertura no financeiro se houver valor inicial
-    if (newRegister.openingAmount && newRegister.openingAmount > 0) {
-      await db.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Abertura de Caixa #${newRegister.id}`,
-        amount: newRegister.openingAmount,
-        createdAt: new Date()
-      } as any);
-    }
-    
-    return newRegister;
-  }
-
-  async updateCashRegisterOpeningAmount(id: number, amount: number): Promise<CashRegister> {
-    const [updated] = await db.update(cashRegisters)
-      .set({ openingAmount: amount })
-      .where(eq(cashRegisters.id, id))
-      .returning();
-
-    // Atualizar ou criar transação financeira correspondente
-    if (amount > 0) {
-      await db.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Ajuste de Abertura de Caixa #${id}`,
-        amount: amount,
-        createdAt: new Date()
-      } as any);
-    }
-
-    return updated;
+    return await dualWrite(async (database) => {
+      const [newRegister] = await database.insert(cashRegisters).values(register).returning();
+      
+      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
+        await database.insert(transactions).values({
+          businessType: "padaria",
+          type: "income",
+          category: "caixa",
+          description: `Abertura de Caixa #${newRegister.id}`,
+          amount: newRegister.openingAmount,
+          createdAt: new Date()
+        } as any);
+      }
+      
+      return newRegister;
+    });
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
-    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id));
-    if (!register) throw new Error("Caixa não encontrado");
+    return await dualWrite(async (database) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
+      if (!register) throw new Error("Caixa não encontrado");
 
-    // Cálculo da diferença: Valor Final Real - (Valor Inicial + Total de Vendas em Dinheiro)
-    const salesList = await db.select().from(sales).where(eq(sales.cashRegisterId, id));
-    
-    const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
-    const expectedAmount = (register.openingAmount || 0) + totalSales;
-    const difference = closingAmount - expectedAmount;
+      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const totalSales = salesList.filter(s => s.status === "completed").reduce((sum, s) => sum + s.totalAmount, 0);
+      const expectedAmount = (register.openingAmount || 0) + totalSales;
+      const difference = closingAmount - expectedAmount;
 
-    const [updated] = await db.update(cashRegisters)
-      .set({ 
-        closingAmount, 
-        difference,
-        closedAt: new Date(),
-        status: "closed"
-      })
-      .where(eq(cashRegisters.id, id))
-      .returning();
+      const [updated] = await database.update(cashRegisters)
+        .set({ 
+          closingAmount, 
+          difference,
+          closedAt: new Date(),
+          status: "closed"
+        })
+        .where(eq(cashRegisters.id, id))
+        .returning();
 
-    // Registrar fechamento no financeiro
-    await db.insert(transactions).values({
-      businessType: "padaria",
-      type: "income", // Fechamento é o saldo final que entra no financeiro consolidado? 
-      // Geralmente registramos a diferença ou o total em mãos.
-      category: "caixa",
-      description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
-      amount: closingAmount,
-      createdAt: new Date()
-    } as any);
+      await database.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "caixa",
+        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
+        amount: closingAmount,
+        createdAt: new Date()
+      } as any);
 
-    return updated;
+      return updated;
+    });
   }
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
-    // Para better-sqlite3, transações devem ser síncronas.
-    // Como a interface IStorage exige Promise, envolvemos em uma Promise,
-    // mas a execução interna da transação deve ser síncrona.
-    return new Promise((resolve, reject) => {
-      try {
-        const result = db.transaction((tx) => {
-          const [insertedSale] = tx.insert(sales).values(sale).returning().all();
+    return await dualWrite(async (database) => {
+      const [insertedSale] = await database.insert(sales).values(sale).returning();
+      
+      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
+      await database.insert(saleItems).values(itemsWithSaleId);
+      
+      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
+      await database.insert(payments).values(paymentsWithSaleId);
+
+      for (const item of items) {
+        const [inventoryItem] = await database.select()
+          .from(inventory)
+          .where(
+            item.itemType === 'product' 
+              ? eq(inventory.itemId, item.itemId)
+              : eq(inventory.customName, item.itemId.toString())
+          )
+          .limit(1);
+
+        if (inventoryItem) {
+          await database.update(inventory)
+            .set({ 
+              quantity: inventoryItem.quantity - item.quantity,
+              updatedAt: new Date()
+            })
+            .where(eq(inventory.id, inventoryItem.id));
           
-          const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
-          tx.insert(saleItems).values(itemsWithSaleId).run();
-          
-          const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
-          tx.insert(payments).values(paymentsWithSaleId).run();
-
-          // Sincronização com Estoque e Financeiro
-          for (const item of items) {
-            // 1. Atualizar Estoque (Venda subtrai do estoque)
-            // IMPORTANTE: Procuramos no inventário pelo barcode ou itemId
-            // Se for um produto cadastrado, usamos o itemId
-            const [inventoryItem] = tx.select()
-              .from(inventory)
-              .where(
-                item.itemType === 'product' 
-                  ? eq(inventory.itemId, item.itemId)
-                  : eq(inventory.customName, item.itemId.toString()) // Fallback para custom
-              )
-              .limit(1)
-              .all();
-
-            if (inventoryItem) {
-              tx.update(inventory)
-                .set({ 
-                  quantity: inventoryItem.quantity - item.quantity,
-                  updatedAt: new Date()
-                })
-                .where(eq(inventory.id, inventoryItem.id))
-                .run();
-              
-              // Registrar log de movimentação
-              tx.insert(inventoryLogs).values({
-                inventoryId: inventoryItem.id,
-                type: "out",
-                quantity: item.quantity,
-                reason: `Venda #${insertedSale.id}`,
-                userId: sale.userId || 0,
-                createdAt: new Date()
-              }).run();
-            }
-          }
-
-          // 2. Registrar Transação Financeira (Receita)
-          tx.insert(transactions).values({
-            businessType: "padaria",
-            type: "income",
-            category: "vendas",
-            description: `Venda PDV #${insertedSale.id}`,
-            amount: insertedSale.totalAmount,
+          await database.insert(inventoryLogs).values({
+            inventoryId: inventoryItem.id,
+            type: "out",
+            quantity: item.quantity,
+            reason: `Venda #${insertedSale.id}`,
+            userId: sale.userId || 0,
             createdAt: new Date()
-          }).run();
-          
-          return insertedSale;
-        });
-        resolve(result);
-      } catch (error) {
-        reject(error);
+          });
+        }
       }
+
+      await database.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "vendas",
+        description: `Venda PDV #${insertedSale.id}`,
+        amount: insertedSale.totalAmount,
+        createdAt: new Date()
+      });
+      
+      return insertedSale;
     });
   }
 
@@ -463,65 +450,52 @@ export class DatabaseStorage implements IStorage {
   }
 
   async cancelSale(id: number): Promise<Sale> {
-    return new Promise((resolve, reject) => {
-      try {
-        const result = db.transaction((tx) => {
-          const [sale] = tx.select().from(sales).where(eq(sales.id, id)).all();
-          if (!sale) throw new Error("Venda não encontrada");
-          if (sale.status === "cancelled") return sale;
+    return await dualWrite(async (database) => {
+      const [sale] = await database.select().from(sales).where(eq(sales.id, id));
+      if (!sale) throw new Error("Venda não encontrada");
+      if (sale.status === "cancelled") return sale;
 
-          // 1. Marcar venda como cancelada
-          const [updatedSale] = tx.update(sales)
-            .set({ status: "cancelled" })
-            .where(eq(sales.id, id))
-            .returning()
-            .all();
+      const [updatedSale] = await database.update(sales)
+        .set({ status: "cancelled" })
+        .where(eq(sales.id, id))
+        .returning();
 
-          // 2. Estornar Estoque
-          const items = tx.select().from(saleItems).where(eq(saleItems.saleId, id)).all();
-          for (const item of items) {
-            const [inventoryItem] = tx.select()
-              .from(inventory)
-              .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, item.itemType === 'product' ? 'product' : 'service')))
-              .limit(1)
-              .all();
+      const items = await database.select().from(saleItems).where(eq(saleItems.saleId, id));
+      for (const item of items) {
+        const [inventoryItem] = await database.select()
+          .from(inventory)
+          .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, item.itemType === 'product' ? 'product' : 'service')))
+          .limit(1);
 
-            if (inventoryItem) {
-              tx.update(inventory)
-                .set({ 
-                  quantity: inventoryItem.quantity + item.quantity,
-                  updatedAt: new Date()
-                })
-                .where(eq(inventory.id, inventoryItem.id))
-                .run();
-              
-              tx.insert(inventoryLogs).values({
-                inventoryId: inventoryItem.id,
-                type: "in",
-                quantity: item.quantity,
-                reason: `Estorno Venda Cancelada #${id}`,
-                userId: sale.userId || 0,
-                createdAt: new Date()
-              }).run();
-            }
-          }
-
-          // 3. Registrar Transação Financeira (Estorno/Despesa para compensar a receita)
-          tx.insert(transactions).values({
-            businessType: "padaria",
-            type: "expense",
-            category: "vendas",
-            description: `ESTORNO: Venda PDV #${id} CANCELADA`,
-            amount: sale.totalAmount,
+        if (inventoryItem) {
+          await database.update(inventory)
+            .set({ 
+              quantity: inventoryItem.quantity + item.quantity,
+              updatedAt: new Date()
+            })
+            .where(eq(inventory.id, inventoryItem.id));
+          
+          await database.insert(inventoryLogs).values({
+            inventoryId: inventoryItem.id,
+            type: "in",
+            quantity: item.quantity,
+            reason: `Estorno Venda Cancelada #${id}`,
+            userId: sale.userId || 0,
             createdAt: new Date()
-          }).run();
-
-          return updatedSale;
-        });
-        resolve(result);
-      } catch (error) {
-        reject(error);
+          });
+        }
       }
+
+      await database.insert(transactions).values({
+        businessType: "padaria",
+        type: "expense",
+        category: "vendas",
+        description: `ESTORNO: Venda PDV #${id} CANCELADA`,
+        amount: sale.totalAmount,
+        createdAt: new Date()
+      });
+
+      return updatedSale;
     });
   }
 
@@ -575,69 +549,39 @@ export class DatabaseStorage implements IStorage {
     return newLog;
   }
 
-  async createTransaction(transaction: any): Promise<Transaction> {
-    const [newTransaction] = await db.insert(transactions).values(transaction).returning();
-    return newTransaction;
-  }
-
-  async deleteTransaction(id: number): Promise<void> {
-    await db.delete(transactions).where(eq(transactions.id, id));
-  }
-
-  async restockInventory(id: number, data: {
-    quantity: number;
-    unit?: string;
-    itemsPerUnit?: number;
-    costPrice?: number;
-    expiryDate?: Date | null;
-  }): Promise<Inventory> {
-    return db.transaction(async (tx) => {
-      const [existingItem] = await tx.select().from(inventory).where(eq(inventory.id, id));
-      if (!existingItem) {
-        throw new Error(`Item com ID ${id} não encontrado no estoque`);
+  async upsertInventory(data: any): Promise<Inventory> {
+    return await dualWrite(async (database) => {
+      const { id, ...itemData } = data;
+      if (id) {
+        const [updated] = await database.update(inventory)
+          .set({ ...itemData, updatedAt: new Date() })
+          .where(eq(inventory.id, id))
+          .returning();
+        return updated;
       }
-
-      const newQuantity = existingItem.quantity + data.quantity;
-      
-      const updateData: any = {
-        quantity: newQuantity,
-        updatedAt: new Date()
-      };
-
-      if (data.unit) updateData.unit = data.unit;
-      if (data.itemsPerUnit) updateData.itemsPerUnit = data.itemsPerUnit;
-      if (data.expiryDate !== undefined) updateData.expiryDate = data.expiryDate;
-
-      const [result] = await tx.update(inventory)
-        .set(updateData)
-        .where(eq(inventory.id, id))
-        .returning();
-
-      await tx.insert(inventoryRestocks).values({
-        inventoryId: id,
-        quantity: data.quantity,
-        unit: data.unit || existingItem.unit,
-        itemsPerUnit: data.itemsPerUnit || existingItem.itemsPerUnit,
-        costPrice: data.costPrice || existingItem.costPrice,
-        expiryDate: data.expiryDate || existingItem.expiryDate,
-        createdAt: new Date()
-      });
-
-      return result;
+      const [inserted] = await database.insert(inventory).values({ ...itemData, updatedAt: new Date() }).returning();
+      return inserted;
     });
   }
 
-  async upsertInventory(data: any): Promise<Inventory> {
-    const { id, ...itemData } = data;
-    if (id) {
-      const [updated] = await db.update(inventory)
-        .set({ ...itemData, updatedAt: new Date() })
-        .where(eq(inventory.id, id))
-        .returning();
-      return updated;
-    }
-    const [inserted] = await db.insert(inventory).values(itemData).returning();
-    return inserted;
+  async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
+    return await dualWrite(async (database) => {
+      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
+      return newLog;
+    });
+  }
+
+  async createTransaction(transaction: any): Promise<Transaction> {
+    return await dualWrite(async (database) => {
+      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
+      return newTransaction;
+    });
+  }
+
+  async deleteTransaction(id: number): Promise<void> {
+    await dualWrite(async (database) => {
+      await database.delete(transactions).where(eq(transactions.id, id));
+    });
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
