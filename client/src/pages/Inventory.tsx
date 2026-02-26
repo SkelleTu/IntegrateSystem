@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon, Landmark } from "lucide-react";
+import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon, Landmark, Building2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
@@ -383,8 +383,8 @@ export default function InventoryPage() {
       salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
       imageUrl: imageUrl || null,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-      ncm: (itemData as any).ncm || null,
-      cfop: (itemData as any).cfop || null,
+      ncm: null,
+      cfop: null,
     };
 
     console.log("Saving inventory item:", itemData);
@@ -641,8 +641,8 @@ export default function InventoryPage() {
                     <div className="space-y-1">
                       <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">NCM</Label>
                       <Input 
-                        value={newItem.ncm || ""} 
-                        onChange={e => setNewItem({...newItem, ncm: e.target.value})}
+                        value={customName || ""} 
+                        onChange={e => setCustomName(e.target.value)}
                         className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
                         placeholder="22021000"
                       />
@@ -650,8 +650,8 @@ export default function InventoryPage() {
                     <div className="space-y-1">
                       <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">CFOP</Label>
                       <Input 
-                        value={newItem.cfop || ""} 
-                        onChange={e => setNewItem({...newItem, cfop: e.target.value})}
+                        value={barcode || ""} 
+                        onChange={e => setBarcode(e.target.value)}
                         className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
                         placeholder="5102"
                       />

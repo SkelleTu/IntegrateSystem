@@ -82,14 +82,14 @@ export default function BarberHome() {
 
   const addItemToTicket = (item: MenuItem) => {
     if (!currentTicket) return;
-    const currentItems = Array.isArray(currentTicket.items) ? currentTicket.items : [];
+    const currentItems = Array.isArray(currentTicket.items) ? (currentTicket.items as any) : [];
     const items = [...currentItems, JSON.stringify({ id: item.id, name: item.name, price: item.price })];
     updateTicketItems.mutate({ ticketId: currentTicket.id, items });
   };
 
   const removeItemFromTicket = (index: number) => {
     if (!currentTicket) return;
-    const currentItems = Array.isArray(currentTicket.items) ? currentTicket.items : [];
+    const currentItems = Array.isArray(currentTicket.items) ? (currentTicket.items as any) : [];
     const items = [...currentItems];
     items.splice(index, 1);
     updateTicketItems.mutate({ ticketId: currentTicket.id, items });
@@ -167,8 +167,8 @@ export default function BarberHome() {
                 <div className="space-y-2">
                   <p className="text-[10px] text-zinc-500 uppercase font-bold px-1">Itens Adicionados</p>
                   <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                    {currentTicket.items && currentTicket.items.length > 0 ? (
-                      currentTicket.items.map((itemStr, idx) => {
+                    {currentTicket.items && (currentTicket.items as any).length > 0 ? (
+                      (currentTicket.items as any[]).map((itemStr: string, idx: number) => {
                         const item = JSON.parse(itemStr);
                         return (
                           <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-xl border border-zinc-800">
