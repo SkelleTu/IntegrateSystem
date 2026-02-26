@@ -1,9 +1,7 @@
 import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import { drizzle as drizzleLibsql } from "drizzle-orm/libsql";
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import Database from "better-sqlite3";
 import { createClient } from "@libsql/client";
-import { neon } from "@neondatabase/serverless";
 import * as schema from "../shared/schema.js";
 import path from "path";
 import { sql } from "drizzle-orm";
@@ -12,16 +10,11 @@ import { sql } from "drizzle-orm";
 const localSqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db"));
 export const dbLocal = drizzleSqlite(localSqlite, { schema });
 
-// 2. Configuração do Banco Persistente (Turso ou Neon/Postgres)
-// Se houver DATABASE_URL (Postgres) ou TURSO_URL, usamos como mestre.
+// 2. Configuração do Banco Persistente (Turso ou outro)
+// Se houver TURSO_URL, usamos como mestre.
 let remoteDb: any = null;
 
-if (process.env.DATABASE_URL) {
-  // Use a string template to avoid the "tagged-template function" error if Drizzle 
-  // tries to call neon() in a way that triggers the serverless-http/neon strict check.
-  const neonSql = neon(process.env.DATABASE_URL);
-  remoteDb = drizzleNeon(neonSql, { schema });
-} else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
+if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
     url: process.env.TURSO_URL, 
     authToken: process.env.TURSO_AUTH_TOKEN 
