@@ -104,7 +104,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
-    "@vercel/node": "^5.6.7",
+    "@vercel/node": "^4.0.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.8",
@@ -118,7 +118,8 @@
   "overrides": {
     "drizzle-kit": {
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
-    }
+    },
+    "node-domexception": "^1.0.0"
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
