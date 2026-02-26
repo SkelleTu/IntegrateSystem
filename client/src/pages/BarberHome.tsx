@@ -168,7 +168,7 @@ export default function BarberHome() {
                   <p className="text-[10px] text-zinc-500 uppercase font-bold px-1">Itens Adicionados</p>
                   <div className="max-h-[300px] overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                     {currentTicket.items && (currentTicket.items as any).length > 0 ? (
-                      (currentTicket.items as any[]).map((itemStr: string, idx: number) => {
+                      (currentTicket.items as unknown as any[]).map((itemStr: string, idx: number) => {
                         const item = JSON.parse(itemStr);
                         return (
                           <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900/50 rounded-xl border border-zinc-800">
