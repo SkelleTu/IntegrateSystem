@@ -1,9 +1,30 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node"
+    }
+  ],
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "server/index.ts"
+    },
+    {
+      "source": "/attached_assets/(.*)",
+      "destination": "/attached_assets/$1"
+    },
+    {
       "source": "/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "dist/public/index.html"
     }
-  ]
+  ],
+  "functions": {
+    "server/index.ts": {
+      "runtime": "nodejs20.x",
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 }

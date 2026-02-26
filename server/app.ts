@@ -16,7 +16,7 @@ const uploadsPath = process.env.VERCEL
   ? path.join('/tmp', "uploads")
   : path.join(process.cwd(), "attached_assets", "uploads");
 
-if (!fs.existsSync(uploadsPath)) {
+if (!fs.existsSync(uploadsPath) && !process.env.VERCEL) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 app.use("/attached_assets/uploads", express.static(uploadsPath));
