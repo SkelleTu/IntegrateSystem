@@ -46,7 +46,7 @@ const ItemCard = ({ item }: { item: MenuItem }) => (
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {item.tags?.map(tag => (
+            {Array.isArray(item.tags) && item.tags.map(tag => (
               <span key={tag} className="text-[9px] lg:text-[10px] font-black text-white/40 uppercase tracking-widest border border-zinc-800 px-2 py-0.5 rounded-sm group-hover:border-primary/20 group-hover:text-white/60 transition-colors">
                 {tag}
               </span>

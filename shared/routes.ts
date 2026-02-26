@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { insertServiceSchema, insertUserSchema, services, tickets, queueState } from "./schema.js";
+import { insertServiceSchema, insertUserSchema, services, tickets, queueState, type Ticket, type QueueState } from "./schema.js";
+
+export type { Ticket, QueueState };
 
 export const errorSchemas = {
   validation: z.object({

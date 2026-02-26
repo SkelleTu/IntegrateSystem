@@ -82,13 +82,15 @@ export default function BarberHome() {
 
   const addItemToTicket = (item: MenuItem) => {
     if (!currentTicket) return;
-    const items = [...(currentTicket.items || []), JSON.stringify({ id: item.id, name: item.name, price: item.price })];
+    const currentItems = Array.isArray(currentTicket.items) ? currentTicket.items : [];
+    const items = [...currentItems, JSON.stringify({ id: item.id, name: item.name, price: item.price })];
     updateTicketItems.mutate({ ticketId: currentTicket.id, items });
   };
 
   const removeItemFromTicket = (index: number) => {
-    if (!currentTicket || !currentTicket.items) return;
-    const items = [...currentTicket.items];
+    if (!currentTicket) return;
+    const currentItems = Array.isArray(currentTicket.items) ? currentTicket.items : [];
+    const items = [...currentItems];
     items.splice(index, 1);
     updateTicketItems.mutate({ ticketId: currentTicket.id, items });
   };

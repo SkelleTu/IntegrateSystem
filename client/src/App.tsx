@@ -18,7 +18,8 @@ import Contact from "@/pages/Contact";
 import Home from "@/pages/Home";
 import BarberHome from "@/pages/BarberHome";
 import Login from "@/pages/Login";
-import Admin from "@/pages/Admin";
+// Admin page removed as it does not exist
+// import Admin from "@/pages/Admin";
 import DigitalMenu from "@/pages/DigitalMenu";
 import BarberQueue from "@/pages/BarberQueue";
 import Cashier from "@/pages/Cashier";

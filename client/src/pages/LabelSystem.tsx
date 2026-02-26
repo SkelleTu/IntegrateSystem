@@ -26,7 +26,7 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
-import { Inventory } from "../../shared/schema.js";
+import { Inventory } from "../../../shared/schema.js";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function LabelSystem() {
