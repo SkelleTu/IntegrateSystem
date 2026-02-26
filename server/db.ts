@@ -11,12 +11,12 @@ const localSqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : path.jo
 export const dbLocal = drizzleSqlite(localSqlite, { schema });
 
 // 2. Configuração do Banco Persistente (Turso ou outro)
-// Se houver TURSO_URL, usamos como mestre.
+// Se houver TURSO_DATABASE_URL, usamos como mestre.
 let remoteDb: any = null;
 
-if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
+if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
-    url: process.env.TURSO_URL, 
+    url: process.env.TURSO_DATABASE_URL, 
     authToken: process.env.TURSO_AUTH_TOKEN 
   });
   remoteDb = drizzleLibsql(client, { schema });
