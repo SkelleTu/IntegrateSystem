@@ -5,18 +5,18 @@ import { createServer } from "http";
 import path from "path";
 import fs from "fs";
 
-// Configurar fuso horário para Brasília
-process.env.TZ = 'America/Sao_Paulo';
-
 const app = express();
 const httpServer = createServer(app);
+
+// Configurar fuso horário para Brasília
+process.env.TZ = 'America/Sao_Paulo';
 
 // Serve attached assets/uploads
 const uploadsPath = process.env.VERCEL 
   ? path.join('/tmp', "uploads")
   : path.join(process.cwd(), "attached_assets", "uploads");
 
-if (!fs.existsSync(uploadsPath) && !process.env.VERCEL) {
+if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
 }
 app.use("/attached_assets/uploads", express.static(uploadsPath));

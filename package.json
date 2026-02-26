@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "tsx script/build.ts && tsc",
-    "vercel-build": "npm run build && mkdir -p public && cp -r dist/public/* public/ 2>/dev/null || true",
+    "vercel-build": "npm run build",
     "start": "node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push"
@@ -104,7 +104,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
-    "@vercel/node": "^5.6.7",
+    "@vercel/node": "^4.0.0",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.8",
