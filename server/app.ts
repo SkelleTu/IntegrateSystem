@@ -37,6 +37,21 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
+// Configuração para Replit e Proxies
+app.set('trust proxy', 1);
+
+app.use((req, res, next) => {
+  // Ajuste de Headers para evitar bloqueios de conexão
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
