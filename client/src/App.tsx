@@ -56,7 +56,8 @@ function Router() {
 
   useEffect(() => {
     const publicPages = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms", "/login", "/register"];
-    if (!isLoading && !user && !publicPages.includes(location)) {
+    const isPublicPage = publicPages.includes(location) || location.startsWith("/blog/");
+    if (!isLoading && !user && !isPublicPage) {
       setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
     }
   }, [user, isLoading, location, setLocation]);
