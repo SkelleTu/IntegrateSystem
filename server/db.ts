@@ -17,8 +17,10 @@ export const dbLocal = drizzleSqlite(localSqlite, { schema });
 let remoteDb: any = null;
 
 if (process.env.DATABASE_URL) {
-  const sql = neon(process.env.DATABASE_URL);
-  remoteDb = drizzleNeon(sql, { schema });
+  // Use a string template to avoid the "tagged-template function" error if Drizzle 
+  // tries to call neon() in a way that triggers the serverless-http/neon strict check.
+  const neonSql = neon(process.env.DATABASE_URL);
+  remoteDb = drizzleNeon(neonSql, { schema });
 } else if (process.env.TURSO_URL && process.env.TURSO_AUTH_TOKEN) {
   const client = createClient({ 
     url: process.env.TURSO_URL, 
