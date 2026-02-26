@@ -15,23 +15,21 @@ export const dbLocal = drizzleSqlite(localSqlite, { schema });
 let remoteDb: any = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
-  const client = createClient({ 
-    url: process.env.TURSO_DATABASE_URL, 
-    authToken: process.env.TURSO_AUTH_TOKEN 
-  });
-  remoteDb = drizzleLibsql(client, { schema });
+  try {
+    const client = createClient({ 
+      url: process.env.TURSO_DATABASE_URL, 
+      authToken: process.env.TURSO_AUTH_TOKEN 
+    });
+    remoteDb = drizzleLibsql(client, { schema });
+    console.log("Conectado ao Turso com sucesso.");
+  } catch (e) {
+    console.error("Erro ao conectar ao Turso:", e);
+  }
 }
 
 // Exportamos o db que tenta usar o remoto, caindo no local se não configurado
 export const db = remoteDb || dbLocal;
 export const isRemoteEnabled = !!remoteDb;
-
-// Função para sincronizar dados do Local para o Remoto (Backup)
-export async function syncToRemote() {
-  if (!isRemoteEnabled) return;
-  // Lógica de sincronização simplificada: No mundo real, usaríamos Change Data Capture ou Filas.
-  // Para este MVP, garantimos que as escritas no storage tentem ambos.
-}
 
 // Auto-migration for SQLite in ephemeral environments like Vercel
 export async function setupDatabase() {
@@ -243,18 +241,15 @@ export async function setupDatabase() {
     )`
   ];
 
-  const targetDb = isRemoteEnabled ? db : dbLocal;
-
   for (const table of tables) {
-    if (isRemoteEnabled && process.env.DATABASE_URL) {
-       // Sincronização remota via raw SQL é arriscada devido a diferenças de sintaxe.
-       // Em produção/preview, as tabelas devem ser gerenciadas via drizzle-kit push.
-       console.log("Aviso: Pulando criação automática de tabela no banco remoto. Use 'npm run db:push'.");
-    } else {
-       localSqlite.prepare(table).run();
-       if (isRemoteEnabled && (targetDb as any).prepare) {
-         (targetDb as any).prepare(table).run();
-       }
+    try {
+      if (isRemoteEnabled) {
+        await (db as any).run(sql.raw(table));
+      } else {
+        localSqlite.prepare(table).run();
+      }
+    } catch (e) {
+      console.error(`Erro ao criar tabela:`, e);
     }
   }
 }
