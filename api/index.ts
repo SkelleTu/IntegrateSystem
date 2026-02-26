@@ -1,14 +1,12 @@
-import serverless from 'serverless-http';
+import app from '../server/app.js';
 import { initApp } from '../server/app.js';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { Express } from 'express';
 
-let appInstance: ((req: VercelRequest, res: VercelResponse) => Promise<any>) | any;
+let prepared = false;
 
-export default async (req: VercelRequest, res: VercelResponse) => {
-  if (!appInstance) {
-    const { app }: { app: Express } = await initApp();
-    appInstance = serverless(app);
+export default async (req: any, res: any) => {
+  if (!prepared) {
+    await initApp();
+    prepared = true;
   }
-  return appInstance(req, res);
+  return app(req, res);
 };
