@@ -1,0 +1,21 @@
+08:15:17.629 client/src/App.tsx(21,19): error TS2307: Cannot find module '@/pages/Admin' or its corresponding type declarations.
+08:15:17.631 client/src/hooks/use-queue.ts(2,20): error TS2305: Module '"@shared/routes"' has no exported member 'QueueState'.
+08:15:17.631 client/src/hooks/use-queue.ts(2,37): error TS2305: Module '"@shared/routes"' has no exported member 'Ticket'.
+08:15:17.631 client/src/pages/BarberHome.tsx(85,23): error TS2802: Type 'string | never[]' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+08:15:17.632 client/src/pages/BarberHome.tsx(91,23): error TS2802: Type 'string' can only be iterated through when using the '--downlevelIteration' flag or with a '--target' of 'es2015' or higher.
+08:15:17.632 client/src/pages/BarberHome.tsx(169,43): error TS2339: Property 'map' does not exist on type 'string'.
+08:15:17.632 client/src/pages/BarberHome.tsx(169,48): error TS7006: Parameter 'itemStr' implicitly has an 'any' type.
+08:15:17.632 client/src/pages/BarberHome.tsx(169,57): error TS7006: Parameter 'idx' implicitly has an 'any' type.
+08:15:17.632 client/src/pages/DigitalMenu.tsx(49,25): error TS2339: Property 'map' does not exist on type 'string'.
+08:15:17.632 client/src/pages/DigitalMenu.tsx(49,29): error TS7006: Parameter 'tag' implicitly has an 'any' type.
+08:15:17.632 client/src/pages/Inventory.tsx(386,12): error TS2304: Cannot find name 'newItem'.
+08:15:17.632 client/src/pages/Inventory.tsx(387,13): error TS2304: Cannot find name 'newItem'.
+08:15:17.632 client/src/pages/Inventory.tsx(638,24): error TS2304: Cannot find name 'Landmark'.
+08:15:17.632 client/src/pages/Inventory.tsx(644,32): error TS2304: Cannot find name 'newItem'.
+08:15:17.632 client/src/pages/Inventory.tsx(645,40): error TS2304: Cannot find name 'setNewItem'.
+08:15:17.633 client/src/pages/Inventory.tsx(645,55): error TS2304: Cannot find name 'newItem'.
+08:15:17.633 client/src/pages/Inventory.tsx(653,32): error TS2304: Cannot find name 'newItem'.
+08:15:17.633 client/src/pages/Inventory.tsx(654,40): error TS2304: Cannot find name 'setNewItem'.
+08:15:17.633 client/src/pages/Inventory.tsx(654,55): error TS2304: Cannot find name 'newItem'.
+08:15:17.633 client/src/pages/LabelSystem.tsx(29,27): error TS2307: Cannot find module '../../shared/schema.js' or its corresponding type declarations.
+08:15:17.675 Error: Command "npm run vercel-build" exited with 2
