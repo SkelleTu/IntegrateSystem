@@ -2,7 +2,7 @@ import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import { drizzle as drizzleLibsql } from "drizzle-orm/libsql";
 import Database from "better-sqlite3";
 import { createClient } from "@libsql/client";
-import * as schema from "../shared/schema.js";
+import * as schema from "../shared/schema";
 import path from "path";
 import { sql } from "drizzle-orm";
 

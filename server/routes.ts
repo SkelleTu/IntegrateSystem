@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { DatabaseStorage, storage } from "./storage.js";
-import { api } from "../shared/routes.js";
+import { DatabaseStorage, storage } from "./storage";
+import { api } from "../shared/routes";
 import { z } from "zod";
 import { 
   insertCashRegisterSchema, 
@@ -11,7 +11,7 @@ import {
   insertTransactionSchema, 
   insertTimeClockSchema,
   insertInventorySchema
-} from "../shared/schema.js";
+} from "../shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 import SQLiteStore from "better-sqlite3-session-store";
@@ -54,8 +54,8 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db } from "./db.js";
-import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema.js";
+import { db } from "./db";
+import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -415,7 +415,7 @@ export async function registerRoutes(
       }
 
       // 1. Gerar XML
-      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce.js");
+      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce");
       let xml = generateNFCeXML(sale, items, settings);
       
       // 2. Assinar XML
