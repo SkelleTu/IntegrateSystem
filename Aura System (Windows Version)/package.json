@@ -6,10 +6,40 @@
   "type": "commonjs",
   "scripts": {
     "start": "electron .",
-    "build": "echo 'Build skip - using pre-built or source'"
+    "build": "echo 'Build skip - using pre-built or source'",
+    "dist": "electron-builder"
+  },
+  "author": "Aura System",
+  "build": {
+    "appId": "com.aura.system",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "dist/**/*",
+      "main.js",
+      "package.json",
+      "public/**/*"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^40.6.1",
+    "electron-builder": "^25.1.8"
   },
   "dependencies": {
-    "electron": "^40.6.1",
     "electron-updater": "^6.8.3",
     "@libsql/client": "^0.17.0",
     "better-sqlite3": "^12.6.2",
