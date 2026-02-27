@@ -279,8 +279,8 @@ export default function Cashier() {
 
   if (!register) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg bg-zinc-900 border-white/10 shadow-2xl rounded-2xl overflow-hidden border-t-4 border-t-primary">
+      <div className="min-h-screen bg-transparent flex items-center justify-center p-6">
+        <Card className="w-full max-w-lg bg-zinc-900/80 backdrop-blur-xl border-white/10 shadow-2xl rounded-2xl overflow-hidden border-t-4 border-t-primary">
           <CardHeader className="flex flex-row items-center gap-6 p-8 bg-white/5">
             <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-7 h-7" /></Button>
             <div className="flex flex-col"><CardTitle className="text-white uppercase italic tracking-tighter text-3xl font-black leading-none">Abertura de Caixa</CardTitle></div>
@@ -314,9 +314,9 @@ export default function Cashier() {
   }
 
   return (
-    <div className="h-screen bg-black flex flex-col w-full overflow-hidden">
+    <div className="h-screen bg-transparent flex flex-col w-full overflow-hidden">
       {/* Header compactado e fixo no topo */}
-      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-900/50 backdrop-blur-md shrink-0">
+      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 panel-translucent shrink-0 rounded-none mb-0">
         <Button 
           variant="ghost" 
           size="icon" 
