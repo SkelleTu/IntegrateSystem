@@ -1,0 +1,46 @@
+modules = ["nodejs-20", "dotnet-7.0", "web", "postgresql-16"]
+[nix]
+channel = "stable-25_05"
+packages = ["unzip"]
+
+[agent]
+expertMode = true
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev -- --host 0.0.0.0 --port 5000"
+waitForPort = 5000
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["node", "./dist/index.cjs"]
+build = ["npm", "run", "build"]
+
+[userenv]
+
+[userenv.shared]
+TURSO_DATABASE_URL = "libsql://aura-system-skelletu.aws-us-east-2.turso.io"
+TURSO_AUTH_TOKEN = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzIxMTE4NTQsImlkIjoiMDE5YzlhMGMtOWYwMS03YzIwLWIxYTctM2VkN2M3YjlkZjZhIiwicmlkIjoiMmMyNDdkZGMtYWNjYy00MzUwLWIwYzctZTc0NDA5MGQyNjFkIn0.4QPqJzS7CAqPzsAh8sTv4yPznbsgRJ3Eeb9V675XKf5JXb4FcSopPb1dtPPqsxKcHXSoVWtU-TXIANTtZkaMAg"
