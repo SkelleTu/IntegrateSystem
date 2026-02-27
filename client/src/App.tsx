@@ -228,7 +228,7 @@ function AppContent() {
         </main>
       </div>
       <Toaster />
-      <StatusBar />
+      {user && <StatusBar />}
       {/* Floating Mini Logo Overlay */}
       <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
         <img 
