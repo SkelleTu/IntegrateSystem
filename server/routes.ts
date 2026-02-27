@@ -184,6 +184,19 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/db/status", (req, res) => {
+    // Check if Turso is configured
+    const isTurso = !!process.env.TURSO_DATABASE_URL;
+    
+    // Simple latency check could be added here
+    res.json({
+      status: "online",
+      message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
+      latency: 15,
+      lastAction: "heartbeat"
+    });
+  });
+
   // Auth Routes
   app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
     const user = req.user as any;

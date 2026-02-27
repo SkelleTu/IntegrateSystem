@@ -39,6 +39,7 @@ import { Menu } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
 
 import { Navbar } from "@/components/layout/Navbar";
+import { StatusBar } from "@/components/layout/StatusBar";
 import { Button } from "@/components/ui/button";
 import { 
   Sheet,
@@ -217,7 +218,7 @@ function AppContent() {
   const isCashierPage = location === "/caixa" || location === "/financeiro" || location === "/relatorios";
 
   return (
-    <div className={`relative min-h-screen w-full bg-black pb-safe ${isCashierPage ? "overflow-hidden" : "overflow-x-hidden"}`}>
+    <div className={`relative min-h-screen w-full bg-black pb-8 ${isCashierPage ? "overflow-hidden" : "overflow-x-hidden"}`}>
       <BackgroundIcons />
       <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
         <main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage && !isCashierPage ? "mb-12 sm:mb-0" : ""}`}>
@@ -227,6 +228,7 @@ function AppContent() {
         </main>
       </div>
       <Toaster />
+      <StatusBar />
       {/* Floating Mini Logo Overlay */}
       <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
         <img 
