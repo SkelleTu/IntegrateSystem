@@ -12,8 +12,10 @@ import {
   Calendar,
   AlertTriangle,
   ArrowUpRight,
-  RefreshCw
+  RefreshCw,
+  Monitor
 } from "lucide-react";
+import { useLocation } from "wouter";
 import { 
   Tooltip,
   TooltipContent,
@@ -32,6 +34,7 @@ interface DBStatus {
 
 export function StatusBar() {
   const { data: user } = useUser();
+  const [, setLocation] = useLocation();
   const [time, setTime] = useState(new Date());
   const [displayAction, setDisplayAction] = useState<string>("Sistema ocioso");
 
@@ -107,6 +110,25 @@ export function StatusBar() {
             <span className="text-zinc-200">{user.username}</span>
             <span className="text-[8px] bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">{user.role}</span>
           </div>
+        )}
+
+        {user?.username === "SkelleTu" && (
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={() => setLocation("/admin/windows-app")}
+                  className="flex items-center gap-2 border-l border-white/5 pl-6 hover:text-primary transition-colors cursor-pointer group"
+                >
+                  <Monitor className="w-3 h-3 text-zinc-500 group-hover:text-primary transition-colors" />
+                  <span className="text-[9px] text-zinc-500 group-hover:text-primary transition-colors">AURA WINDOWS</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-zinc-900 border-white/10 text-white text-[10px] p-2">
+                <p>Executar Aura System (Versão Windows)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
 
         <div className="flex items-center gap-2 border-l border-white/5 pl-6 overflow-hidden">
