@@ -135,6 +135,71 @@ export async function registerRoutes(
     });
   });
 
+  // Windows File Explorer API
+  const windowsErrors: any[] = [];
+  
+  app.get("/api/windows/files", async (req, res) => {
+    try {
+      const relPath = (req.query.path as string) || ".";
+      const baseDir = path.resolve(process.cwd(), "Aura System (Windows Version)");
+      const targetDir = path.resolve(baseDir, relPath);
+      
+      if (!targetDir.startsWith(baseDir)) {
+        return res.status(403).json({ error: "Acesso negado fora do diretório base" });
+      }
+
+      const entries = fs.readdirSync(targetDir, { withFileTypes: true });
+      const files = entries.map(entry => ({
+        name: entry.name,
+        path: path.join(relPath, entry.name),
+        isDirectory: entry.isDirectory(),
+        size: entry.isDirectory() ? 0 : fs.statSync(path.join(targetDir, entry.name)).size
+      }));
+
+      res.json(files);
+    } catch (err: any) {
+      windowsErrors.push({ message: err.message, timestamp: new Date().toISOString() });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/windows/open", async (req, res) => {
+    try {
+      const filePath = req.body.path;
+      const baseDir = path.resolve(process.cwd(), "Aura System (Windows Version)");
+      const targetFile = path.resolve(baseDir, filePath);
+
+      if (!targetFile.startsWith(baseDir)) {
+        return res.status(403).json({ error: "Acesso negado" });
+      }
+
+      // No Replit (Linux), apenas simulamos a abertura se for um arquivo, 
+      // ou se for .js podemos tentar rodar com node para ver erros
+      if (filePath.endsWith(".js") || filePath.endsWith(".cjs")) {
+        const { spawn } = await import("child_process");
+        const child = spawn("node", [targetFile]);
+        
+        child.stderr.on("data", (data) => {
+          windowsErrors.push({ 
+            message: `Erro ao executar ${filePath}: ${data.toString()}`, 
+            timestamp: new Date().toISOString() 
+          });
+        });
+
+        return res.json({ success: true, message: "Script iniciado (veja logs de erro)" });
+      }
+
+      res.json({ success: true, message: "Arquivo lido com sucesso (simulado)" });
+    } catch (err: any) {
+      windowsErrors.push({ message: err.message, timestamp: new Date().toISOString() });
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/windows/errors", (req, res) => {
+    res.json(windowsErrors.slice(-10).reverse());
+  });
+
   // Session & Auth Setup
   app.use(
     session({
