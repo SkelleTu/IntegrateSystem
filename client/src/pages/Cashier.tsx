@@ -286,8 +286,27 @@ export default function Cashier() {
             <div className="flex flex-col"><CardTitle className="text-white uppercase italic tracking-tighter text-3xl font-black leading-none">Abertura de Caixa</CardTitle></div>
           </CardHeader>
           <CardContent className="p-8 space-y-8">
-            <div className="space-y-3"><label className="text-white/40 text-xs uppercase font-black tracking-widest pl-1">Saldo Inicial (R$)</label><Input type="number" value={openingAmount} onChange={(e) => setOpeningAmount(e.target.value)} className="bg-black border-white/10 text-white h-14 text-2xl font-black italic rounded-xl focus:border-primary/50" /></div>
-            <Button className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl" disabled={openMutation.isPending} onClick={() => openMutation.mutate(Number(openingAmount.replace(",", ".")))}>{openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}</Button>
+            <div className="space-y-3">
+              <label className="text-white/40 text-xs uppercase font-black tracking-widest pl-1">Saldo Inicial (R$)</label>
+              <Input 
+                type="text" 
+                inputMode="decimal"
+                value={openingAmount} 
+                onChange={(e) => setOpeningAmount(e.target.value)} 
+                className="bg-black border-white/10 text-white h-14 text-2xl font-black italic rounded-xl focus:border-primary/50" 
+              />
+            </div>
+            <Button 
+              className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl active:scale-95 transition-transform" 
+              disabled={openMutation.isPending} 
+              onClick={(e) => {
+                e.preventDefault();
+                const amount = Number(openingAmount.replace(",", "."));
+                openMutation.mutate(amount || 0);
+              }}
+            >
+              {openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}
+            </Button>
           </CardContent>
         </Card>
       </div>
