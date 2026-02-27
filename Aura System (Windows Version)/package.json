@@ -40,12 +40,11 @@
     "electron-builder": "^25.1.8"
   },
   "dependencies": {
-    "electron-updater": "^6.8.3",
     "@libsql/client": "^0.17.0",
     "better-sqlite3": "^12.6.2",
-    "express": "^4.21.2",
     "drizzle-orm": "^0.39.3",
-    "tsx": "^4.21.0",
-    "electron": "^40.6.1"
+    "electron-updater": "^6.8.3",
+    "express": "^4.21.2",
+    "tsx": "^4.21.0"
   }
 }
