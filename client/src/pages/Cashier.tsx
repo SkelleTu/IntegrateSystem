@@ -314,26 +314,28 @@ export default function Cashier() {
   }
 
   return (
-    <div className="h-screen bg-transparent flex flex-col p-2 md:p-4 gap-2 w-full pt-2 overflow-hidden">
-      <div className="flex flex-row items-center justify-between gap-2 panel-translucent p-2 shrink-0 w-full mb-1">
-        <div className="flex items-center gap-2 min-w-0">
-          <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-8 h-8 rounded-full shrink-0" onClick={() => setLocation("/")}><ArrowLeft className="w-4 h-4" /></Button>
-          <div className="flex flex-col min-w-0">
-            <h1 className="text-white text-sm md:text-lg font-black uppercase italic tracking-tighter leading-none truncate">Terminal de <span className="text-primary">Vendas</span></h1>
-            <p className="text-[6px] md:text-[7px] font-bold text-white/40 uppercase tracking-[0.2em] mt-0.5 truncate">AURA System</p>
-          </div>
-        </div>
-        
-        <div className="flex flex-row items-center gap-2 shrink-0">
-          <Badge variant="outline" className="bg-primary/5 border-primary/20 text-primary px-1.5 py-0 font-black italic uppercase tracking-wider text-[7px] md:text-[8px] hidden sm:inline-flex">ID: {register.userId}</Badge>
-          <div className="flex items-center gap-1">
-            {isAdmin && <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary hover:text-black font-black uppercase italic text-[7px] md:text-[8px] h-7 px-2" onClick={() => setAdjustModalOpen(true)}>Ajustar</Button>}
-            <Button variant="destructive" size="sm" className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white border-red-500/20 font-black uppercase italic text-[7px] md:text-[8px] h-7 px-2" onClick={() => setLocation("/caixa/fechar")}>Sair</Button>
-          </div>
+    <div className="h-screen bg-black flex flex-col w-full overflow-hidden">
+      {/* Header compactado e fixo no topo */}
+      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-900/50 backdrop-blur-md shrink-0">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-white hover:text-primary hover:bg-white/5 w-10 h-10 rounded-full shrink-0" 
+          onClick={() => setLocation("/")}
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </Button>
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-white text-xl md:text-2xl font-black uppercase italic tracking-tighter leading-none truncate">
+            Terminal de <span className="text-primary">Vendas</span>
+          </h1>
+          <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em] mt-1 truncate">
+            AURA System
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 items-start flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:flex-row gap-4 p-4 items-start flex-1 min-h-0 overflow-hidden">
         <div className="flex-1 w-full h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-4">
             {filteredMenuItems?.map((item: any) => (
