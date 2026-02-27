@@ -18,7 +18,7 @@ if %errorlevel% neq 0 (
 :: Verifica dependências
 if not exist node_modules (
     echo [INFO] Instalando dependencias pela primeira vez...
-    call npm install --omit=dev
+    call npm install
 )
 
 echo [INFO] Iniciando o sistema...
