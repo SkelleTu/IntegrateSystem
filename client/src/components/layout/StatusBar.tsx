@@ -27,19 +27,26 @@ interface DBStatus {
   message: string;
   latency?: number;
   lastAction?: string;
+  timestamp?: number;
 }
 
 export function StatusBar() {
   const { data: user } = useUser();
   const [time, setTime] = useState(new Date());
-  const [lastAction, setLastAction] = useState<{ icon: string, text: string } | null>(null);
+  const [displayAction, setDisplayAction] = useState<string>("Sistema ocioso");
 
   // Poll for database status
   const { data: dbStatus } = useQuery<DBStatus>({
     queryKey: ["/api/db/status"],
-    refetchInterval: 5000,
+    refetchInterval: 2000,
     initialData: { status: "online", message: "Sistema operando normalmente" }
   });
+
+  useEffect(() => {
+    if (dbStatus?.lastAction) {
+      setDisplayAction(dbStatus.lastAction);
+    }
+  }, [dbStatus?.lastAction, dbStatus?.timestamp]);
 
   // Effect to update time every second
   useEffect(() => {
@@ -117,14 +124,12 @@ export function StatusBar() {
         </div>
       </div>
 
-      {/* Center: Real-time Data Feed (Visual only for now) */}
-      <div className="hidden lg:flex items-center gap-4 text-[9px] text-zinc-500 italic truncate max-w-md">
-        {isSyncing && (
-          <div className="flex items-center gap-2 animate-in fade-in duration-500">
-             <ArrowUpRight className="w-3 h-3 text-green-500/50" />
-             <span>Write: table_update_async_{Math.random().toString(36).substring(7)}</span>
-          </div>
-        )}
+      {/* Center: Real-time Data Feed */}
+      <div className="hidden lg:flex items-center gap-4 text-[9px] text-primary italic truncate max-w-md animate-in fade-in slide-in-from-bottom-1">
+        <div className="flex items-center gap-2">
+           <ArrowUpRight className="w-3 h-3 text-green-500" />
+           <span className="font-mono tracking-tighter">{displayAction}</span>
+        </div>
       </div>
 
       {/* Right side: Date & Time */}

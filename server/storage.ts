@@ -140,21 +140,36 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private lastAction: string = "Sistema iniciado";
+
+  private logAction(action: string) {
+    this.lastAction = `${action} em ${new Date().toLocaleTimeString('pt-BR')}`;
+    console.log(`[DB ACTION]: ${this.lastAction}`);
+  }
+
+  getLastAction(): string {
+    return this.lastAction;
+  }
+
   async getEnterprises(): Promise<Enterprise[]> {
+    this.logAction("Consulta de instituições");
     return await db.select().from(enterprises);
   }
 
   async getEnterprise(id: number): Promise<Enterprise | undefined> {
+    this.logAction(`Consulta instituição ID:${id}`);
     const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.id, id));
     return enterprise;
   }
 
   async getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined> {
+    this.logAction(`Busca instituição por slug: ${slug}`);
     const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.slug, slug));
     return enterprise;
   }
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
+    this.logAction(`Criação de instituição: ${enterprise.name}`);
     return await db.transaction(async (tx: any) => {
       const [newEnterprise] = await tx.insert(enterprises).values(enterprise).returning();
       // Initialize settings for new enterprise
@@ -173,26 +188,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
+    this.logAction(`Atualização instituição ID:${id}`);
     const [updated] = await db.update(enterprises).set(update).where(eq(enterprises.id, id)).returning();
     return updated;
   }
 
   async deleteEnterprise(id: number): Promise<void> {
+    this.logAction(`Exclusão instituição ID:${id}`);
     await db.delete(settings).where(eq(settings.enterpriseId, id));
     await db.delete(enterprises).where(eq(enterprises.id, id));
   }
 
   async getUser(id: number): Promise<User | undefined> {
+    this.logAction(`Consulta usuário ID:${id}`);
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
+    this.logAction(`Login/Busca usuário: ${username}`);
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user;
   }
 
   async createUser(user: InsertUser): Promise<User> {
+    this.logAction(`Novo usuário cadastrado: ${user.username}`);
     return await dualWrite(async (database) => {
       const [newUser] = await database.insert(users).values(user).returning();
       return newUser;
@@ -200,15 +220,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getServices(): Promise<Service[]> {
+    this.logAction("Consulta lista de serviços");
     return await db.select().from(services).where(eq(services.isActive, true));
   }
 
   async getService(id: number): Promise<Service | undefined> {
+    this.logAction(`Consulta serviço ID:${id}`);
     const [service] = await db.select().from(services).where(eq(services.id, id));
     return service;
   }
 
   async createService(service: InsertService): Promise<Service> {
+    this.logAction(`Criação de serviço: ${service.name}`);
     return await dualWrite(async (database) => {
       const [newService] = await database.insert(services).values(service).returning();
       return newService;
@@ -216,6 +239,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
+    this.logAction(`Atualização serviço ID:${id}`);
     return await dualWrite(async (database) => {
       const [updated] = await database.update(services).set(update).where(eq(services.id, id)).returning();
       return updated;
@@ -223,20 +247,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteService(id: number): Promise<void> {
+    this.logAction(`Desativação serviço ID:${id}`);
     await dualWrite(async (database) => {
       await database.update(services).set({ isActive: false }).where(eq(services.id, id));
     });
   }
 
   async getUsers(): Promise<User[]> {
+    this.logAction("Consulta lista de usuários");
     return await db.select().from(users);
   }
 
   async deleteUser(id: number): Promise<void> {
+    this.logAction(`Exclusão usuário ID:${id}`);
     await db.delete(users).where(eq(users.id, id));
   }
 
   async getQueueState(): Promise<QueueState> {
+    this.logAction("Consulta estado da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
       [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
@@ -245,6 +273,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateQueueState(update: Partial<QueueState>): Promise<QueueState> {
+    this.logAction("Atualização da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
       [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
@@ -257,6 +286,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
+    this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
     return await dualWrite(async (database) => {
       const [newTicket] = await database.insert(tickets).values(ticket).returning();
       return newTicket;
@@ -264,6 +294,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTicketByNumber(number: number): Promise<Ticket | undefined> {
+    this.logAction(`Busca ticket #${number}`);
     const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
@@ -278,6 +309,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestTicket(): Promise<Ticket | undefined> {
+    this.logAction("Consulta último ticket");
     const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
@@ -292,10 +324,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCategories(): Promise<Category[]> {
+    this.logAction("Consulta categorias menu");
     return await db.select().from(categories).orderBy(asc(categories.order));
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
+    this.logAction(`Nova categoria: ${category.name}`);
     return await dualWrite(async (database) => {
       const [newCategory] = await database.insert(categories).values(category).returning();
       return newCategory;
@@ -303,6 +337,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMenuItems(): Promise<MenuItem[]> {
+    this.logAction("Consulta itens menu");
     const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
     const inv = await db.select().from(inventory);
     
@@ -314,10 +349,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {
+    this.logAction(`Busca itens categoria ID:${categoryId}`);
     return await db.select().from(menuItems).where(eq(menuItems.categoryId, categoryId));
   }
 
   async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
+    this.logAction(`Novo item menu: ${item.name}`);
     const itemToInsert = {
       ...item,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
@@ -328,6 +365,7 @@ export class DatabaseStorage implements IStorage {
 
   // Cashier
   async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
+    this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
     const [register] = await db.select()
       .from(cashRegisters)
       .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
@@ -335,6 +373,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
+    this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
     return await dualWrite(async (database) => {
       const [newRegister] = await database.insert(cashRegisters).values(register).returning();
       
@@ -354,6 +393,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
+    this.logAction(`Fechamento de caixa ID:${id}`);
     return await dualWrite(async (database) => {
       const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
       if (!register) throw new Error("Caixa não encontrado");
@@ -387,6 +427,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
+    this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     return await dualWrite(async (database) => {
       const [insertedSale] = await database.insert(sales).values(sale).returning();
       
@@ -439,6 +480,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
+    this.logAction("Consulta histórico de vendas");
     let conditions = [];
     if (filters.startDate) conditions.push(gte(sales.createdAt, filters.startDate));
     if (filters.endDate) conditions.push(lte(sales.createdAt, filters.endDate));
@@ -450,6 +492,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async cancelSale(id: number): Promise<Sale> {
+    this.logAction(`Cancelamento venda ID:${id}`);
     return await dualWrite(async (database) => {
       const [sale] = await database.select().from(sales).where(eq(sales.id, id));
       if (!sale) throw new Error("Venda não encontrada");
@@ -500,6 +543,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
+    this.logAction("Consulta financeiro");
     let conditions = [];
     if (filters.startDate) {
       conditions.push(gte(transactions.createdAt, filters.startDate));
@@ -519,20 +563,24 @@ export class DatabaseStorage implements IStorage {
 
   // Inventory
   async getInventory(): Promise<Inventory[]> {
+    this.logAction("Consulta estoque completo");
     return await db.select().from(inventory);
   }
 
   async getInventoryItem(id: number): Promise<Inventory | undefined> {
+    this.logAction(`Busca item estoque ID:${id}`);
     const [item] = await db.select().from(inventory).where(eq(inventory.id, id)).limit(1);
     return item;
   }
 
   async getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined> {
+    this.logAction(`Busca item por código: ${barcode}`);
     const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode)).limit(1);
     return item;
   }
 
   async updateInventory(id: number, quantity: number): Promise<Inventory> {
+    this.logAction(`Ajuste manual estoque ID:${id}`);
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
       .where(eq(inventory.id, id))
@@ -541,10 +589,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteInventoryItem(id: number): Promise<void> {
+    this.logAction(`Exclusão item estoque ID:${id}`);
     await db.delete(inventory).where(eq(inventory.id, id));
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
+    this.logAction(`Cadastro/Atualização estoque: ${data.customName || data.itemId}`);
     return await dualWrite(async (database) => {
       const { id, ...itemData } = data;
       if (id) {
@@ -580,6 +630,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
+    this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
     return await dualWrite(async (database) => {
       const [newLog] = await database.insert(inventoryLogs).values(log).returning();
       return newLog;
@@ -587,6 +638,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateCashRegisterOpeningAmount(id: number, amount: number) {
+    this.logAction(`Ajuste abertura caixa ID:${id}`);
     return await dualWrite(async (database) => {
       return await database
         .update(cashRegisters)
@@ -596,6 +648,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async restockInventory(id: number, data: any): Promise<Inventory> {
+    this.logAction(`Reposição estoque ID:${id} (+${data.quantity})`);
     return await dualWrite(async (database) => {
       const [item] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
       if (!item) throw new Error("Item de inventário não encontrado");

@@ -188,12 +188,12 @@ export async function registerRoutes(
     // Check if Turso is configured
     const isTurso = !!process.env.TURSO_DATABASE_URL;
     
-    // Simple latency check could be added here
     res.json({
       status: "online",
       message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
       latency: 15,
-      lastAction: "heartbeat"
+      lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+      timestamp: Date.now()
     });
   });
 
