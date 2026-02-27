@@ -1,4 +1,4 @@
-import { initApp, log } from "./app.js";
+import { initApp, log } from "./app";
 
 console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
 
