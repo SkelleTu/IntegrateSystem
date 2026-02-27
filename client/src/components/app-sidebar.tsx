@@ -28,7 +28,8 @@ import {
   Fingerprint,
   History,
   X,
-  FileText
+  FileText,
+  Monitor
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -347,6 +348,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
     { title: "Sistema de Etiquetas", url: "/admin/labels", icon: FileText, ownerOnly: true },
+    { title: "Aura Windows", url: "/admin/windows-app", icon: Monitor, ownerOnly: true },
   ]
 
   if (!user) return null;

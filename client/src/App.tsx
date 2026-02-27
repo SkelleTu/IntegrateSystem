@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/sheet";
 
 import MasterControl from "./pages/MasterControl";
+import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
 
 function Router() {
   const { data: user, isLoading } = useUser();
@@ -115,6 +116,7 @@ function Router() {
             <Route path="/admin/monitoring" component={MasterControl} />
             <Route path="/cart" component={ClientCart} />
             <Route path="/admin/master" component={MasterControl} />
+            <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route component={NotFound} />
           </Switch>
         </main>

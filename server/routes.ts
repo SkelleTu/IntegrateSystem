@@ -373,6 +373,11 @@ export async function registerRoutes(
     res.download(filePath, "AuraSystem.exe");
   });
 
+  app.get("/api/windows/stream", isAuthenticated, (req, res) => {
+    // Rota placeholder para o stream do Windows
+    res.send("<html><body style='background:black;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;'>Conectando ao stream do Windows...</body></html>");
+  });
+
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
