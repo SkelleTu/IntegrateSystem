@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Versao Desktop do Aura System Offline-First",
   "main": "main.js",
-  "type": "commonjs",
+  "type": "module",
   "scripts": {
     "start": "electron .",
     "build": "echo 'Build skip - using pre-built or source'",

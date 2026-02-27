@@ -7,8 +7,12 @@ let serverProcess;
 
 function startServer() {
   const serverPath = path.join(__dirname, 'dist', 'index.cjs');
+  // Usamos node -e para carregar o arquivo .cjs como um módulo se necessário, 
+  // ou simplesmente node se o package.json já estiver como module.
   serverProcess = spawn('node', [serverPath], {
-    env: { ...process.env, NODE_ENV: 'production', PORT: '5000' }
+    cwd: __dirname,
+    env: { ...process.env, NODE_ENV: 'production', PORT: '5000' },
+    shell: true
   });
 
   serverProcess.stdout.on('data', (data) => {
