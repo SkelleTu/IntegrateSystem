@@ -1,6 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes.js";
-import { serveStatic } from "./static.js";
+import { registerRoutes } from "./routes";
+import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
@@ -91,7 +91,7 @@ app.use((req, res, next) => {
 
 // Wrapper function to initialize routes and static serving
 export async function initApp() {
-  const { setupDatabase } = await import("./db.js");
+  const { setupDatabase } = await import("./db");
   await setupDatabase();
   await registerRoutes(httpServer, app);
 
@@ -107,7 +107,7 @@ export async function initApp() {
     serveStatic(app);
   } else {
     try {
-      const { setupVite } = await import("./vite.js");
+      const { setupVite } = await import("./vite");
       await setupVite(httpServer, app);
     } catch (e) {
       // Vite might not be available in production/serverless environment
