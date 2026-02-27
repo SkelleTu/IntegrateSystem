@@ -55,7 +55,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  startServer();
+  // startServer(); // Comentado para não iniciar automaticamente
   createWindow();
 
   app.on('activate', () => {
