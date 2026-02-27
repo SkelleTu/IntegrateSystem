@@ -16,7 +16,8 @@ function createWindow() {
   // Em produção, carregaríamos o app buildado. 
   // Para fins de demonstração e "versão windows", apontamos para a URL do app ou carregamos o index.html
   // Como é uma versão "portátil" que se atualiza, idealmente ela carrega o conteúdo web da Aura
-  win.loadURL('https://' + process.env.REPL_SLUG + '.' + process.env.REPL_OWNER + '.repl.co');
+  const url = process.env.APP_URL || 'https://aura-system.replit.app';
+  win.loadURL(url);
 
   win.once('ready-to-show', () => {
     win.show();
