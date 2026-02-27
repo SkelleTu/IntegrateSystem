@@ -1,11 +1,30 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
+const { spawn } = require('child_process');
+
+let serverProcess;
+
+function startServer() {
+  const serverPath = path.join(__dirname, 'dist', 'index.cjs');
+  serverProcess = spawn('node', [serverPath], {
+    env: { ...process.env, NODE_ENV: 'production', PORT: '5000' }
+  });
+
+  serverProcess.stdout.on('data', (data) => {
+    console.log(`Server: ${data}`);
+  });
+
+  serverProcess.stderr.on('data', (data) => {
+    console.error(`Server Error: ${data}`);
+  });
+}
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -13,11 +32,18 @@ function createWindow() {
     icon: path.join(__dirname, 'public', 'favicon.ico')
   });
 
-  // Em produção, carregaríamos o app buildado. 
-  // Para fins de demonstração e "versão windows", apontamos para a URL do app ou carregamos o index.html
-  // Como é uma versão "portátil" que se atualiza, idealmente ela carrega o conteúdo web da Aura
-  const url = process.env.APP_URL || 'https://aura-system.replit.app';
-  win.loadURL(url);
+  // Tenta carregar localmente primeiro (Offline First)
+  const localUrl = 'http://localhost:5000';
+  
+  win.loadURL(localUrl).catch(() => {
+    // Se falhar o local (servidor ainda subindo), tenta novamente em 2s ou carrega remoto
+    setTimeout(() => {
+      win.loadURL(localUrl).catch(() => {
+        const remoteUrl = process.env.APP_URL || 'https://aura-system.replit.app';
+        win.loadURL(remoteUrl);
+      });
+    }, 2000);
+  });
 
   win.once('ready-to-show', () => {
     win.show();
@@ -25,6 +51,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  startServer();
   createWindow();
 
   app.on('activate', () => {
@@ -33,17 +60,16 @@ app.whenReady().then(() => {
     }
   });
 
-  // Iniciar verificação de atualizações
   autoUpdater.checkForUpdatesAndNotify();
 });
 
 app.on('window-all-closed', () => {
+  if (serverProcess) serverProcess.kill();
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-// Lógica de atualização silenciosa
 autoUpdater.on('update-downloaded', () => {
   autoUpdater.quitAndInstall();
 });

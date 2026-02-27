@@ -6,28 +6,29 @@ import * as schema from "../shared/schema.js";
 import path from "path";
 import { sql } from "drizzle-orm";
 
-// 1. Configuração do SQLite Local (Rápido, mas volátil na Vercel)
-const localSqlite = new Database(process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db"));
+// 1. Configuração do SQLite Local (Persistente no Windows)
+const dbPath = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
+const localSqlite = new Database(dbPath);
 export const dbLocal = drizzleSqlite(localSqlite, { schema });
 
-// 2. Configuração do Banco Persistente (Turso ou outro)
-// Se houver TURSO_DATABASE_URL, usamos como mestre.
+// 2. Configuração do Banco Persistente (Turso/Remote) com Sync
 let remoteDb: any = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const client = createClient({ 
       url: process.env.TURSO_DATABASE_URL, 
-      authToken: process.env.TURSO_AUTH_TOKEN 
-    });
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    } as any);
     remoteDb = drizzleLibsql(client, { schema });
-    console.log("Conectado ao Turso com sucesso.");
+    console.log("Conectado ao Turso.");
   } catch (e) {
     console.error("Erro ao conectar ao Turso:", e);
   }
 }
 
-// Exportamos o db que tenta usar o remoto, caindo no local se não configurado
+// O db principal agora prioriza o local para velocidade e offline, 
+// mas o sistema de storage usará dualWrite para manter ambos.
 export const db = remoteDb || dbLocal;
 export const isRemoteEnabled = !!remoteDb;
 

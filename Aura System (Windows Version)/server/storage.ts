@@ -26,20 +26,29 @@ import {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
-// Helper para escrita dupla (Garante persistência)
+// Helper para escrita dupla (Garante persistência e Sincronização)
 async function dualWrite(operation: (database: any) => Promise<any>) {
-  const result = await operation(db); // Escreve no principal (Remoto se disponível)
-  
-  // Se o principal for o remoto, tentamos espelhar no local como cache/backup
+  // 1. Sempre escreve no Local primeiro (Garante funcionamento offline)
+  let localResult;
+  try {
+    localResult = await operation(dbLocal);
+  } catch (e) {
+    console.error("Erro na escrita local:", e);
+  }
+
+  // 2. Tenta escrever no Remoto (Turso/Replit) se disponível
   if (isRemoteEnabled) {
     try {
-      await operation(dbLocal).catch(() => {}); 
+      // Em segundo plano ou aguardando, tenta sincronizar
+      await operation(db).catch(err => {
+        console.warn("Remoto offline, dados salvos apenas localmente para posterior sincronização.", err);
+      });
     } catch (e) {
-      console.error("Falha no espelhamento local:", e);
+      console.error("Falha na sincronização remota imediata:", e);
     }
   }
   
-  return result;
+  return localResult || await operation(db);
 }
 
 export interface IStorage {

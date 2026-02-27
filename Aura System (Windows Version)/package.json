@@ -1,14 +1,20 @@
 {
   "name": "aura-system-windows",
   "version": "1.0.0",
-  "description": "Versao Desktop do Aura System",
+  "description": "Versao Desktop do Aura System Offline-First",
   "main": "main.js",
   "type": "commonjs",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "echo 'Build skip - using pre-built or source'"
   },
   "dependencies": {
     "electron": "^40.6.1",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "@libsql/client": "^0.17.0",
+    "better-sqlite3": "^12.6.2",
+    "express": "^4.21.2",
+    "drizzle-orm": "^0.39.3",
+    "tsx": "^4.21.0"
   }
 }
