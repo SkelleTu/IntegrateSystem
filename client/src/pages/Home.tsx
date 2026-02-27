@@ -32,8 +32,24 @@ export default function Home() {
   };
 
   const menuItemsList = [
-    { label: "Dashboard", href: "/app", icon: Home },
+    { label: "Dashboard", href: "/app", icon: HomeIcon },
   ];
+
+  const downloadWindowsApp = () => {
+    // In a real scenario, this would trigger the download of the generated EXE
+    // For now, we simulate the intent as requested.
+    const link = document.createElement('a');
+    link.href = "/downloads/AuraSystem.exe";
+    link.download = "AuraSystem.exe";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Download Iniciado",
+      description: "O instalador do Aura System para Windows está sendo baixado.",
+    });
+  };
 
   const authOptions = user ? [
     { label: "Sair", onClick: () => logout.mutate(), icon: X, variant: "ghost" as const }
@@ -134,9 +150,7 @@ export default function Home() {
           variant="outline" 
           size="sm" 
           className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 text-white/60"
-          onClick={() => {
-            window.location.href = "/api/download/app";
-          }}
+          onClick={downloadWindowsApp}
           data-testid="button-download-app"
         >
           <Download className="h-4 w-4" />
