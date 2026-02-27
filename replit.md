@@ -1,16 +1,18 @@
-# Aura
+# Aura System (Windows Version) Fixes
 
-Sistema de gestão para barbearias e estabelecimentos multi-serviços.
+## Module System Alignment
+- Changed `script/build.ts` to output CommonJS (`cjs`) instead of ESM.
+- Electron and the existing `package.json` are configured for CommonJS, so the build must match.
+- Updated `outExtension` to `.cjs` to be explicit.
 
-## Mudanças Recentes
-- Remoção do modal de login inicial obrigatório.
-- Atualização da interface de login para um design mais limpo e moderno.
-- Ajuste na navegação para permitir visualização da Home sem autenticação prévia (funcionalidades protegidas continuam exigindo login).
-- Correção na lógica de biometria: Retornamos o uso da API WebAuthn real para garantir que o sensor do dispositivo seja ativado no cadastro e na marcação de ponto, vinculando o ID único gerado ao banco de dados.
-- **Funcionalidade de REPOSIÇÃO de estoque**: Agora é possível clicar em "Repor" em qualquer produto do estoque para adicionar mais unidades sem conflitos de ID. A reposição permite especificar: quantidade de embalagens, tipo de embalagem, unidades por embalagem, custo e nova validade. A quantidade é adicionada ao estoque existente.
-- **Histórico de reposições expandível**: Cada item do estoque pode ser clicado para expandir e ver todas as reposições individuais com data/hora, quantidade, custo e validade.
-- **Indicadores de urgência de validade**: Sistema visual de cores para alertar sobre produtos próximos do vencimento:
-  - **Vermelho (URGENTE)**: Vence em 3 dias ou menos
-  - **Amarelo (ATENÇÃO)**: Vence em 7 dias ou menos
-  - **Azul (EM BREVE)**: Vence em 14 dias ou menos
-  - Borda colorida na linha principal + badges individuais nas reposições expandidas
+## Server Startup
+- Modified `server/index.ts` to always start the HTTP server, even in production mode.
+- This ensures that when the Electron app starts, the Express server is already listening on port 5000, preventing `ERR_CONNECTION_REFUSED`.
+
+## Package Configuration
+- Updated `package.json` start script to point to `dist/index.cjs`.
+- Kept `"type": "module"` in `package.json` for the development environment (which uses `tsx`), but the production build is now correctly handled as CommonJS for the packed application.
+
+## Verification
+- Run `npm run build` to generate the new `dist/index.cjs`.
+- The application should now start without syntax errors and connect to the local server correctly.
