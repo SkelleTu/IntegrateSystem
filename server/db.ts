@@ -266,6 +266,7 @@ export async function setupDatabase() {
       }
     }
     try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0").run(); } catch(e) {}
+    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER NOT NULL DEFAULT 0").run(); } catch(e) {}
     try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT").run(); } catch(e) {}
   }
 
