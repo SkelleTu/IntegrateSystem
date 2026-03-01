@@ -783,17 +783,31 @@ export class DatabaseStorage implements IStorage {
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
     const existing = await this.getFiscalSettings(settingsData.enterpriseId);
     if (existing) {
-      const [updated] = await db.update(fiscalSettings).set(settingsData).where(eq(fiscalSettings.id, existing.id)).returning();
+      // Ensure boolean conversion for SQLite
+      const dataToUpdate = {
+        ...settingsData,
+        simulacaoReal: !!settingsData.simulacaoReal
+      };
+      const [updated] = await db.update(fiscalSettings).set(dataToUpdate).where(eq(fiscalSettings.id, existing.id)).returning();
       return updated;
     }
-    const [inserted] = await db.insert(fiscalSettings).values(settingsData).returning();
+    const [inserted] = await db.insert(fiscalSettings).values({
+      ...settingsData,
+      simulacaoReal: !!settingsData.simulacaoReal
+    }).returning();
     return inserted;
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {
-    // In a real app, you might have a dedicated table for fiscal logs
-    // For now, we return sales with fiscal info
-    return await db.select().from(sales).where(and(eq(sales.status, "completed"), eq(sales.fiscalStatus, "authorized"))).orderBy(desc(sales.createdAt));
+    return await db.select().from(sales)
+      .where(and(
+        eq(sales.status, "completed"), 
+        or(
+          eq(sales.fiscalStatus, "authorized"), 
+          eq(sales.fiscalStatus, "simulated")
+        )
+      ))
+      .orderBy(desc(sales.createdAt));
   }
 
   async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {

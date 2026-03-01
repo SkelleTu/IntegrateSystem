@@ -223,6 +223,7 @@ export const fiscalSettings = pgTable("fiscal_settings", {
   serieNfce: integer("serie_nfce").notNull().default(1),
   ultimoNumeroNfce: integer("ultimo_numero_nfce").notNull().default(0),
   ambiente: text("ambiente").notNull().default("homologacao"), // "homologacao" or "producao"
+  simulacaoReal: integer("simulacao_real", { mode: 'boolean' }).default(false).notNull(),
   certificadoA1: text("certificado_a1"), // Base64 or path
   certificadoSenha: text("certificado_senha"),
   printerWidth: text("printer_width").default("58mm").notNull(), // "58mm" or "80mm"

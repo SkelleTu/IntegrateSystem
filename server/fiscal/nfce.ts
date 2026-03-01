@@ -189,10 +189,11 @@ export async function transmitToSefaz(xmlSigned: string, settings: any) {
   // Simulação de resposta autorizada (código 100)
   return {
     success: true,
-    protocol: "135" + Math.floor(Math.random() * 1000000000),
-    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "ERROR",
+    protocol: (settings.simulacaoReal ? "SIM" : "135") + Math.floor(Math.random() * 1000000000),
+    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || chave,
     cStat: "100",
-    xMotivo: "Autorizado o uso da NF-e"
+    xMotivo: settings.simulacaoReal ? "Simulação Real Autorizada" : "Autorizado o uso da NF-e",
+    simulado: settings.simulacaoReal
   };
 }
 

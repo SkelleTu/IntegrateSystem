@@ -450,8 +450,20 @@ export async function registerRoutes(
       // 5. Assinar XML (Simulado)
       const xmlSigned = await signXML(xml, settings);
       
-      // 6. Transmitir (Simulado)
-      const result = await transmitToSefaz(xmlSigned, settings);
+      // 6. Transmitir (Simulado se simulacaoReal estiver ON)
+      let result;
+      if (settings.simulacaoReal) {
+        console.log("SIMULAÇÃO REAL SEFAZ ATIVA: Ignorando envio real, gerando protocolo local.");
+        result = {
+          success: true,
+          protocol: "SIM" + Math.floor(Math.random() * 1000000000),
+          key: chave,
+          cStat: "100",
+          xMotivo: "Simulação Real Autorizada"
+        };
+      } else {
+        result = await transmitToSefaz(xmlSigned, settings);
+      }
       
       if (result.success) {
         const qrCode = generateQRCode(chave, settings);
@@ -464,13 +476,13 @@ export async function registerRoutes(
           xmlEnviado: xml,
           xmlAutorizado: xmlSigned,
           protocolo: result.protocol,
-          status: "authorized",
+          status: settings.simulacaoReal ? "simulated" : "authorized",
           valorTotal: sale.totalAmount,
           dataEmissao: new Date(),
         });
 
         await storage.updateSaleFiscal(saleId, {
-          fiscalStatus: "authorized",
+          fiscalStatus: settings.simulacaoReal ? "simulated" : "authorized",
           fiscalKey: chave,
           fiscalXml: xmlSigned,
           fiscalType: "NFCe"

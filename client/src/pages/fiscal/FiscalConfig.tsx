@@ -168,6 +168,18 @@ export default function FiscalConfig() {
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
+                <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl h-12 mt-auto">
+                  <div className="space-y-0.5">
+                    <label className="text-[10px] font-black uppercase italic text-primary">Simulação Real SEFAZ</label>
+                    <p className="text-[8px] text-white/40 uppercase">Gera XML real sem enviar à SEFAZ</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                    checked={formData?.simulacaoReal || false}
+                    onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -314,9 +326,11 @@ export default function FiscalConfig() {
                           <TableCell>
                             <Badge className={
                               doc.status === 'authorized' ? 'bg-primary/20 text-primary border-primary/20' :
+                              doc.status === 'simulated' ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' :
                               'bg-red-500/20 text-red-500 border-red-500/20'
                             }>
-                              {doc.status === 'authorized' ? 'AUTORIZADO' : 'REJEITADO'}
+                              {doc.status === 'authorized' ? 'AUTORIZADO' : 
+                               doc.status === 'simulated' ? 'SIMULADO' : 'REJEITADO'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

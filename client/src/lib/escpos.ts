@@ -27,10 +27,19 @@ export async function printNFCe(nfceData: any, settings: any) {
     const BOLD_OFF = new Uint8Array([0x1b, 0x45, 0x00]);
     const CUT = new Uint8Array([0x1d, 0x56, 0x01]);
 
+    let lines: string[] = [];
+    if (nfceData.status === "simulated" || nfceData.protocolo?.startsWith("SIM")) {
+      lines.push("--------------------------------");
+      lines.push("      MODO SIMULACAO REAL       ");
+      lines.push("   SEM VALOR FISCAL (TESTE)     ");
+      lines.push("--------------------------------");
+    }
+
     let data = new Uint8Array([
       ...INIT,
       ...CENTER,
       ...BOLD_ON,
+      ...encoder.encode(lines.join("\n") + (lines.length > 0 ? "\n" : "")),
       ...encoder.encode(settings.razaoSocial + "\n"),
       ...BOLD_OFF,
       ...encoder.encode("CNPJ: " + settings.cnpj + "\n"),
