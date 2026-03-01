@@ -471,24 +471,6 @@ function CashierContent({
             AURA System
           </p>
         </div>
-
-        {/* Botão de Simulação Real SEFAZ */}
-        <div className="ml-auto flex items-center gap-2">
-          <div className="flex flex-col items-end">
-            <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Simulação SEFAZ</span>
-            <span className={`text-[10px] font-black uppercase italic ${fiscalSettingsData?.simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
-              {fiscalSettingsData?.simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}
-            </span>
-          </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className={`h-10 px-4 border-white/10 font-black uppercase italic text-[10px] transition-all ${fiscalSettingsData?.simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
-            onClick={() => toggleSimulacaoMutation.mutate(!fiscalSettingsData?.simulacaoReal)}
-          >
-            {fiscalSettingsData?.simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
-          </Button>
-        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-4 p-4 items-start flex-1 min-h-0 overflow-hidden">
@@ -533,6 +515,26 @@ function CashierContent({
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
                   <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-10 pl-9 text-[10px] font-black italic rounded-xl focus:border-primary/50 w-full" />
+                </div>
+              </div>
+
+              {/* Botão de Simulação Real SEFAZ - Movido para dentro do esquadro do carrinho */}
+              <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
+                <div className="flex items-center justify-between px-2">
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase text-white/40 tracking-widest leading-none">Simulação SEFAZ</span>
+                    <span className={`text-[10px] font-black uppercase italic ${fiscalSettingsData?.simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
+                      {fiscalSettingsData?.simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}
+                    </span>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className={`h-8 px-3 border-white/10 font-black uppercase italic text-[9px] transition-all ${fiscalSettingsData?.simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
+                    onClick={() => toggleSimulacaoMutation.mutate(!fiscalSettingsData?.simulacaoReal)}
+                  >
+                    {fiscalSettingsData?.simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
+                  </Button>
                 </div>
               </div>
             </CardHeader>
