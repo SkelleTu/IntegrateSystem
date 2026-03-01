@@ -1,0 +1,279 @@
+========================================================
+MÓDULO COMPLETO – CAIXA → NFC-e → SEFAZ (PADARIA SP)
+========================================================
+
+CONTEXTO:
+- Empresa no Simples Nacional
+- Emissão NFC-e modelo 65
+- Estado: SP
+- Fluxo: Finalizar venda → Autorizar na SEFAZ
+
+========================================================
+FLUXO COMPLETO DA FINALIZAÇÃO DA VENDA
+========================================================
+
+1. Validar venda
+2. Gerar número sequencial NFC-e
+3. Montar estrutura fiscal
+4. Gerar chave de acesso
+5. Gerar XML
+6. Assinar XML (certificado A1)
+7. Enviar para SEFAZ (SOAP)
+8. Processar resposta
+9. Salvar protocolo
+10. Gerar DANFE + QR Code
+11. Atualizar estoque (somente se autorizado)
+
+========================================================
+BANCO DE DADOS NECESSÁRIO
+========================================================
+
+TABELA: empresa
+- cnpj
+- razao_social
+- nome_fantasia
+- inscricao_estadual
+- regime_tributario (1 = Simples)
+- certificado_path
+- certificado_senha
+- csc
+- csc_id
+
+TABELA: sequencial_nfce
+- serie
+- ultimo_numero
+
+TABELA: nfce
+- id
+- numero
+- serie
+- chave_acesso
+- xml_enviado
+- xml_autorizado
+- protocolo
+- status (autorizado / rejeitado / contingencia)
+- data_emissao
+- valor_total
+
+========================================================
+BLOCO 1 – VALIDAR VENDA
+========================================================
+
+Verificar:
+- Existe ao menos 1 item
+- Todos os itens possuem:
+  - NCM
+  - CFOP (ex: 5102)
+  - CSOSN
+- Forma de pagamento definida
+- Soma dos itens = total
+
+Se falhar → não gerar NFC-e.
+
+========================================================
+BLOCO 2 – GERAR NÚMERO SEQUENCIAL
+========================================================
+
+novoNumero = ultimoNumero + 1
+
+Nunca pode repetir número.
+
+========================================================
+BLOCO 3 – ESTRUTURA FISCAL INTERNA
+========================================================
+
+Criar objeto antes de gerar XML:
+
+const nfce = {
+  ide: {
+    cUF: 35,
+    natOp: "Venda no varejo",
+    mod: 65,
+    serie: 1,
+    nNF: 123,
+    tpNF: 1,
+    idDest: 1,
+    indFinal: 1,
+    indPres: 1
+  },
+  emit: {
+    CNPJ: "xxxxxxxxxxxxxx",
+    IE: "xxxxxxxx",
+    CRT: 1
+  },
+  det: [
+    {
+      produto: {...},
+      imposto: {...}
+    }
+  ],
+  total: {...},
+  pag: {...}
+}
+
+========================================================
+BLOCO 4 – TRIBUTAÇÃO (SIMPLES NACIONAL)
+========================================================
+
+ICMS:
+CSOSN 102 (tributado sem destaque)
+
+Exemplo XML:
+
+<ICMS>
+  <ICMSSN102>
+    <orig>0</orig>
+    <CSOSN>102</CSOSN>
+  </ICMSSN102>
+</ICMS>
+
+PIS:
+CST 49
+Valor 0.00
+
+COFINS:
+CST 49
+Valor 0.00
+
+========================================================
+BLOCO 5 – GERAÇÃO DA CHAVE DE ACESSO
+========================================================
+
+Formato:
+cUF + AAMM + CNPJ + mod + serie + nNF + tpEmis + cNF + DV
+
+Implementar:
+- Código numérico (8 dígitos aleatórios)
+- Dígito verificador (módulo 11)
+
+Total: 44 dígitos
+
+========================================================
+BLOCO 6 – GERAR XML
+========================================================
+
+Estrutura mínima:
+
+<infNFe>
+  <ide>
+  <emit>
+  <dest>
+  <det>
+  <total>
+  <transp>
+  <pag>
+  <infAdic>
+</infNFe>
+
+Validar contra schema antes de enviar.
+
+========================================================
+BLOCO 7 – ASSINATURA DIGITAL
+========================================================
+
+Requisitos:
+- Certificado A1 (.pfx)
+- Senha
+
+Processo:
+1. Ler certificado
+2. Extrair chave privada
+3. Assinar tag <infNFe>
+4. Inserir <Signature>
+
+Algoritmo: RSA-SHA256
+
+========================================================
+BLOCO 8 – ENVIO PARA SEFAZ
+========================================================
+
+HOMOLOGAÇÃO:
+https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx
+
+PRODUÇÃO:
+https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx
+
+Envio via SOAP.
+XML dentro de <nfeDadosMsg>.
+
+========================================================
+BLOCO 9 – TRATAR RESPOSTA
+========================================================
+
+Principais códigos:
+
+100 – Autorizado
+204 – Duplicidade
+215 – Falha de schema
+402 – Rejeição cadastro
+
+Se 100:
+- Salvar protocolo
+- Salvar XML autorizado
+- Salvar chave
+- Status = autorizado
+
+Se erro:
+- Salvar motivo
+- Status = rejeitado
+
+========================================================
+BLOCO 10 – QR CODE
+========================================================
+
+Compor:
+URL consulta + chave + ambiente + CSC + hash
+
+CSC e ID obtidos no portal da SEFAZ.
+
+========================================================
+BLOCO 11 – CONTINGÊNCIA
+========================================================
+
+Se internet cair:
+tpEmis = 9
+
+Transmitir depois quando conexão voltar.
+
+========================================================
+BLOCO 12 – FECHAMENTO DE CAIXA
+========================================================
+
+Gerar relatório:
+- Total autorizado
+- Total rejeitado
+- Total contingência
+- Total por forma de pagamento
+- Total por CFOP
+
+========================================================
+ESTRUTURA FINAL DO MÓDULO
+========================================================
+
+/fiscal
+  validarVenda.js
+  gerarNumero.js
+  montarEstrutura.js
+  gerarChave.js
+  gerarXml.js
+  assinarXml.js
+  enviarSefaz.js
+  tratarResposta.js
+  gerarQrCode.js
+  contingencia.js
+
+========================================================
+ORDEM DE IMPLEMENTAÇÃO (IMPORTANTE)
+========================================================
+
+1. Estrutura fiscal interna
+2. Geração da chave
+3. Geração do XML
+4. Validação local
+5. Assinatura
+6. Homologação
+7. Produção
+
+========================================================
+FIM DO MÓDULO CAIXA → SEFAZ
+========================================================
