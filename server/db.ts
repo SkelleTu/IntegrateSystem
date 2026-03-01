@@ -234,12 +234,40 @@ export async function setupDatabase() {
       csc_token TEXT,
       csc_id TEXT,
       serie_nfce INTEGER NOT NULL DEFAULT 1,
+      ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0,
       ambiente TEXT NOT NULL DEFAULT 'homologacao',
       certificado_a1 TEXT,
       certificado_senha TEXT,
       printer_width TEXT NOT NULL DEFAULT '58mm'
+    )`,
+    `CREATE TABLE IF NOT EXISTS nfce (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL,
+      numero INTEGER NOT NULL,
+      serie INTEGER NOT NULL,
+      chave_acesso TEXT NOT NULL,
+      xml_enviado TEXT,
+      xml_autorizado TEXT,
+      protocolo TEXT,
+      status TEXT NOT NULL,
+      motivo TEXT,
+      data_emissao INTEGER NOT NULL,
+      valor_total INTEGER NOT NULL
     )`
   ];
+
+  // SQLite manually if drizzle push fails
+  if (!isRemoteEnabled) {
+    for (const table of tables) {
+      try {
+        localSqlite.prepare(table).run();
+      } catch (e) {
+        // Table already exists
+      }
+    }
+    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0").run(); } catch(e) {}
+    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT").run(); } catch(e) {}
+  }
 
   for (const table of tables) {
     try {

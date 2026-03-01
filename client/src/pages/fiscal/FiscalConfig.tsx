@@ -45,7 +45,6 @@ export default function FiscalConfig() {
     );
   }
 
-  // Initialize form data once settings are loaded
   if (settings && !formData) {
     setFormData(settings);
   }
@@ -121,6 +120,51 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.cnpj || ""} 
                     onChange={e => setFormData({...formData, cnpj: e.target.value})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Regime Tributário</Label>
+                  <Select value={formData?.regimeTributario} onValueChange={v => setFormData({...formData, regimeTributario: v})}>
+                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
+                      <SelectValue placeholder="Regime" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                      <SelectItem value="1">Simples Nacional</SelectItem>
+                      <SelectItem value="2">Simples Nacional - Excesso</SelectItem>
+                      <SelectItem value="3">Regime Normal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Ambiente</Label>
+                  <Select value={formData?.ambiente} onValueChange={v => setFormData({...formData, ambiente: v})}>
+                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
+                      <SelectValue placeholder="Ambiente" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                      <SelectItem value="homologacao">Homologação</SelectItem>
+                      <SelectItem value="producao">Produção</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Série NFC-e</Label>
+                  <Input 
+                    type="number"
+                    value={formData?.serieNfce || 1} 
+                    onChange={e => setFormData({...formData, serieNfce: parseInt(e.target.value)})}
+                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Inscrição Estadual</Label>
+                  <Input 
+                    value={formData?.inscricaoEstadual || ""} 
+                    onChange={e => setFormData({...formData, inscricaoEstadual: e.target.value})}
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -256,7 +300,7 @@ export default function FiscalConfig() {
                       {history?.map((doc) => (
                         <TableRow key={doc.id} className="border-white/10 hover:bg-white/5 transition-colors">
                           <TableCell className="text-white font-bold text-xs">
-                            {format(new Date(doc.dataEmissao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            {doc.dataEmissao ? format(new Date(doc.dataEmissao), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-"}
                           </TableCell>
                           <TableCell className="text-white font-black italic">
                             {doc.serie}/{doc.numero}
@@ -287,6 +331,11 @@ export default function FiscalConfig() {
                           </TableCell>
                         </TableRow>
                       ))}
+                      {(!history || history.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="text-center py-12 text-white/20 font-bold uppercase tracking-widest">Nenhum documento encontrado</TableCell>
+                        </TableRow>
+                      )}
                     </TableBody>
                   </Table>
                 </div>
