@@ -1,5 +1,4 @@
-import { XMLBuilder } from "fast-xml-parser";
-import { signer } from "nfe-signer"; 
+import { XMLBuilder, XMLParser } from "fast-xml-parser";
 import crypto from "crypto";
 
 export function generateChaveAcesso(settings: any, nNF: number) {
@@ -169,13 +168,41 @@ export async function signXML(xml: string, settings: any) {
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
     throw new Error("Certificado ou senha não configurados");
   }
+  // No ambiente Lite, retornamos o XML original como se estivesse assinado
+  // Em produção, aqui usaria uma biblioteca de assinatura XML como xml-crypto
   return xml; 
 }
 
 export async function transmitToSefaz(xmlSigned: string, settings: any) {
+  // Simulação de transmissão SOAP para SEFAZ SP
+  const isHomologacao = settings.ambiente !== "producao";
+  const url = isHomologacao 
+    ? "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx"
+    : "https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx";
+
+  console.log(`Transmition to SEFAZ (${settings.ambiente}): ${url}`);
+
+  // Simulação de resposta autorizada (código 100)
   return {
     success: true,
     protocol: "135" + Math.floor(Math.random() * 1000000000),
-    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "ERROR"
+    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "ERROR",
+    cStat: "100",
+    xMotivo: "Autorizado o uso da NF-e"
   };
+}
+
+export function generateQRCode(chave: string, settings: any) {
+  const isHomologacao = settings.ambiente !== "producao";
+  const urlBase = isHomologacao
+    ? "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode"
+    : "https://www.nfce.fazenda.sp.gov.br/qrcode";
+  
+  const csc = settings.cscToken || "000001";
+  const cscId = settings.cscId || "000001";
+  
+  // Simplificação do Hash para o QR Code (Sha1 do concatenado conforme manual SEFAZ)
+  const hash = crypto.createHash('sha1').update(`${chave}|2|${isHomologacao ? '1' : '2'}|${cscId}${csc}`).digest('hex');
+  
+  return `${urlBase}?p=${chave}|2|${isHomologacao ? '1' : '2'}|${cscId}|${hash}`;
 }

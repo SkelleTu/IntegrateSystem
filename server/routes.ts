@@ -423,7 +423,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Configurações fiscais não encontradas" });
       }
 
-      const { generateNFCeXML, signXML, transmitToSefaz, generateChaveAcesso } = await import("./fiscal/nfce");
+      const { generateNFCeXML, signXML, transmitToSefaz, generateChaveAcesso, generateQRCode } = await import("./fiscal/nfce");
       
       // 1. Gerar número sequencial
       const nNF = await storage.getNextNfceNumber(user.enterpriseId);
@@ -441,6 +441,8 @@ export async function registerRoutes(
       const result = await transmitToSefaz(xml, settings);
       
       if (result.success) {
+        const qrCode = generateQRCode(chave, settings);
+        
         const nfceData = await storage.createNfce({
           saleId,
           numero: nNF,
@@ -461,7 +463,7 @@ export async function registerRoutes(
           fiscalType: "NFCe"
         });
 
-        res.json({ success: true, key: chave, nfce: nfceData });
+        res.json({ success: true, key: chave, nfce: nfceData, qrCode });
       } else {
         throw new Error("Falha na transmissão");
       }
