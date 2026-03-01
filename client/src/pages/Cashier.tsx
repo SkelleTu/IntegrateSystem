@@ -151,9 +151,9 @@ export default function Cashier() {
         // Se for simulação, mostramos um aviso visual
         if (fiscalSettingsData?.simulacaoReal) {
           toast({ 
-            title: "MODO SIMULAÇÃO ATIVO", 
-            description: "A nota foi gerada perfeitamente, mas NÃO foi enviada à SEFAZ (Ambiente de Teste Local).",
-            className: "bg-primary text-black font-black"
+            title: "SIMULAÇÃO REAL SEFAZ (CONFIGURAÇÃO) ATIVA", 
+            description: "A venda foi processada com DADOS REAIS E LEGÍTIMOS, mas em estado de SIMULAÇÃO para fins de configuração. A nota NÃO foi enviada ao SEFAZ.",
+            className: "bg-primary text-black font-black border-2 border-black"
           });
         }
         
@@ -486,7 +486,7 @@ function CashierContent({
             className={`h-10 px-4 border-white/10 font-black uppercase italic text-[10px] transition-all ${fiscalSettingsData?.simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
             onClick={() => toggleSimulacaoMutation.mutate(!fiscalSettingsData?.simulacaoReal)}
           >
-            {fiscalSettingsData?.simulacaoReal ? 'SIMULAÇÃO REAL: ON' : 'SIMULAÇÃO REAL: OFF'}
+            {fiscalSettingsData?.simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
           </Button>
         </div>
       </div>

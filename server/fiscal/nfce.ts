@@ -190,7 +190,7 @@ export async function transmitToSefaz(xmlSigned: string, settings: any) {
   return {
     success: true,
     protocol: (settings.simulacaoReal ? "SIM" : "135") + Math.floor(Math.random() * 1000000000),
-    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || chave,
+    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "",
     cStat: "100",
     xMotivo: settings.simulacaoReal ? "Simulação Real Autorizada" : "Autorizado o uso da NF-e",
     simulado: settings.simulacaoReal

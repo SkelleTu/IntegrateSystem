@@ -170,8 +170,8 @@ export default function FiscalConfig() {
                 </div>
                 <div className="flex items-center justify-between p-4 bg-primary/5 border border-primary/20 rounded-xl h-12 mt-auto">
                   <div className="space-y-0.5">
-                    <label className="text-[10px] font-black uppercase italic text-primary">Simulação Real SEFAZ</label>
-                    <p className="text-[8px] text-white/40 uppercase">Gera XML real sem enviar à SEFAZ</p>
+                    <label className="text-[10px] font-black uppercase italic text-primary">VENDA SIMULADA SEFAZ (CONFIGURAÇÃO)</label>
+                    <p className="text-[8px] text-white/40 uppercase">DADOS 100% REAIS - APENAS NÃO ENVIA AO SEFAZ</p>
                   </div>
                   <input
                     type="checkbox"

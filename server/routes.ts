@@ -462,6 +462,7 @@ export async function registerRoutes(
           xMotivo: "Simulação Real Autorizada"
         };
       } else {
+        const { transmitToSefaz } = await import("./fiscal/nfce");
         result = await transmitToSefaz(xmlSigned, settings);
       }
       
