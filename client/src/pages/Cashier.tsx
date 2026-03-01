@@ -32,6 +32,10 @@ export default function Cashier() {
     retry: false,
   });
 
+  const { data: fiscalSettingsData, isLoading: isLoadingFiscalSettings } = useQuery<FiscalSettings>({
+    queryKey: ["/api/fiscal/settings"],
+  });
+
   const { data: menuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
     queryKey: ["/api/menu-items-combined"],
     queryFn: async () => {
@@ -316,7 +320,7 @@ export default function Cashier() {
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingTotal = total - totalPaid;
 
-  if (isLoadingRegister || isLoadingFiscal) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
+  if (isLoadingRegister || isLoadingFiscalSettings) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
 
   if (!register) {
     return (
