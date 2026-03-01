@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { MenuItem, CashRegister, Inventory } from "@shared/schema";
+import { MenuItem, CashRegister, Inventory, Nfce, FiscalSettings } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { printNFCe } from "@/lib/escpos";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Image as ImageIcon } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
@@ -140,9 +141,21 @@ export default function Cashier() {
   const saleMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/sales", data);
-      return res.json();
+      const sale = await res.json();
+      
+      // Se houver CPF/CNPJ, tenta emitir NFC-e automaticamente
+      if (data.sale.customerTaxId) {
+        try {
+          const fiscalRes = await apiRequest("POST", `/api/fiscal/emitir/${sale.id}`);
+          const fiscalData = await fiscalRes.json();
+          return { sale, fiscal: fiscalData };
+        } catch (e) {
+          console.error("Erro na emissão automática:", e);
+        }
+      }
+      return { sale };
     },
-    onSuccess: () => {
+    onSuccess: async (data) => {
       setCart([]);
       setPaymentModalOpen(false);
       setConfirmModalOpen(false);
@@ -151,7 +164,27 @@ export default function Cashier() {
       setCurrentMethod(null);
       setCustomerInfo({ name: "", taxId: "", email: "" });
       setShowFiscalFields(false);
-      toast({ title: "Venda realizada com sucesso!" });
+      
+      toast({ 
+        title: "Venda realizada com sucesso!",
+        description: data.fiscal ? "NFC-e emitida e pronta para impressão." : undefined
+      });
+
+      // Se a NFC-e foi emitida, oferece impressão imediata via WebUSB
+      if (data.fiscal && data.fiscal.success) {
+        try {
+          const settingsRes = await fetch("/api/fiscal/settings");
+          const settings = await settingsRes.json();
+          await printNFCe(data.fiscal.nfce, settings);
+          toast({ title: "Impressão enviada!" });
+        } catch (e) {
+          toast({ 
+            title: "Impressão Manual", 
+            description: "Não foi possível conectar à impressora USB automaticamente.",
+            variant: "destructive"
+          });
+        }
+      }
     },
   });
 
@@ -407,6 +440,27 @@ export default function Cashier() {
                     </div>
                   )}
                 </div>
+              )}
+              {showFiscalFields && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }} 
+                  animate={{ opacity: 1, height: "auto" }} 
+                  className="space-y-2 pb-2 border-b border-white/5"
+                >
+                  <p className="text-[8px] font-black uppercase text-primary">Dados do Cliente (NFC-e)</p>
+                  <Input 
+                    placeholder="CPF/CNPJ (Apenas números)" 
+                    value={customerInfo.taxId} 
+                    onChange={e => setCustomerInfo(prev => ({ ...prev, taxId: e.target.value }))}
+                    className="h-8 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl"
+                  />
+                  <Input 
+                    placeholder="Nome do Cliente" 
+                    value={customerInfo.name} 
+                    onChange={e => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
+                    className="h-8 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl"
+                  />
+                </motion.div>
               )}
               <div className="flex items-center justify-between gap-2"><div><span className="text-white/40 font-black uppercase text-[8px] tracking-widest">Total</span></div><span className="text-primary text-xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
               <div className="grid grid-cols-2 gap-2">

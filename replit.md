@@ -10,7 +10,9 @@ Implementação parcial do fluxo de emissão de NFC-e para o estado de São Paul
 - [x] Assinatura Digital (Stub para modo Lite)
 - [x] Transmissão SEFAZ (Simulação SOAP)
 - [x] Tratamento de Resposta (Autorização simulada)
-- [x] Geração de QR Code (Manual SEFAZ)
+- [x] Impressão Térmica via WebUSB (ESC/POS) - Permite comunicação direta com impressoras USB pelo navegador.
+- [x] Automação de Emissão: Ao preencher CPF/CNPJ no terminal, a NFC-e é emitida e enviada para a impressora automaticamente.
+- [x] Layout de Impressão Base: Cabeçalho, Chave de Acesso e Link do QR Code.
 
 ## Próximos Passos (Etapa por Etapa)
 
