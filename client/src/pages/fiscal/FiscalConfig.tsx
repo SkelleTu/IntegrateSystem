@@ -8,12 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck } from "lucide-react";
+import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 export default function FiscalConfig() {
   const { toast } = useToast();
   const { data: settings, isLoading } = useQuery<any>({
     queryKey: ["/api/fiscal/settings"],
+  });
+
+  const { data: history, isLoading: isLoadingHistory } = useQuery<any[]>({
+    queryKey: ["/api/fiscal/history"],
   });
 
   const mutation = useMutation({
@@ -64,6 +72,9 @@ export default function FiscalConfig() {
         <TabsList className="bg-black/40 border border-white/10 p-1 rounded-xl mb-8 flex-wrap h-auto gap-2">
           <TabsTrigger value="config" className="data-[state=active]:bg-primary data-[state=active]:text-black font-black uppercase italic tracking-widest text-[10px] py-3 px-6 rounded-lg transition-all gap-2">
             <Settings2 className="w-4 h-4" /> Configuração Fiscal
+          </TabsTrigger>
+          <TabsTrigger value="history" className="data-[state=active]:bg-primary data-[state=active]:text-black font-black uppercase italic tracking-widest text-[10px] py-3 px-6 rounded-lg transition-all gap-2">
+            <History className="w-4 h-4" /> Histórico NFC-e
           </TabsTrigger>
           <TabsTrigger value="printers" className="data-[state=active]:bg-primary data-[state=active]:text-black font-black uppercase italic tracking-widest text-[10px] py-3 px-6 rounded-lg transition-all gap-2">
             <Printer className="w-4 h-4" /> Impressoras
@@ -214,7 +225,75 @@ export default function FiscalConfig() {
             </CardContent>
           </Card>
         </TabsContent>
-        {/* Other TabsContent removed for brevity as they are not relevant to the fix */}
+
+        <TabsContent value="history">
+          <Card className="panel-translucent border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                <History className="w-6 h-6 text-primary" /> Histórico de Emissões
+              </CardTitle>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Lista de todas as NFC-e emitidas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingHistory ? (
+                <div className="flex justify-center p-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="rounded-xl border border-white/10 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-black/40">
+                      <TableRow className="border-white/10 hover:bg-white/5">
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest">Data/Hora</TableHead>
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest">Número</TableHead>
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest">Chave de Acesso</TableHead>
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest">Valor</TableHead>
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest">Status</TableHead>
+                        <TableHead className="text-white/40 uppercase font-black text-[10px] tracking-widest text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {history?.map((doc) => (
+                        <TableRow key={doc.id} className="border-white/10 hover:bg-white/5 transition-colors">
+                          <TableCell className="text-white font-bold text-xs">
+                            {format(new Date(doc.dataEmissao), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                          </TableCell>
+                          <TableCell className="text-white font-black italic">
+                            {doc.serie}/{doc.numero}
+                          </TableCell>
+                          <TableCell className="text-white/60 font-mono text-[10px]">
+                            {doc.chaveAcesso}
+                          </TableCell>
+                          <TableCell className="text-primary font-black">
+                            R$ {(doc.valorTotal / 100).toFixed(2)}
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={
+                              doc.status === 'authorized' ? 'bg-primary/20 text-primary border-primary/20' :
+                              'bg-red-500/20 text-red-500 border-red-500/20'
+                            }>
+                              {doc.status === 'authorized' ? 'AUTORIZADO' : 'REJEITADO'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button size="icon" variant="outline" className="h-8 w-8 border-white/10 hover:bg-primary hover:text-black">
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button size="icon" variant="outline" className="h-8 w-8 border-white/10 hover:bg-primary hover:text-black">
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   );

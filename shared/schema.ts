@@ -217,15 +217,35 @@ export const fiscalSettings = pgTable("fiscal_settings", {
   codigoIbge: text("codigo_ibge").notNull(),
   uf: text("uf").notNull(),
   cep: text("cep").notNull(),
-  regimeTributario: text("regime_tributario").notNull(), // "Simples Nacional", etc
+  regimeTributario: text("regime_tributario").notNull(), // "1" for Simples Nacional
   cscToken: text("csc_token"),
   cscId: text("csc_id"),
   serieNfce: integer("serie_nfce").notNull().default(1),
+  ultimoNumeroNfce: integer("ultimo_numero_nfce").notNull().default(0),
   ambiente: text("ambiente").notNull().default("homologacao"), // "homologacao" or "producao"
   certificadoA1: text("certificado_a1"), // Base64 or path
   certificadoSenha: text("certificado_senha"),
   printerWidth: text("printer_width").default("58mm").notNull(), // "58mm" or "80mm"
 });
+
+export const nfce = pgTable("nfce", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  saleId: integer("sale_id").notNull(),
+  numero: integer("numero").notNull(),
+  serie: integer("serie").notNull(),
+  chaveAcesso: text("chave_acesso").notNull(),
+  xmlEnviado: text("xml_enviado"),
+  xmlAutorizado: text("xml_autorizado"),
+  protocolo: text("protocolo"),
+  status: text("status").notNull(), // authorized, rejected, contingency
+  motivo: text("motivo"),
+  dataEmissao: integer("data_emissao", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  valorTotal: integer("valor_total").notNull(),
+});
+
+export const insertNfceSchema = createInsertSchema(nfce);
+export type Nfce = typeof nfce.$inferSelect;
+export type InsertNfce = z.infer<typeof insertNfceSchema>;
 
 export const insertFiscalSettingsSchema = createInsertSchema(fiscalSettings);
 export type FiscalSettings = typeof fiscalSettings.$inferSelect;

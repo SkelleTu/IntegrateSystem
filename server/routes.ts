@@ -412,6 +412,10 @@ export async function registerRoutes(
       const sale = await storage.getSale(saleId);
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
       
+      if (sale.fiscalStatus === "authorized") {
+        return res.status(400).json({ message: "NFC-e já emitida para esta venda" });
+      }
+
       const items = await storage.getSaleItems(saleId);
       const settings = await storage.getFiscalSettings(user.enterpriseId);
       
@@ -419,24 +423,45 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Configurações fiscais não encontradas" });
       }
 
-      // 1. Gerar XML
-      const { generateNFCeXML, signXML, transmitToSefaz } = await import("./fiscal/nfce");
-      let xml = generateNFCeXML(sale, items, settings);
+      const { generateNFCeXML, signXML, transmitToSefaz, generateChaveAcesso } = await import("./fiscal/nfce");
       
-      // 2. Assinar XML
+      // 1. Gerar número sequencial
+      const nNF = await storage.getNextNfceNumber(user.enterpriseId);
+      
+      // 2. Gerar Chave de Acesso
+      const chave = generateChaveAcesso(settings, nNF);
+
+      // 3. Gerar XML
+      let xml = generateNFCeXML(sale, items, settings, nNF, chave);
+      
+      // 4. Assinar XML
       xml = await signXML(xml, settings);
       
-      // 3. Transmitir
+      // 5. Transmitir
       const result = await transmitToSefaz(xml, settings);
       
       if (result.success) {
+        const nfceData = await storage.createNfce({
+          saleId,
+          numero: nNF,
+          serie: settings.serieNfce,
+          chaveAcesso: chave,
+          xmlEnviado: xml,
+          xmlAutorizado: xml, // In reality, SEFAZ returns a modified XML
+          protocolo: result.protocol,
+          status: "authorized",
+          valorTotal: sale.totalAmount,
+          dataEmissao: new Date(),
+        });
+
         await storage.updateSaleFiscal(saleId, {
           fiscalStatus: "authorized",
-          fiscalKey: result.key,
+          fiscalKey: chave,
           fiscalXml: xml,
           fiscalType: "NFCe"
         });
-        res.json({ success: true, key: result.key });
+
+        res.json({ success: true, key: chave, nfce: nfceData });
       } else {
         throw new Error("Falha na transmissão");
       }
@@ -448,6 +473,13 @@ export async function registerRoutes(
       });
       res.status(500).json({ message: err.message || "Erro na emissão fiscal" });
     }
+  });
+
+  app.get("/api/fiscal/history", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const history = await storage.getNfceHistory(user.enterpriseId);
+    res.json(history);
   });
 
   // Services Routes

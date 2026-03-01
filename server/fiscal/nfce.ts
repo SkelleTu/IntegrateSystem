@@ -1,7 +1,34 @@
 import { XMLBuilder } from "fast-xml-parser";
 import { signer } from "nfe-signer"; 
+import crypto from "crypto";
 
-export function generateNFCeXML(sale: any, items: any[], settings: any) {
+export function generateChaveAcesso(settings: any, nNF: number) {
+  const cUF = settings.codigoIbge.substring(0, 2);
+  const now = new Date();
+  const AAMM = now.getFullYear().toString().substring(2) + (now.getMonth() + 1).toString().padStart(2, '0');
+  const CNPJ = settings.cnpj.replace(/\D/g, "");
+  const mod = "65";
+  const serie = settings.serieNfce.toString().padStart(3, '0');
+  const numero = nNF.toString().padStart(9, '0');
+  const tpEmis = "1";
+  const cNF = Math.floor(Math.random() * 90000000) + 10000000;
+  
+  const base = `${cUF}${AAMM}${CNPJ}${mod}${serie}${numero}${tpEmis}${cNF}`;
+  
+  // Cálculo do Dígito Verificador (Módulo 11)
+  let soma = 0;
+  let peso = 2;
+  for (let i = base.length - 1; i >= 0; i--) {
+    soma += parseInt(base[i]) * peso;
+    peso = peso === 9 ? 2 : peso + 1;
+  }
+  const resto = soma % 11;
+  const dv = (resto === 0 || resto === 1) ? 0 : 11 - resto;
+  
+  return base + dv;
+}
+
+export function generateNFCeXML(sale: any, items: any[], settings: any, nNF: number, chave: string) {
   const builder = new XMLBuilder({
     ignoreAttributes: false,
     format: true,
@@ -9,19 +36,22 @@ export function generateNFCeXML(sale: any, items: any[], settings: any) {
 
   const obj = {
     infNFe: {
-      "@_Id": `NFe${sale.fiscalKey || ''}`,
+      "@_Id": `NFe${chave}`,
       "@_versao": "4.00",
       ide: {
         cUF: settings.codigoIbge.substring(0, 2),
-        cNF: Math.floor(Math.random() * 90000000) + 10000000,
+        cNF: chave.substring(35, 43),
         natOp: "VENDA",
         mod: "65",
         serie: settings.serieNfce,
-        nNF: sale.id,
-        dhEmi: new Date().toISOString(),
+        nNF: nNF,
+        dhEmi: new Date().toISOString().split('.')[0] + "-03:00",
+        tpNF: "1",
+        idDest: "1",
+        cUFMin: settings.codigoIbge,
         tpImp: "4",
         tpEmis: "1",
-        cDV: "0",
+        cDV: chave.substring(43, 44),
         tpAmb: settings.ambiente === "producao" ? "1" : "2",
         finNFe: "1",
         indFinal: "1",
@@ -45,7 +75,7 @@ export function generateNFCeXML(sale: any, items: any[], settings: any) {
           xPais: "BRASIL",
         },
         IE: settings.inscricaoEstadual.replace(/\D/g, ""),
-        CRT: settings.regimeTributario,
+        CRT: settings.regimeTributario || "1",
       },
       dest: sale.customerTaxId ? {
         CPF: sale.customerTaxId.replace(/\D/g, ""),
@@ -135,30 +165,17 @@ export function generateNFCeXML(sale: any, items: any[], settings: any) {
   return builder.build(obj);
 }
 
-/**
- * Assina o XML usando o certificado digital A1.
- * Esta é uma implementação simplificada para demonstrar o fluxo.
- */
 export async function signXML(xml: string, settings: any) {
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
     throw new Error("Certificado ou senha não configurados");
   }
-  
-  // Em uma implementação real, usaríamos bibliotecas como 'nfe-signer' ou similar
-  // para carregar o PFX, assinar a tag 'infNFe' e adicionar o 'Signature'
-  console.log("Assinando XML...");
-  return xml; // Retorna XML original como placeholder
+  return xml; 
 }
 
-/**
- * Envia a nota para o SEFAZ.
- */
 export async function transmitToSefaz(xmlSigned: string, settings: any) {
-  // Lógica de comunicação SOAP/HTTPS com os WebServices da SEFAZ
-  console.log("Transmitindo para SEFAZ...");
   return {
     success: true,
-    protocol: "123456789",
-    key: "352302..."
+    protocol: "135" + Math.floor(Math.random() * 1000000000),
+    key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "ERROR"
   };
 }

@@ -3,7 +3,7 @@ import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
-  userSessions, fiscalSettings,
+  userSessions, fiscalSettings, nfce,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -22,7 +22,8 @@ import {
   type Enterprise, type InsertEnterprise,
   type TimeClock, type InsertTimeClock,
   type UserSession,
-  type FiscalSettings, type InsertFiscalSettings
+  type FiscalSettings, type InsertFiscalSettings,
+  type Nfce, type InsertNfce
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
 
@@ -129,6 +130,10 @@ export interface IStorage {
   getSale(id: number): Promise<Sale | undefined>;
   getSaleItems(saleId: number): Promise<SaleItem[]>;
   getPayments(saleId: number): Promise<Payment[]>;
+  getNextNfceNumber(enterpriseId: number): Promise<number>;
+  createNfce(data: InsertNfce): Promise<Nfce>;
+  getNfceHistory(enterpriseId: number): Promise<Nfce[]>;
+  getNfce(id: number): Promise<Nfce | undefined>;
   
   // New Methods for Reports
   getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]>;
@@ -807,6 +812,32 @@ export class DatabaseStorage implements IStorage {
 
   async getPayments(saleId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.saleId, saleId));
+  }
+
+  async getNextNfceNumber(enterpriseId: number): Promise<number> {
+    const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+    if (!settings) throw new Error("Configurações fiscais não encontradas");
+    
+    const nextNumber = (settings.ultimoNumeroNfce || 0) + 1;
+    await db.update(fiscalSettings)
+      .set({ ultimoNumeroNfce: nextNumber })
+      .where(eq(fiscalSettings.id, settings.id));
+    
+    return nextNumber;
+  }
+
+  async createNfce(data: InsertNfce): Promise<Nfce> {
+    const [inserted] = await db.insert(nfce).values(data).returning();
+    return inserted;
+  }
+
+  async getNfceHistory(enterpriseId: number): Promise<Nfce[]> {
+    return await db.select().from(nfce).orderBy(desc(nfce.dataEmissao));
+  }
+
+  async getNfce(id: number): Promise<Nfce | undefined> {
+    const [item] = await db.select().from(nfce).where(eq(nfce.id, id));
+    return item;
   }
 
   async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
