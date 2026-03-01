@@ -143,15 +143,13 @@ export default function Cashier() {
       const res = await apiRequest("POST", "/api/sales", data);
       const sale = await res.json();
       
-      // Se houver CPF/CNPJ, tenta emitir NFC-e automaticamente
-      if (data.sale.customerTaxId) {
-        try {
-          const fiscalRes = await apiRequest("POST", `/api/fiscal/emitir/${sale.id}`);
-          const fiscalData = await fiscalRes.json();
-          return { sale, fiscal: fiscalData };
-        } catch (e) {
-          console.error("Erro na emissão automática:", e);
-        }
+      // Sempre tenta emitir NFC-e para todas as vendas finalizadas no PDV
+      try {
+        const fiscalRes = await apiRequest("POST", `/api/fiscal/emitir/${sale.id}`);
+        const fiscalData = await fiscalRes.json();
+        return { sale, fiscal: fiscalData };
+      } catch (e) {
+        console.error("Erro na emissão automática:", e);
       }
       return { sale };
     },
@@ -297,7 +295,7 @@ export default function Cashier() {
         customerName: customerInfo.name || null,
         customerTaxId: customerInfo.taxId || null,
         customerEmail: customerInfo.email || null,
-        fiscalStatus: customerInfo.taxId ? "pending" : "none",
+        fiscalStatus: "pending",
         status: "completed"
       },
       items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
