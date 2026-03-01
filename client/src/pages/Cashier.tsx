@@ -316,7 +316,7 @@ export default function Cashier() {
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingTotal = total - totalPaid;
 
-  if (isLoadingRegister) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
+  if (isLoadingRegister || isLoadingFiscal) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
 
   if (!register) {
     return (
@@ -399,17 +399,26 @@ function CashierContent({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
-  const { data: fiscalSettingsData } = useQuery<FiscalSettings>({
+  const { data: fiscalSettingsData, isLoading: isLoadingFiscal } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
   });
 
+  const [simulacaoReal, setSimulacaoReal] = useState(false);
+
+  useEffect(() => {
+    if (fiscalSettingsData) {
+      setSimulacaoReal(!!fiscalSettingsData.simulacaoReal);
+    }
+  }, [fiscalSettingsData]);
+
   const toggleSimulacaoMutation = useMutation({
     mutationFn: async (val: boolean) => {
+      setSimulacaoReal(val);
       await apiRequest("POST", "/api/fiscal/settings", { ...fiscalSettingsData, simulacaoReal: val });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/fiscal/settings"] });
-      toast({ title: `Simulação Real ${!fiscalSettingsData?.simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}` });
+      toast({ title: `Simulação Real ${!simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}` });
     }
   });
 
@@ -524,17 +533,17 @@ function CashierContent({
                 <div className="flex items-center justify-between px-2 bg-white/5 py-2 rounded-lg border border-white/10">
                   <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase text-white/40 tracking-widest leading-none">Simulação SEFAZ</span>
-                    <span className={`text-[10px] font-black uppercase italic ${fiscalSettingsData?.simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
-                      {fiscalSettingsData?.simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}
+                    <span className={`text-[10px] font-black uppercase italic ${simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
+                      {simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}
                     </span>
                   </div>
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className={`h-8 px-3 border-white/10 font-black uppercase italic text-[9px] transition-all ${fiscalSettingsData?.simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
-                    onClick={() => toggleSimulacaoMutation.mutate(!fiscalSettingsData?.simulacaoReal)}
+                    className={`h-8 px-3 border-white/10 font-black uppercase italic text-[9px] transition-all ${simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
+                    onClick={() => toggleSimulacaoMutation.mutate(!simulacaoReal)}
                   >
-                    {fiscalSettingsData?.simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
+                    {simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
                   </Button>
                 </div>
               </div>

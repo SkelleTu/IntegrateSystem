@@ -776,8 +776,14 @@ export class DatabaseStorage implements IStorage {
 
   // Fiscal
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
-    const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
-    return settings;
+    this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
+    try {
+      const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+      return settings || undefined;
+    } catch (e: any) {
+      console.error("Erro ao buscar fiscal_settings:", e.message);
+      return undefined;
+    }
   }
 
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
