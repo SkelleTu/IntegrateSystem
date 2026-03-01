@@ -517,10 +517,11 @@ function CashierContent({
                   <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-10 pl-9 text-[10px] font-black italic rounded-xl focus:border-primary/50 w-full" />
                 </div>
               </div>
-
-              {/* Botão de Simulação Real SEFAZ - Movido para dentro do esquadro do carrinho */}
-              <div className="pt-2 border-t border-white/5 flex flex-col gap-2">
-                <div className="flex items-center justify-between px-2">
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-0">
+              {/* Botão de Simulação Real SEFAZ - Movido para o topo do corpo do carrinho */}
+              <div className="pb-2 mb-2 border-b border-white/5 flex flex-col gap-2">
+                <div className="flex items-center justify-between px-2 bg-white/5 py-2 rounded-lg border border-white/10">
                   <div className="flex flex-col">
                     <span className="text-[8px] font-black uppercase text-white/40 tracking-widest leading-none">Simulação SEFAZ</span>
                     <span className={`text-[10px] font-black uppercase italic ${fiscalSettingsData?.simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
@@ -537,8 +538,7 @@ function CashierContent({
                   </Button>
                 </div>
               </div>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-0">
+
               {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-white/20 gap-2 py-6"><ShoppingCart className="w-8 h-8 opacity-10" /><p className="font-black uppercase text-[8px]">Vazio</p></div> : cart.map(({ item, quantity }: any) => (
                 <div key={item.id} className="flex items-center justify-between gap-2"><div className="flex-1 min-w-0"><h4 className="text-white text-[10px] font-black uppercase truncate">{item.name}</h4><p className="text-white/40 text-[8px]">R$ {(item.price / 100).toFixed(2)}</p></div><div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5"><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeFromCart(item.id)}><Minus className="w-3 h-3" /></Button><span className="text-white font-black text-xs italic w-4 text-center">{quantity}</span><Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={() => addToCart(item as any)}><Plus className="w-3 h-3" /></Button></div></div>
               ))}
