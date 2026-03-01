@@ -815,13 +815,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextNfceNumber(enterpriseId: number): Promise<number> {
-    const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
-    if (!settings) throw new Error("Configurações fiscais não encontradas");
+    const [settingsData] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+    if (!settingsData) throw new Error("Configurações fiscais não encontradas");
     
-    const nextNumber = (settings.ultimoNumeroNfce || 0) + 1;
+    const nextNumber = (settingsData.ultimoNumeroNfce || 0) + 1;
     await db.update(fiscalSettings)
       .set({ ultimoNumeroNfce: nextNumber })
-      .where(eq(fiscalSettings.id, settings.id));
+      .where(eq(fiscalSettings.id, settingsData.id));
     
     return nextNumber;
   }

@@ -416,29 +416,42 @@ export async function registerRoutes(
         return res.status(400).json({ message: "NFC-e já emitida para esta venda" });
       }
 
-      const items = await storage.getSaleItems(saleId);
-      const settings = await storage.getFiscalSettings(user.enterpriseId);
+      const [items, payments, settings] = await Promise.all([
+        storage.getSaleItems(saleId),
+        storage.getPayments(saleId),
+        storage.getFiscalSettings(user.enterpriseId)
+      ]);
       
       if (!settings) {
         return res.status(400).json({ message: "Configurações fiscais não encontradas" });
       }
 
+      // Add payments to sale object for XML generation
+      const saleWithPayments = { ...sale, payments };
+
+      // 1. Validar Venda (Garantir NCM/CFOP)
+      for (const item of items) {
+        if (!item.ncm || !item.cfop) {
+          return res.status(400).json({ message: `Item ${item.itemId} sem NCM ou CFOP configurado` });
+        }
+      }
+
       const { generateNFCeXML, signXML, transmitToSefaz, generateChaveAcesso, generateQRCode } = await import("./fiscal/nfce");
       
-      // 1. Gerar número sequencial
+      // 2. Gerar número sequencial
       const nNF = await storage.getNextNfceNumber(user.enterpriseId);
       
-      // 2. Gerar Chave de Acesso
+      // 3. Gerar Chave de Acesso
       const chave = generateChaveAcesso(settings, nNF);
 
-      // 3. Gerar XML
-      let xml = generateNFCeXML(sale, items, settings, nNF, chave);
+      // 4. Gerar XML
+      const xml = generateNFCeXML(saleWithPayments, items, settings, nNF, chave);
       
-      // 4. Assinar XML
-      xml = await signXML(xml, settings);
+      // 5. Assinar XML (Simulado)
+      const xmlSigned = await signXML(xml, settings);
       
-      // 5. Transmitir
-      const result = await transmitToSefaz(xml, settings);
+      // 6. Transmitir (Simulado)
+      const result = await transmitToSefaz(xmlSigned, settings);
       
       if (result.success) {
         const qrCode = generateQRCode(chave, settings);
@@ -449,7 +462,7 @@ export async function registerRoutes(
           serie: settings.serieNfce,
           chaveAcesso: chave,
           xmlEnviado: xml,
-          xmlAutorizado: xml, // In reality, SEFAZ returns a modified XML
+          xmlAutorizado: xmlSigned,
           protocolo: result.protocol,
           status: "authorized",
           valorTotal: sale.totalAmount,
@@ -459,13 +472,17 @@ export async function registerRoutes(
         await storage.updateSaleFiscal(saleId, {
           fiscalStatus: "authorized",
           fiscalKey: chave,
-          fiscalXml: xml,
+          fiscalXml: xmlSigned,
           fiscalType: "NFCe"
         });
 
         res.json({ success: true, key: chave, nfce: nfceData, qrCode });
       } else {
-        throw new Error("Falha na transmissão");
+        await storage.updateSaleFiscal(saleId, {
+          fiscalStatus: "rejected",
+          fiscalError: result.xMotivo
+        });
+        res.status(400).json({ message: result.xMotivo });
       }
     } catch (err: any) {
       console.error("Erro na emissão fiscal:", err);

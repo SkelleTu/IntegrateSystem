@@ -100,22 +100,22 @@ export function generateNFCeXML(sale: any, items: any[], settings: any, nNF: num
         imposto: {
           ICMS: {
             ICMSSN102: {
-              orig: "0",
-              CSOSN: "102",
+              orig: item.icmsOrigem?.toString() || "0",
+              CSOSN: item.icmsSituacaoTributaria || "102",
             },
           },
           PIS: {
-            PISAliq: {
-              CST: "01",
-              vBC: (item.totalPrice / 100).toFixed(2),
+            PISOutr: {
+              CST: "49",
+              vBC: "0.00",
               pPIS: "0.00",
               vPIS: "0.00",
             },
           },
           COFINS: {
-            COFINSAliq: {
-              CST: "01",
-              vBC: (item.totalPrice / 100).toFixed(2),
+            COFINSOutr: {
+              CST: "49",
+              vBC: "0.00",
               pCOFINS: "0.00",
               vCOFINS: "0.00",
             },
@@ -151,12 +151,12 @@ export function generateNFCeXML(sale: any, items: any[], settings: any, nNF: num
       pag: {
         detPag: {
           indPag: "0",
-          tPag: "01",
+          tPag: sale.payments?.[0]?.method === "cash" ? "01" : (sale.payments?.[0]?.method === "card" ? "03" : "99"),
           vPag: (sale.totalAmount / 100).toFixed(2),
         },
       },
       infAdic: {
-        infCpl: "Voce pagou aproximadamente R$ 0,00 de tributos federais, R$ 0,00 de tributos estaduais e R$ 0,00 de tributos municipais conforme a Lei Federal 12.741/2012.",
+        infCpl: `Voce pagou aproximadamente R$ ${(sale.totalAmount * 0.1345 / 100).toFixed(2)} de tributos federais, R$ ${(sale.totalAmount * 0.12 / 100).toFixed(2)} de tributos estaduais e R$ 0,00 de tributos municipais conforme a Lei Federal 12.741/2012.`,
       },
     },
   };
@@ -166,6 +166,10 @@ export function generateNFCeXML(sale: any, items: any[], settings: any, nNF: num
 
 export async function signXML(xml: string, settings: any) {
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
+    // Para homologação sem certificado, retornamos o XML original
+    if (settings.ambiente === "homologacao") {
+      return xml;
+    }
     throw new Error("Certificado ou senha não configurados");
   }
   // No ambiente Lite, retornamos o XML original como se estivesse assinado
