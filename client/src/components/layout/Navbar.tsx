@@ -53,8 +53,8 @@ export function Navbar() {
   const navItems = [
     { title: "Dashboard", url: "/app", icon: Home },
     { title: "Ponto", url: "/ponto", icon: Fingerprint },
-    { title: "Caixa", url: "/caixa", icon: ClipboardList },
-    { title: "Financeiro", url: "/financeiro", icon: Landmark },
+    { title: "Vendas", url: "/caixa", icon: ShoppingCart },
+    { title: "Caixa", url: "/financeiro", icon: Landmark },
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
     { title: "Estoque", url: "/inventory", icon: Search },
     { title: "Fiscal", url: "/fiscal", icon: FileText },
