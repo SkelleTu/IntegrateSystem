@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
@@ -168,7 +168,13 @@ export default function Cashier() {
         const fiscalRes = await apiRequest("POST", `/api/fiscal/emitir/${sale.id}`);
         const fiscalData = await fiscalRes.json();
         
-        if (fiscalSettingsData?.simulacaoReal) {
+        if (data.sale.status === "simulation") {
+          toast({ 
+            title: "VENDA EM MODO SIMULAÇÃO", 
+            description: "A venda foi processada sem falhas de autenticação para fins de teste.",
+            className: "bg-blue-600 text-white font-black border-2 border-white"
+          });
+        } else if (fiscalSettingsData?.simulacaoReal) {
           toast({ 
             title: "SIMULAÇÃO REAL SEFAZ (CONFIGURAÇÃO) ATIVA", 
             description: "A venda foi processada com DADOS REAIS E LEGÍTIMOS, mas em estado de SIMULAÇÃO para fins de configuração. A nota NÃO foi enviada ao SEFAZ.",
@@ -334,9 +340,9 @@ export default function Cashier() {
     setPayments(prev => prev.filter((_, i) => i !== index));
   };
 
-  const finalizeSale = () => {
+  const finalizeSale = (isSimulation: boolean = false) => {
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
-    if (totalPaid < total) {
+    if (totalPaid < total && !isSimulation) {
       toast({ title: "Pagamento Incompleto", description: `Faltam R$ ${((total - totalPaid) / 100).toFixed(2)}`, variant: "destructive" });
       return;
     }
@@ -347,11 +353,11 @@ export default function Cashier() {
         customerName: customerInfo.name || null,
         customerTaxId: customerInfo.taxId || null,
         customerEmail: customerInfo.email || null,
-        fiscalStatus: "pending",
-        status: "completed"
+        fiscalStatus: isSimulation ? "simulated" : "pending",
+        status: isSimulation ? "simulation" : "completed"
       },
       items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
-      payments: payments
+      payments: isSimulation ? [{ method: "cash", amount: total }] : payments
     });
   };
 
@@ -562,7 +568,17 @@ function CashierContent({
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-4 p-4 items-start flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col gap-4 p-4 items-start flex-1 min-h-0 overflow-hidden">
+        <div className="w-full flex justify-end px-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => finalizeSale(true)}
+            className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[10px] h-10 px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+          >
+            <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
+          </Button>
+        </div>
         <div className="flex-1 w-full h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-4">
             {filteredMenuItems?.map((item: any) => (
@@ -590,45 +606,47 @@ function CashierContent({
           </div>
         </div>
 
-        <div className="w-full lg:w-[360px] flex flex-col shrink-0 h-full min-h-0 overflow-hidden">
-          <Card className="panel-translucent flex flex-col h-full overflow-hidden">
+        {/* Sidebar Direita / Carrinho */}
+        <div className="w-full lg:w-96 shrink-0 flex flex-col gap-4 h-full min-h-0">
+          <Card className="flex-1 panel-translucent flex flex-col min-h-0 overflow-hidden border-white/10 shadow-2xl relative">
             <CardHeader className="border-b border-white/5 p-2 bg-white/5 space-y-2">
-              <CardTitle className="text-white flex items-center justify-between uppercase italic tracking-tighter text-md font-black"><div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-primary" /> Carrinho</div><Badge className="bg-primary text-black font-black italic text-[10px] h-5">{cart.reduce((s: number,i: any) => s + i.quantity, 0)}</Badge></CardTitle>
-              
-              <div className="space-y-1">
+              <div className="flex flex-col gap-2">
                 <div className="relative">
-                  <Input placeholder="Número da Comanda" value={searchTicket} onChange={e => setSearchTicket(e.target.value)} className="h-10 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl pl-4 pr-10" />
-                  <Button variant="ghost" className="absolute right-1 top-1 h-8 w-8 p-0 text-primary" onClick={() => loadTicketMutation.mutate(searchTicket)}><Search className="w-4 h-4" /></Button>
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                  <Input 
+                    placeholder="BIPAR CÓDIGO OU BUSCAR..." 
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-10 bg-black/60 border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50" 
+                    autoFocus
+                  />
                 </div>
-                
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-                  <Input placeholder="BUSCAR PRODUTO..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-black/60 border-white/10 text-white h-10 pl-9 text-[10px] font-black italic rounded-xl focus:border-primary/50 w-full" />
+                  <Input 
+                    placeholder="COMANDA #" 
+                    value={searchTicket}
+                    onChange={(e) => setSearchTicket(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && loadTicketMutation.mutate(searchTicket)}
+                    className="h-10 bg-black/60 border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 pr-10" 
+                  />
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-primary hover:bg-primary/10"
+                    onClick={() => loadTicketMutation.mutate(searchTicket)}
+                    disabled={loadTicketMutation.isPending}
+                  >
+                    {loadTicketMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                  </Button>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar min-h-0">
-              {/* Botão de Simulação Real SEFAZ - Movido para o topo do corpo do carrinho */}
-              <div className="pb-2 mb-2 border-b border-white/5 flex flex-col gap-2">
-                <div className="flex items-center justify-between px-2 bg-white/5 py-2 rounded-lg border border-white/10">
-                  <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase text-white/40 tracking-widest leading-none">Simulação SEFAZ</span>
-                    <span className={`text-[10px] font-black uppercase italic ${simulacaoReal ? 'text-primary' : 'text-red-500'}`}>
-                      {simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}
-                    </span>
-                  </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={`h-8 px-3 border-white/10 font-black uppercase italic text-[9px] transition-all ${simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
-                    onClick={() => {
-                      const newValue = !simulacaoReal;
-                      setSimulacaoReal(newValue);
-                      toggleSimulacaoMutation.mutate(newValue);
-                    }}
-                  >
-                    {simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
-                  </Button>
+
+            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="w-4 h-4 text-primary" />
+                  <h3 className="text-white font-black uppercase italic text-xs tracking-tighter leading-none">Checkout <span className="text-primary">Ativo</span></h3>
                 </div>
               </div>
 
@@ -687,11 +705,9 @@ function CashierContent({
                 <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}><CreditCard className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Cartão</span></Button>
                 <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}><QrCode className="w-4 h-4" /><span className="text-[8px] font-black uppercase">PIX</span></Button>
               </div>
-              {remainingTotal <= 0 && total > 0 && (
-                <Button className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-xl" onClick={finalizeSale} disabled={saleMutation.isPending}>
-                  {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "FINALIZAR VENDA"}
-                </Button>
-              )}
+              <Button className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-xl" onClick={() => finalizeSale(false)} disabled={saleMutation.isPending}>
+                {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "FINALIZAR VENDA"}
+              </Button>
             </div>
           </Card>
         </div>

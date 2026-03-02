@@ -142,28 +142,14 @@ export default function FiscalConfig() {
                   variant="outline"
                   size="sm"
                   onClick={handleFillFakeData}
-                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[8px] h-8 px-2 gap-1 hover:bg-primary hover:text-black transition-all"
+                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[10px] h-10 px-4 gap-2 hover:bg-primary hover:text-black transition-all shadow-[0_0_15px_rgba(0,255,102,0.1)] hover:shadow-[0_0_20px_rgba(0,255,102,0.3)]"
                 >
-                  <Wand2 className="w-3 h-3" /> Gerar Dados Fictícios
-                </Button>
-                <div className="flex items-center gap-3 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-xl">
-                  <div className="text-right">
-                    <p className="text-[9px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
-                    <p className="text-[6px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
+                  <Wand2 className="w-4 h-4" /> 
+                  <div className="flex flex-col items-start leading-none">
+                    <span>Modo Teste</span>
+                    <span className="text-[7px] opacity-60">Gerar Dados Fictícios</span>
                   </div>
-                  <input
-                    type="checkbox"
-                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
-                    checked={formData?.simulacaoReal || false}
-                    onChange={(e) => {
-                      const newValue = e.target.checked;
-                      const updatedData = {...formData, simulacaoReal: newValue};
-                      setFormData(updatedData);
-                      // Sincroniza imediatamente com o backend para que o Caixa veja a mesma opção
-                      mutation.mutate(updatedData);
-                    }}
-                  />
-                </div>
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -393,11 +379,11 @@ export default function FiscalConfig() {
                           <TableCell>
                             <Badge className={
                               doc.status === 'authorized' ? 'bg-primary/20 text-primary border-primary/20' :
-                              doc.status === 'simulated' ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' :
+                              (doc.status === 'simulated' || doc.status === 'simulation') ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' :
                               'bg-red-500/20 text-red-500 border-red-500/20'
                             }>
                               {doc.status === 'authorized' ? 'AUTORIZADO' : 
-                               doc.status === 'simulated' ? 'SIMULADO' : 'REJEITADO'}
+                               (doc.status === 'simulated' || doc.status === 'simulation') ? 'SIMULADO' : 'REJEITADO'}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">

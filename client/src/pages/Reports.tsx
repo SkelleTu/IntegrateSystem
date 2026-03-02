@@ -282,8 +282,11 @@ export default function Reports() {
                         R$ {(sale.totalAmount / 100).toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={sale.status === "completed" ? "default" : "destructive"} className="uppercase text-[8px] font-black italic tracking-widest">
-                          {sale.status === "completed" ? "Concluída" : "Cancelada"}
+                        <Badge 
+                          variant={sale.status === "completed" ? "default" : (sale.status === "simulation" ? "outline" : "destructive")} 
+                          className={`uppercase text-[8px] font-black italic tracking-widest ${sale.status === "simulation" ? "border-blue-500 text-blue-500 bg-blue-500/10" : ""}`}
+                        >
+                          {sale.status === "completed" ? "Concluída" : (sale.status === "simulation" ? "Simulação" : "Cancelada")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">

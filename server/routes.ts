@@ -449,6 +449,29 @@ export async function registerRoutes(
       const sale = await storage.getSale(saleId);
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
       
+      if (sale.status === "simulation") {
+        const nfceData = await storage.createNfce({
+          saleId,
+          numero: Math.floor(Math.random() * 1000000),
+          serie: 1,
+          chaveAcesso: "SIMULACAO" + Math.random().toString(36).substring(7).toUpperCase(),
+          status: "simulated",
+          valorTotal: sale.totalAmount,
+          dataEmissao: new Date(),
+        });
+
+        // Update sale to reflected simulated status if not already
+        if (sale.fiscalStatus !== "simulated") {
+          await storage.updateSaleFiscal(saleId, {
+            fiscalStatus: "simulated",
+            fiscalKey: nfceData.chaveAcesso,
+            fiscalType: "NFCe"
+          });
+        }
+
+        return res.json({ success: true, key: nfceData.chaveAcesso, nfce: nfceData, simulado: true });
+      }
+
       if (sale.fiscalStatus === "authorized") {
         return res.status(400).json({ message: "NFC-e já emitida para esta venda" });
       }
