@@ -265,9 +265,25 @@ export async function setupDatabase() {
         // Table already exists
       }
     }
-    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0").run(); } catch(e) {}
-    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER NOT NULL DEFAULT 0").run(); } catch(e) {}
-    try { localSqlite.prepare("ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT").run(); } catch(e) {}
+  }
+
+  // Migrações manuais resilientes para ambos os ambientes (Local e Turso)
+  const migrations = [
+    "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT"
+  ];
+
+  for (const sqlQuery of migrations) {
+    try {
+      if (isRemoteEnabled) {
+        await db.execute(sql.raw(sqlQuery));
+      } else {
+        localSqlite.prepare(sqlQuery).run();
+      }
+    } catch (e) {
+      // Coluna provavelmente já existe ou erro de sintaxe ignorável
+    }
   }
 
   for (const table of tables) {

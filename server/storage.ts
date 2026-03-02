@@ -779,14 +779,11 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
     const idToUse = enterpriseId || 1;
     try {
-      // Tenta a consulta tipada primeiro
       const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
       return settings || undefined;
     } catch (e: any) {
-      console.warn("Aviso: Falha na consulta segura de fiscal_settings. Tentando fallback raw.");
+      console.warn(`Aviso: Falha na consulta de fiscal_settings (Empresa ${idToUse}). Tentando fallback raw.`);
       try {
-        // Fallback extremamente resiliente: busca apenas os campos mais básicos
-        // Verificamos se a tabela existe e quais colunas ela tem
         const result = await db.execute({
           sql: `SELECT * FROM fiscal_settings WHERE enterprise_id = ? LIMIT 1`,
           args: [idToUse]
@@ -794,7 +791,6 @@ export class DatabaseStorage implements IStorage {
         
         if (result.rows && result.rows.length > 0) {
           const row = result.rows[0] as any;
-          // Mapeamento dinâmico baseado no que vier do banco
           return {
             id: Number(row.id ?? row[0]),
             enterpriseId: Number(row.enterprise_id ?? row.enterpriseId ?? row[1] ?? idToUse),
@@ -813,7 +809,7 @@ export class DatabaseStorage implements IStorage {
             serieNfce: Number(row.serie_nfce ?? row.serieNfce ?? 1),
             ultimoNumeroNfce: Number(row.ultimo_numero_nfce ?? row.ultimoNumeroNfce ?? 0),
             ambiente: String(row.ambiente ?? "homologacao"),
-            simulacaoReal: Boolean(row.simulacao_real ?? row.simulacaoReal ?? false),
+            simulacaoReal: !!(row.simulacao_real ?? row.simulacaoReal ?? false),
             printerWidth: String(row.printer_width ?? row.printerWidth ?? "58mm")
           } as any;
         }
