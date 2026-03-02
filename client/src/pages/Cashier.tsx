@@ -34,6 +34,8 @@ export default function Cashier() {
 
   const { data: fiscalSettingsData, isLoading: isLoadingFiscalSettings } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
   const { data: menuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
@@ -442,16 +444,27 @@ function CashierContent({
     if (fiscalSettingsData) {
       setSimulacaoReal(!!fiscalSettingsData.simulacaoReal);
     }
-  }, [fiscalSettingsData]);
+  }, [fiscalSettingsData?.simulacaoReal]);
 
   const toggleSimulacaoMutation = useMutation({
     mutationFn: async (val: boolean) => {
-      setSimulacaoReal(val);
-      await apiRequest("POST", "/api/fiscal/settings", { ...fiscalSettingsData, simulacaoReal: val });
+      // Busca as configurações atuais para garantir que não estamos sobrescrevendo com dados incompletos
+      const currentRes = await fetch("/api/fiscal/settings");
+      const currentSettings = await currentRes.json();
+      
+      const updatedSettings = { 
+        ...currentSettings, 
+        simulacaoReal: val,
+        enterpriseId: fiscalSettingsData?.enterpriseId || currentSettings.enterpriseId 
+      };
+      
+      const res = await apiRequest("POST", "/api/fiscal/settings", updatedSettings);
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/fiscal/settings"], data);
       queryClient.invalidateQueries({ queryKey: ["/api/fiscal/settings"] });
-      toast({ title: `Simulação Real ${!simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}` });
+      toast({ title: `Simulação Real ${data.simulacaoReal ? 'ATIVADA' : 'DESATIVADA'}` });
     }
   });
 

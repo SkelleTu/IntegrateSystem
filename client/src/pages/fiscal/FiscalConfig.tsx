@@ -18,6 +18,8 @@ export default function FiscalConfig() {
   const { toast } = useToast();
   const { data: settings, isLoading } = useQuery<any>({
     queryKey: ["/api/fiscal/settings"],
+    refetchOnWindowFocus: true,
+    staleTime: 0
   });
 
   const { data: history, isLoading: isLoadingHistory } = useQuery<any[]>({
@@ -29,7 +31,8 @@ export default function FiscalConfig() {
       const res = await apiRequest("POST", "/api/fiscal/settings", data);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.setQueryData(["/api/fiscal/settings"], data);
       queryClient.invalidateQueries({ queryKey: ["/api/fiscal/settings"] });
       toast({ title: "Sucesso", description: "Configurações fiscais salvas." });
     },
@@ -47,6 +50,11 @@ export default function FiscalConfig() {
 
   if (settings && !formData) {
     setFormData(settings);
+  }
+
+  // Sincroniza o estado local se as configurações mudarem (ex: vindo do Caixa)
+  if (settings && formData && settings.simulacaoReal !== formData.simulacaoReal) {
+    setFormData(prev => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
   }
 
   const handleSave = () => {
@@ -149,9 +157,10 @@ export default function FiscalConfig() {
                     checked={formData?.simulacaoReal || false}
                     onChange={(e) => {
                       const newValue = e.target.checked;
-                      setFormData({...formData, simulacaoReal: newValue});
+                      const updatedData = {...formData, simulacaoReal: newValue};
+                      setFormData(updatedData);
                       // Sincroniza imediatamente com o backend para que o Caixa veja a mesma opção
-                      mutation.mutate({...formData, simulacaoReal: newValue});
+                      mutation.mutate(updatedData);
                     }}
                   />
                 </div>

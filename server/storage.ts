@@ -778,7 +778,8 @@ export class DatabaseStorage implements IStorage {
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
     try {
-      const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+      const idToUse = enterpriseId || 1;
+      const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
       return settings || undefined;
     } catch (e: any) {
       console.error("Erro ao buscar fiscal_settings:", e.message);
@@ -787,21 +788,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
-    const existing = await this.getFiscalSettings(settingsData.enterpriseId);
-    if (existing) {
-      // Ensure boolean conversion for SQLite
-      const dataToUpdate = {
-        ...settingsData,
-        simulacaoReal: !!settingsData.simulacaoReal
-      };
-      const [updated] = await db.update(fiscalSettings).set(dataToUpdate).where(eq(fiscalSettings.id, existing.id)).returning();
-      return updated;
-    }
-    const [inserted] = await db.insert(fiscalSettings).values({
+    this.logAction(`Upsert configurações fiscais empresa ID:${settingsData.enterpriseId}`);
+    const enterpriseId = settingsData.enterpriseId || 1;
+    const existing = await this.getFiscalSettings(enterpriseId);
+
+    const dataToSave = {
       ...settingsData,
+      enterpriseId,
       simulacaoReal: !!settingsData.simulacaoReal
-    }).returning();
-    return inserted;
+    };
+
+    if (existing) {
+      const { id, ...updateData } = dataToSave as any;
+      const [updated] = await db.update(fiscalSettings)
+        .set(updateData)
+        .where(eq(fiscalSettings.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [inserted] = await db.insert(fiscalSettings)
+        .values(dataToSave)
+        .returning();
+      return inserted;
+    }
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {

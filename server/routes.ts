@@ -382,19 +382,50 @@ export async function registerRoutes(
     const user = req.user as any;
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
     const settings = await storage.getFiscalSettings(user.enterpriseId);
-    res.json(settings || {});
+    if (!settings) {
+      // Create default settings if they don't exist
+      const defaultSettings = {
+        enterpriseId: user.enterpriseId,
+        razaoSocial: "",
+        nomeFantasia: "",
+        cnpj: "",
+        inscricaoEstadual: "",
+        logradouro: "",
+        numero: "",
+        bairro: "",
+        municipio: "",
+        codigoIbge: "",
+        uf: "SP",
+        cep: "",
+        regimeTributario: "1",
+        ambiente: "homologacao",
+        simulacaoReal: false
+      };
+      const created = await storage.upsertFiscalSettings(defaultSettings as any);
+      return res.json(created);
+    }
+    res.json(settings);
   });
 
   app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
     try {
-      const currentSettings = await storage.getFiscalSettings(user.enterpriseId);
-      const data = insertFiscalSettingsSchema.parse({ 
+      const enterpriseId = user.enterpriseId || 1;
+      const currentSettings = await storage.getFiscalSettings(enterpriseId);
+      
+      const dataToParse = { 
         ...currentSettings,
         ...req.body, 
-        enterpriseId: user.enterpriseId 
-      });
+        enterpriseId: enterpriseId
+      };
+      
+      // Ensure specific fields have correct types for Zod
+      if (dataToParse.ultimoNumeroNfce !== undefined) dataToParse.ultimoNumeroNfce = Number(dataToParse.ultimoNumeroNfce);
+      if (dataToParse.serieNfce !== undefined) dataToParse.serieNfce = Number(dataToParse.serieNfce);
+      if (dataToParse.simulacaoReal !== undefined) dataToParse.simulacaoReal = !!dataToParse.simulacaoReal;
+
+      const data = insertFiscalSettingsSchema.parse(dataToParse);
       const settings = await storage.upsertFiscalSettings(data);
       res.json(settings);
     } catch (err) {
