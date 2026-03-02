@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye } from "lucide-react";
+import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye, Wand2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -51,6 +51,33 @@ export default function FiscalConfig() {
 
   const handleSave = () => {
     mutation.mutate(formData);
+  };
+
+  const handleFillFakeData = () => {
+    const fakeData = {
+      ...formData,
+      razaoSocial: "EMPRESA DE TESTES ALEATORIOS LTDA",
+      nomeFantasia: "LOJA VIRTUAL TESTE",
+      cnpj: "12.345.678/0001-99",
+      regimeTributario: "1",
+      ambiente: "homologacao",
+      serieNfce: 1,
+      inscricaoEstadual: "123456789",
+      uf: "SP",
+      municipio: "SAO PAULO",
+      codigoIbge: "3550308",
+      logradouro: "AVENIDA PAULISTA",
+      numero: "1000",
+      bairro: "BELA VISTA",
+      cep: "01310-100",
+      cscToken: "ABC123DEF456GHI789",
+      cscId: "000001"
+    };
+    setFormData(fakeData);
+    toast({
+      title: "Dados Gerados",
+      description: "Campos preenchidos com dados fictícios para teste.",
+    });
   };
 
   return (
@@ -98,17 +125,27 @@ export default function FiscalConfig() {
                 </CardTitle>
                 <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Preencha os dados conforme registro na SEFAZ</CardDescription>
               </div>
-              <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
-                <div className="text-right">
-                  <p className="text-[10px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
-                  <p className="text-[7px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleFillFakeData}
+                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[10px] h-10 gap-2 hover:bg-primary hover:text-black transition-all"
+                >
+                  <Wand2 className="w-3 h-3" /> Gerar Dados Fictícios
+                </Button>
+                <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
+                  <div className="text-right">
+                    <p className="text-[10px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
+                    <p className="text-[7px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                    checked={formData?.simulacaoReal || false}
+                    onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
+                  />
                 </div>
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 accent-primary cursor-pointer"
-                  checked={formData?.simulacaoReal || false}
-                  onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
-                />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
