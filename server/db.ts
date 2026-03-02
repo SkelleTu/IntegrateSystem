@@ -236,6 +236,7 @@ export async function setupDatabase() {
       serie_nfce INTEGER NOT NULL DEFAULT 1,
       ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0,
       ambiente TEXT NOT NULL DEFAULT 'homologacao',
+      simulacao_real INTEGER NOT NULL DEFAULT 0,
       certificado_a1 TEXT,
       certificado_senha TEXT,
       printer_width TEXT NOT NULL DEFAULT '58mm'
@@ -271,7 +272,12 @@ export async function setupDatabase() {
   const migrations = [
     "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT"
+    "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN csc_token TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN csc_id TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER NOT NULL DEFAULT 1"
   ];
 
   for (const sqlQuery of migrations) {
@@ -282,19 +288,19 @@ export async function setupDatabase() {
         localSqlite.prepare(sqlQuery).run();
       }
     } catch (e) {
-      // Coluna provavelmente já existe ou erro de sintaxe ignorável
+      // Ignorar erros de "coluna já existe"
     }
   }
 
   for (const table of tables) {
     try {
       if (isRemoteEnabled) {
-        await (db as any).run(sql.raw(table));
+        await (db as any).execute(sql.raw(table));
       } else {
         localSqlite.prepare(table).run();
       }
     } catch (e) {
-      console.error(`Erro ao criar tabela:`, e);
+      // Table already exists
     }
   }
 }

@@ -784,10 +784,7 @@ export class DatabaseStorage implements IStorage {
     } catch (e: any) {
       console.warn(`Aviso: Falha na consulta de fiscal_settings (Empresa ${idToUse}). Tentando fallback raw.`);
       try {
-        const result = await db.execute({
-          sql: `SELECT * FROM fiscal_settings WHERE enterprise_id = ? LIMIT 1`,
-          args: [idToUse]
-        });
+        const result = await db.execute(sql.raw(`SELECT * FROM fiscal_settings WHERE enterprise_id = ${idToUse} LIMIT 1`));
         
         if (result.rows && result.rows.length > 0) {
           const row = result.rows[0] as any;
