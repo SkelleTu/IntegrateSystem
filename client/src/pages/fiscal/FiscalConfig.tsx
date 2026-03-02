@@ -91,11 +91,25 @@ export default function FiscalConfig() {
 
         <TabsContent value="config">
           <Card className="panel-translucent border-white/10">
-            <CardHeader>
-              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
-                <ShieldCheck className="w-6 h-6 text-primary" /> Dados da Instituição
-              </CardTitle>
-              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Preencha os dados conforme registro na SEFAZ</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <div>
+                <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                  <ShieldCheck className="w-6 h-6 text-primary" /> Dados da Instituição
+                </CardTitle>
+                <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Preencha os dados conforme registro na SEFAZ</CardDescription>
+              </div>
+              <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
+                <div className="text-right">
+                  <p className="text-[10px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
+                  <p className="text-[7px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
+                </div>
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary cursor-pointer"
+                  checked={formData?.simulacaoReal || false}
+                  onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
+                />
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
