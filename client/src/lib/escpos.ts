@@ -8,14 +8,23 @@ export async function printNFCe(nfceData: any, settings: any) {
     // 1. Solicitar acesso ao dispositivo USB
     // Filtros comuns para impressoras térmicas (Vendor IDs variados)
     const device = await navigator.usb.requestDevice({
-      filters: [] // Vazio permite listar todos para o usuário escolher
+      filters: [] 
     });
 
+    console.log("Dispositivo selecionado:", device.productName);
     await device.open();
+    
+    // Forçar seleção de configuração se necessário
     if (device.configuration === null) {
       await device.selectConfiguration(1);
     }
-    await device.claimInterface(0);
+    
+    // Tentar dar claim na interface (geralmente 0)
+    try {
+      await device.claimInterface(0);
+    } catch (e) {
+      console.warn("Interface 0 já ocupada ou indisponível, tentando continuar...");
+    }
 
     const encoder = new TextEncoder();
     

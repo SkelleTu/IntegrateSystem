@@ -69,14 +69,18 @@ export default function FiscalConfig() {
       logradouro: "AVENIDA PAULISTA",
       numero: "1000",
       bairro: "BELA VISTA",
-      cep: "01310-100",
+      ultimoNumeroNfce: 1,
       cscToken: "ABC123DEF456GHI789",
       cscId: "000001"
     };
     setFormData(fakeData);
+    
+    // Auto-save when generating fake data to ensure backend has it
+    mutation.mutate(fakeData);
+    
     toast({
-      title: "Dados Gerados",
-      description: "Campos preenchidos com dados fictícios para teste.",
+      title: "Dados Gerados e Salvos",
+      description: "Campos preenchidos e configurações atualizadas para teste.",
     });
   };
 

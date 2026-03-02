@@ -184,18 +184,32 @@ export default function Cashier() {
 
       // Se a NFC-e foi emitida, oferece impressão imediata via WebUSB
       if (data.fiscal && data.fiscal.success) {
-        try {
-          const settingsRes = await fetch("/api/fiscal/settings");
-          const settings = await settingsRes.json();
-          await printNFCe(data.fiscal.nfce, settings);
-          toast({ title: "Impressão enviada!" });
-        } catch (e) {
-          toast({ 
-            title: "Impressão Manual", 
-            description: "Não foi possível conectar à impressora USB automaticamente.",
-            variant: "destructive"
-          });
-        }
+        toast({ 
+          title: "Venda Finalizada", 
+          description: "Clique em IMPRIMIR para conectar à impressora USB.",
+          action: (
+            <Button 
+              size="sm" 
+              className="bg-primary text-black font-bold"
+              onClick={async () => {
+                try {
+                  const settingsRes = await fetch("/api/fiscal/settings");
+                  const settings = await settingsRes.json();
+                  await printNFCe(data.fiscal.nfce, settings);
+                  toast({ title: "Impressão enviada!" });
+                } catch (e) {
+                  toast({ 
+                    title: "Erro na Impressão", 
+                    description: "Verifique a conexão USB da impressora.",
+                    variant: "destructive"
+                  });
+                }
+              }}
+            >
+              <Printer className="w-4 h-4 mr-2" /> IMPRIMIR
+            </Button>
+          )
+        });
       }
     },
   });
