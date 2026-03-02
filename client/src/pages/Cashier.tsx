@@ -411,9 +411,10 @@ export default function Cashier() {
               />
             </div>
             <Button 
+              type="button"
               className="w-full bg-[#00e5ff] text-white font-black uppercase italic h-14 text-lg rounded-xl active:scale-95 transition-transform" 
               disabled={openMutation.isPending} 
-              onClick={(e) => {
+              onPointerDown={(e) => {
                 e.preventDefault();
                 const amount = Number(openingAmount.replace(",", "."));
                 openMutation.mutate(amount || 0);

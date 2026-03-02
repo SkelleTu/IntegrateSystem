@@ -25,7 +25,7 @@ import {
   type FiscalSettings, type InsertFiscalSettings,
   type Nfce, type InsertNfce
 } from "../shared/schema.js";
-import { eq, desc, asc, and, isNull, gte, lte } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 
 // Helper para escrita dupla (Garante persistência)
 async function dualWrite(operation: (database: any) => Promise<any>) {

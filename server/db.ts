@@ -283,8 +283,10 @@ export async function setupDatabase() {
   for (const sqlQuery of migrations) {
     try {
       if (isRemoteEnabled) {
-        await db.execute(sql.raw(sqlQuery));
+        // Para LibSQL/Turso
+        await (db as any).execute(sql.raw(sqlQuery));
       } else {
+        // Para SQLite local
         localSqlite.prepare(sqlQuery).run();
       }
     } catch (e) {
