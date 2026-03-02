@@ -184,24 +184,39 @@ export default function Cashier() {
 
       // Se a NFC-e foi emitida, oferece impressão imediata via WebUSB
       if (data.fiscal && data.fiscal.success) {
+        // Aciona o diálogo de impressão do navegador ou integração
+        if (window.print) {
+          // Pequeno delay para garantir que o DOM/Toast processou
+          setTimeout(() => {
+            window.print();
+          }, 500);
+        }
+
         toast({ 
           title: "Venda Finalizada", 
-          description: "Clique em IMPRIMIR para conectar à impressora USB.",
+          description: "Clique em IMPRIMIR para selecionar a impressora.",
           action: (
             <Button 
               size="sm" 
               className="bg-primary text-black font-bold"
               onClick={async () => {
                 try {
+                  // Tenta primeiro o diálogo nativo do sistema para seleção de impressora
+                  window.print();
+                  
+                  // Mantém a opção de ESC/POS se disponível
                   const settingsRes = await fetch("/api/fiscal/settings");
                   const settings = await settingsRes.json();
-                  await printNFCe(data.fiscal.nfce, settings);
-                  toast({ title: "Impressão enviada!" });
+                  if (settings.printerWidth) {
+                    await printNFCe(data.fiscal.nfce, settings);
+                  }
+                  toast({ title: "Comando de impressão enviado!" });
                 } catch (e) {
+                  console.error("Erro na impressão:", e);
                   toast({ 
-                    title: "Erro na Impressão", 
-                    description: "Verifique a conexão USB da impressora.",
-                    variant: "destructive"
+                    title: "Aviso de Impressão", 
+                    description: "Use o diálogo do sistema (Ctrl+P) se a impressora USB não responder.",
+                    variant: "default"
                   });
                 }
               }}
@@ -559,7 +574,11 @@ function CashierContent({
                     variant="outline" 
                     size="sm" 
                     className={`h-8 px-3 border-white/10 font-black uppercase italic text-[9px] transition-all ${simulacaoReal ? 'bg-primary text-black border-primary' : 'hover:bg-primary/10'}`}
-                    onClick={() => toggleSimulacaoMutation.mutate(!simulacaoReal)}
+                    onClick={() => {
+                      const newValue = !simulacaoReal;
+                      setSimulacaoReal(newValue);
+                      toggleSimulacaoMutation.mutate(newValue);
+                    }}
                   >
                     {simulacaoReal ? 'VENDA SIMULADA: ON' : 'VENDA SIMULADA: OFF'}
                   </Button>

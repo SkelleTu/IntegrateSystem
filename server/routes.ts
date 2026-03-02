@@ -389,10 +389,16 @@ export async function registerRoutes(
     const user = req.user as any;
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
     try {
-      const data = insertFiscalSettingsSchema.parse({ ...req.body, enterpriseId: user.enterpriseId });
+      const currentSettings = await storage.getFiscalSettings(user.enterpriseId);
+      const data = insertFiscalSettingsSchema.parse({ 
+        ...currentSettings,
+        ...req.body, 
+        enterpriseId: user.enterpriseId 
+      });
       const settings = await storage.upsertFiscalSettings(data);
       res.json(settings);
     } catch (err) {
+      console.error("Erro ao salvar configurações fiscais:", err);
       res.status(400).json({ message: "Dados fiscais inválidos" });
     }
   });

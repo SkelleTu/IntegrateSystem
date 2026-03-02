@@ -147,7 +147,12 @@ export default function FiscalConfig() {
                     type="checkbox"
                     className="w-3.5 h-3.5 accent-primary cursor-pointer"
                     checked={formData?.simulacaoReal || false}
-                    onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
+                    onChange={(e) => {
+                      const newValue = e.target.checked;
+                      setFormData({...formData, simulacaoReal: newValue});
+                      // Sincroniza imediatamente com o backend para que o Caixa veja a mesma opção
+                      mutation.mutate({...formData, simulacaoReal: newValue});
+                    }}
                   />
                 </div>
               </div>
