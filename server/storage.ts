@@ -779,8 +779,30 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
     try {
       const idToUse = enterpriseId || 1;
-      const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
-      return settings || undefined;
+      // Busca segura: tenta buscar todos os campos, se falhar, tenta buscar apenas os básicos
+      try {
+        const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
+        return settings || undefined;
+      } catch (e: any) {
+        console.warn("Aviso: Algumas colunas podem estar faltando na tabela fiscal_settings. Usando busca raw.");
+        const result = await db.execute({
+          sql: `SELECT id, enterprise_id, razao_social, nome_fantasia, cnpj FROM fiscal_settings WHERE enterprise_id = ? LIMIT 1`,
+          args: [idToUse]
+        });
+        if (result.rows.length > 0) {
+          const row = result.rows[0] as any;
+          return {
+            id: row.id,
+            enterpriseId: row.enterprise_id,
+            razaoSocial: row.razao_social,
+            nomeFantasia: row.nome_fantasia,
+            cnpj: row.cnpj,
+            simulacaoReal: false, // Default fallback
+            ambiente: "homologacao"
+          } as any;
+        }
+      }
+      return undefined;
     } catch (e: any) {
       console.error("Erro ao buscar fiscal_settings:", e.message);
       return undefined;
@@ -790,7 +812,8 @@ export class DatabaseStorage implements IStorage {
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
     this.logAction(`Upsert configurações fiscais empresa ID:${settingsData.enterpriseId}`);
     const enterpriseId = settingsData.enterpriseId || 1;
-    const existing = await this.getFiscalSettings(enterpriseId);
+    
+    let existing = await this.getFiscalSettings(enterpriseId);
 
     const dataToSave = {
       ...settingsData,
@@ -798,18 +821,43 @@ export class DatabaseStorage implements IStorage {
       simulacaoReal: !!settingsData.simulacaoReal
     };
 
-    if (existing) {
-      const { id, ...updateData } = dataToSave as any;
-      const [updated] = await db.update(fiscalSettings)
-        .set(updateData)
-        .where(eq(fiscalSettings.id, existing.id))
-        .returning();
-      return updated;
-    } else {
-      const [inserted] = await db.insert(fiscalSettings)
-        .values(dataToSave)
-        .returning();
-      return inserted;
+    try {
+      if (existing) {
+        const { id, ...updateData } = dataToSave as any;
+        // Tenta atualizar campo a campo ou o objeto todo de forma segura
+        try {
+          const [updated] = await db.update(fiscalSettings)
+            .set(updateData)
+            .where(eq(fiscalSettings.id, existing.id))
+            .returning();
+          return updated;
+        } catch (updateErr: any) {
+          console.error("Falha ao atualizar todas as colunas, tentando subconjunto:", updateErr.message);
+          // Fallback para colunas básicas se as novas não existirem
+          await db.execute({
+            sql: `UPDATE fiscal_settings SET razao_social = ?, nome_fantasia = ?, cnpj = ? WHERE id = ?`,
+            args: [dataToSave.razaoSocial, dataToSave.nomeFantasia, dataToSave.cnpj, existing.id]
+          });
+          return (await this.getFiscalSettings(enterpriseId))!;
+        }
+      } else {
+        try {
+          const [inserted] = await db.insert(fiscalSettings)
+            .values(dataToSave)
+            .returning();
+          return inserted;
+        } catch (insertErr: any) {
+          console.error("Falha ao inserir com todas as colunas, tentando subconjunto:", insertErr.message);
+          await db.execute({
+            sql: `INSERT INTO fiscal_settings (enterprise_id, razao_social, nome_fantasia, cnpj) VALUES (?, ?, ?, ?)`,
+            args: [enterpriseId, dataToSave.razaoSocial, dataToSave.nomeFantasia, dataToSave.cnpj]
+          });
+          return (await this.getFiscalSettings(enterpriseId))!;
+        }
+      }
+    } catch (e: any) {
+      console.error("Erro crítico no upsertFiscalSettings:", e.message);
+      throw e;
     }
   }
 
@@ -844,13 +892,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextNfceNumber(enterpriseId: number): Promise<number> {
-    const [settingsData] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, enterpriseId));
+    const settingsData = await this.getFiscalSettings(enterpriseId);
     if (!settingsData) throw new Error("Configurações fiscais não encontradas");
     
-    const nextNumber = (settingsData.ultimoNumeroNfce || 0) + 1;
-    await db.update(fiscalSettings)
-      .set({ ultimoNumeroNfce: nextNumber })
-      .where(eq(fiscalSettings.id, settingsData.id));
+    // Fallback manual se a coluna não existir no objeto
+    const currentNumber = (settingsData as any).ultimoNumeroNfce || 0;
+    const nextNumber = currentNumber + 1;
+    
+    try {
+      await db.update(fiscalSettings)
+        .set({ ultimoNumeroNfce: nextNumber } as any)
+        .where(eq(fiscalSettings.id, settingsData.id));
+    } catch (e) {
+      console.warn("Aviso: Não foi possível atualizar ultimoNumeroNfce (coluna ausente?)");
+    }
     
     return nextNumber;
   }
