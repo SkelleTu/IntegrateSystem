@@ -824,7 +824,6 @@ export class DatabaseStorage implements IStorage {
     try {
       if (existing) {
         const { id, ...updateData } = dataToSave as any;
-        // Tenta atualizar campo a campo ou o objeto todo de forma segura
         try {
           const [updated] = await db.update(fiscalSettings)
             .set(updateData)
@@ -832,12 +831,7 @@ export class DatabaseStorage implements IStorage {
             .returning();
           return updated;
         } catch (updateErr: any) {
-          console.error("Falha ao atualizar todas as colunas, tentando subconjunto:", updateErr.message);
-          // Fallback para colunas básicas se as novas não existirem
-          await db.execute({
-            sql: `UPDATE fiscal_settings SET razao_social = ?, nome_fantasia = ?, cnpj = ? WHERE id = ?`,
-            args: [dataToSave.razaoSocial, dataToSave.nomeFantasia, dataToSave.cnpj, existing.id]
-          });
+          console.error("Falha ao atualizar todas as colunas:", updateErr.message);
           return (await this.getFiscalSettings(enterpriseId))!;
         }
       } else {
@@ -847,11 +841,7 @@ export class DatabaseStorage implements IStorage {
             .returning();
           return inserted;
         } catch (insertErr: any) {
-          console.error("Falha ao inserir com todas as colunas, tentando subconjunto:", insertErr.message);
-          await db.execute({
-            sql: `INSERT INTO fiscal_settings (enterprise_id, razao_social, nome_fantasia, cnpj) VALUES (?, ?, ?, ?)`,
-            args: [enterpriseId, dataToSave.razaoSocial, dataToSave.nomeFantasia, dataToSave.cnpj]
-          });
+          console.error("Falha ao inserir com todas as colunas:", insertErr.message);
           return (await this.getFiscalSettings(enterpriseId))!;
         }
       }
