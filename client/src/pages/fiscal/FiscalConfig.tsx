@@ -125,23 +125,23 @@ export default function FiscalConfig() {
                 </CardTitle>
                 <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Preencha os dados conforme registro na SEFAZ</CardDescription>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleFillFakeData}
-                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[10px] h-10 gap-2 hover:bg-primary hover:text-black transition-all"
+                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[8px] h-8 px-2 gap-1 hover:bg-primary hover:text-black transition-all"
                 >
                   <Wand2 className="w-3 h-3" /> Gerar Dados Fictícios
                 </Button>
-                <div className="flex items-center gap-3 px-4 py-2 bg-primary/5 border border-primary/20 rounded-xl">
+                <div className="flex items-center gap-3 px-3 py-1.5 bg-primary/5 border border-primary/20 rounded-xl">
                   <div className="text-right">
-                    <p className="text-[10px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
-                    <p className="text-[7px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
+                    <p className="text-[9px] font-black uppercase italic text-primary leading-none">Modo Simulação</p>
+                    <p className="text-[6px] text-white/40 uppercase font-bold tracking-tighter">Ignorar validações reais</p>
                   </div>
                   <input
                     type="checkbox"
-                    className="w-4 h-4 accent-primary cursor-pointer"
+                    className="w-3.5 h-3.5 accent-primary cursor-pointer"
                     checked={formData?.simulacaoReal || false}
                     onChange={(e) => setFormData({...formData, simulacaoReal: e.target.checked})}
                   />
