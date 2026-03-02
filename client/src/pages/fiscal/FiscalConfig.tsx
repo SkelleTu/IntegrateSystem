@@ -118,6 +118,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.razaoSocial || ""} 
                     onChange={e => setFormData({...formData, razaoSocial: e.target.value})}
+                    placeholder="Ex: Empresa de Teste LTDA"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -126,6 +127,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.nomeFantasia || ""} 
                     onChange={e => setFormData({...formData, nomeFantasia: e.target.value})}
+                    placeholder="Ex: Minha Loja"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -134,6 +136,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.cnpj || ""} 
                     onChange={e => setFormData({...formData, cnpj: e.target.value})}
+                    placeholder="Ex: 00.000.000/0001-00"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -179,6 +182,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.inscricaoEstadual || ""} 
                     onChange={e => setFormData({...formData, inscricaoEstadual: e.target.value})}
+                    placeholder="Ex: 123456789"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -203,6 +207,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.municipio || ""} 
                     onChange={e => setFormData({...formData, municipio: e.target.value})}
+                    placeholder="Ex: São Paulo"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -211,6 +216,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.codigoIbge || ""} 
                     onChange={e => setFormData({...formData, codigoIbge: e.target.value})}
+                    placeholder="Ex: 3550308"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -222,6 +228,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.logradouro || ""} 
                     onChange={e => setFormData({...formData, logradouro: e.target.value})}
+                    placeholder="Ex: Av. Paulista"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -230,6 +237,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.numero || ""} 
                     onChange={e => setFormData({...formData, numero: e.target.value})}
+                    placeholder="Ex: 1000"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -238,6 +246,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.bairro || ""} 
                     onChange={e => setFormData({...formData, bairro: e.target.value})}
+                    placeholder="Ex: Bela Vista"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
@@ -246,6 +255,7 @@ export default function FiscalConfig() {
                   <Input 
                     value={formData?.cep || ""} 
                     onChange={e => setFormData({...formData, cep: e.target.value})}
+                    placeholder="Ex: 01310-100"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
                 </div>
