@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -27,28 +28,46 @@ export default function Cashier() {
   const [customerInfo, setCustomerInfo] = useState({ name: "", taxId: "", email: "" });
   const [showFiscalFields, setShowFiscalFields] = useState(false);
 
-  const { data: register, isLoading: isLoadingRegister } = useQuery<CashRegister>({
+  const { user, isLoading: isLoadingAuth } = useAuth();
+  
+  const { data: register, isLoading: isLoadingRegister, error: registerError } = useQuery<CashRegister | null>({
     queryKey: ["/api/cash-register/open"],
+    queryFn: async () => {
+      const res = await fetch("/api/cash-register/open");
+      if (res.status === 401) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user,
     retry: false,
+    staleTime: 30000,
   });
 
-  const { data: fiscalSettingsData, isLoading: isLoadingFiscalSettings } = useQuery<FiscalSettings>({
+  const { data: fiscalSettingsData, isLoading: isLoadingFiscal, error: fiscalError } = useQuery<FiscalSettings | null>({
     queryKey: ["/api/fiscal/settings"],
-    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const res = await fetch("/api/fiscal/settings");
+      if (res.status === 401) return null;
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!user,
     staleTime: 300000,
-    retry: 1
+    retry: 1,
   });
 
-  const { data: menuItems, isLoading: isLoadingMenuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
+  const { data: menuItems, isLoading: isLoadingMenu, error: menuError } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
     queryKey: ["/api/menu-items-combined"],
-    staleTime: 300000,
     queryFn: async () => {
       const [menuRes, inventoryRes] = await Promise.all([
         fetch("/api/menu-items"),
         fetch("/api/inventory")
       ]);
-      const menuData = await menuRes.json();
-      const inventoryData = await inventoryRes.json();
+      
+      if (menuRes.status === 401 || inventoryRes.status === 401) return [];
+      
+      const menuData = menuRes.ok ? await menuRes.json() : [];
+      const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
       
       const combined = [...menuData];
       inventoryData.forEach((invItem: any) => {
@@ -70,7 +89,9 @@ export default function Cashier() {
         }
       });
       return combined;
-    }
+    },
+    enabled: !!user,
+    staleTime: 300000,
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -90,19 +111,12 @@ export default function Cashier() {
   const filteredMenuItems = useMemo(() => {
     if (!menuItems) return [];
     
-    // Mapear primeiro para garantir que imageUrl e image_url sejam tratados consistentemente
     const normalizedItems = menuItems.map(item => {
       let img = (item as any).imageUrl || (item as any).image_url;
-      
-      // Se a imagem for a lupinha do Unsplash (placeholder de erro), tentamos limpar para mostrar o ícone de pacote
       if (img && typeof img === 'string' && (img.includes("images.unsplash.com") || img.includes("photo-1586769852836-bc069f19e1b6"))) {
         img = null;
       }
-      
-      return {
-        ...item,
-        imageUrl: img
-      };
+      return { ...item, imageUrl: img };
     });
 
     if (!searchTerm) return normalizedItems;
@@ -120,7 +134,6 @@ export default function Cashier() {
       const item = filteredMenuItems[0];
       const term = searchTerm.toLowerCase();
       
-      // Se for um match exato de barcode ou se o termo for longo o suficiente para ser um scan
       if (
         (item.barcode && item.barcode.toLowerCase() === term) ||
         (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
@@ -151,12 +164,10 @@ export default function Cashier() {
       const res = await apiRequest("POST", "/api/sales", data);
       const sale = await res.json();
       
-      // Sempre tenta emitir NFC-e para todas as vendas finalizadas no PDV
       try {
         const fiscalRes = await apiRequest("POST", `/api/fiscal/emitir/${sale.id}`);
         const fiscalData = await fiscalRes.json();
         
-        // Se for simulação, mostramos um aviso visual
         if (fiscalSettingsData?.simulacaoReal) {
           toast({ 
             title: "SIMULAÇÃO REAL SEFAZ (CONFIGURAÇÃO) ATIVA", 
@@ -186,11 +197,8 @@ export default function Cashier() {
         description: data.fiscal ? "NFC-e emitida e pronta para impressão." : undefined
       });
 
-      // Se a NFC-e foi emitida, oferece impressão imediata via WebUSB
       if (data.fiscal && data.fiscal.success) {
-        // Aciona o diálogo de impressão do navegador ou integração
         if (window.print) {
-          // Pequeno delay para garantir que o DOM/Toast processou
           setTimeout(() => {
             window.print();
           }, 500);
@@ -205,10 +213,7 @@ export default function Cashier() {
               className="bg-primary text-black font-bold"
               onClick={async () => {
                 try {
-                  // Tenta primeiro o diálogo nativo do sistema para seleção de impressora
                   window.print();
-                  
-                  // Mantém a opção de ESC/POS se disponível
                   const settingsRes = await fetch("/api/fiscal/settings");
                   const settings = await settingsRes.json();
                   if (settings.printerWidth) {
@@ -353,7 +358,32 @@ export default function Cashier() {
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingTotal = total - totalPaid;
 
-  if (isLoadingRegister || isLoadingFiscalSettings || isLoadingMenuItems) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-white/40 text-xs font-black uppercase tracking-widest animate-pulse">Verificando Acesso...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-white/40 text-xs font-black uppercase tracking-widest animate-pulse">Redirecionando...</p>
+      </div>
+    );
+  }
+
+  if (isLoadingRegister || isLoadingFiscal || isLoadingMenu) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-white/40 text-xs font-black uppercase tracking-widest animate-pulse">Iniciando Terminal...</p>
+      </div>
+    );
+  }
 
   if (!register) {
     return (

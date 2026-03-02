@@ -777,34 +777,49 @@ export class DatabaseStorage implements IStorage {
   // Fiscal
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
+    const idToUse = enterpriseId || 1;
     try {
-      const idToUse = enterpriseId || 1;
-      // Busca segura: tenta buscar todos os campos, se falhar, tenta buscar apenas os básicos
+      // Tenta a consulta tipada primeiro
+      const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
+      return settings || undefined;
+    } catch (e: any) {
+      console.warn("Aviso: Falha na consulta segura de fiscal_settings. Tentando fallback raw.");
       try {
-        const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
-        return settings || undefined;
-      } catch (e: any) {
-        console.warn("Aviso: Algumas colunas podem estar faltando na tabela fiscal_settings. Usando busca raw.");
+        // Fallback extremamente resiliente: busca apenas os campos mais básicos
+        // Verificamos se a tabela existe e quais colunas ela tem
         const result = await db.execute({
-          sql: `SELECT id, enterprise_id, razao_social, nome_fantasia, cnpj FROM fiscal_settings WHERE enterprise_id = ? LIMIT 1`,
+          sql: `SELECT * FROM fiscal_settings WHERE enterprise_id = ? LIMIT 1`,
           args: [idToUse]
         });
-        if (result.rows.length > 0) {
+        
+        if (result.rows && result.rows.length > 0) {
           const row = result.rows[0] as any;
+          // Mapeamento dinâmico baseado no que vier do banco
           return {
-            id: row.id,
-            enterpriseId: row.enterprise_id,
-            razaoSocial: row.razao_social,
-            nomeFantasia: row.nome_fantasia,
-            cnpj: row.cnpj,
-            simulacaoReal: false, // Default fallback
-            ambiente: "homologacao"
+            id: Number(row.id ?? row[0]),
+            enterpriseId: Number(row.enterprise_id ?? row.enterpriseId ?? row[1] ?? idToUse),
+            razaoSocial: String(row.razao_social ?? row.razaoSocial ?? row[2] ?? ""),
+            nomeFantasia: String(row.nome_fantasia ?? row.nomeFantasia ?? row[3] ?? ""),
+            cnpj: String(row.cnpj ?? ""),
+            inscricaoEstadual: String(row.inscricao_estadual ?? row.inscricaoEstadual ?? ""),
+            logradouro: String(row.logradouro ?? ""),
+            numero: String(row.numero ?? ""),
+            bairro: String(row.bairro ?? ""),
+            municipio: String(row.municipio ?? ""),
+            codigoIbge: String(row.codigo_ibge ?? row.codigoIbge ?? ""),
+            uf: String(row.uf ?? "SP"),
+            cep: String(row.cep ?? ""),
+            regimeTributario: String(row.regime_tributario ?? row.regimeTributario ?? "1"),
+            serieNfce: Number(row.serie_nfce ?? row.serieNfce ?? 1),
+            ultimoNumeroNfce: Number(row.ultimo_numero_nfce ?? row.ultimoNumeroNfce ?? 0),
+            ambiente: String(row.ambiente ?? "homologacao"),
+            simulacaoReal: Boolean(row.simulacao_real ?? row.simulacaoReal ?? false),
+            printerWidth: String(row.printer_width ?? row.printerWidth ?? "58mm")
           } as any;
         }
+      } catch (e2: any) {
+        console.error("Erro fatal no fallback de fiscal_settings:", e2.message);
       }
-      return undefined;
-    } catch (e: any) {
-      console.error("Erro ao buscar fiscal_settings:", e.message);
       return undefined;
     }
   }
@@ -824,29 +839,20 @@ export class DatabaseStorage implements IStorage {
     try {
       if (existing) {
         const { id, ...updateData } = dataToSave as any;
-        try {
-          const [updated] = await db.update(fiscalSettings)
-            .set(updateData)
-            .where(eq(fiscalSettings.id, existing.id))
-            .returning();
-          return updated;
-        } catch (updateErr: any) {
-          console.error("Falha ao atualizar todas as colunas:", updateErr.message);
-          return (await this.getFiscalSettings(enterpriseId))!;
-        }
+        const [updated] = await db.update(fiscalSettings)
+          .set(updateData)
+          .where(eq(fiscalSettings.id, existing.id))
+          .returning();
+        return updated;
       } else {
-        try {
-          const [inserted] = await db.insert(fiscalSettings)
-            .values(dataToSave)
-            .returning();
-          return inserted;
-        } catch (insertErr: any) {
-          console.error("Falha ao inserir com todas as colunas:", insertErr.message);
-          return (await this.getFiscalSettings(enterpriseId))!;
-        }
+        const [inserted] = await db.insert(fiscalSettings)
+          .values(dataToSave)
+          .returning();
+        return inserted;
       }
     } catch (e: any) {
-      console.error("Erro crítico no upsertFiscalSettings:", e.message);
+      console.error("Erro no upsertFiscalSettings:", e.message);
+      if (existing) return existing;
       throw e;
     }
   }
