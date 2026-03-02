@@ -34,12 +34,14 @@ export default function Cashier() {
 
   const { data: fiscalSettingsData, isLoading: isLoadingFiscalSettings } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
-    refetchOnWindowFocus: true,
-    staleTime: 0
+    refetchOnWindowFocus: false,
+    staleTime: 300000,
+    retry: 1
   });
 
-  const { data: menuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
+  const { data: menuItems, isLoading: isLoadingMenuItems } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
     queryKey: ["/api/menu-items-combined"],
+    staleTime: 300000,
     queryFn: async () => {
       const [menuRes, inventoryRes] = await Promise.all([
         fetch("/api/menu-items"),
@@ -351,7 +353,7 @@ export default function Cashier() {
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const remainingTotal = total - totalPaid;
 
-  if (isLoadingRegister || isLoadingFiscalSettings) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
+  if (isLoadingRegister || isLoadingFiscalSettings || isLoadingMenuItems) return <div className="min-h-screen bg-black flex items-center justify-center"><Loader2 className="w-12 h-12 text-primary animate-spin" /></div>;
 
   if (!register) {
     return (
@@ -436,6 +438,8 @@ function CashierContent({
 
   const { data: fiscalSettingsData, isLoading: isLoadingFiscal } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
+    staleTime: 300000,
+    refetchOnWindowFocus: false,
   });
 
   const [simulacaoReal, setSimulacaoReal] = useState(false);
