@@ -108,7 +108,28 @@ export default function Cashier() {
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  const addToCart = useCallback((item: MenuItem) => {
+  const addToCart = useCallback((item: MenuItem & { unitType?: string }) => {
+    if (item.unitType === "kg") {
+      const weightStr = prompt(`Informe o peso para ${item.name} (kg):`, "1.000");
+      if (weightStr === null) return;
+      const weight = parseFloat(weightStr.replace(",", "."));
+      if (isNaN(weight) || weight <= 0) {
+        toast({ title: "Peso Inválido", variant: "destructive" });
+        return;
+      }
+      setCart((prev) => {
+        const existingIdx = prev.findIndex((i) => i.item.id === item.id);
+        if (existingIdx >= 0) {
+          const newCart = [...prev];
+          const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
+          newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+          return newCart;
+        }
+        return [...prev, { item, quantity: weight }];
+      });
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((i) => i.item.id === item.id);
       if (existing) {
@@ -118,7 +139,7 @@ export default function Cashier() {
       }
       return [...prev, { item, quantity: 1 }];
     });
-  }, []);
+  }, [toast]);
 
   const filteredMenuItems = useMemo(() => {
     if (!menuItems) return [];
@@ -257,11 +278,15 @@ export default function Cashier() {
   });
 
   const removeFromCart = (itemId: number) => {
-    setCart((prev) =>
-      prev
+    setCart((prev) => {
+      const existing = prev.find(i => i.item.id === itemId);
+      if (existing && (existing.item as any).unitType === "kg") {
+        return prev.filter(i => i.item.id !== itemId);
+      }
+      return prev
         .map((i) => (i.item.id === itemId ? { ...i, quantity: i.quantity - 1 } : i))
-        .filter((i) => i.quantity > 0)
-    );
+        .filter((i) => i.quantity > 0);
+    });
   };
 
   const loadTicketMutation = useMutation({
@@ -285,7 +310,12 @@ export default function Cashier() {
     }
   });
 
-  const total = cart.reduce((sum, i) => sum + i.item.price * i.quantity, 0);
+  const total = useMemo(() => {
+    return cart.reduce((sum, i) => {
+      const price = i.item.price;
+      return sum + Math.round(price * i.quantity);
+    }, 0);
+  }, [cart]);
 
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
@@ -368,7 +398,18 @@ export default function Cashier() {
         fiscalStatus: isSimulation ? "simulated" : "pending",
         status: isSimulation ? "simulation" : "completed"
       },
-      items: cart.map(i => ({ itemType: 'product', itemId: i.item.id, quantity: i.quantity, unitPrice: i.item.price, totalPrice: i.item.price * i.quantity })),
+      items: cart.map(i => {
+        const isKg = (i.item as any).unitType === "kg";
+        return { 
+          itemType: 'product', 
+          itemId: i.item.id, 
+          // Para produtos por quilo, a quantidade é enviada em gramas (inteiro)
+          // Para unidade, permanece como inteiro
+          quantity: isKg ? Math.round(i.quantity * 1000) : Math.round(i.quantity), 
+          unitPrice: i.item.price, 
+          totalPrice: Math.round(i.item.price * i.quantity) 
+        };
+      }),
       payments: isSimulation ? [{ method: "cash", amount: total }] : payments
     });
   };
@@ -612,7 +653,12 @@ function CashierContent({
                       )}
                     </div>
                     <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
-                      <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
+                      <div className="space-y-1">
+                        <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
+                        <p className="text-white/40 text-[8px] font-bold uppercase tracking-wider">
+                          {(item as any).unitType === "kg" ? "Preço por Kg" : "Preço Unitário"}
+                        </p>
+                      </div>
                       <p className="text-primary font-black text-sm md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>
                     </CardContent>
                   </Card>
@@ -675,13 +721,20 @@ function CashierContent({
                     <div key={item.id} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
                       <div className="flex-1 min-w-0">
                         <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{item.name}</h4>
-                        <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
+                          <span className="text-white/20 text-[8px] font-bold uppercase italic">
+                            {(item as any).unitType === "kg" ? "kg" : "un"}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(item.id)}>
                           <Minus className="w-3 h-3" />
                         </Button>
-                        <span className="text-white font-black text-xs italic w-5 text-center">{quantity}</span>
+                        <span className="text-white font-black text-xs italic w-14 text-center">
+                          {(item as any).unitType === "kg" ? quantity.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : quantity}
+                        </span>
                         <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
                           <Plus className="w-3 h-3" />
                         </Button>

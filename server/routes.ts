@@ -783,7 +783,8 @@ export async function registerRoutes(
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,
-      tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || [])
+      tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []),
+      unitType: (item as any).unitType || "unit"
     }));
     res.json(items);
   });

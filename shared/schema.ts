@@ -64,6 +64,7 @@ export const menuItems = pgTable("menu_items", {
   cfop: text("cfop"), // Código Fiscal de Operações e Prestações
   icmsOrigem: integer("icms_origem").default(0), // 0-Nacional, 1-Estrangeira, etc
   icmsSituacaoTributaria: text("icms_st"), // CSOSN ou CST
+  unitType: text("unit_type").default("unit").notNull(), // "unit" or "kg"
 });
 
 export const cashRegisters = pgTable("cash_register", {
