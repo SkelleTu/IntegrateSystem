@@ -560,9 +560,9 @@ function CashierContent({
   };
 
   return (
-    <div className="h-screen bg-transparent flex flex-col w-full overflow-hidden">
+    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
       {/* Header compactado e fixo no topo */}
-      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 panel-translucent shrink-0 rounded-none mb-0">
+      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-950/50 backdrop-blur-md shrink-0 z-50">
         <Button 
           variant="ghost" 
           size="icon" 
@@ -581,56 +581,59 @@ function CashierContent({
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 p-4 items-start flex-1 min-h-0 overflow-hidden">
-        <div className="w-full flex justify-end px-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => finalizeSale(true)}
-            className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[10px] h-10 px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-          >
-            <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
-          </Button>
-        </div>
-        <div className="flex-1 w-full h-full min-h-0 overflow-y-auto pr-2 custom-scrollbar">
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-4">
-            {filteredMenuItems?.map((item: any) => (
-              <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
-                <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col">
-                  <div className="h-20 md:h-24 overflow-hidden rounded-t-lg bg-zinc-800 flex items-center justify-center border-b border-white/5 relative group">
-                    {item.imageUrl ? (
-                      <img 
-                        src={item.imageUrl} 
-                        alt={item.name} 
-                        className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
-                      />
-                    ) : null}
-                    <div className={`flex items-center justify-center w-full h-full bg-zinc-900 fallback-icon ${item.imageUrl ? 'hidden' : ''}`}>
-                      <Package className="h-8 w-8 text-white/10" />
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative">
+        {/* Area Principal de Produtos */}
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
+          <div className="w-full flex justify-end mb-4 shrink-0">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => finalizeSale(true)}
+              className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[10px] h-10 px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+            >
+              <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
+            </Button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-20 lg:pb-4">
+              {filteredMenuItems?.map((item: any) => (
+                <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
+                  <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col border-white/5 bg-zinc-900/40">
+                    <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-zinc-800/50 flex items-center justify-center border-b border-white/5 relative group">
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name} 
+                          className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <Package className="h-10 w-10 text-white/5" />
+                      )}
                     </div>
-                  </div>
-                  <CardContent className="p-2 flex flex-col flex-1 justify-between gap-1">
-                    <h3 className="text-white font-black text-[9px] md:text-[10px] uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
-                    <p className="text-primary font-black text-sm md:text-md italic">R$ {(item.price / 100).toFixed(2)}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+                    <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
+                      <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
+                      <p className="text-primary font-black text-sm md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
 
         {/* Sidebar Direita / Carrinho */}
-        <div className="w-full lg:w-96 shrink-0 flex flex-col gap-4 h-full min-h-0">
-          <Card className="flex-1 panel-translucent flex flex-col min-h-0 overflow-hidden border-white/10 shadow-2xl relative">
-            <CardHeader className="border-b border-white/5 p-2 bg-white/5 space-y-2">
-              <div className="flex flex-col gap-2">
+        <div className="w-full lg:w-[400px] shrink-0 border-l border-white/10 bg-zinc-950/30 backdrop-blur-xl flex flex-col h-full min-h-0 relative z-40">
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="p-4 border-b border-white/5 space-y-3 bg-white/5">
+              <div className="flex flex-col gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                   <Input 
                     placeholder="BIPAR CÓDIGO OU BUSCAR..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-10 bg-black/60 border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50" 
+                    className="pl-10 h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 text-white" 
                     autoFocus
                   />
                 </div>
@@ -640,109 +643,166 @@ function CashierContent({
                     value={searchTicket}
                     onChange={(e) => setSearchTicket(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && loadTicketMutation.mutate(searchTicket)}
-                    className="h-10 bg-black/60 border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 pr-10" 
+                    className="h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 pr-12 text-white" 
                   />
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-primary hover:bg-primary/10"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 text-primary hover:bg-primary/10"
                     onClick={() => loadTicketMutation.mutate(searchTicket)}
                     disabled={loadTicketMutation.isPending}
                   >
-                    {loadTicketMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                    {loadTicketMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                   </Button>
                 </div>
               </div>
-            </CardHeader>
+            </div>
 
-            <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-primary" />
-                  <h3 className="text-white font-black uppercase italic text-xs tracking-tighter leading-none">Checkout <span className="text-primary">Ativo</span></h3>
-                </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              <div className="flex items-center gap-2 mb-4">
+                <ShoppingCart className="w-4 h-4 text-primary" />
+                <h3 className="text-white font-black uppercase italic text-xs tracking-tighter">Itens no <span className="text-primary">Carrinho</span></h3>
               </div>
 
-              {cart.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-white/20 gap-2 py-6"><ShoppingCart className="w-8 h-8 opacity-10" /><p className="font-black uppercase text-[8px]">Vazio</p></div> : cart.map(({ item, quantity }: any) => (
-                <div key={item.id} className="flex items-center justify-between gap-2"><div className="flex-1 min-w-0"><h4 className="text-white text-[10px] font-black uppercase truncate">{item.name}</h4><p className="text-white/40 text-[8px]">R$ {(item.price / 100).toFixed(2)}</p></div><div className="flex items-center gap-1 bg-black/40 p-1 rounded-lg border border-white/5"><Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeFromCart(item.id)}><Minus className="w-3 h-3" /></Button><span className="text-white font-black text-xs italic w-4 text-center">{quantity}</span><Button size="icon" variant="ghost" className="h-6 w-6 text-primary" onClick={() => addToCart(item as any)}><Plus className="w-3 h-3" /></Button></div></div>
-              ))}
-            </CardContent>
-            <div className="p-3 border-t border-white/5 bg-black/40 space-y-3 mt-auto shrink-0">
+              {cart.length === 0 ? (
+                <div className="h-40 flex flex-col items-center justify-center text-white/10 gap-2">
+                  <ShoppingCart className="w-12 h-12 opacity-5" />
+                  <p className="font-black uppercase text-[10px] tracking-widest">Carrinho Vazio</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map(({ item, quantity }: any) => (
+                    <div key={item.id} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{item.name}</h4>
+                        <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(item.id)}>
+                          <Minus className="w-3 h-3" />
+                        </Button>
+                        <span className="text-white font-black text-xs italic w-5 text-center">{quantity}</span>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
+                          <Plus className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-zinc-900 border-t border-white/10 space-y-4 shrink-0">
               {payments.length > 0 && (
-                <div className="space-y-1 py-1 border-b border-white/5">
-                  <p className="text-[8px] font-black uppercase text-zinc-500">Pagamentos</p>
+                <div className="space-y-2 pb-3 border-b border-white/5">
+                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Pagamentos</p>
                   {payments.map((p: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-white/5 px-2 py-1 rounded text-[9px]">
-                      <span className="text-white/60 uppercase font-bold italic">{p.method}</span>
-                      <div className="flex items-center gap-2">
+                    <div key={idx} className="flex justify-between items-center bg-white/5 px-3 py-2 rounded-lg text-[10px] border border-white/5">
+                      <span className="text-white/60 uppercase font-black italic">{p.method}</span>
+                      <div className="flex items-center gap-3">
                         <span className="text-primary font-black">R$ {(p.amount / 100).toFixed(2)}</span>
-                        <Button variant="ghost" size="icon" className="h-4 w-4 text-red-500 p-0" onClick={() => removePayment(idx)}>
-                          <Minus className="w-2 h-2" />
+                        <Button variant="ghost" size="icon" className="h-5 w-5 text-red-500 hover:bg-red-500/10 p-0" onClick={() => removePayment(idx)}>
+                          <Minus className="w-3 h-3" />
                         </Button>
                       </div>
                     </div>
                   ))}
                   {remainingTotal > 0 && (
-                    <div className="flex justify-between items-center px-2 py-1">
-                      <span className="text-red-500/60 uppercase font-black text-[9px] italic">Restante</span>
-                      <span className="text-red-500 font-black text-[9px]">R$ {(remainingTotal / 100).toFixed(2)}</span>
+                    <div className="flex justify-between items-center px-1 pt-1">
+                      <span className="text-red-500/60 uppercase font-black text-[10px] italic">Falta pagar</span>
+                      <span className="text-red-500 font-black text-xs">R$ {(remainingTotal / 100).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
               )}
-              {showFiscalFields && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }} 
-                  animate={{ opacity: 1, height: "auto" }} 
-                  className="space-y-2 pb-2 border-b border-white/5"
-                >
-                  <p className="text-[8px] font-black uppercase text-primary">Dados do Cliente (NFC-e)</p>
-                  <Input 
-                    placeholder="CPF/CNPJ (Apenas números)" 
-                    value={customerInfo.taxId} 
-                    onChange={e => setCustomerInfo((prev: any) => ({ ...prev, taxId: e.target.value }))}
-                    className="h-8 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl"
-                  />
-                  <Input 
-                    placeholder="Nome do Cliente" 
-                    value={customerInfo.name} 
-                    onChange={e => setCustomerInfo((prev: any) => ({ ...prev, name: e.target.value }))}
-                    className="h-8 bg-black/60 border-white/10 text-[10px] font-black italic rounded-xl"
-                  />
-                </motion.div>
-              )}
-              <div className="flex items-center justify-between gap-2"><div><span className="text-white/40 font-black uppercase text-[8px] tracking-widest">Total</span></div><span className="text-primary text-xl font-black italic tracking-tighter">R$ {(total / 100).toFixed(2)}</span></div>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className={`flex flex-col h-12 border-white/10 ${showFiscalFields ? 'bg-primary/20 text-primary' : ''}`} onClick={handleFiscalToggle}><Landmark className="w-4 h-4" /><span className="text-[8px] font-black uppercase">CPF</span></Button>
-                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}><Banknote className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Dinheiro</span></Button>
-                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}><CreditCard className="w-4 h-4" /><span className="text-[8px] font-black uppercase">Cartão</span></Button>
-                <Button variant="outline" className="flex flex-col h-12 border-white/10" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}><QrCode className="w-4 h-4" /><span className="text-[8px] font-black uppercase">PIX</span></Button>
+
+              <AnimatePresence>
+                {showFiscalFields && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }} 
+                    animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    className="space-y-2 overflow-hidden"
+                  >
+                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Identificação NFC-e</p>
+                    <Input 
+                      placeholder="CPF/CNPJ" 
+                      value={customerInfo.taxId} 
+                      onChange={e => setCustomerInfo((prev: any) => ({ ...prev, taxId: e.target.value }))}
+                      className="h-10 bg-black border-white/10 text-[11px] font-black italic rounded-xl text-white"
+                    />
+                    <Input 
+                      placeholder="NOME COMPLETO" 
+                      value={customerInfo.name} 
+                      onChange={e => setCustomerInfo((prev: any) => ({ ...prev, name: e.target.value }))}
+                      className="h-10 bg-black border-white/10 text-[11px] font-black italic rounded-xl text-white"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="flex items-end justify-between mb-2">
+                <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.3em] pb-1">Total Geral</span>
+                <span className="text-primary text-4xl font-black italic tracking-tighter drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+                  R$ {(total / 100).toFixed(2)}
+                </span>
               </div>
-              <Button className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-xl" onClick={() => finalizeSale(false)} disabled={saleMutation.isPending}>
-                {saleMutation.isPending ? <Loader2 className="animate-spin" /> : "FINALIZAR VENDA"}
+
+              <div className="grid grid-cols-4 gap-2">
+                <Button variant="outline" className={`flex flex-col h-14 border-white/10 transition-colors ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-black text-white'}`} onClick={handleFiscalToggle}>
+                  <Landmark className="w-5 h-5 mb-1" />
+                  <span className="text-[8px] font-black uppercase">CPF</span>
+                </Button>
+                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}>
+                  <Banknote className="w-5 h-5 mb-1 text-green-500" />
+                  <span className="text-[8px] font-black uppercase">DIN</span>
+                </Button>
+                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}>
+                  <CreditCard className="w-5 h-5 mb-1 text-blue-500" />
+                  <span className="text-[8px] font-black uppercase">CART</span>
+                </Button>
+                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}>
+                  <QrCode className="w-5 h-5 mb-1 text-primary" />
+                  <span className="text-[8px] font-black uppercase">PIX</span>
+                </Button>
+              </div>
+
+              <Button 
+                className="w-full h-16 bg-primary text-black font-black uppercase italic text-lg rounded-2xl shadow-[0_0_30px_rgba(0,229,255,0.2)] hover:scale-[1.02] active:scale-95 transition-all" 
+                onClick={() => finalizeSale(false)} 
+                disabled={saleMutation.isPending || cart.length === 0}
+              >
+                {saleMutation.isPending ? <Loader2 className="animate-spin w-8 h-8" /> : "FINALIZAR VENDA"}
               </Button>
             </div>
-          </Card>
+          </div>
         </div>
       </div>
 
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-2xl shadow-2xl">
-          <DialogHeader><DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">Pagamento: <span className="text-primary">{currentMethod?.toUpperCase()}</span></DialogTitle></DialogHeader>
-          <div className="space-y-6 pt-4">
-            <div className="flex justify-between items-center"><span className="text-zinc-500 uppercase font-black text-xs">Total Restante</span><span className="text-3xl font-black italic text-red-500">R$ {(remainingTotal / 100).toFixed(2)}</span></div>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-3xl shadow-2xl z-[999]">
+          <DialogHeader>
+            <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
+              PAGAMENTO: <span className="text-primary">{currentMethod?.toUpperCase()}</span>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-8 pt-6">
+            <div className="flex justify-between items-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">
+              <span className="text-zinc-500 uppercase font-black text-xs tracking-widest">Total Restante</span>
+              <span className="text-4xl font-black italic text-red-500">R$ {(remainingTotal / 100).toFixed(2)}</span>
+            </div>
             <div className="space-y-4">
-              <label className="text-zinc-500 text-[10px] uppercase font-black">Valor a Pagar</label>
+              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest pl-2">Valor a Pagar</label>
               <Input 
                 type="text" 
                 value={customerAmount} 
                 onChange={(e) => setCustomerAmount(e.target.value)} 
-                className="bg-black border-white/10 text-white text-4xl h-20 font-black italic rounded-2xl text-center" 
+                className="bg-black border-white/10 text-white text-5xl h-24 font-black italic rounded-3xl text-center focus:border-primary/50 shadow-inner" 
                 autoFocus 
               />
             </div>
-            <Button className="w-full h-16 bg-primary text-black font-black uppercase italic text-xl rounded-xl" onClick={addPayment}>
-              ADICIONAR PAGAMENTO
+            <Button className="w-full h-20 bg-primary text-black font-black uppercase italic text-2xl rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" onClick={addPayment}>
+              CONFIRMAR VALOR
             </Button>
           </div>
         </DialogContent>
