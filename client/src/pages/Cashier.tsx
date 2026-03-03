@@ -46,49 +46,61 @@ export default function Cashier() {
   const { data: fiscalSettingsData, isLoading: isLoadingFiscal, error: fiscalError } = useQuery<FiscalSettings | null>({
     queryKey: ["/api/fiscal/settings"],
     queryFn: async () => {
-      const res = await fetch("/api/fiscal/settings");
-      if (res.status === 401) return null;
-      if (!res.ok) return null;
-      return res.json();
+      try {
+        const res = await fetch("/api/fiscal/settings");
+        if (res.status === 401) return null;
+        if (!res.ok) return null;
+        return res.json();
+      } catch (err) {
+        console.error("Error fetching fiscal settings:", err);
+        return null;
+      }
     },
     enabled: !!user,
-    staleTime: 300000,
+    staleTime: 3000000,
     retry: 1,
   });
 
   const { data: menuItems, isLoading: isLoadingMenu, error: menuError } = useQuery<(MenuItem | (Inventory & { name: string; price: number; imageUrl: string }))[]>({
     queryKey: ["/api/menu-items-combined"],
     queryFn: async () => {
-      const [menuRes, inventoryRes] = await Promise.all([
-        fetch("/api/menu-items"),
-        fetch("/api/inventory")
-      ]);
-      
-      if (menuRes.status === 401 || inventoryRes.status === 401) return [];
-      
-      const menuData = menuRes.ok ? await menuRes.json() : [];
-      const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
-      
-      const combined = [...menuData];
-      inventoryData.forEach((invItem: any) => {
-        const exists = combined.find(m => 
-          (m.barcode && invItem.barcode && m.barcode === invItem.barcode) || 
-          (m.id === invItem.itemId)
-        );
+      try {
+        const [menuRes, inventoryRes] = await Promise.all([
+          fetch("/api/menu-items"),
+          fetch("/api/inventory")
+        ]);
         
-        if (!exists) {
-          combined.push({
-            id: invItem.id + 10000,
-            name: invItem.customName || `Produto #${invItem.id}`,
-            price: invItem.salePrice || (invItem.costPrice * 1.3),
-            imageUrl: invItem.imageUrl,
-            barcode: invItem.barcode,
-            isAvailable: invItem.quantity > 0,
-            inventoryId: invItem.id
+        if (menuRes.status === 401 || inventoryRes.status === 401) return [];
+        
+        const menuData = menuRes.ok ? await menuRes.json() : [];
+        const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
+        
+        const combined = Array.isArray(menuData) ? [...menuData] : [];
+        if (Array.isArray(inventoryData)) {
+          inventoryData.forEach((invItem: any) => {
+            const exists = combined.find(m => 
+              (m.barcode && invItem.barcode && m.barcode === invItem.barcode) || 
+              (m.id === invItem.itemId)
+            );
+            
+            if (!exists) {
+              combined.push({
+                id: invItem.id + 10000,
+                name: invItem.customName || `Produto #${invItem.id}`,
+                price: invItem.salePrice || (invItem.costPrice * 1.3),
+                imageUrl: invItem.imageUrl,
+                barcode: invItem.barcode,
+                isAvailable: invItem.quantity > 0,
+                inventoryId: invItem.id
+              });
+            }
           });
         }
-      });
-      return combined;
+        return combined;
+      } catch (err) {
+        console.error("Error fetching menu items:", err);
+        return [];
+      }
     },
     enabled: !!user,
     staleTime: 300000,
