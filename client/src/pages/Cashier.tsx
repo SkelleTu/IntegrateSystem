@@ -640,28 +640,43 @@ function CashierContent({
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
             <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-32 lg:pb-8">
               {filteredMenuItems?.map((item: any) => (
-                <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
-                  <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col border-white/5 bg-zinc-900/40">
-                    <div className="h-24 md:h-32 overflow-hidden rounded-t-lg bg-zinc-800/50 flex items-center justify-center border-b border-white/5 relative group">
+                <motion.div 
+                  key={item.id} 
+                  whileHover={{ y: -5 }} 
+                  whileTap={{ scale: 0.95 }} 
+                  onClick={() => addToCart(item as any)} 
+                  className="cursor-pointer h-full group"
+                >
+                  <Card className="h-full border-white/5 bg-zinc-900/40 overflow-hidden hover:border-primary/50 transition-all flex flex-col relative">
+                    {/* Imagem Pura sem Fundo/Bordas Internas */}
+                    <div className="aspect-square w-full flex items-center justify-center p-0 bg-transparent relative overflow-hidden shrink-0">
                       {item.imageUrl ? (
                         <img 
                           src={item.imageUrl} 
                           alt={item.name} 
-                          className="w-full h-full object-contain p-2 transition-all duration-500 group-hover:scale-110"
+                          className="w-full h-full object-contain transition-all duration-500 group-hover:scale-110 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)]"
                         />
                       ) : (
-                        <Package className="h-10 w-10 text-white/5" />
+                        <div className="w-full h-full flex items-center justify-center bg-white/5">
+                          <Package className="h-10 w-10 text-white/5" />
+                        </div>
                       )}
                     </div>
-                    <CardContent className="p-3 flex flex-col flex-1 justify-between gap-2">
-                      <div className="space-y-1">
-                        <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight">{item.name}</h3>
-                        <p className="text-white/40 text-[8px] font-bold uppercase tracking-wider">
-                          {(item as any).unitType === "kg" ? "Preço por Kg" : "Preço Unitário"}
+                    
+                    {/* Barra de Informações na Parte de Baixo */}
+                    <div className="p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col justify-end flex-1 min-h-[70px]">
+                      <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">
+                        {item.name}
+                      </h3>
+                      <div className="flex items-center justify-between items-end">
+                        <span className="text-white/40 text-[8px] font-bold uppercase tracking-wider italic">
+                          {(item as any).unitType === "kg" ? "por Kg" : "Unid."}
+                        </span>
+                        <p className="text-primary font-black text-sm md:text-base italic tracking-tighter">
+                          R$ {(item.price / 100).toFixed(2)}
                         </p>
                       </div>
-                      <p className="text-primary font-black text-sm md:text-lg italic">R$ {(item.price / 100).toFixed(2)}</p>
-                    </CardContent>
+                    </div>
                   </Card>
                 </motion.div>
               ))}
