@@ -32,6 +32,21 @@ export default function Cashier() {
 
   const { user, isLoading: isLoadingAuth } = useAuth();
   
+  const [selectedProductForAdjust, setSelectedProductForAdjust] = useState<any>(null);
+  const [adjustProductModalOpen, setAdjustProductModalOpen] = useState(false);
+
+  const updateProductAdjustmentMutation = useMutation({
+    mutationFn: async ({ id, rotation, imageScale }: { id: number, rotation: number, imageScale: number }) => {
+      const res = await apiRequest("PATCH", `/api/menu-items/${id}/adjust`, { rotation, imageScale });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items-combined"] });
+      toast({ title: "Ajustes do produto salvos!" });
+      setAdjustProductModalOpen(false);
+    }
+  });
+
   const { data: register, isLoading: isLoadingRegister, error: registerError } = useQuery<CashRegister | null>({
     queryKey: ["/api/cash-register/open"],
     queryFn: async () => {
@@ -483,21 +498,6 @@ export default function Cashier() {
     );
   }
 
-  const [selectedProductForAdjust, setSelectedProductForAdjust] = useState<any>(null);
-  const [adjustProductModalOpen, setAdjustProductModalOpen] = useState(false);
-
-  const updateProductAdjustmentMutation = useMutation({
-    mutationFn: async ({ id, rotation, imageScale }: { id: number, rotation: number, imageScale: number }) => {
-      const res = await apiRequest("PATCH", `/api/menu-items/${id}/adjust`, { rotation, imageScale });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/menu-items-combined"] });
-      toast({ title: "Ajustes do produto salvos!" });
-      setAdjustProductModalOpen(false);
-    }
-  });
-
   return (
     <CashierContent 
       register={register}
@@ -530,6 +530,9 @@ export default function Cashier() {
       remainingTotal={remainingTotal}
       setSelectedProductForAdjust={setSelectedProductForAdjust}
       setAdjustProductModalOpen={setAdjustProductModalOpen}
+      updateProductAdjustmentMutation={updateProductAdjustmentMutation}
+      selectedProductForAdjust={selectedProductForAdjust}
+      adjustProductModalOpen={adjustProductModalOpen}
     />
   );
 }
@@ -541,7 +544,8 @@ function CashierContent({
   customerAmount, setCustomerAmount, paymentModalOpen, setPaymentModalOpen, 
   customerInfo, setCustomerInfo, showFiscalFields, setShowFiscalFields, 
   finalizeSale, saleMutation, remainingTotal,
-  setSelectedProductForAdjust, setAdjustProductModalOpen
+  setSelectedProductForAdjust, setAdjustProductModalOpen,
+  updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
