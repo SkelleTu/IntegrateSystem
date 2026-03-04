@@ -24,6 +24,14 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
   }
+
+  /* Slider Styles */
+  .relative.flex.w-full.touch-none.select-none.items-center {
+    @apply py-4;
+  }
+  [role="slider"] {
+    @apply border-primary bg-black ring-offset-black focus-visible:ring-primary;
+  }
 }
 
 @keyframes beam {

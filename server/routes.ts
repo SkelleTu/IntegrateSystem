@@ -789,6 +789,18 @@ export async function registerRoutes(
     res.json(items);
   });
 
+  app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { rotation, imageScale } = req.body;
+      const updated = await storage.updateMenuItem(id, { rotation, imageScale });
+      res.json(updated);
+    } catch (err) {
+      console.error("Erro ao ajustar produto:", err);
+      res.status(500).json({ message: "Erro ao salvar ajustes do produto" });
+    }
+  });
+
   // Cashier API
   app.get("/api/cash-register/open", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);

@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play, RotateCw, Maximize } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 
 export default function Cashier() {
   const { toast } = useToast();
@@ -481,6 +483,21 @@ export default function Cashier() {
     );
   }
 
+  const [selectedProductForAdjust, setSelectedProductForAdjust] = useState<any>(null);
+  const [adjustProductModalOpen, setAdjustProductModalOpen] = useState(false);
+
+  const updateProductAdjustmentMutation = useMutation({
+    mutationFn: async ({ id, rotation, imageScale }: { id: number, rotation: number, imageScale: number }) => {
+      const res = await apiRequest("PATCH", `/api/menu-items/${id}/adjust`, { rotation, imageScale });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-items-combined"] });
+      toast({ title: "Ajustes do produto salvos!" });
+      setAdjustProductModalOpen(false);
+    }
+  });
+
   return (
     <CashierContent 
       register={register}
@@ -511,6 +528,8 @@ export default function Cashier() {
       finalizeSale={finalizeSale}
       saleMutation={saleMutation}
       remainingTotal={remainingTotal}
+      setSelectedProductForAdjust={setSelectedProductForAdjust}
+      setAdjustProductModalOpen={setAdjustProductModalOpen}
     />
   );
 }
@@ -521,7 +540,8 @@ function CashierContent({
   loadTicketMutation, payments, setPayments, currentMethod, setCurrentMethod, 
   customerAmount, setCustomerAmount, paymentModalOpen, setPaymentModalOpen, 
   customerInfo, setCustomerInfo, showFiscalFields, setShowFiscalFields, 
-  finalizeSale, saleMutation, remainingTotal 
+  finalizeSale, saleMutation, remainingTotal,
+  setSelectedProductForAdjust, setAdjustProductModalOpen
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -648,13 +668,30 @@ function CashierContent({
                   className="cursor-pointer h-full group"
                 >
                   <Card className="h-full border-white/5 bg-zinc-900/40 overflow-hidden hover:border-primary/50 transition-all flex flex-col relative">
+                    {/* Botão de Ajuste no Canto Superior Direito */}
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-primary hover:bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedProductForAdjust(item);
+                        setAdjustProductModalOpen(true);
+                      }}
+                    >
+                      <RotateCw className="h-4 w-4" />
+                    </Button>
+
                     {/* Imagem Pura sem Fundo/Bordas Internas */}
                     <div className="aspect-square w-full flex items-center justify-center p-0 bg-transparent relative overflow-hidden shrink-0">
                       {item.imageUrl ? (
                         <img 
                           src={item.imageUrl} 
                           alt={item.name} 
-                          className="w-full h-full object-contain transition-all duration-500 group-hover:scale-110 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)]"
+                          style={{ 
+                            transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` 
+                          }}
+                          className="w-full h-full object-contain transition-all duration-500 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)]"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white/5">
@@ -895,6 +932,99 @@ function CashierContent({
           </div>
         </DialogContent>
       </Dialog>
+
+      <ProductAdjustModal 
+        isOpen={adjustProductModalOpen} 
+        onClose={() => setAdjustProductModalOpen(false)} 
+        product={selectedProductForAdjust}
+        onSave={(data: any) => updateProductAdjustmentMutation.mutate({ id: selectedProductForAdjust.id, ...data })}
+        isPending={updateProductAdjustmentMutation.isPending}
+      />
     </div>
+  );
+}
+
+function ProductAdjustModal({ isOpen, onClose, product, onSave, isPending }: any) {
+  const [rotation, setRotation] = useState(product?.rotation || 0);
+  const [scale, setScale] = useState(product?.imageScale || 100);
+
+  useEffect(() => {
+    if (product) {
+      setRotation(product.rotation || 0);
+      setScale(product.imageScale || 100);
+    }
+  }, [product, isOpen]);
+
+  if (!product) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-8 rounded-3xl shadow-2xl z-[1000]">
+        <DialogHeader>
+          <DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">
+            AJUSTAR: <span className="text-primary">{product.name}</span>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-8 pt-4">
+          <div className="aspect-square w-full bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-white/5">
+            {product.imageUrl ? (
+              <img 
+                src={product.imageUrl} 
+                alt={product.name} 
+                style={{ transform: `rotate(${rotation}deg) scale(${scale / 100})` }}
+                className="w-48 h-48 object-contain transition-transform duration-200"
+              />
+            ) : (
+              <Package className="h-16 w-16 text-white/10" />
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                  <RotateCw className="w-3 h-3" /> Rotação: {rotation}°
+                </Label>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary" onClick={() => setRotation(0)}>RESET</Button>
+              </div>
+              <Slider 
+                value={[rotation]} 
+                min={0} 
+                max={360} 
+                step={1} 
+                onValueChange={([val]) => setRotation(val)}
+                className="py-2"
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                  <Maximize className="w-3 h-3" /> Escala: {scale}%
+                </Label>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary" onClick={() => setScale(100)}>RESET</Button>
+              </div>
+              <Slider 
+                value={[scale]} 
+                min={50} 
+                max={200} 
+                step={1} 
+                onValueChange={([val]) => setScale(val)}
+                className="py-2"
+              />
+            </div>
+          </div>
+
+          <Button 
+            className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" 
+            onClick={() => onSave({ rotation, imageScale: scale })}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 className="animate-spin w-5 h-5" /> : "SALVAR ALTERAÇÕES"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

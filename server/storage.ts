@@ -142,6 +142,7 @@ export interface IStorage {
   getAllInventoryRestocks(): Promise<InventoryRestock[]>;
   getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]>;
   restockInventory(id: number, data: any): Promise<Inventory>;
+  updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -678,6 +679,12 @@ export class DatabaseStorage implements IStorage {
 
       return updated;
     });
+  }
+
+  async updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem> {
+    this.logAction(`Atualização item menu ID:${id}`);
+    const [updated] = await db.update(menuItems).set(update).where(eq(menuItems.id, id)).returning();
+    return updated;
   }
 
   async createTransaction(transaction: any): Promise<Transaction> {
