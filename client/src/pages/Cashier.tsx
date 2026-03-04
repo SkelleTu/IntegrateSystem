@@ -963,34 +963,34 @@ function ProductAdjustModal({ isOpen, onClose, product, onSave, isPending }: any
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-8 rounded-3xl shadow-2xl z-[1000]">
-        <DialogHeader>
+      <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-6 rounded-3xl shadow-2xl z-[1000] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
           <DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">
             AJUSTAR: <span className="text-primary">{product.name}</span>
           </DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-8 pt-4">
-          <div className="aspect-square w-full bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-white/5">
+        <div className="space-y-6 pt-2">
+          <div className="aspect-square w-full max-w-[280px] mx-auto bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-white/5">
             {product.imageUrl ? (
               <img 
                 src={product.imageUrl} 
                 alt={product.name} 
                 style={{ transform: `rotate(${rotation}deg) scale(${scale / 100})` }}
-                className="w-48 h-48 object-contain transition-transform duration-200"
+                className="w-40 h-40 object-contain transition-transform duration-200"
               />
             ) : (
-              <Package className="h-16 w-16 text-white/10" />
+              <Package className="h-12 w-12 text-white/10" />
             )}
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-3">
+          <div className="space-y-5">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                   <RotateCw className="w-3 h-3" /> Rotação: {rotation}°
                 </Label>
-                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary" onClick={() => setRotation(0)}>RESET</Button>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary hover:bg-white/5" onClick={() => setRotation(0)}>RESET</Button>
               </div>
               <Slider 
                 value={[rotation]} 
@@ -1002,12 +1002,12 @@ function ProductAdjustModal({ isOpen, onClose, product, onSave, isPending }: any
               />
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2">
               <div className="flex justify-between items-center">
                 <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
                   <Maximize className="w-3 h-3" /> Escala: {scale}%
                 </Label>
-                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary" onClick={() => setScale(100)}>RESET</Button>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary hover:bg-white/5" onClick={() => setScale(100)}>RESET</Button>
               </div>
               <Slider 
                 value={[scale]} 
@@ -1021,7 +1021,7 @@ function ProductAdjustModal({ isOpen, onClose, product, onSave, isPending }: any
           </div>
 
           <Button 
-            className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" 
+            className="w-full h-12 bg-primary text-black font-black uppercase italic text-base rounded-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg mt-2" 
             onClick={() => onSave({ rotation, imageScale: scale })}
             disabled={isPending}
           >
