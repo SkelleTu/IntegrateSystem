@@ -59,18 +59,16 @@ export function BackgroundIcons() {
     setIcons(generateIcons(40));
   }, []);
 
-  return (
+    return (
     <>
       <div 
-        className="fixed inset-0 overflow-hidden pointer-events-none z-[-1] bg-[#05070a] w-full h-full"
+        className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-black w-full h-full"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(0, 229, 255, 0.06) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 229, 255, 0.06) 1px, transparent 1px),
-            radial-gradient(at 0% 0%, rgba(0, 229, 255, 0.12) 0, transparent 80%),
-            radial-gradient(at 100% 100%, rgba(147, 51, 234, 0.12) 0, transparent 80%)
+            linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px)
           `,
-          backgroundSize: '40px 40px, 40px 40px, 100% 100%, 100% 100%',
+          backgroundSize: '40px 40px, 40px 40px',
           backgroundAttachment: 'fixed'
         }}
       />

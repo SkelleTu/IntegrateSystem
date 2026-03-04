@@ -12,7 +12,7 @@ import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, Arrow
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import { Badge } from "@/components/ui/badge";
+import { BackgroundIcons } from "@/components/BackgroundIcons";
 
 export default function Cashier() {
   const { toast } = useToast();
@@ -602,8 +602,9 @@ function CashierContent({
 
   return (
     <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
+      <BackgroundIcons />
       {/* Header compactado e fixo no topo */}
-      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-950/50 backdrop-blur-md shrink-0 z-50">
+      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-950/80 backdrop-blur-md shrink-0 z-50">
         <Button 
           variant="ghost" 
           size="icon" 
@@ -637,7 +638,7 @@ function CashierContent({
           </div>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-20 lg:pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-32 lg:pb-8">
               {filteredMenuItems?.map((item: any) => (
                 <motion.div key={item.id} whileHover={{ y: -5 }} whileTap={{ scale: 0.95 }} onClick={() => addToCart(item as any)} className="cursor-pointer h-full">
                   <Card className="h-full panel-translucent overflow-hidden hover:border-primary/50 transition-all flex flex-col border-white/5 bg-zinc-900/40">
@@ -745,7 +746,7 @@ function CashierContent({
               )}
             </div>
 
-            <div className="p-4 bg-zinc-900 border-t border-white/10 space-y-4 shrink-0">
+            <div className="p-4 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-4 shrink-0 pb-8 lg:pb-6">
               {payments.length > 0 && (
                 <div className="space-y-2 pb-3 border-b border-white/5">
                   <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Pagamentos</p>
