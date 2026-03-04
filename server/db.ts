@@ -284,24 +284,38 @@ export async function setupDatabase() {
     "ALTER TABLE sale_items ADD COLUMN total_price INTEGER DEFAULT 0 NOT NULL"
   ];
 
+  const migrationResults = [];
   for (const sqlQuery of migrations) {
     try {
       if (isRemoteEnabled) {
         // Para LibSQL/Turso
-        await (db as any).execute(sql.raw(sqlQuery));
+        const client = (db as any).$client || (db as any).client;
+        if (client && typeof client.execute === 'function') {
+          await client.execute(sqlQuery);
+        } else {
+          await db.run(sql.raw(sqlQuery));
+        }
       } else {
         // Para SQLite local
         localSqlite.prepare(sqlQuery).run();
       }
-    } catch (e) {
+      migrationResults.push({ query: sqlQuery, status: "success" });
+    } catch (e: any) {
+      migrationResults.push({ query: sqlQuery, status: "error", error: e.message });
       // Ignorar erros de "coluna já existe"
     }
   }
+  console.log("[DB MIGRATIONS]:", JSON.stringify(migrationResults, null, 2));
 
   for (const table of tables) {
     try {
       if (isRemoteEnabled) {
-        await (db as any).execute(sql.raw(table));
+        const client = (db as any).$client || (db as any).client;
+        if (client && typeof client.execute === 'function') {
+          await client.execute(table);
+        } else {
+          await db.run(sql.raw(table));
+        }
       } else {
         localSqlite.prepare(table).run();
       }
