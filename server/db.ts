@@ -278,7 +278,10 @@ export async function setupDatabase() {
     "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
     "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
     "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER NOT NULL DEFAULT 1",
-    "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL"
+    "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
+    "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
+    "ALTER TABLE sale_items ADD COLUMN unit_price INTEGER",
+    "ALTER TABLE sale_items ADD COLUMN total_price INTEGER"
   ];
 
   for (const sqlQuery of migrations) {

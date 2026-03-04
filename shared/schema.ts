@@ -107,6 +107,7 @@ export const saleItems = pgTable("sale_items", {
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unit_price").notNull(), // in cents
   totalPrice: integer("total_price").notNull(), // in cents
+  unitType: text("unit_type").default("unit").notNull(), 
 });
 
 export const payments = pgTable("payments", {
