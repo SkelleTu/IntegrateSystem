@@ -746,25 +746,25 @@ function CashierContent({
               )}
             </div>
 
-            <div className="p-4 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-4 shrink-0 pb-8 lg:pb-6">
+            <div className="p-3 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-3 shrink-0 pb-6 lg:pb-4">
               {payments.length > 0 && (
-                <div className="space-y-2 pb-3 border-b border-white/5">
-                  <p className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Pagamentos</p>
+                <div className="space-y-1 pb-2 border-b border-white/5">
+                  <p className="text-[9px] font-black uppercase text-zinc-500 tracking-widest">Pagamentos</p>
                   {payments.map((p: any, idx: number) => (
-                    <div key={idx} className="flex justify-between items-center bg-white/5 px-3 py-2 rounded-lg text-[10px] border border-white/5">
+                    <div key={idx} className="flex justify-between items-center bg-white/5 px-2 py-1 rounded-lg text-[9px] border border-white/5">
                       <span className="text-white/60 uppercase font-black italic">{p.method}</span>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         <span className="text-primary font-black">R$ {(p.amount / 100).toFixed(2)}</span>
-                        <Button variant="ghost" size="icon" className="h-5 w-5 text-red-500 hover:bg-red-500/10 p-0" onClick={() => removePayment(idx)}>
-                          <Minus className="w-3 h-3" />
+                        <Button variant="ghost" size="icon" className="h-4 w-4 text-red-500 hover:bg-red-500/10 p-0" onClick={() => removePayment(idx)}>
+                          <Minus className="w-2.5 h-2.5" />
                         </Button>
                       </div>
                     </div>
                   ))}
                   {remainingTotal > 0 && (
-                    <div className="flex justify-between items-center px-1 pt-1">
-                      <span className="text-red-500/60 uppercase font-black text-[10px] italic">Falta pagar</span>
-                      <span className="text-red-500 font-black text-xs">R$ {(remainingTotal / 100).toFixed(2)}</span>
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-red-500/60 uppercase font-black text-[9px] italic">Falta pagar</span>
+                      <span className="text-red-500 font-black text-[11px]">R$ {(remainingTotal / 100).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -774,59 +774,59 @@ function CashierContent({
                 {showFiscalFields && (
                   <motion.div 
                     initial={{ opacity: 0, height: 0, marginBottom: 0 }} 
-                    animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
+                    animate={{ opacity: 1, height: "auto", marginBottom: 8 }}
                     exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                    className="space-y-2 overflow-hidden"
+                    className="space-y-1 overflow-hidden"
                   >
-                    <p className="text-[10px] font-black uppercase text-primary tracking-widest">Identificação NFC-e</p>
+                    <p className="text-[9px] font-black uppercase text-primary tracking-widest">Identificação NFC-e</p>
                     <Input 
                       placeholder="CPF/CNPJ" 
                       value={customerInfo.taxId} 
                       onChange={e => setCustomerInfo((prev: any) => ({ ...prev, taxId: e.target.value }))}
-                      className="h-10 bg-black border-white/10 text-[11px] font-black italic rounded-xl text-white"
+                      className="h-8 bg-black border-white/10 text-[10px] font-black italic rounded-lg text-white"
                     />
                     <Input 
                       placeholder="NOME COMPLETO" 
                       value={customerInfo.name} 
                       onChange={e => setCustomerInfo((prev: any) => ({ ...prev, name: e.target.value }))}
-                      className="h-10 bg-black border-white/10 text-[11px] font-black italic rounded-xl text-white"
+                      className="h-8 bg-black border-white/10 text-[10px] font-black italic rounded-lg text-white"
                     />
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              <div className="flex items-end justify-between mb-2">
-                <span className="text-white/40 font-black uppercase text-[10px] tracking-[0.3em] pb-1">Total Geral</span>
-                <span className="text-primary text-4xl font-black italic tracking-tighter drop-shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+              <div className="flex items-end justify-between mb-1">
+                <span className="text-white/40 font-black uppercase text-[9px] tracking-[0.2em] pb-1">Total Geral</span>
+                <span className="text-primary text-3xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(0,229,255,0.3)]">
                   R$ {(total / 100).toFixed(2)}
                 </span>
               </div>
 
-              <div className="grid grid-cols-4 gap-2">
-                <Button variant="outline" className={`flex flex-col h-14 border-white/10 transition-colors ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-black text-white'}`} onClick={handleFiscalToggle}>
-                  <Landmark className="w-5 h-5 mb-1" />
-                  <span className="text-[8px] font-black uppercase">CPF</span>
+              <div className="grid grid-cols-4 gap-1.5">
+                <Button variant="outline" className={`flex flex-col h-12 border-white/10 transition-colors ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-black text-white'}`} onClick={handleFiscalToggle}>
+                  <Landmark className="w-4 h-4 mb-0.5" />
+                  <span className="text-[7px] font-black uppercase">CPF</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}>
-                  <Banknote className="w-5 h-5 mb-1 text-green-500" />
-                  <span className="text-[8px] font-black uppercase">DIN</span>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}>
+                  <Banknote className="w-4 h-4 mb-0.5 text-green-500" />
+                  <span className="text-[7px] font-black uppercase">DIN</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}>
-                  <CreditCard className="w-5 h-5 mb-1 text-blue-500" />
-                  <span className="text-[8px] font-black uppercase">CART</span>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}>
+                  <CreditCard className="w-4 h-4 mb-0.5 text-blue-500" />
+                  <span className="text-[7px] font-black uppercase">CART</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-14 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}>
-                  <QrCode className="w-5 h-5 mb-1 text-primary" />
-                  <span className="text-[8px] font-black uppercase">PIX</span>
+                <Button variant="outline" className="flex flex-col h-12 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}>
+                  <QrCode className="w-4 h-4 mb-0.5 text-primary" />
+                  <span className="text-[7px] font-black uppercase">PIX</span>
                 </Button>
               </div>
 
               <Button 
-                className="w-full h-16 bg-primary text-black font-black uppercase italic text-lg rounded-2xl shadow-[0_0_30px_rgba(0,229,255,0.2)] hover:scale-[1.02] active:scale-95 transition-all" 
+                className="w-full h-14 bg-primary text-black font-black uppercase italic text-base rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.2)] hover:scale-[1.01] active:scale-95 transition-all" 
                 onClick={() => finalizeSale(false)} 
                 disabled={saleMutation.isPending || cart.length === 0}
               >
-                {saleMutation.isPending ? <Loader2 className="animate-spin w-8 h-8" /> : "FINALIZAR VENDA"}
+                {saleMutation.isPending ? <Loader2 className="animate-spin w-6 h-6" /> : "FINALIZAR VENDA"}
               </Button>
             </div>
           </div>
