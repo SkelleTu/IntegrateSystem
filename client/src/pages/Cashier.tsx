@@ -802,22 +802,41 @@ function CashierContent({
                 </span>
               </div>
 
-              <div className="grid grid-cols-4 gap-1">
-                <Button variant="outline" className={`flex flex-col h-10 border-white/10 transition-colors ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-black text-white'}`} onClick={handleFiscalToggle}>
-                  <Landmark className="w-3.5 h-3.5 mb-0.5" />
-                  <span className="text-[6px] font-black uppercase">CPF</span>
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                <Button 
+                  variant="outline" 
+                  className={`flex flex-col items-center justify-center h-14 border-white/10 transition-all gap-1 group relative overflow-hidden ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-zinc-900/50 text-white hover:border-primary/50 hover:bg-primary/5'}`} 
+                  onClick={handleFiscalToggle}
+                >
+                  <Landmark className={`w-4 h-4 transition-transform group-hover:scale-110 ${showFiscalFields ? 'text-primary' : 'text-white/40'}`} />
+                  <span className="text-[8px] font-black uppercase tracking-wider">CPF</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-10 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('cash')}>
-                  <Banknote className="w-3.5 h-3.5 mb-0.5 text-green-500" />
-                  <span className="text-[6px] font-black uppercase">DIN</span>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col items-center justify-center h-14 border-white/10 bg-zinc-900/50 text-white hover:border-green-500/50 hover:bg-green-500/5 transition-all gap-1 group" 
+                  disabled={remainingTotal <= 0} 
+                  onClick={() => handlePayment('cash')}
+                >
+                  <Banknote className="w-4 h-4 text-green-500/60 group-hover:text-green-500 transition-transform group-hover:scale-110" />
+                  <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">DIN</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-10 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('card')}>
-                  <CreditCard className="w-3.5 h-3.5 mb-0.5 text-blue-500" />
-                  <span className="text-[6px] font-black uppercase">CART</span>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col items-center justify-center h-14 border-white/10 bg-zinc-900/50 text-white hover:border-blue-500/50 hover:bg-blue-500/5 transition-all gap-1 group" 
+                  disabled={remainingTotal <= 0} 
+                  onClick={() => handlePayment('card')}
+                >
+                  <CreditCard className="w-4 h-4 text-blue-500/60 group-hover:text-blue-500 transition-transform group-hover:scale-110" />
+                  <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">CART</span>
                 </Button>
-                <Button variant="outline" className="flex flex-col h-10 border-white/10 bg-black text-white" disabled={remainingTotal <= 0} onClick={() => handlePayment('pix')}>
-                  <QrCode className="w-3.5 h-3.5 mb-0.5 text-primary" />
-                  <span className="text-[6px] font-black uppercase">PIX</span>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col items-center justify-center h-14 border-white/10 bg-zinc-900/50 text-white hover:border-primary/50 hover:bg-primary/5 transition-all gap-1 group" 
+                  disabled={remainingTotal <= 0} 
+                  onClick={() => handlePayment('pix')}
+                >
+                  <QrCode className="w-4 h-4 text-primary/60 group-hover:text-primary transition-transform group-hover:scale-110" />
+                  <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">PIX</span>
                 </Button>
               </div>
 
