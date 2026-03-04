@@ -182,6 +182,8 @@ export const inventory = pgTable("inventory", {
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
   imageUrl: text("image_url"), // Campo de imagem adicionado
+  rotation: integer("rotation").default(0).notNull(),
+  imageScale: integer("image_scale").default(100).notNull(),
   updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 

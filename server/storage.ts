@@ -681,6 +681,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async updateInventoryItem(id: number, update: any): Promise<Inventory> {
+    this.logAction(`Atualização item inventário ID:${id}`);
+    const [updated] = await db.update(inventory).set(update).where(eq(inventory.id, id)).returning();
+    return updated;
+  }
+
   async updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem> {
     this.logAction(`Atualização item menu ID:${id}`);
     const [updated] = await db.update(menuItems).set(update).where(eq(menuItems.id, id)).returning();

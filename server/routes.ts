@@ -1032,6 +1032,36 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+      
+      const id = Number(req.params.id);
+      const { rotation, imageScale } = req.body;
+      
+      // Se for um item do inventário (ID > 10000), precisamos atualizar no inventário
+      if (id > 10000) {
+        const inventoryId = id - 10000;
+        const updated = await storage.updateInventoryItem(inventoryId, { 
+          rotation: Number(rotation), 
+          imageScale: Number(imageScale) 
+        });
+        return res.json(updated);
+      }
+      
+      const updated = await storage.updateMenuItem(id, { 
+        rotation: Number(rotation), 
+        imageScale: Number(imageScale) 
+      });
+      
+      res.json(updated);
+    } catch (err) {
+      console.error("Erro ao ajustar item do menu:", err);
+      res.status(500).json({ message: "Erro ao salvar ajustes" });
+    }
+  });
+
   app.get("/api/transactions", isAuthenticated, async (req, res) => {
     try {
       const { start, end, businessType } = req.query;

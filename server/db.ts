@@ -281,6 +281,8 @@ export async function setupDatabase() {
     "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
     "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100 NOT NULL",
+    "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0 NOT NULL",
+    "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100 NOT NULL",
     "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
     "ALTER TABLE sale_items ADD COLUMN unit_price INTEGER DEFAULT 0 NOT NULL",
     "ALTER TABLE sale_items ADD COLUMN total_price INTEGER DEFAULT 0 NOT NULL"

@@ -166,7 +166,12 @@ export default function Cashier() {
       if (img && typeof img === 'string' && (img.includes("images.unsplash.com") || img.includes("photo-1586769852836-bc069f19e1b6"))) {
         img = null;
       }
-      return { ...item, imageUrl: img };
+      return { 
+        ...item, 
+        imageUrl: img,
+        rotation: (item as any).rotation ?? 0,
+        imageScale: (item as any).imageScale ?? 100
+      };
     });
 
     if (!searchTerm) return normalizedItems;
@@ -761,46 +766,62 @@ function CashierContent({
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-              <div className="flex items-center gap-2 mb-4">
-                <ShoppingCart className="w-4 h-4 text-primary" />
-                <h3 className="text-white font-black uppercase italic text-xs tracking-tighter">Itens no <span className="text-primary">Carrinho</span></h3>
-              </div>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                      <div className="flex items-center gap-2 mb-4">
+                        <ShoppingCart className="w-4 h-4 text-primary" />
+                        <h3 className="text-white font-black uppercase italic text-xs tracking-tighter">Itens no <span className="text-primary">Carrinho</span></h3>
+                      </div>
 
-              {cart.length === 0 ? (
-                <div className="h-40 flex flex-col items-center justify-center text-white/10 gap-2">
-                  <ShoppingCart className="w-12 h-12 opacity-5" />
-                  <p className="font-black uppercase text-[10px] tracking-widest">Carrinho Vazio</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {cart.map(({ item, quantity }: any) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{item.name}</h4>
-                        <div className="flex items-center gap-2">
-                          <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
-                          <span className="text-white/20 text-[8px] font-bold uppercase italic">
-                            {(item as any).unitType === "kg" ? "kg" : "un"}
-                          </span>
+                      {cart.length === 0 ? (
+                        <div className="h-40 flex flex-col items-center justify-center text-white/10 gap-2">
+                          <ShoppingCart className="w-12 h-12 opacity-5" />
+                          <p className="font-black uppercase text-[10px] tracking-widest">Carrinho Vazio</p>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(item.id)}>
-                          <Minus className="w-3 h-3" />
-                        </Button>
-                        <span className="text-white font-black text-xs italic w-14 text-center">
-                          {(item as any).unitType === "kg" ? quantity.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : quantity}
-                        </span>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
-                          <Plus className="w-3 h-3" />
-                        </Button>
-                      </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {cart.map(({ item, quantity }: any) => (
+                            <div key={item.id} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-10 h-10 rounded-lg bg-black/40 border border-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                                  {item.imageUrl ? (
+                                    <img 
+                                      src={item.imageUrl} 
+                                      alt={item.name}
+                                      style={{ 
+                                        transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` 
+                                      }}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  ) : (
+                                    <Package className="w-5 h-5 text-white/10" />
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{item.name}</h4>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
+                                    <span className="text-white/20 text-[8px] font-bold uppercase italic">
+                                      {(item as any).unitType === "kg" ? "kg" : "un"}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(item.id)}>
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="text-white font-black text-xs italic w-14 text-center">
+                                  {(item as any).unitType === "kg" ? quantity.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : quantity}
+                                </span>
+                                <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
 
             <div className="p-3 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-2 shrink-0 pb-[50px] lg:pb-[45px]">
               {payments.length > 0 && (
