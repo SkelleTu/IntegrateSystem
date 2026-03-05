@@ -147,6 +147,28 @@ export default function Cashier() {
       return;
     }
 
+    // New check for manual kg change if item is kg
+    if (item.unitType === "kg" || (item as any).unit === "kg") {
+      const weightStr = prompt(`Informe o peso para ${item.name} (kg):`, "1.000");
+      if (weightStr === null) return;
+      const weight = parseFloat(weightStr.replace(",", "."));
+      if (isNaN(weight) || weight <= 0) {
+        toast({ title: "Peso Inválido", variant: "destructive" });
+        return;
+      }
+      setCart((prev) => {
+        const existingIdx = prev.findIndex((i) => i.item.id === item.id);
+        if (existingIdx >= 0) {
+          const newCart = [...prev];
+          const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
+          newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+          return newCart;
+        }
+        return [...prev, { item, quantity: weight }];
+      });
+      return;
+    }
+
     setCart((prev) => {
       const existing = prev.find((i) => i.item.id === item.id);
       if (existing) {
@@ -779,16 +801,16 @@ function CashierContent({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          {cart.map(({ item, quantity }: any) => (
-                            <div key={item.id} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                          {cart.map((i: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between gap-3 bg-white/5 p-3 rounded-xl border border-white/5 group hover:border-primary/30 transition-all">
                               <div className="flex items-center gap-3 flex-1 min-w-0">
                                 <div className="w-10 h-10 rounded-lg bg-black/40 border border-white/5 flex items-center justify-center overflow-hidden shrink-0">
-                                  {item.imageUrl ? (
+                                  {i.item.imageUrl ? (
                                     <img 
-                                      src={item.imageUrl} 
-                                      alt={item.name}
+                                      src={i.item.imageUrl} 
+                                      alt={i.item.name}
                                       style={{ 
-                                        transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` 
+                                        transform: `rotate(${i.item.rotation || 0}deg) scale(${(i.item.imageScale || 100) / 100})` 
                                       }}
                                       className="w-full h-full object-contain"
                                     />
@@ -797,25 +819,49 @@ function CashierContent({
                                   )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{item.name}</h4>
+                                  <h4 className="text-white text-[10px] font-black uppercase truncate leading-tight">{i.item.name}</h4>
                                   <div className="flex items-center gap-2">
-                                    <p className="text-primary text-[10px] font-bold">R$ {(item.price / 100).toFixed(2)}</p>
+                                    <p className="text-primary text-[10px] font-bold">R$ {((i.item.price * i.quantity) / 100).toFixed(2)}</p>
                                     <span className="text-white/20 text-[8px] font-bold uppercase italic">
-                                      {(item as any).unitType === "kg" ? "kg" : "un"}
+                                      {i.quantity} { (i.item as any).unitType === "kg" || (i.item as any).unit === "kg" ? "kg" : "un" } x R$ {(i.item.price / 100).toFixed(2)}
                                     </span>
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2 bg-black/60 p-1 rounded-lg border border-white/10 shrink-0">
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(item.id)}>
-                                  <Minus className="w-3 h-3" />
-                                </Button>
-                                <span className="text-white font-black text-xs italic w-14 text-center">
-                                  {(item as any).unitType === "kg" ? quantity.toLocaleString('pt-BR', { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : quantity}
-                                </span>
-                                <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(item as any)}>
-                                  <Plus className="w-3 h-3" />
-                                </Button>
+                                {((i.item as any).unitType === "kg" || (i.item as any).unit === "kg") ? (
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7 text-white/40 hover:text-primary hover:bg-primary/10 rounded-lg"
+                                    onClick={() => {
+                                      const weightStr = prompt(`Ajustar peso para ${i.item.name} (kg):`, i.quantity.toString());
+                                      if (weightStr === null) return;
+                                      const weight = parseFloat(weightStr.replace(",", "."));
+                                      if (isNaN(weight) || weight <= 0) {
+                                        toast({ title: "Peso Inválido", variant: "destructive" });
+                                        return;
+                                      }
+                                      setCart((prev: any[]) => prev.map((item, idx) => 
+                                        idx === index ? { ...item, quantity: weight } : item
+                                      ));
+                                    }}
+                                  >
+                                    <Maximize className="w-3.5 h-3.5" />
+                                  </Button>
+                                ) : (
+                                  <>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-white/60 hover:text-white" onClick={() => removeFromCart(i.item.id)}>
+                                      <Minus className="w-3 h-3" />
+                                    </Button>
+                                    <span className="text-white font-black text-xs italic w-14 text-center">
+                                      {i.quantity}
+                                    </span>
+                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-primary hover:bg-primary/10" onClick={() => addToCart(i.item)}>
+                                      <Plus className="w-3 h-3" />
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           ))}

@@ -528,6 +528,7 @@ export default function InventoryPage() {
                       </SelectTrigger>
                       <SelectContent className="bg-[#0a0f0f] border-white/10 backdrop-blur-2xl">
                         <SelectItem value="Unidade" className="py-2 font-bold uppercase italic text-[10px] text-white">Unidade</SelectItem>
+                        <SelectItem value="kg" className="py-2 font-bold uppercase italic text-[10px] text-white">Quilo (kg)</SelectItem>
                         <SelectItem value="Bag" className="py-2 font-bold uppercase italic text-[10px] text-white">Bag</SelectItem>
                         <SelectItem value="Caixa" className="py-2 font-bold uppercase italic text-[10px] text-white">Caixa</SelectItem>
                         <SelectItem value="Pacote" className="py-2 font-bold uppercase italic text-[10px] text-white">Pacote</SelectItem>
