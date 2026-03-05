@@ -37,6 +37,8 @@ export default function InventoryPage() {
   const [salePrice, setSalePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
   const [imageUrl, setImageUrl] = useState(""); // Novo estado para imagem
+  const [rotation, setRotation] = useState(0);
+  const [imageScale, setImageScale] = useState(100);
   const [viewMode, setViewMode] = useState<"package" | "unit">("package");
   const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
 
@@ -186,6 +188,8 @@ export default function InventoryPage() {
     setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
     setImageUrl(inv.imageUrl || ""); // Carregar imagem ao editar
+    setRotation(inv.rotation || 0);
+    setImageScale(inv.imageScale || 100);
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
   };
 
@@ -200,6 +204,8 @@ export default function InventoryPage() {
     setCostPrice((inv.costPrice / 100).toString().replace('.', ','));
     setSalePrice(inv.salePrice ? (inv.salePrice / 100).toString().replace('.', ',') : "");
     setImageUrl(inv.imageUrl || ""); // Carregar imagem ao duplicar
+    setRotation(inv.rotation || 0);
+    setImageScale(inv.imageScale || 100);
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
@@ -238,6 +244,8 @@ export default function InventoryPage() {
       setCostPrice("");
       setSalePrice("");
       setImageUrl("");
+      setRotation(0);
+      setImageScale(100);
     },
     onError: (error: any) => {
       toast({ 
@@ -382,6 +390,8 @@ export default function InventoryPage() {
       costPrice: Math.round(Number(costPrice.replace(',', '.')) * 100),
       salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
       imageUrl: imageUrl || null,
+      rotation: rotation,
+      imageScale: imageScale,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
       ncm: null,
       cfop: null,
@@ -656,6 +666,30 @@ export default function InventoryPage() {
                         placeholder="5102"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Escala (%)</Label>
+                      <Input 
+                        type="number"
+                        value={imageScale} 
+                        onChange={e => setImageScale(parseInt(e.target.value) || 100)}
+                        className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
+                        placeholder="100"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Rotação</Label>
+                      <Select value={rotation.toString()} onValueChange={(v) => setRotation(parseInt(v))}>
+                        <SelectTrigger className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg">
+                          <SelectValue placeholder="0°" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0a0f0f] border-white/10">
+                          <SelectItem value="0">0°</SelectItem>
+                          <SelectItem value="90">90°</SelectItem>
+                          <SelectItem value="180">180°</SelectItem>
+                          <SelectItem value="270">270°</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -698,6 +732,9 @@ export default function InventoryPage() {
                           setCostPrice("");
                           setSalePrice("");
                           setExpiryDate("");
+                          setImageUrl("");
+                          setRotation(0);
+                          setImageScale(100);
                         }}
                       >
                         X

@@ -1137,14 +1137,22 @@ export async function registerRoutes(
       if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
       
       const { id, ...data } = req.body;
-      // Ensure id is a number if it exists and is not null/empty
-      const inventoryId = (id !== undefined && id !== null && id !== "") ? Number(id) : undefined;
-      const item = await storage.upsertInventory({ ...data, id: inventoryId });
+      
+      // Map frontend fields to database fields if necessary
+      const inventoryData = {
+        ...data,
+        id: (id !== undefined && id !== null && id !== "") ? Number(id) : undefined,
+        rotation: data.rotation || 0,
+        imageScale: data.imageScale || 100,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+      };
+
+      const item = await storage.upsertInventory(inventoryData);
       
       await storage.createInventoryLog({
         inventoryId: item.id,
         type: "in",
-        quantity: data.quantity || 0,
+        quantity: Number(data.quantity) || 0,
         reason: inventoryId ? "Update" : "Initial Stock",
         userId: user.id
       });
