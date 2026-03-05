@@ -107,8 +107,10 @@ export default function Cashier() {
                 price: invItem.salePrice || (invItem.costPrice * 1.3),
                 imageUrl: invItem.imageUrl,
                 barcode: invItem.barcode,
-                isAvailable: invItem.quantity > 0,
-                inventoryId: invItem.id
+                isAvailable: true, // Always available if in inventory, even with 0 qty for some weighable items
+                inventoryId: invItem.id,
+                unitType: invItem.unit === 'kg' ? 'kg' : 'unit',
+                unit: invItem.unit
               });
             }
           });
