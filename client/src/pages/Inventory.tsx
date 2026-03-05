@@ -360,9 +360,13 @@ export default function InventoryPage() {
   };
 
   const handleUpsert = () => {
-    if (!customName) return;
-    if (!quantity) return;
+    if (!customName) {
+      toast({ title: "Nome obrigatório", variant: "destructive" });
+      return;
+    }
 
+    // Permitir quantidade 0 ou vazia (será tratada como 0 no objeto)
+    
     // Verificar se o barcode já existe na lista local antes de enviar
     if (barcode) {
       const existing = inventoryWithNames.find(item => 
@@ -384,14 +388,14 @@ export default function InventoryPage() {
       itemType: "custom",
       customName: customName,
       barcode: barcode || null,
-      quantity: parseInt(quantity),
+      quantity: quantity ? parseFloat(quantity.toString().replace(',', '.')) : 0,
       unit: unit === "Outros" ? customUnit : unit,
-      itemsPerUnit: parseInt(itemsPerUnit),
-      costPrice: Math.round(Number(costPrice.replace(',', '.')) * 100),
-      salePrice: salePrice ? Math.round(Number(salePrice.replace(',', '.')) * 100) : null,
+      itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit.toString()) : 1,
+      costPrice: costPrice ? Math.round(Number(costPrice.toString().replace(',', '.')) * 100) : 0,
+      salePrice: salePrice ? Math.round(Number(salePrice.toString().replace(',', '.')) * 100) : null,
       imageUrl: imageUrl || null,
-      rotation: rotation,
-      imageScale: imageScale,
+      rotation: rotation || 0,
+      imageScale: imageScale || 100,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
       ncm: null,
       cfop: null,
@@ -715,9 +719,9 @@ export default function InventoryPage() {
 
                   <div className="flex items-end gap-2">
                     <Button 
-                      className="flex-1 bg-primary hover:bg-white text-white hover:text-black font-black italic uppercase h-9 transition-all active:scale-[0.98] rounded-lg text-[10px] tracking-tighter shadow-[0_0_15px_rgba(0,229,255,0.3)]" 
+                      className="flex-1 bg-primary hover:bg-white text-black font-black italic uppercase h-9 transition-all active:scale-[0.98] rounded-lg text-[10px] tracking-tighter shadow-[0_0_15px_rgba(0,229,255,0.3)]" 
                       onClick={handleUpsert}
-                      disabled={upsertMutation.isPending}
+                      disabled={upsertMutation.isPending || !customName}
                     >
                       {upsertMutation.isPending ? <Loader2 className="animate-spin h-4 w-4" /> : (editingId ? "Salvar" : "Adicionar")}
                     </Button>
