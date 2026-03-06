@@ -381,7 +381,8 @@ export default function Cashier() {
   const total = useMemo(() => {
     return cart.reduce((sum, i) => {
       const price = i.item.price;
-      return sum + Math.round(price * i.quantity);
+      const itemTotal = price * i.quantity;
+      return sum + Math.round(itemTotal);
     }, 0);
   }, [cart]);
 
@@ -855,7 +856,10 @@ function CashierContent({
                                   <div className="flex items-center gap-2">
                                     <p className="text-primary text-[10px] font-bold">R$ {((i.item.price * i.quantity) / 100).toFixed(2)}</p>
                                     <span className="text-white/20 text-[8px] font-bold uppercase italic">
-                                      {i.quantity} { (i.item as any).unitType === "kg" || (i.item as any).unit === "kg" ? "kg" : "un" } x R$ {(i.item.price / 100).toFixed(2)}
+                                      {((i.item as any).unitType === "kg" || (i.item as any).unit === "kg")
+                                        ? `${i.quantity.toFixed(3)}kg x R$ ${(i.item.price / 100).toFixed(2)}`
+                                        : `${i.quantity}un x R$ ${(i.item.price / 100).toFixed(2)}`
+                                      }
                                     </span>
                                   </div>
                                 </div>
