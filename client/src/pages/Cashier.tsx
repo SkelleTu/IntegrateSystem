@@ -127,47 +127,38 @@ export default function Cashier() {
 
   const [searchTerm, setSearchTerm] = useState("");
 
-  const addToCart = useCallback((item: MenuItem & { unitType?: string }) => {
-    if (item.unitType === "kg") {
-      const weightStr = prompt(`Informe o peso para ${item.name} (kg):`, "1.000");
-      if (weightStr === null) return;
-      const weight = parseFloat(weightStr.replace(",", "."));
-      if (isNaN(weight) || weight <= 0) {
-        toast({ title: "Peso Inválido", variant: "destructive" });
-        return;
-      }
-      setCart((prev) => {
-        const existingIdx = prev.findIndex((i) => i.item.id === item.id);
-        if (existingIdx >= 0) {
-          const newCart = [...prev];
-          const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
-          newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
-          return newCart;
-        }
-        return [...prev, { item, quantity: weight }];
-      });
+  const [weightModalOpen, setWeightModalOpen] = useState(false);
+  const [weightInputValue, setWeightInputValue] = useState("");
+  const [activeItemForWeight, setActiveItemForWeight] = useState<any>(null);
+
+  const handleWeightSubmit = () => {
+    if (!activeItemForWeight) return;
+    const weight = parseFloat(weightInputValue.replace(",", "."));
+    if (isNaN(weight) || weight <= 0) {
+      toast({ title: "Peso Inválido", variant: "destructive" });
       return;
     }
-
-    // New check for manual kg change if item is kg
-    if (item.unitType === "kg" || (item as any).unit === "kg") {
-      const weightStr = prompt(`Informe o peso para ${item.name} (kg):`, "1.000");
-      if (weightStr === null) return;
-      const weight = parseFloat(weightStr.replace(",", "."));
-      if (isNaN(weight) || weight <= 0) {
-        toast({ title: "Peso Inválido", variant: "destructive" });
-        return;
+    setCart((prev) => {
+      const existingIdx = prev.findIndex((i) => i.item.id === activeItemForWeight.id);
+      if (existingIdx >= 0) {
+        const newCart = [...prev];
+        const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
+        newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+        return newCart;
       }
-      setCart((prev) => {
-        const existingIdx = prev.findIndex((i) => i.item.id === item.id);
-        if (existingIdx >= 0) {
-          const newCart = [...prev];
-          const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
-          newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
-          return newCart;
-        }
-        return [...prev, { item, quantity: weight }];
-      });
+      return [...prev, { item: activeItemForWeight, quantity: weight }];
+    });
+    setWeightModalOpen(false);
+    setWeightInputValue("");
+    setActiveItemForWeight(null);
+  };
+
+  const addToCart = useCallback((item: MenuItem & { unitType?: string }) => {
+    // Check if it's a weighable item
+    if (item.unitType === "kg" || (item as any).unit === "kg") {
+      setActiveItemForWeight(item);
+      setWeightInputValue("1.000");
+      setWeightModalOpen(true);
       return;
     }
 
@@ -182,50 +173,55 @@ export default function Cashier() {
     });
   }, [toast]);
 
-  const filteredMenuItems = useMemo(() => {
-    if (!menuItems) return [];
-    
-    const normalizedItems = menuItems.map(item => {
-      let img = (item as any).imageUrl || (item as any).image_url;
-      if (img && typeof img === 'string' && (img.includes("images.unsplash.com") || img.includes("photo-1586769852836-bc069f19e1b6"))) {
-        img = null;
-      }
-      return { 
-        ...item, 
-        imageUrl: img,
-        rotation: (item as any).rotation ?? 0,
-        imageScale: (item as any).imageScale ?? 100
-      };
-    });
-
-    if (!searchTerm) return normalizedItems;
-
-    const term = searchTerm.toLowerCase();
-    return normalizedItems.filter(item => 
-      (item.name && item.name.toLowerCase().includes(term)) ||
-      (item.id && item.id.toString() === term) ||
-      (item.barcode && item.barcode.toLowerCase() === term)
-    );
-  }, [menuItems, searchTerm]);
-
   useEffect(() => {
-    if (searchTerm && filteredMenuItems.length === 1) {
-      const item = filteredMenuItems[0];
+    if (searchTerm) {
       const term = searchTerm.toLowerCase();
       
-      if (
-        (item.barcode && item.barcode.toLowerCase() === term) ||
-        (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
-      ) {
-        addToCart(item as any);
-        setSearchTerm("");
-        toast({ 
-          title: "Produto BIPADO", 
-          description: `${item.name} adicionado ao carrinho.` 
-        });
+      // Handle weighed labels (standard EAN-13 for variable weight usually starts with '2')
+      // Pattern: 2 + 6 digits (product code) + 5 digits (weight/price) + 1 check digit
+      if (term.length === 13 && term.startsWith("2")) {
+        const productCode = term.substring(1, 7);
+        const weightPart = term.substring(7, 12);
+        const weight = parseFloat(weightPart) / 1000; // Assuming 00000 is grams
+
+        const item = menuItems?.find(m => 
+          (m.barcode && m.barcode.includes(productCode)) || 
+          (m.id.toString().padStart(6, '0') === productCode)
+        );
+
+        if (item) {
+          setCart((prev) => {
+            const existingIdx = prev.findIndex((i) => i.item.id === item.id);
+            if (existingIdx >= 0) {
+              const newCart = [...prev];
+              const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
+              newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+              return newCart;
+            }
+            return [...prev, { item: item as any, quantity: weight }];
+          });
+          setSearchTerm("");
+          toast({ title: "Etiqueta Pesada", description: `${item.name} - ${weight.toFixed(3)}kg` });
+          return;
+        }
+      }
+
+      if (filteredMenuItems.length === 1) {
+        const item = filteredMenuItems[0];
+        if (
+          (item.barcode && item.barcode.toLowerCase() === term) ||
+          (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
+        ) {
+          addToCart(item as any);
+          setSearchTerm("");
+          toast({ 
+            title: "Produto BIPADO", 
+            description: `${item.name} adicionado ao carrinho.` 
+          });
+        }
       }
     }
-  }, [searchTerm, filteredMenuItems, addToCart, toast]);
+  }, [searchTerm, filteredMenuItems, menuItems, addToCart, toast]);
 
   const openMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -562,6 +558,12 @@ export default function Cashier() {
       updateProductAdjustmentMutation={updateProductAdjustmentMutation}
       selectedProductForAdjust={selectedProductForAdjust}
       adjustProductModalOpen={adjustProductModalOpen}
+      weightModalOpen={weightModalOpen}
+      setWeightModalOpen={setWeightModalOpen}
+      weightInputValue={weightInputValue}
+      setWeightInputValue={setWeightInputValue}
+      activeItemForWeight={activeItemForWeight}
+      handleWeightSubmit={handleWeightSubmit}
     />
   );
 }
@@ -574,7 +576,9 @@ function CashierContent({
   customerInfo, setCustomerInfo, showFiscalFields, setShowFiscalFields, 
   finalizeSale, saleMutation, remainingTotal,
   setSelectedProductForAdjust, setAdjustProductModalOpen,
-  updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen
+  updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen,
+  weightModalOpen, setWeightModalOpen, weightInputValue, setWeightInputValue,
+  activeItemForWeight, handleWeightSubmit
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -976,6 +980,36 @@ function CashierContent({
           </div>
         </div>
       </div>
+
+      {/* Weight Input Modal */}
+      <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary">
+              {activeItemForWeight?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-widest text-white/40">Informe o Peso (kg)</Label>
+              <Input
+                autoFocus
+                value={weightInputValue}
+                onChange={(e) => setWeightInputValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleWeightSubmit()}
+                className="bg-black border-white/10 h-14 text-3xl font-black text-center text-primary"
+                placeholder="0.000"
+              />
+            </div>
+            <Button 
+              className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)]"
+              onClick={handleWeightSubmit}
+            >
+              Confirmar Peso
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-3xl shadow-2xl z-[999]">
