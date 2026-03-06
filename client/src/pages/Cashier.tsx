@@ -131,6 +131,32 @@ export default function Cashier() {
   const [weightInputValue, setWeightInputValue] = useState("");
   const [activeItemForWeight, setActiveItemForWeight] = useState<any>(null);
 
+  const filteredMenuItems = useMemo(() => {
+    if (!menuItems) return [];
+    
+    const normalizedItems = menuItems.map(item => {
+      let img = (item as any).imageUrl || (item as any).image_url;
+      if (img && typeof img === 'string' && (img.includes("images.unsplash.com") || img.includes("photo-1586769852836-bc069f19e1b6"))) {
+        img = null;
+      }
+      return { 
+        ...item, 
+        imageUrl: img,
+        rotation: (item as any).rotation ?? 0,
+        imageScale: (item as any).imageScale ?? 100
+      };
+    });
+
+    if (!searchTerm) return normalizedItems;
+
+    const term = searchTerm.toLowerCase();
+    return normalizedItems.filter(item => 
+      (item.name && item.name.toLowerCase().includes(term)) ||
+      (item.id && item.id.toString() === term) ||
+      (item.barcode && item.barcode.toLowerCase() === term)
+    );
+  }, [menuItems, searchTerm]);
+
   const handleWeightSubmit = () => {
     if (!activeItemForWeight) return;
     const weight = parseFloat(weightInputValue.replace(",", "."));
@@ -174,7 +200,7 @@ export default function Cashier() {
   }, [toast]);
 
   useEffect(() => {
-    if (searchTerm) {
+    if (searchTerm && filteredMenuItems) {
       const term = searchTerm.toLowerCase();
       
       // Handle weighed labels (standard EAN-13 for variable weight usually starts with '2')
@@ -184,7 +210,7 @@ export default function Cashier() {
         const weightPart = term.substring(7, 12);
         const weight = parseFloat(weightPart) / 1000; // Assuming 00000 is grams
 
-        const item = menuItems?.find(m => 
+        const item = menuItems?.find((m: any) => 
           (m.barcode && m.barcode.includes(productCode)) || 
           (m.id.toString().padStart(6, '0') === productCode)
         );
