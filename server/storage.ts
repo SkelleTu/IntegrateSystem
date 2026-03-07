@@ -143,6 +143,8 @@ export interface IStorage {
   getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]>;
   restockInventory(id: number, data: any): Promise<Inventory>;
   updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem>;
+  getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined>;
+  getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -582,6 +584,18 @@ export class DatabaseStorage implements IStorage {
   async getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined> {
     this.logAction(`Busca item por código: ${barcode}`);
     const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode)).limit(1);
+    return item;
+  }
+
+  async getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined> {
+    this.logAction(`Busca item estoque por código balança: ${codigoBalanca}`);
+    const [item] = await db.select().from(inventory).where(eq(inventory.codigoBalanca, codigoBalanca)).limit(1);
+    return item;
+  }
+
+  async getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined> {
+    this.logAction(`Busca item menu por código balança: ${codigoBalanca}`);
+    const [item] = await db.select().from(menuItems).where(eq(menuItems.codigoBalanca, codigoBalanca)).limit(1);
     return item;
   }
 

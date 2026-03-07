@@ -206,7 +206,7 @@ export default function Cashier() {
       
       // Handle weighed labels (standard EAN-13 for variable weight usually starts with '2')
       // Pattern from Urano POP-S: 20 + 4 digits (product code/PLU) + 5 digits (weight in grams) + 1 check digit
-      if (term.length === 13 && term.startsWith("20")) {
+      if (term.length === 13 && (term.startsWith("20") || term.startsWith("21"))) {
         const productCode = term.substring(2, 6);
         const weightPart = term.substring(6, 11);
         const weight = parseFloat(weightPart) / 1000; // Grams to Kg

@@ -197,6 +197,29 @@ export async function registerRoutes(
     });
   });
 
+  // Inventory & Menu Search Routes
+  app.get("/api/inventory/search", isAuthenticated, async (req, res) => {
+    const { barcode, codigoBalanca } = req.query;
+    if (barcode) {
+      const item = await storage.getInventoryItemByBarcode(barcode as string);
+      return res.json(item || null);
+    }
+    if (codigoBalanca) {
+      const item = await storage.getInventoryItemByCodigoBalanca(codigoBalanca as string);
+      return res.json(item || null);
+    }
+    res.status(400).json({ message: "Barcode or codigoBalanca required" });
+  });
+
+  app.get("/api/menu/search", isAuthenticated, async (req, res) => {
+    const { codigoBalanca } = req.query;
+    if (codigoBalanca) {
+      const item = await storage.getMenuItemByCodigoBalanca(codigoBalanca as string);
+      return res.json(item || null);
+    }
+    res.status(400).json({ message: "codigoBalanca required" });
+  });
+
   // Auth Routes
   app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
     const user = req.user as any;
