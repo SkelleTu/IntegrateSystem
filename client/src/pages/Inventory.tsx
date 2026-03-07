@@ -33,6 +33,9 @@ export default function InventoryPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
 
   const [customUnit, setCustomUnit] = useState("");
+  const [codigoBalanca, setCodigoBalanca] = useState("");
+  const [ncm, setNcm] = useState("");
+  const [cfop, setCfop] = useState("");
 
   const [salePrice, setSalePrice] = useState("");
   const [costPrice, setCostPrice] = useState("");
@@ -182,6 +185,7 @@ export default function InventoryPage() {
     setEditingId(inv.id);
     setCustomName(inv.name || inv.customName || "");
     setBarcode(inv.barcode || "");
+    setCodigoBalanca(inv.codigoBalanca || "");
     setQuantity(inv.quantity.toString());
     setUnit(inv.unit || "Unidade");
     setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
@@ -190,6 +194,8 @@ export default function InventoryPage() {
     setImageUrl(inv.imageUrl || ""); // Carregar imagem ao editar
     setRotation(inv.rotation || 0);
     setImageScale(inv.imageScale || 100);
+    setNcm(inv.ncm || "");
+    setCfop(inv.cfop || "");
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
   };
 
@@ -198,6 +204,7 @@ export default function InventoryPage() {
     setEditingId(null);
     setCustomName(`${inv.name} (Cópia)`);
     setBarcode("");
+    setCodigoBalanca("");
     setQuantity(inv.quantity.toString());
     setUnit(inv.unit || "Unidade");
     setItemsPerUnit(inv.itemsPerUnit?.toString() || "1");
@@ -206,6 +213,8 @@ export default function InventoryPage() {
     setImageUrl(inv.imageUrl || ""); // Carregar imagem ao duplicar
     setRotation(inv.rotation || 0);
     setImageScale(inv.imageScale || 100);
+    setNcm(inv.ncm || "");
+    setCfop(inv.cfop || "");
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
@@ -237,6 +246,7 @@ export default function InventoryPage() {
       setSelectedItem(null);
       setCustomName("");
       setBarcode("");
+      setCodigoBalanca("");
       setEditingId(null);
       setIsCustomMode(false);
       setQuantity("");
@@ -388,6 +398,7 @@ export default function InventoryPage() {
       itemType: "custom",
       customName: customName,
       barcode: barcode || null,
+      codigoBalanca: codigoBalanca || null,
       quantity: quantity ? parseFloat(quantity.toString().replace(',', '.')) : 0,
       unit: unit === "Outros" ? customUnit : unit,
       itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit.toString()) : 1,
@@ -397,8 +408,8 @@ export default function InventoryPage() {
       rotation: rotation || 0,
       imageScale: imageScale || 100,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : null,
-      ncm: null,
-      cfop: null,
+      ncm: ncm || null,
+      cfop: cfop || null,
     };
 
     console.log("Saving inventory item:", itemData);
@@ -620,6 +631,16 @@ export default function InventoryPage() {
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Cód. Balança (PLU)</Label>
+                    <Input 
+                      value={codigoBalanca} 
+                      onChange={e => setCodigoBalanca(e.target.value)} 
+                      className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
+                      placeholder="EX: 0123"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Custo (R$)</Label>
                     <Input 
                       type="number" 
@@ -656,8 +677,8 @@ export default function InventoryPage() {
                     <div className="space-y-1">
                       <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">NCM</Label>
                       <Input 
-                        value={customName || ""} 
-                        onChange={e => setCustomName(e.target.value)}
+                        value={ncm} 
+                        onChange={e => setNcm(e.target.value)}
                         className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
                         placeholder="22021000"
                       />
@@ -665,8 +686,8 @@ export default function InventoryPage() {
                     <div className="space-y-1">
                       <Label className="text-[8px] font-bold text-zinc-500 uppercase tracking-widest pl-1">CFOP</Label>
                       <Input 
-                        value={barcode || ""} 
-                        onChange={e => setBarcode(e.target.value)}
+                        value={cfop} 
+                        onChange={e => setCfop(e.target.value)}
                         className="bg-black/40 border-white/10 h-8 text-[10px] text-white font-bold rounded-lg"
                         placeholder="5102"
                       />

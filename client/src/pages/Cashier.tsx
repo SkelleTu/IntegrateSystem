@@ -107,6 +107,7 @@ export default function Cashier() {
                 price: invItem.salePrice || (invItem.costPrice * 1.3),
                 imageUrl: invItem.imageUrl,
                 barcode: invItem.barcode,
+                codigoBalanca: invItem.codigoBalanca,
                 isAvailable: true, // Always available if in inventory, even with 0 qty for some weighable items
                 inventoryId: invItem.id,
                 unitType: invItem.unit === 'kg' ? 'kg' : 'unit',
@@ -204,15 +205,15 @@ export default function Cashier() {
       const term = searchTerm.toLowerCase();
       
       // Handle weighed labels (standard EAN-13 for variable weight usually starts with '2')
-      // Pattern: 2 + 6 digits (product code) + 5 digits (weight/price) + 1 check digit
-      if (term.length === 13 && term.startsWith("2")) {
-        const productCode = term.substring(1, 7);
-        const weightPart = term.substring(7, 12);
-        const weight = parseFloat(weightPart) / 1000; // Assuming 00000 is grams
+      // Pattern from Urano POP-S: 20 + 4 digits (product code/PLU) + 5 digits (weight in grams) + 1 check digit
+      if (term.length === 13 && term.startsWith("20")) {
+        const productCode = term.substring(2, 6);
+        const weightPart = term.substring(6, 11);
+        const weight = parseFloat(weightPart) / 1000; // Grams to Kg
 
         const item = menuItems?.find((m: any) => 
-          (m.barcode && m.barcode.includes(productCode)) || 
-          (m.id.toString().padStart(6, '0') === productCode)
+          (m.codigoBalanca === productCode) ||
+          (m.codigoBalanca === parseInt(productCode).toString())
         );
 
         if (item) {
@@ -227,12 +228,12 @@ export default function Cashier() {
             return [...prev, { item: item as any, quantity: weight }];
           });
           setSearchTerm("");
-          toast({ title: "Etiqueta Pesada", description: `${item.name} - ${weight.toFixed(3)}kg` });
+          toast({ title: "Etiqueta Balança", description: `${item.name} - ${weight.toFixed(3)}kg` });
           return;
         }
       }
 
-      if (filteredMenuItems.length === 1) {
+      if (filteredMenuItems && filteredMenuItems.length === 1) {
         const item = filteredMenuItems[0];
         if (
           (item.barcode && item.barcode.toLowerCase() === term) ||

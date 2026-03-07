@@ -601,13 +601,25 @@ export class DatabaseStorage implements IStorage {
 
   async upsertInventory(data: any): Promise<Inventory> {
     this.logAction(`Cadastro/Atualização estoque: ${data.customName || data.itemId}`);
+    
+    const { id, ...itemData } = data;
+    const itemToUpsert = {
+      ...itemData,
+      quantity: itemData.quantity !== undefined && itemData.quantity !== "" ? parseFloat(itemData.quantity) : 0,
+      itemsPerUnit: itemData.itemsPerUnit ? parseInt(itemData.itemsPerUnit) : 1,
+      expiryDate: itemData.expiryDate ? new Date(itemData.expiryDate) : null,
+      updatedAt: new Date(),
+      codigoBalanca: itemData.codigoBalanca || null,
+      ncm: itemData.ncm || null,
+      cfop: itemData.cfop || null,
+    };
+
     return await dualWrite(async (database) => {
-      const { id, ...itemData } = data;
       if (id) {
         const [existing] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
         if (existing) {
           const [updated] = await database.update(inventory)
-            .set({ ...itemData, updatedAt: new Date() })
+            .set(itemToUpsert)
             .where(eq(inventory.id, id))
             .returning();
           return updated;
@@ -623,14 +635,16 @@ export class DatabaseStorage implements IStorage {
           
         if (existing) {
           const [updated] = await database.update(inventory)
-            .set({ ...itemData, updatedAt: new Date() })
+            .set(itemToUpsert)
             .where(eq(inventory.id, existing.id))
             .returning();
           return updated;
         }
       }
 
-      const [inserted] = await database.insert(inventory).values({ ...itemData, updatedAt: new Date() }).returning();
+      const [inserted] = await database.insert(inventory)
+        .values(itemToUpsert)
+        .returning();
       return inserted;
     });
   }
