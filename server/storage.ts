@@ -349,7 +349,7 @@ export class DatabaseStorage implements IStorage {
     const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
     const inv = await db.select().from(inventory);
     
-    // Only return items that exist in inventory OR are 'Coca-Cola'
+    // Filter items based on inventory or specific rules
     return (items as any[]).filter((item: any) => 
       item.name === 'Coca-Cola' || 
       (inv as any[]).some((i: any) => i.itemId === item.id && i.itemType === 'product')
