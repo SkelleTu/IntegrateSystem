@@ -1,0 +1,217 @@
+IMPLEMENTAÇÃO DE LEITURA DE CÓDIGO DE BARRAS DE BALANÇA (URANO POP-S)
+
+OBJETIVO
+Implementar no sistema de estoque e no caixa a interpretação automática de códigos de barras gerados por balanças etiquetadoras como a Urano POP-S.
+
+Essas balanças imprimem etiquetas com código EAN-13 contendo:
+- identificação do produto
+- peso
+- dígito verificador
+
+O sistema precisa interpretar esses números quando o leitor de código de barras fizer a leitura no caixa.
+
+---------------------------------------------------------------------
+
+PADRÃO DE CÓDIGO DE BARRAS
+
+Formato comum utilizado por balanças:
+
+20PPPPVVVVVC
+
+ou
+
+2PPPPVVVVVVC
+
+Estrutura:
+
+20 = prefixo indicando produto pesável  
+PPPP = código do produto na balança (PLU)  
+VVVVV = peso ou valor codificado  
+C = dígito verificador
+
+Exemplo de código de barras:
+
+2001234007508
+
+Interpretação:
+
+prefixo = 20  
+produto = 0123  
+peso = 00750  
+dígito verificador = 8
+
+Peso real:
+
+0.750 kg
+
+---------------------------------------------------------------------
+
+ESTRUTURA NECESSÁRIA NO BANCO DE DADOS
+
+Tabela produtos:
+
+id
+nome
+codigo_balanca
+preco_kg
+tipo_produto
+
+Exemplo de registro:
+
+id: 12
+nome: Picanha
+codigo_balanca: 0123
+preco_kg: 79.90
+tipo_produto: pesavel
+
+---------------------------------------------------------------------
+
+LÓGICA DO CAIXA
+
+Quando o leitor bipar um código de barras:
+
+1. Sistema recebe o número completo
+
+exemplo:
+2001234007508
+
+2. Verificar prefixo
+
+if codigo começa com "20"
+→ tratar como produto de balança
+
+3. Extrair partes do código
+
+prefixo = codigo[0:2]
+produto = codigo[2:6]
+peso = codigo[6:11]
+
+Resultado:
+
+produto = 0123
+peso = 00750
+
+4. Converter peso
+
+peso_real = peso / 1000
+
+Resultado:
+
+0.750 kg
+
+5. Buscar produto no banco
+
+SELECT * FROM produtos
+WHERE codigo_balanca = '0123'
+
+6. Calcular valor
+
+valor = peso_real * preco_kg
+
+Exemplo:
+
+0.750 × 79.90 = 59.92
+
+7. Adicionar item ao carrinho
+
+Item exibido no caixa:
+
+Produto: Picanha
+Peso: 0.750 kg
+Preço/kg: 79.90
+Total: 59.92
+
+---------------------------------------------------------------------
+
+FUNÇÃO DE INTERPRETAÇÃO DO CÓDIGO
+
+Pseudo código:
+
+function interpretarCodigoBalanca(codigo) {
+
+  if (codigo.startsWith("20")) {
+
+    const codigoProduto = codigo.substring(2,6)
+    const peso = codigo.substring(6,11)
+
+    const pesoKg = parseInt(peso) / 1000
+
+    return {
+      codigoProduto,
+      pesoKg
+    }
+
+  }
+
+  return null
+}
+
+---------------------------------------------------------------------
+
+INTEGRAÇÃO NO FLUXO DO CAIXA
+
+Ao ler código de barras:
+
+if codigo começa com "20"
+    interpretar como produto de balança
+    buscar produto pelo codigo_balanca
+    calcular peso e valor
+    adicionar ao carrinho
+else
+    tratar como produto normal EAN
+
+---------------------------------------------------------------------
+
+CONFIGURAÇÃO NA BALANÇA
+
+Na balança deve ser configurado o PLU (Price Look Up).
+
+Exemplo:
+
+PLU 123 = Picanha
+
+O código configurado na balança deve corresponder ao campo:
+
+codigo_balanca no sistema.
+
+Se o PLU for 123, no sistema usar:
+
+codigo_balanca = 0123
+
+---------------------------------------------------------------------
+
+FLUXO COMPLETO
+
+Balança pesa produto
+↓
+Balança imprime etiqueta com código de barras
+↓
+Cliente leva ao caixa
+↓
+Operador passa no leitor
+↓
+Sistema recebe número
+↓
+Sistema identifica prefixo de produto pesável
+↓
+Extrai código do produto e peso
+↓
+Busca produto no estoque
+↓
+Calcula preço com base no peso
+↓
+Adiciona item ao carrinho
+
+---------------------------------------------------------------------
+
+IMPORTANTE
+
+Não é necessária integração direta com a balança.
+Não é necessário driver ou comunicação serial.
+A integração acontece exclusivamente pela leitura do código de barras da etiqueta.
+
+---------------------------------------------------------------------
+
+RESULTADO FINAL
+
+O sistema passa a entender automaticamente produtos pesáveis vindos da balança Urano POP-S e calcular o valor correto no caixa com base no peso impresso na etiqueta.
