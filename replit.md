@@ -39,6 +39,16 @@ Sistema de Ponto de Venda (PDV), Gestão de Estoque e Serviços para Padarias e 
 - `client/src/pages/Cashier.tsx`: Integração do scanner no caixa
 - `server/storage.ts`: Métodos de busca por `codigoBalanca`
 
+## Inventário de Produtos
+
+### Produtos Atuais (Sincronizados - 09/03/2026)
+- **ID 15**: Pão Francês - R$ 10.00
+- **ID 16**: Coca Cola 2L - R$ 12.00
+
+**Nota**: Banco completamente limpo em 09/03/2026. Removidos 12 produtos duplicados de testes anteriores (cortes de cabelo, pães artesanais, bebidas quentes, doces). Agora apenas estes 2 produtos existem na plataforma e devem aparecer no caixa.
+
+**Sincronização**: Banco local (SQLite) e remoto (Turso) sincronizados.
+
 ## Próximos Passos (Etapa por Etapa)
 
 1. **Implementar Contingência Offline**: Detectar falhas de rede e marcar `tpEmis = 9`.
