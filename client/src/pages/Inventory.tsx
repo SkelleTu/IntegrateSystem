@@ -16,6 +16,20 @@ import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import Fuse from "fuse.js";
 
+// Helper function to extract PLU code from scale barcode
+function extractPLUFromBarcode(barcode: string): string | null {
+  const normalized = barcode.trim();
+  if (normalized.length === 13 && (normalized.startsWith("20") || normalized.startsWith("21"))) {
+    try {
+      const pluCode = normalized.substring(2, 6);
+      return pluCode;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export default function InventoryPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -218,6 +232,15 @@ export default function InventoryPage() {
     setExpiryDate(inv.expiryDate ? format(new Date(inv.expiryDate), "yyyy-MM-dd") : "");
     window.scrollTo({ top: 0, behavior: 'smooth' });
     toast({ title: "Copiado", description: "As informações foram copiadas para o formulário. Clique em 'Adicionar' para salvar." });
+  };
+
+  const handleBarcodeChange = (value: string) => {
+    setBarcode(value);
+    // Auto-extract PLU code from scale barcode
+    const plu = extractPLUFromBarcode(value);
+    if (plu) {
+      setCodigoBalanca(plu);
+    }
   };
 
   const handleBarcodeSubmit = (e: React.KeyboardEvent) => {
@@ -623,7 +646,7 @@ export default function InventoryPage() {
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Código de Barras</Label>
                     <Input 
                       value={barcode} 
-                      onChange={e => setBarcode(e.target.value)} 
+                      onChange={e => handleBarcodeChange(e.target.value)} 
                       onKeyDown={handleBarcodeSubmit}
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="BIPA O CÓDIGO..."
@@ -722,7 +745,7 @@ export default function InventoryPage() {
                     <Label className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Código / ID</Label>
                     <Input 
                       value={barcode} 
-                      onChange={e => setBarcode(e.target.value)} 
+                      onChange={e => handleBarcodeChange(e.target.value)} 
                       className="bg-black/40 border-white/10 h-9 text-xs text-white font-bold focus:border-primary/50 transition-all rounded-lg"
                       placeholder="CÓDIGO..."
                     />

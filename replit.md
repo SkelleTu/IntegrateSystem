@@ -36,9 +36,16 @@ Sistema de Ponto de Venda (PDV), Gestão de Estoque e Serviços para Padarias e 
 7. Se o barcode não tiver peso codificado, mostra modal para entrada manual
 
 #### Mudança Recente (09/03/2026)
-**Problema**: Ao escanear código de barras de produto pesável (ex: Catarina Banana), o sistema pedia o peso manualmente.
+**Problema 1**: Ao escanear código de barras de produto pesável (ex: Catarina Banana), o sistema pedia o peso manualmente.
+**Solução 1**: Agora o sistema tenta extrair o peso automaticamente do barcode antes de abrir o modal. Se o barcode estiver no formato Urano POP-S (20PPPPVVVVVC), o peso é extraído e o produto é adicionado ao carrinho sem confirmação do operador.
 
-**Solução**: Agora o sistema tenta extrair o peso automaticamente do barcode antes de abrir o modal. Se o barcode estiver no formato Urano POP-S (20PPPPVVVVVC), o peso é extraído e o produto é adicionado ao carrinho sem confirmação do operador.
+**Problema 2**: Ao escanear uma segunda etiqueta da mesma Catarina (com peso/validade diferentes), o sistema não encontrava o produto porque buscava pelo barcode exato, não pelo PLU code.
+**Solução 2**: 
+- Agora o sistema busca produtos pelo `codigoBalanca` (PLU code extraído do barcode)
+- Cada etiqueta de balança com peso diferente terá um barcode diferente, mas o PLU code (dígitos 2-6) será o mesmo
+- Adicionado `extractPLUFromBarcode()` que extrai automaticamente o PLU code quando um barcode é inserido
+- Campo `codigoBalanca` agora é auto-preenchido quando você insere um barcode de balança Urano (20/21 + 11 dígitos)
+- Catarina Banana atualizada com codigoBalanca = "3780"
 
 #### Arquivos Relacionados
 - `shared/barcodeParser.ts`: Parser e validador de códigos de barras de balança
