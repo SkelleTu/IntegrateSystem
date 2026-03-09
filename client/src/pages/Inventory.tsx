@@ -17,10 +17,14 @@ import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import Fuse from "fuse.js";
 
 // Helper function to extract PLU code from scale barcode
+// Supports both 13-digit (EAN-13) and 20-digit Urano formats
 function extractPLUFromBarcode(barcode: string): string | null {
   const normalized = barcode.trim();
-  if (normalized.length === 13 && (normalized.startsWith("20") || normalized.startsWith("21"))) {
+  // Accept both 13-digit and 20-digit formats starting with 20/21
+  if ((normalized.startsWith("20") || normalized.startsWith("21")) && 
+      (normalized.length === 13 || normalized.length === 20)) {
     try {
+      // PLU code is always at positions 2-6
       const pluCode = normalized.substring(2, 6);
       return pluCode;
     } catch {

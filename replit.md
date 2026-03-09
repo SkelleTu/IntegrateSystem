@@ -35,23 +35,36 @@ Sistema de Ponto de Venda (PDV), Gestão de Estoque e Serviços para Padarias e 
 6. Adiciona automaticamente ao carrinho com peso extraído do barcode
 7. Se o barcode não tiver peso codificado, mostra modal para entrada manual
 
-#### Mudança Recente (09/03/2026)
+#### Mudança Recente (09/03/2026) - VERSÃO 2.0 ✓
 **Problema 1**: Ao escanear código de barras de produto pesável (ex: Catarina Banana), o sistema pedia o peso manualmente.
-**Solução 1**: Agora o sistema tenta extrair o peso automaticamente do barcode antes de abrir o modal. Se o barcode estiver no formato Urano POP-S (20PPPPVVVVVC), o peso é extraído e o produto é adicionado ao carrinho sem confirmação do operador.
+**Solução 1**: Sistema tenta extrair peso automaticamente do barcode antes de abrir o modal.
 
-**Problema 2**: Ao escanear uma segunda etiqueta da mesma Catarina (com peso/validade diferentes), o sistema não encontrava o produto porque buscava pelo barcode exato, não pelo PLU code.
-**Solução 2**: 
-- Agora o sistema busca produtos pelo `codigoBalanca` (PLU code extraído do barcode)
-- Cada etiqueta de balança com peso diferente terá um barcode diferente, mas o PLU code (dígitos 2-6) será o mesmo
-- Adicionado `extractPLUFromBarcode()` que extrai automaticamente o PLU code quando um barcode é inserido
-- Campo `codigoBalanca` agora é auto-preenchido quando você insere um barcode de balança Urano (20/21 + 11 dígitos)
-- Catarina Banana atualizada com codigoBalanca = "3780"
+**Problema 2**: Ao escanear segunda etiqueta da mesma Catarina (peso/validade diferentes), não encontrava produto.
+**Solução 2 - IMPLEMENTADA**: 
+- ✓ Barcode agora suporta ambos os formatos: 13 dígitos (EAN-13 Urano) e **20 dígitos** (formato Catarina)
+- ✓ PLU code sempre extraído das posições 2-6: "203780..." → "3780"
+- ✓ Cada etiqueta com peso diferente = barcode diferente, mas PLU code igual = MESMO PRODUTO
+- ✓ Catarina Banana: barcode "20378000170282301260" → codigoBalanca "3780"
+- ✓ Busca por PLU code em vez de barcode exato
+- ✓ Auto-extração de PLU em Inventory.tsx ao inserir barcode
+- ✓ Parser suporta múltiplos formatos Urano
 
-#### Arquivos Relacionados
-- `shared/barcodeParser.ts`: Parser e validador de códigos de barras de balança
-- `shared/schema.ts`: Campo `codigoBalanca` na tabela `inventory`
-- `client/src/pages/Cashier.tsx`: Integração do scanner no caixa
-- `server/storage.ts`: Métodos de busca por `codigoBalanca`
+**Teste**: Barcode "20378000170282301260" → Extrai PLU "3780" ✓
+
+#### Arquivos Modificados (09/03/2026)
+- `client/src/pages/Cashier.tsx`: Parser suporta ambos 13 e 20 dígitos, extrai peso
+- `client/src/pages/Inventory.tsx`: Auto-extração de PLU ao inserir barcode
+- `replit.md`: Documentação das mudanças
+
+#### Como Usar
+1. **Cadastrar Produto**: Insira barcode Urano (20378... com 20 dígitos)
+   - PLU code "3780" será auto-extraído
+2. **Scanear Etiqueta**: Bipa qualquer etiqueta do mesmo produto
+   - Sistema busca pelo PLU code (não pelo barcode exato)
+   - Peso é extraído automaticamente da etiqueta
+3. **Múltiplas Etiquetas**: Cada etiqueta com peso diferente funciona
+   - Mesmo PLU code = mesmo produto
+   - Pesos diferentes = quantidades diferentes no carrinho
 
 ## Inventário de Produtos
 

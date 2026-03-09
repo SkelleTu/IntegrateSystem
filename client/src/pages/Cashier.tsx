@@ -4,24 +4,70 @@ import { MenuItem, CashRegister, Inventory, Nfce, FiscalSettings } from "@shared
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { printNFCe } from "@/lib/escpos";
 
-// Barcode parser for Urano POP-S scale labels (Format: 20PPPPVVVVVC)
+// Barcode parser for Urano scale labels
+// Supports multiple formats:
+// - Standard EAN-13: 20PPPPVVVVVC (13 digits)
+// - Extended: 20PPPPXXXXXXXXXX (20 digits where PPPP = PLU code at position 2-6)
 function parseScaleBarcode(barcode: string) {
   const normalized = barcode.trim();
-  if (normalized.length !== 13 || (!normalized.startsWith("20") && !normalized.startsWith("21"))) {
+  
+  // Must start with 20 or 21 and be at least 13 characters
+  if ((!normalized.startsWith("20") && !normalized.startsWith("21")) || normalized.length < 13) {
     return null;
   }
+  
   try {
+    // Extract PLU code (always at positions 2-6)
     const productCode = normalized.substring(2, 6);
-    const weightPart = normalized.substring(6, 11);
-    const checkDigit = normalized.substring(11, 12);
-    const weightGrams = parseInt(weightPart, 10);
+    
+    // For 13-char format: weight is at positions 6-11
+    if (normalized.length === 13) {
+      const weightPart = normalized.substring(6, 11);
+      const checkDigit = normalized.substring(11, 12);
+      const weightGrams = parseInt(weightPart, 10);
+      return {
+        isScaleBarcode: true,
+        productCode,
+        weightGrams,
+        weightKg: weightGrams / 1000,
+        checkDigit,
+        rawBarcode: normalized
+      };
+    }
+    
+    // For 20-char format: try to extract weight from various positions
+    // Format appears to be: 20 + PPPP + WEIGHT_INFO + CHECKSUM
+    // Try positions 6-11 first (standard), then 5-10
+    let weightGrams = 0;
+    let foundWeight = false;
+    
+    // Try standard position (6-11)
+    const potentialWeight1 = normalized.substring(6, 11);
+    const weight1 = parseInt(potentialWeight1, 10);
+    if (!isNaN(weight1) && weight1 > 0 && weight1 < 100000) {
+      weightGrams = weight1;
+      foundWeight = true;
+    }
+    
+    // If not found, try extracting from other positions
+    if (!foundWeight) {
+      // Try positions 5-10
+      const potentialWeight2 = normalized.substring(5, 10);
+      const weight2 = parseInt(potentialWeight2, 10);
+      if (!isNaN(weight2) && weight2 > 0 && weight2 < 100000) {
+        weightGrams = weight2;
+        foundWeight = true;
+      }
+    }
+    
     return {
       isScaleBarcode: true,
       productCode,
-      weightGrams,
-      weightKg: weightGrams / 1000,
-      checkDigit,
-      rawBarcode: normalized
+      weightGrams: foundWeight ? weightGrams : 0,
+      weightKg: foundWeight ? weightGrams / 1000 : 0,
+      checkDigit: normalized.substring(normalized.length - 1),
+      rawBarcode: normalized,
+      format: normalized.length === 13 ? "ean13" : "extended"
     };
   } catch {
     return null;
@@ -30,7 +76,9 @@ function parseScaleBarcode(barcode: string) {
 
 function isLikelyScaleBarcode(barcode: string): boolean {
   const normalized = barcode.trim();
-  return normalized.length === 13 && (normalized.startsWith("20") || normalized.startsWith("21"));
+  // Accept both 13-digit (EAN-13) and 20-digit formats starting with 20/21
+  return (normalized.startsWith("20") || normalized.startsWith("21")) && 
+         (normalized.length === 13 || normalized.length === 20);
 }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
