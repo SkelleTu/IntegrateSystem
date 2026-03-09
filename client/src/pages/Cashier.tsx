@@ -3,7 +3,35 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MenuItem, CashRegister, Inventory, Nfce, FiscalSettings } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { printNFCe } from "@/lib/escpos";
-import { parseScaleBarcode, isLikelyScaleBarcode } from "@shared/barcodeParser";
+
+// Barcode parser for Urano POP-S scale labels (Format: 20PPPPVVVVVC)
+function parseScaleBarcode(barcode: string) {
+  const normalized = barcode.trim();
+  if (normalized.length !== 13 || (!normalized.startsWith("20") && !normalized.startsWith("21"))) {
+    return null;
+  }
+  try {
+    const productCode = normalized.substring(2, 6);
+    const weightPart = normalized.substring(6, 11);
+    const checkDigit = normalized.substring(11, 12);
+    const weightGrams = parseInt(weightPart, 10);
+    return {
+      isScaleBarcode: true,
+      productCode,
+      weightGrams,
+      weightKg: weightGrams / 1000,
+      checkDigit,
+      rawBarcode: normalized
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isLikelyScaleBarcode(barcode: string): boolean {
+  const normalized = barcode.trim();
+  return normalized.length === 13 && (normalized.startsWith("20") || normalized.startsWith("21"));
+}
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
