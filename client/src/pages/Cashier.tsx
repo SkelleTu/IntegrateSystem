@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { MenuItem, CashRegister, Inventory, Nfce, FiscalSettings } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { printNFCe } from "@/lib/escpos";
+import { parseScaleBarcode, isLikelyScaleBarcode } from "@shared/barcodeParser";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -204,32 +205,32 @@ export default function Cashier() {
     if (searchTerm && filteredMenuItems) {
       const term = searchTerm.toLowerCase();
       
-      // Handle weighed labels (standard EAN-13 for variable weight usually starts with '2')
-      // Pattern from Urano POP-S: 20 + 4 digits (product code/PLU) + 5 digits (weight in grams) + 1 check digit
-      if (term.length === 13 && (term.startsWith("20") || term.startsWith("21"))) {
-        const productCode = term.substring(2, 6);
-        const weightPart = term.substring(6, 11);
-        const weight = parseFloat(weightPart) / 1000; // Grams to Kg
+      // Handle weighed labels from Urano POP-S scale
+      if (isLikelyScaleBarcode(term)) {
+        const parsed = parseScaleBarcode(term);
+        
+        if (parsed) {
+          const item = menuItems?.find((m: any) => 
+            (m.codigoBalanca === parsed.productCode) ||
+            (m.codigoBalanca === parsed.productCode.padStart(4, '0')) ||
+            (m.codigoBalanca === parseInt(parsed.productCode).toString())
+          );
 
-        const item = menuItems?.find((m: any) => 
-          (m.codigoBalanca === productCode) ||
-          (m.codigoBalanca === parseInt(productCode).toString())
-        );
-
-        if (item) {
-          setCart((prev) => {
-            const existingIdx = prev.findIndex((i) => i.item.id === item.id);
-            if (existingIdx >= 0) {
-              const newCart = [...prev];
-              const newQuantity = Math.round((newCart[existingIdx].quantity + weight) * 1000) / 1000;
-              newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
-              return newCart;
-            }
-            return [...prev, { item: item as any, quantity: weight }];
-          });
-          setSearchTerm("");
-          toast({ title: "Etiqueta Balança", description: `${item.name} - ${weight.toFixed(3)}kg` });
-          return;
+          if (item) {
+            setCart((prev) => {
+              const existingIdx = prev.findIndex((i) => i.item.id === item.id);
+              if (existingIdx >= 0) {
+                const newCart = [...prev];
+                const newQuantity = Math.round((newCart[existingIdx].quantity + parsed.weightKg) * 1000) / 1000;
+                newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+                return newCart;
+              }
+              return [...prev, { item: item as any, quantity: parsed.weightKg }];
+            });
+            setSearchTerm("");
+            toast({ title: "Etiqueta Balança", description: `${item.name} - ${parsed.weightKg.toFixed(3)}kg` });
+            return;
+          }
         }
       }
 
