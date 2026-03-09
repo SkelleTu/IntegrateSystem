@@ -24,14 +24,21 @@ Sistema de Ponto de Venda (PDV), Gestão de Estoque e Serviços para Padarias e 
 - [x] Integração com carrinho do caixa
 - [x] Campo `codigoBalanca` no banco de dados para produtos pesáveis
 - [x] Lógica de cálculo de preço: peso × preço por kg
+- [x] **NOVO (09/03/2026)**: Extração automática de peso do código de barras para produtos em kg
 
 #### Como Funciona
 1. Operador lê etiqueta da balança no leitor de código de barras
 2. Sistema detecta prefixo "20" ou "21" (produto pesável)
 3. Extrai código PLU (4 dígitos) e peso (5 dígitos em gramas)
-4. Busca produto pelo `codigoBalanca`
-5. Calcula preço: peso_kg × preço_por_kg
-6. Adiciona automaticamente ao carrinho com peso correto
+4. Para produtos com unit="kg", busca o produto pelo `barcode` ou por match automático
+5. **Extrai peso automaticamente do código de barras** em vez de pedir ao operador
+6. Adiciona automaticamente ao carrinho com peso extraído do barcode
+7. Se o barcode não tiver peso codificado, mostra modal para entrada manual
+
+#### Mudança Recente (09/03/2026)
+**Problema**: Ao escanear código de barras de produto pesável (ex: Catarina Banana), o sistema pedia o peso manualmente.
+
+**Solução**: Agora o sistema tenta extrair o peso automaticamente do barcode antes de abrir o modal. Se o barcode estiver no formato Urano POP-S (20PPPPVVVVVC), o peso é extraído e o produto é adicionado ao carrinho sem confirmação do operador.
 
 #### Arquivos Relacionados
 - `shared/barcodeParser.ts`: Parser e validador de códigos de barras de balança

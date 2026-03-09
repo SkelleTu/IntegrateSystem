@@ -209,9 +209,24 @@ export default function Cashier() {
     setActiveItemForWeight(null);
   };
 
-  const addToCart = useCallback((item: MenuItem & { unitType?: string }) => {
+  const addToCart = useCallback((item: MenuItem & { unitType?: string }, weightFromBarcode?: number) => {
     // Check if it's a weighable item
     if (item.unitType === "kg" || (item as any).unit === "kg") {
+      // If weight is encoded in barcode, use it directly
+      if (weightFromBarcode !== undefined && weightFromBarcode > 0) {
+        setCart((prev) => {
+          const existingIdx = prev.findIndex((i) => i.item.id === item.id);
+          if (existingIdx >= 0) {
+            const newCart = [...prev];
+            const newQuantity = Math.round((newCart[existingIdx].quantity + weightFromBarcode) * 1000) / 1000;
+            newCart[existingIdx] = { ...newCart[existingIdx], quantity: newQuantity };
+            return newCart;
+          }
+          return [...prev, { item, quantity: weightFromBarcode }];
+        });
+        return;
+      }
+      // Otherwise, prompt for weight
       setActiveItemForWeight(item);
       setWeightInputValue("1.000");
       setWeightModalOpen(true);
@@ -268,12 +283,29 @@ export default function Cashier() {
           (item.barcode && item.barcode.toLowerCase() === term) ||
           (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
         ) {
-          addToCart(item as any);
+          // Try to extract weight from barcode for kg products
+          let weightFromBarcode: number | undefined;
+          if ((item as any).unitType === "kg" || (item as any).unit === "kg") {
+            const parsed = parseScaleBarcode(term);
+            if (parsed) {
+              weightFromBarcode = parsed.weightKg;
+            }
+          }
+          
+          addToCart(item as any, weightFromBarcode);
           setSearchTerm("");
-          toast({ 
-            title: "Produto BIPADO", 
-            description: `${item.name} adicionado ao carrinho.` 
-          });
+          
+          if (weightFromBarcode !== undefined) {
+            toast({ 
+              title: "Produto BIPADO", 
+              description: `${item.name} - ${weightFromBarcode.toFixed(3)}kg` 
+            });
+          } else {
+            toast({ 
+              title: "Produto BIPADO", 
+              description: `${item.name} adicionado ao carrinho.` 
+            });
+          }
         }
       }
     }
