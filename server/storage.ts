@@ -347,13 +347,7 @@ export class DatabaseStorage implements IStorage {
   async getMenuItems(): Promise<MenuItem[]> {
     this.logAction("Consulta itens menu");
     const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
-    const inv = await db.select().from(inventory);
-    
-    // Filter items based on inventory or specific rules
-    return (items as any[]).filter((item: any) => 
-      item.name === 'Coca-Cola' || 
-      (inv as any[]).some((i: any) => i.itemId === item.id && i.itemType === 'product')
-    );
+    return items;
   }
 
   async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {

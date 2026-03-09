@@ -274,6 +274,41 @@ export async function setupDatabase() {
       }
     }
   }
+
+  // Migrations to add missing columns in remote database (Turso)
+  if (isRemoteEnabled) {
+    const remoteMigrations = [
+      "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
+      "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER DEFAULT 0",
+      "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
+      "ALTER TABLE fiscal_settings ADD COLUMN csc_token TEXT",
+      "ALTER TABLE fiscal_settings ADD COLUMN csc_id TEXT",
+      "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
+      "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
+      "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER DEFAULT 1",
+      "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
+      "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0",
+      "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100",
+      "ALTER TABLE inventory ADD COLUMN codigo_balanca TEXT",
+      "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
+      "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
+      "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit'"
+    ];
+
+    for (const migration of remoteMigrations) {
+      try {
+        const client = (db as any).$client || (db as any).client;
+        if (client && typeof client.execute === 'function') {
+          await client.execute(migration);
+        }
+      } catch (e: any) {
+        // Ignore "column already exists" errors
+        if (!e.message?.includes("duplicate column")) {
+          console.error(`Migration warning: ${migration}`, e.message);
+        }
+      }
+    }
+  }
 }
 
 // Helper para manter compatibilidade com o pool se necessário
