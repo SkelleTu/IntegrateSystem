@@ -179,7 +179,6 @@ export const inventory = pgTable("inventory", {
   costPrice: integer("cost_price").notNull().default(0), // in cents
   salePrice: integer("sale_price"), // in cents
   barcode: text("barcode"), // Barcode or internal ID
-  codigoBalanca: text("codigo_balanca"), // Código PLU da balança
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
   imageUrl: text("image_url"), // Campo de imagem adicionado
