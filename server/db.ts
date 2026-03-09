@@ -89,7 +89,10 @@ export async function setupDatabase() {
       ncm TEXT,
       cfop TEXT,
       icms_origem INTEGER DEFAULT 0,
-      icms_st TEXT
+      icms_st TEXT,
+      unit_type TEXT DEFAULT 'unit' NOT NULL,
+      rotation INTEGER DEFAULT 0 NOT NULL,
+      image_scale INTEGER DEFAULT 100 NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS cash_register (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -128,7 +131,8 @@ export async function setupDatabase() {
       item_id INTEGER NOT NULL,
       quantity INTEGER NOT NULL,
       unit_price INTEGER NOT NULL,
-      total_price INTEGER NOT NULL
+      total_price INTEGER NOT NULL,
+      unit_type TEXT DEFAULT 'unit' NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS payments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -192,9 +196,12 @@ export async function setupDatabase() {
       cost_price INTEGER NOT NULL DEFAULT 0,
       sale_price INTEGER,
       barcode TEXT,
+      codigo_balanca TEXT,
       expiry_date INTEGER,
       min_stock INTEGER NOT NULL DEFAULT 5,
       image_url TEXT,
+      rotation INTEGER DEFAULT 0 NOT NULL,
+      image_scale INTEGER DEFAULT 100 NOT NULL,
       updated_at INTEGER NOT NULL
     )`,
     `CREATE TABLE IF NOT EXISTS inventory_logs (
@@ -265,66 +272,6 @@ export async function setupDatabase() {
       } catch (e) {
         // Table already exists
       }
-    }
-  }
-
-  // Migrações manuais resilientes para ambos os ambientes (Local e Turso)
-  const migrations = [
-    "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER NOT NULL DEFAULT 0",
-    "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
-    "ALTER TABLE fiscal_settings ADD COLUMN csc_token TEXT",
-    "ALTER TABLE fiscal_settings ADD COLUMN csc_id TEXT",
-    "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
-    "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
-    "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER NOT NULL DEFAULT 1",
-    "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
-    "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0 NOT NULL",
-    "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100 NOT NULL",
-    "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0 NOT NULL",
-    "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100 NOT NULL",
-    "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit' NOT NULL",
-    "ALTER TABLE sale_items ADD COLUMN unit_price INTEGER DEFAULT 0 NOT NULL",
-    "ALTER TABLE sale_items ADD COLUMN total_price INTEGER DEFAULT 0 NOT NULL"
-  ];
-
-  const migrationResults = [];
-  for (const sqlQuery of migrations) {
-    try {
-      if (isRemoteEnabled) {
-        // Para LibSQL/Turso
-        const client = (db as any).$client || (db as any).client;
-        if (client && typeof client.execute === 'function') {
-          await client.execute(sqlQuery);
-        } else {
-          await db.run(sql.raw(sqlQuery));
-        }
-      } else {
-        // Para SQLite local
-        localSqlite.prepare(sqlQuery).run();
-      }
-      migrationResults.push({ query: sqlQuery, status: "success" });
-    } catch (e: any) {
-      migrationResults.push({ query: sqlQuery, status: "error", error: e.message });
-      // Ignorar erros de "coluna já existe"
-    }
-  }
-  console.log("[DB MIGRATIONS]:", JSON.stringify(migrationResults, null, 2));
-
-  for (const table of tables) {
-    try {
-      if (isRemoteEnabled) {
-        const client = (db as any).$client || (db as any).client;
-        if (client && typeof client.execute === 'function') {
-          await client.execute(table);
-        } else {
-          await db.run(sql.raw(table));
-        }
-      } else {
-        localSqlite.prepare(table).run();
-      }
-    } catch (e) {
-      // Table already exists
     }
   }
 }
