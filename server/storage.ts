@@ -143,6 +143,8 @@ export interface IStorage {
   getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]>;
   restockInventory(id: number, data: any): Promise<Inventory>;
   updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem>;
+  getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined>;
+  getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -344,25 +346,7 @@ export class DatabaseStorage implements IStorage {
 
   async getMenuItems(): Promise<MenuItem[]> {
     this.logAction("Consulta itens menu");
-    const items = await db.select({
-      id: menuItems.id,
-      categoryId: menuItems.categoryId,
-      name: menuItems.name,
-      description: menuItems.description,
-      price: menuItems.price,
-      imageUrl: menuItems.imageUrl,
-      isAvailable: menuItems.isAvailable,
-      barcode: menuItems.barcode,
-      tags: menuItems.tags,
-      ncm: menuItems.ncm,
-      cfop: menuItems.cfop,
-      icmsOrigem: menuItems.icmsOrigem,
-      icmsSituacaoTributaria: menuItems.icmsSituacaoTributaria,
-      unitType: menuItems.unitType,
-      rotation: menuItems.rotation,
-      imageScale: menuItems.imageScale,
-    }).from(menuItems).where(eq(menuItems.isAvailable, true));
-    
+    const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
     const inv = await db.select().from(inventory);
     
     // Filter items based on inventory or specific rules
@@ -601,6 +585,18 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca item por código: ${barcode}`);
     const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode)).limit(1);
     return item;
+  }
+
+  async getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined> {
+    this.logAction(`Busca item estoque por código balança: ${codigoBalanca}`);
+    const items = await db.select().from(inventory);
+    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
+  }
+
+  async getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined> {
+    this.logAction(`Busca item menu por código balança: ${codigoBalanca}`);
+    const items = await db.select().from(menuItems);
+    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
   }
 
 

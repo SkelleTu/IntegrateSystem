@@ -64,6 +64,7 @@ export const menuItems = pgTable("menu_items", {
   cfop: text("cfop"), // Código Fiscal de Operações e Prestações
   icmsOrigem: integer("icms_origem").default(0), // 0-Nacional, 1-Estrangeira, etc
   icmsSituacaoTributaria: text("icms_st"), // CSOSN ou CST
+  codigoBalanca: text("codigo_balanca"), // Código PLU da balança para busca automática
   unitType: text("unit_type").default("unit").notNull(), // "unit" or "kg"
   rotation: integer("rotation").default(0).notNull(),
   imageScale: integer("image_scale").default(100).notNull(),
@@ -179,6 +180,7 @@ export const inventory = pgTable("inventory", {
   costPrice: integer("cost_price").notNull().default(0), // in cents
   salePrice: integer("sale_price"), // in cents
   barcode: text("barcode"), // Barcode or internal ID
+  codigoBalanca: text("codigo_balanca"), // Código PLU da balança
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   minStock: integer("min_stock").notNull().default(5),
   imageUrl: text("image_url"), // Campo de imagem adicionado
@@ -272,6 +274,7 @@ export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ saleId:
 export const insertPaymentSchema = createInsertSchema(payments).omit({ saleId: true });
 export const insertMenuItemSchema = createInsertSchema(menuItems, {
   tags: z.union([z.string(), z.array(z.string())]).optional().nullable(),
+  codigoBalanca: z.string().optional().nullable(),
 });
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertTimeClockSchema = createInsertSchema(timeClock);
@@ -280,6 +283,7 @@ export const insertSettingsSchema = createInsertSchema(settings);
 export const insertInventorySchema = createInsertSchema(inventory, {
   costPrice: z.number().transform(v => Math.round(v * 100)),
   salePrice: z.number().transform(v => Math.round(v * 100)).optional(),
+  codigoBalanca: z.string().optional().nullable(),
 }).omit({ id: true, updatedAt: true });
 export const insertInventoryLogSchema = createInsertSchema(inventoryLogs).omit({ id: true, createdAt: true });
 export const insertInventoryRestockSchema = createInsertSchema(inventoryRestocks).omit({ id: true, createdAt: true });
