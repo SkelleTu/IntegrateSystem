@@ -78,19 +78,19 @@ export function Navbar() {
         boxShadow: "0 0 0 1px rgba(0,229,255,0.05), 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
       }}
     >
-      {/* Logo */}
-      <div className="shrink-0 flex items-center">
-        <Link href="/app" className="flex items-center">
+      {/* Left spacer (keeps right side balanced) */}
+      <div className="shrink-0 w-4" />
+
+      {/* Nav items — desktop */}
+      <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center px-2">
+        {/* Logo junto ao Dashboard */}
+        <Link href="/app" className="flex items-center mr-1 shrink-0">
           <img
             src={auraLogo}
             alt="Aura"
             className="h-9 w-auto object-contain transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.6)] active:scale-95"
           />
         </Link>
-      </div>
-
-      {/* Nav items — desktop */}
-      <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center px-2">
         {navItems.map((item) => {
           const active = isActive(item.url);
           return (
