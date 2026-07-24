@@ -71,7 +71,7 @@ export function Navbar() {
           </Link>
         </div>
 
-        <div className="hidden lg:flex items-center gap-0 overflow-x-auto no-scrollbar mask-fade-right pr-2 flex-1 justify-end">
+        <div className="hidden lg:flex items-center gap-0 flex-1 justify-center">
           {navItems.map((item) => (
             <Button
               key={item.url}
@@ -85,7 +85,7 @@ export function Navbar() {
           ))}
           <Button
             variant="ghost"
-            className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate mr-2"
+            className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate"
             onClick={() => handleNavigation("/admin/master")}
           >
             <ShieldAlert className="w-3 h-3" />
