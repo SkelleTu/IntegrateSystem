@@ -81,9 +81,9 @@ export function Navbar() {
         />
       </Link>
 
-      {/* Barra real — começa no Dashboard */}
+      {/* Barra real — encostada à direita */}
       <nav
-        className="flex-1 h-12 flex items-center justify-between px-3 md:px-4 rounded-2xl shadow-2xl"
+        className="ml-auto h-12 flex items-center gap-1 px-3 md:px-4 rounded-2xl shadow-2xl"
         style={{
           background: "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,20,30,0.75) 100%)",
           backdropFilter: "blur(20px)",
