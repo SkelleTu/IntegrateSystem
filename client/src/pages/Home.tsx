@@ -88,11 +88,11 @@ export default function Home() {
         className="z-10 mb-8 md:mb-16 mt-4 md:mt-8 w-full max-w-[1400px] flex items-center justify-center relative"
       >
         {/* Logo — absolutamente livre, bem à esquerda */}
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 pointer-events-none select-none">
+        <div className="absolute left-0 top-[38%] -translate-y-1/2 z-20 pointer-events-none select-none">
           <img
             src={auraLogo}
             alt="Aura"
-            className="w-44 sm:w-60 md:w-80 lg:w-96 h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
+            className="w-40 sm:w-56 md:w-72 lg:w-[345px] h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
           />
         </div>
 
