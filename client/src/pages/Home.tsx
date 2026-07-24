@@ -88,7 +88,7 @@ export default function Home() {
         className="z-10 mb-8 md:mb-16 mt-4 md:mt-8 w-full max-w-[1400px] flex items-center justify-center relative"
       >
         {/* Logo — absolutamente livre, bem à esquerda */}
-        <div className="absolute left-0 top-[38%] -translate-y-1/2 z-20 pointer-events-none select-none">
+        <div className="absolute left-0 top-[28%] -translate-y-1/2 z-20 pointer-events-none select-none">
           <img
             src={auraLogo}
             alt="Aura"
