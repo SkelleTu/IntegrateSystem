@@ -70,27 +70,29 @@ export function Navbar() {
   const isActive = (url: string) => location === url;
 
   return (
-    <nav className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-12 flex items-center justify-between px-3 md:px-4 rounded-2xl shadow-2xl"
-      style={{
-        background: "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,20,30,0.75) 100%)",
-        backdropFilter: "blur(20px)",
-        border: "1px solid rgba(0,229,255,0.12)",
-        boxShadow: "0 0 0 1px rgba(0,229,255,0.05), 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
-      }}
-    >
-      {/* Left spacer (keeps right side balanced) */}
-      <div className="shrink-0 w-4" />
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-14 flex items-center gap-3">
 
+      {/* Logo flutuando fora da barra, no espaço vazio à esquerda */}
+      <Link href="/app" className="shrink-0 flex items-center">
+        <img
+          src={auraLogo}
+          alt="Aura"
+          className="h-11 w-auto object-contain drop-shadow-[0_0_16px_rgba(0,229,255,0.35)] transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_22px_rgba(0,229,255,0.65)] active:scale-95"
+        />
+      </Link>
+
+      {/* Barra real — começa no Dashboard */}
+      <nav
+        className="flex-1 h-12 flex items-center justify-between px-3 md:px-4 rounded-2xl shadow-2xl"
+        style={{
+          background: "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,20,30,0.75) 100%)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(0,229,255,0.12)",
+          boxShadow: "0 0 0 1px rgba(0,229,255,0.05), 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
       {/* Nav items — desktop */}
       <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center px-2">
-        {/* Logo junto ao Dashboard */}
-        <Link href="/app" className="flex items-center mr-1 shrink-0">
-          <img
-            src={auraLogo}
-            alt="Aura"
-            className="h-9 w-auto object-contain transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.6)] active:scale-95"
-          />
-        </Link>
         {navItems.map((item) => {
           const active = isActive(item.url);
           return (
@@ -419,6 +421,7 @@ export function Navbar() {
         onOpenChange={setGuardOpen}
         onSuccess={() => pendingUrl && setLocation(pendingUrl)}
       />
-    </nav>
+      </nav>
+    </div>
   );
 }
