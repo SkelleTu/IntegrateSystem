@@ -1,5 +1,6 @@
 import { useLocation, Link } from "wouter";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
+import auraLogo from "@assets/AURA_1768346008566.png";
 import { ClipboardList, Landmark, Search, Lock, Clock, Star, Shield, Menu, X, LogIn, UserPlus, Info, Phone, Home as HomeIcon, Download } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
@@ -84,19 +85,31 @@ export default function Home() {
       <motion.div 
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center z-10 mb-8 md:mb-16 mt-4 md:mt-8"
+        className="z-10 mb-8 md:mb-16 mt-4 md:mt-8 w-full max-w-[1400px] flex items-center justify-center gap-0 relative"
       >
-        <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-4 md:mb-6">
-          <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
-            Plataforma Multi-Serviços
+        {/* Logo — livre, sobreposta, à esquerda */}
+        <div className="relative flex-shrink-0 z-20 -mr-8 md:-mr-16 lg:-mr-24 pointer-events-none select-none">
+          <img
+            src={auraLogo}
+            alt="Aura"
+            className="w-40 sm:w-56 md:w-72 lg:w-80 h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
+          />
+        </div>
+
+        {/* Texto — BEM-VINDO e subtítulo */}
+        <div className="text-left relative z-10">
+          <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-4 md:mb-6">
+            <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
+              Plataforma Multi-Serviços
+            </p>
+          </div>
+          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black mb-4 tracking-tighter text-white italic leading-none uppercase">
+            BEM-VINDO
+          </h1>
+          <p className="text-white/60 text-sm sm:text-base md:text-lg font-medium tracking-tight opacity-90 max-w-lg leading-relaxed">
+            Selecione o estabelecimento para iniciar seu atendimento personalizado.
           </p>
         </div>
-        <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black mb-4 tracking-tighter text-white italic leading-none uppercase">
-          BEM-VINDO
-        </h1>
-        <p className="text-white/60 text-sm sm:text-base md:text-lg font-medium tracking-tight opacity-90 max-w-lg mx-auto leading-relaxed px-4">
-          Selecione o estabelecimento para iniciar seu atendimento personalizado.
-        </p>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-[1400px] z-10 mb-12 md:mb-20 px-2 auto-rows-fr justify-center mx-auto">
