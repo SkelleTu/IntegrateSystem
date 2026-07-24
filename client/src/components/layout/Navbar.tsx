@@ -70,14 +70,14 @@ export function Navbar() {
   const isActive = (url: string) => location === url;
 
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-14 flex items-center gap-3">
+    <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-16 flex items-center gap-3">
 
-      {/* Logo flutuando fora da barra, no espaço vazio à esquerda */}
-      <Link href="/app" className="shrink-0 flex items-center">
+      {/* Logo centralizada no espaço vazio à esquerda */}
+      <Link href="/app" className="flex-1 flex items-center justify-center">
         <img
           src={auraLogo}
           alt="Aura"
-          className="h-11 w-auto object-contain drop-shadow-[0_0_16px_rgba(0,229,255,0.35)] transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_22px_rgba(0,229,255,0.65)] active:scale-95"
+          className="h-16 w-auto object-contain drop-shadow-[0_0_18px_rgba(0,229,255,0.4)] transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_26px_rgba(0,229,255,0.7)] active:scale-95"
         />
       </Link>
 
