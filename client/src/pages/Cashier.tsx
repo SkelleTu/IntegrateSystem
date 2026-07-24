@@ -798,25 +798,7 @@ function CashierContent({
   return (
     <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
       <BackgroundIcons />
-      {/* Header compactado e fixo no topo */}
-      <div className="flex flex-row items-center gap-4 p-4 border-b border-white/10 bg-zinc-950/80 backdrop-blur-md shrink-0 z-50">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="text-white hover:text-primary hover:bg-white/5 w-10 h-10 rounded-full shrink-0" 
-          onClick={() => setLocation("/")}
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </Button>
-        <img
-          src={auraLogo}
-          alt="Aura"
-          className="h-9 w-auto object-contain"
-          style={{ filter: "drop-shadow(0 0 6px rgba(0,229,255,0.35))" }}
-        />
-      </div>
-
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative">
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
         {/* Area Principal de Produtos */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
           <div className="w-full flex justify-end mb-4 shrink-0">
