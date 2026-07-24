@@ -106,7 +106,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-transparent relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-6 bg-transparent relative overflow-x-hidden">
       {/* Background Image with Overlay */}
       <div 
         className="absolute inset-0 z-[-2] bg-center bg-no-repeat opacity-40 blur-[2px] bg-fixed"
@@ -120,25 +120,6 @@ export default function LandingPage() {
       
       {/* Cybernetic Icons Texture Overlay */}
       <CyberTextureOverlay iconCount={45} className="z-[1]" />
-
-      {/* Top Menu */}
-      <nav className="fixed top-0 left-0 w-full z-50 px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
-        <div className="flex items-center gap-2 pl-10 -mt-3">
-          <img src={auraLogo} alt="Aura Logo" className="h-[5.72rem] w-auto" />
-        </div>
-        <div className="hidden md:flex items-center gap-8">
-          <a href="/" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Início</a>
-          <a href="/quem-somos" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Quem Somos</a>
-          <a href="/solucoes" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Soluções</a>
-          <a href="/casos-de-sucesso" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Impacto Aura</a>
-          <a href="/blog" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Blog</a>
-          <a href="/contato" className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">Contato</a>
-        </div>
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" className="text-white font-bold text-xs uppercase tracking-widest hover:scale-105 transition-all" onClick={() => setLocation("/login")}>Entrar</Button>
-          <Button className="bg-[#00e5ff] text-black font-black text-xs uppercase tracking-widest px-6 hover:scale-105 transition-all shadow-[0_0_20px_rgba(0,229,255,0.4)] border-none" onClick={() => setStep(2)}>Assinar</Button>
-        </div>
-      </nav>
 
       {/* Decorative Neon Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
