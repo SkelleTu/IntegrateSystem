@@ -129,7 +129,7 @@ export default function LandingPage() {
       {step === 1 && (
         <>
         <div className="max-w-4xl w-full text-center space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-1000 relative z-10 pt-2 md:pt-4">
-          <div className="flex justify-center mb-4">
+          <div className="flex justify-center mb-4 mt-12">
             <div className="relative group">
               <img 
                 src={auraLogo} 
