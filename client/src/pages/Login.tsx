@@ -61,10 +61,21 @@ export default function Login() {
               {/* Botão Voltar */}
               <button
                 onClick={() => setLocation("/")}
-                className="absolute top-6 left-6 flex items-center gap-1.5 text-white/40 hover:text-white transition-colors duration-200 z-10 group"
+                className="absolute top-6 left-6 z-10 group flex items-center gap-2 px-4 py-2 rounded-xl border border-white/15 bg-white/5 backdrop-blur-md hover:bg-primary/10 hover:border-primary/40 transition-all duration-300"
+                style={{ boxShadow: "0 0 0 1px rgba(255,255,255,0.03), 0 4px 12px rgba(0,0,0,0.3)" }}
               >
-                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Voltar</span>
+                <ArrowLeft
+                  className="w-3 h-3 group-hover:-translate-x-0.5 transition-transform duration-300"
+                  style={{ color: "rgba(0,229,255,0.7)", filter: "drop-shadow(0 0 4px rgba(0,229,255,0.4))" }}
+                />
+                <span
+                  className="text-[9px] font-black uppercase tracking-[0.2em] transition-colors duration-300"
+                  style={{ color: "rgba(255,255,255,0.45)" }}
+                  onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
+                  onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.45)")}
+                >
+                  Voltar
+                </span>
               </button>
 
               <div className="flex flex-col items-center mb-12 text-center relative z-10">
