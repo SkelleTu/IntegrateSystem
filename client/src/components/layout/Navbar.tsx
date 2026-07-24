@@ -92,7 +92,7 @@ export function Navbar() {
         }}
       >
       {/* Nav items — desktop */}
-      <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center px-2">
+      <div className="hidden lg:flex items-center gap-0.5 justify-start pl-1">
         {navItems.map((item) => {
           const active = isActive(item.url);
           return (
