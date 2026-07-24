@@ -27,7 +27,6 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import auraLogo from "@assets/AURA_1768346008566.png";
 import { useState } from "react";
 import { MasterPasswordGuard } from "@/components/MasterPasswordGuard";
 
@@ -71,15 +70,6 @@ export function Navbar() {
 
   return (
     <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-16 flex items-center gap-3">
-
-      {/* Logo — centralizada no espaço vazio à esquerda */}
-      <Link href="/app" className="flex-1 flex items-center justify-center">
-        <img
-          src={auraLogo}
-          alt="Aura"
-          className="h-9 sm:h-10 md:h-11 lg:h-12 w-auto object-contain drop-shadow-[0_0_18px_rgba(0,229,255,0.4)] transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_26px_rgba(0,229,255,0.7)] active:scale-95"
-        />
-      </Link>
 
       {/* Barra real — encostada à direita */}
       <nav
