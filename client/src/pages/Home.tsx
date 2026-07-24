@@ -92,7 +92,7 @@ export default function Home() {
           <img
             src={auraLogo}
             alt="Aura"
-            className="w-40 sm:w-56 md:w-72 lg:w-[345px] h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
+            className="w-32 sm:w-44 md:w-56 lg:w-[276px] h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
           />
         </div>
 
