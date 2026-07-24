@@ -90,6 +90,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
+import auraLogo from "@assets/AURA_1768346008566.png";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
 
@@ -807,14 +808,12 @@ function CashierContent({
         >
           <ArrowLeft className="w-6 h-6" />
         </Button>
-        <div className="flex flex-col min-w-0">
-          <h1 className="text-white text-xl md:text-2xl font-black uppercase italic tracking-tighter leading-none truncate">
-            Terminal de <span className="text-primary">Vendas</span>
-          </h1>
-          <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em] mt-1 truncate">
-            AURA System
-          </p>
-        </div>
+        <img
+          src={auraLogo}
+          alt="Aura"
+          className="h-9 w-auto object-contain"
+          style={{ filter: "drop-shadow(0 0 6px rgba(0,229,255,0.35))" }}
+        />
       </div>
 
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative">
