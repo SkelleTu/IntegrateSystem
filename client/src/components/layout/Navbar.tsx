@@ -1,20 +1,20 @@
 import { Link, useLocation } from "wouter";
 import { useUser, useLogout } from "@/hooks/use-auth";
 import { 
-  Home, 
+  LayoutDashboard,
   ClipboardList, 
-  BarChart3, 
-  Scissors, 
-  LogOut, 
+  TrendingUp,
   Landmark, 
-  Search, 
-  ShoppingCart,
-  Fingerprint,
-  User,
-  ShieldAlert,
-  Menu,
+  BarChart3, 
+  Package,
   FileText,
-  UserPlus
+  Tag,
+  Activity,
+  ShieldAlert,
+  LogOut, 
+  User,
+  Menu,
+  Fingerprint,
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -30,7 +30,7 @@ import { useState } from "react";
 import { MasterPasswordGuard } from "@/components/MasterPasswordGuard";
 
 export function Navbar() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { data: user } = useUser();
   const logout = useLogout();
   const [guardOpen, setGuardOpen] = useState(false);
@@ -39,9 +39,7 @@ export function Navbar() {
   if (!user) return null;
 
   const handleNavigation = (url: string) => {
-    // Rotas liberadas para todos sem senha master
     const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
-    
     if (user.username === "SkelleTu" || freeRoutes.includes(url)) {
       setLocation(url);
     } else {
@@ -51,112 +49,254 @@ export function Navbar() {
   };
 
   const navItems = [
-    { title: "Dashboard", url: "/app", icon: Home },
-    { title: "Ponto", url: "/ponto", icon: Fingerprint },
-    { title: "Caixa", url: "/caixa", icon: ClipboardList },
-    { title: "Financeiro", url: "/financeiro", icon: Landmark },
-    { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
-    { title: "Estoque", url: "/inventory", icon: Search },
-    { title: "Fiscal", url: "/fiscal", icon: FileText },
-    { title: "Etiquetas", url: "/admin/labels", icon: FileText },
-    { title: "Monitoramento", url: "/admin/monitoring", icon: BarChart3 },
+    { title: "Dashboard", url: "/app",               icon: LayoutDashboard },
+    { title: "Ponto",     url: "/ponto",             icon: Fingerprint },
+    { title: "Caixa",     url: "/caixa",             icon: ClipboardList },
+    { title: "Financeiro",url: "/financeiro",        icon: Landmark },
+    { title: "Relatórios",url: "/relatorios",        icon: BarChart3 },
+    { title: "Estoque",   url: "/inventory",         icon: Package },
+    { title: "Fiscal",    url: "/fiscal",            icon: FileText },
+    { title: "Etiquetas", url: "/admin/labels",      icon: Tag },
+    { title: "Monitor",   url: "/admin/monitoring",  icon: Activity },
   ];
 
-  return (
-    <nav className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl px-3 md:px-5 h-14 flex items-center justify-between shadow-2xl">
-      <div className="flex items-center gap-3 overflow-hidden flex-1 mr-4">
-        <div className="relative shrink-0 flex items-center justify-center">
-          <Link href="/app" className="flex items-center">
-            <img src={auraLogo} alt="Aura Logo" className="h-10 w-auto object-contain transition-transform duration-300 hover:scale-105 active:scale-95" />
-          </Link>
-        </div>
+  const isActive = (url: string) => location === url;
 
-        <div className="hidden lg:flex items-center gap-0 flex-1 justify-center">
-          {navItems.map((item) => (
-            <Button
-              key={item.url}
-              variant="ghost"
-              className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate"
-              onClick={() => handleNavigation(item.url)}
-            >
-              <item.icon className="w-3 h-3" />
-              <span>{item.title}</span>
-            </Button>
-          ))}
-          <Button
-            variant="ghost"
-            className="text-zinc-400 hover:text-primary hover:bg-primary/10 px-2 h-9 flex items-center gap-1 font-bold uppercase italic text-[8.5px] tracking-tight transition-all shrink-0 no-default-hover-elevate"
-            onClick={() => handleNavigation("/admin/master")}
-          >
-            <ShieldAlert className="w-3 h-3" />
-            Mestre
-          </Button>
-        </div>
+  return (
+    <nav className="fixed top-3 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-12 flex items-center justify-between px-3 md:px-4 rounded-2xl shadow-2xl"
+      style={{
+        background: "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,20,30,0.75) 100%)",
+        backdropFilter: "blur(20px)",
+        border: "1px solid rgba(0,229,255,0.12)",
+        boxShadow: "0 0 0 1px rgba(0,229,255,0.05), 0 8px 32px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}
+    >
+      {/* Logo */}
+      <div className="shrink-0 flex items-center">
+        <Link href="/app" className="flex items-center">
+          <img
+            src={auraLogo}
+            alt="Aura"
+            className="h-9 w-auto object-contain transition-all duration-300 hover:scale-105 hover:drop-shadow-[0_0_8px_rgba(0,229,255,0.6)] active:scale-95"
+          />
+        </Link>
       </div>
 
+      {/* Nav items — desktop */}
+      <div className="hidden lg:flex items-center gap-0.5 flex-1 justify-center px-2">
+        {navItems.map((item) => {
+          const active = isActive(item.url);
+          return (
+            <button
+              key={item.url}
+              onClick={() => handleNavigation(item.url)}
+              className="relative group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 shrink-0"
+              style={{
+                background: active
+                  ? "linear-gradient(135deg, rgba(0,229,255,0.12), rgba(0,180,220,0.06))"
+                  : "transparent",
+                border: active
+                  ? "1px solid rgba(0,229,255,0.3)"
+                  : "1px solid transparent",
+                boxShadow: active
+                  ? "0 0 12px rgba(0,229,255,0.15), inset 0 0 8px rgba(0,229,255,0.04)"
+                  : "none",
+              }}
+              onMouseEnter={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.background = "rgba(0,229,255,0.06)";
+                  (e.currentTarget as HTMLElement).style.border = "1px solid rgba(0,229,255,0.15)";
+                }
+              }}
+              onMouseLeave={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                  (e.currentTarget as HTMLElement).style.border = "1px solid transparent";
+                }
+              }}
+            >
+              <item.icon
+                className="w-3 h-3 transition-all duration-200"
+                style={{
+                  color: active ? "#00e5ff" : "rgba(160,160,180,1)",
+                  filter: active ? "drop-shadow(0 0 4px rgba(0,229,255,0.7))" : "none",
+                }}
+              />
+              <span
+                className="text-[9px] font-black uppercase tracking-widest transition-all duration-200"
+                style={{
+                  color: active ? "#00e5ff" : "rgba(160,160,180,1)",
+                  textShadow: active ? "0 0 10px rgba(0,229,255,0.6)" : "none",
+                  letterSpacing: "0.12em",
+                }}
+              >
+                {item.title}
+              </span>
+              {/* Active underline glow */}
+              {active && (
+                <span
+                  className="absolute bottom-0 left-1/2 -translate-x-1/2 w-3/5 h-px rounded-full"
+                  style={{ background: "linear-gradient(90deg, transparent, #00e5ff, transparent)" }}
+                />
+              )}
+            </button>
+          );
+        })}
+
+        {/* Divider */}
+        <div className="w-px h-5 mx-1 shrink-0" style={{ background: "rgba(0,229,255,0.15)" }} />
+
+        {/* Mestre — destaque especial */}
+        {(() => {
+          const active = isActive("/admin/master");
+          return (
+            <button
+              onClick={() => handleNavigation("/admin/master")}
+              className="relative group flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200 shrink-0"
+              style={{
+                background: active
+                  ? "linear-gradient(135deg, rgba(255,60,60,0.18), rgba(200,0,80,0.08))"
+                  : "linear-gradient(135deg, rgba(255,60,60,0.08), rgba(200,0,80,0.03))",
+                border: active
+                  ? "1px solid rgba(255,80,80,0.5)"
+                  : "1px solid rgba(255,80,80,0.2)",
+                boxShadow: active
+                  ? "0 0 14px rgba(255,60,60,0.2), inset 0 0 6px rgba(255,60,60,0.05)"
+                  : "none",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,60,60,0.15), rgba(200,0,80,0.08))";
+                (e.currentTarget as HTMLElement).style.border = "1px solid rgba(255,80,80,0.4)";
+                (e.currentTarget as HTMLElement).style.boxShadow = "0 0 12px rgba(255,60,60,0.2)";
+              }}
+              onMouseLeave={e => {
+                if (!active) {
+                  (e.currentTarget as HTMLElement).style.background = "linear-gradient(135deg, rgba(255,60,60,0.08), rgba(200,0,80,0.03))";
+                  (e.currentTarget as HTMLElement).style.border = "1px solid rgba(255,80,80,0.2)";
+                  (e.currentTarget as HTMLElement).style.boxShadow = "none";
+                }
+              }}
+            >
+              <ShieldAlert
+                className="w-3 h-3 transition-all duration-200"
+                style={{
+                  color: active ? "#ff4444" : "rgba(255,100,100,0.9)",
+                  filter: active ? "drop-shadow(0 0 4px rgba(255,60,60,0.8))" : "drop-shadow(0 0 2px rgba(255,60,60,0.4))",
+                }}
+              />
+              <span
+                className="text-[9px] font-black uppercase tracking-widest"
+                style={{
+                  color: active ? "#ff6666" : "rgba(255,120,120,0.9)",
+                  textShadow: active ? "0 0 10px rgba(255,60,60,0.7)" : "0 0 6px rgba(255,60,60,0.3)",
+                  letterSpacing: "0.12em",
+                }}
+              >
+                Mestre
+              </span>
+            </button>
+          );
+        })()}
+      </div>
+
+      {/* Right side — mobile menu + user */}
       <div className="flex items-center gap-2 shrink-0">
+        {/* Mobile menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="icon"
-              className="lg:hidden text-white hover:bg-white/10"
-              data-testid="button-mobile-menu"
+              className="lg:hidden text-white hover:bg-white/10 h-8 w-8"
             >
-              <Menu className="w-5 h-5" />
+              <Menu className="w-4 h-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white z-[200]" align="end">
-            <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Menu</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-black uppercase text-[10px] tracking-widest text-zinc-500">Menu</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-white/5" />
             {navItems.map((item) => (
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 key={item.url}
                 className="cursor-pointer hover:bg-primary/10 hover:text-primary transition-colors py-3"
                 onClick={() => handleNavigation(item.url)}
               >
                 <item.icon className="mr-2 h-4 w-4" />
-                <span className="font-bold uppercase italic text-[10px] tracking-widest">{item.title}</span>
+                <span className="font-bold uppercase text-[10px] tracking-widest">{item.title}</span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator className="bg-white/5" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
+              className="cursor-pointer text-red-400 hover:bg-red-500/10 transition-colors py-3"
+              onClick={() => handleNavigation("/admin/master")}
+            >
+              <ShieldAlert className="mr-2 h-4 w-4" />
+              <span className="font-bold uppercase text-[10px] tracking-widest">Mestre</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/5" />
+            <DropdownMenuItem
               className="cursor-pointer text-red-500 hover:bg-red-500/10 transition-colors py-3"
               onClick={() => logout.mutate()}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              <span className="font-bold uppercase italic text-[10px] tracking-widest">Sair do Sistema</span>
+              <span className="font-bold uppercase text-[10px] tracking-widest">Sair do Sistema</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {/* User profile */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-all shrink-0">
-              <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
-                <User className="w-3.5 h-3.5 text-primary" />
+            <div
+              className="flex items-center gap-2 px-2.5 py-1 rounded-xl cursor-pointer transition-all duration-200 shrink-0"
+              style={{
+                background: "rgba(0,229,255,0.05)",
+                border: "1px solid rgba(0,229,255,0.12)",
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLElement).style.background = "rgba(0,229,255,0.1)";
+                (e.currentTarget as HTMLElement).style.border = "1px solid rgba(0,229,255,0.25)";
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLElement).style.background = "rgba(0,229,255,0.05)";
+                (e.currentTarget as HTMLElement).style.border = "1px solid rgba(0,229,255,0.12)";
+              }}
+            >
+              <div
+                className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0,229,255,0.2), rgba(0,180,220,0.1))",
+                  border: "1px solid rgba(0,229,255,0.3)",
+                  boxShadow: "0 0 8px rgba(0,229,255,0.2)",
+                }}
+              >
+                <User className="w-3 h-3" style={{ color: "#00e5ff", filter: "drop-shadow(0 0 3px rgba(0,229,255,0.6))" }} />
               </div>
               <div className="hidden xl:block">
-                <p className="text-[9px] font-black text-white leading-none uppercase italic">{user.username}</p>
-                <p className="text-[7px] font-bold text-zinc-500 uppercase tracking-widest">{user.role}</p>
+                <p className="text-[9px] font-black text-white uppercase tracking-widest leading-none" style={{ textShadow: "0 0 8px rgba(0,229,255,0.3)" }}>
+                  {user.username}
+                </p>
+                <p className="text-[7px] font-bold uppercase tracking-widest mt-0.5" style={{ color: "rgba(0,229,255,0.5)" }}>
+                  {user.role}
+                </p>
               </div>
             </div>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 text-white z-[200]" align="end">
-            <DropdownMenuLabel className="font-black uppercase italic text-[10px] tracking-widest text-zinc-500">Minha Conta</DropdownMenuLabel>
+            <DropdownMenuLabel className="font-black uppercase text-[10px] tracking-widest text-zinc-500">Minha Conta</DropdownMenuLabel>
             <DropdownMenuSeparator className="bg-white/5" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               className="cursor-pointer text-red-500 hover:bg-red-500/10 transition-colors py-3"
               onClick={() => logout.mutate()}
             >
               <LogOut className="mr-2 h-4 w-4" />
-              <span className="font-bold uppercase italic text-[10px] tracking-widest">Sair do Sistema</span>
+              <span className="font-bold uppercase text-[10px] tracking-widest">Sair do Sistema</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <MasterPasswordGuard 
+      <MasterPasswordGuard
         open={guardOpen}
         onOpenChange={setGuardOpen}
         onSuccess={() => pendingUrl && setLocation(pendingUrl)}
