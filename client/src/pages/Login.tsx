@@ -58,6 +58,15 @@ export default function Login() {
               {/* Subtle Top Glow Line */}
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
               
+              {/* Botão Voltar */}
+              <button
+                onClick={() => setLocation("/")}
+                className="absolute top-6 left-6 flex items-center gap-1.5 text-white/40 hover:text-white transition-colors duration-200 z-10 group"
+              >
+                <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
+                <span className="text-[9px] font-black uppercase tracking-widest">Voltar</span>
+              </button>
+
               <div className="flex flex-col items-center mb-12 text-center relative z-10">
                 <motion.div 
                   initial={{ rotate: -10, scale: 0.8 }}
