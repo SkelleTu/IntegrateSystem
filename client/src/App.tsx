@@ -146,34 +146,50 @@ function LandingNavigation() {
   ];
 
   return (
-    <nav className="fixed top-0 left-0 w-full z-[100] px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
-      <div className="flex items-center gap-2 pl-4 -mt-1">
-        <img src={auraLogo} alt="Aura Logo" className="h-[4.33rem] w-auto" />
+    <nav className="fixed top-0 left-0 w-full z-[100] px-4 md:px-6 py-3 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
+      {/* Logo */}
+      <div className="flex items-center gap-2 shrink-0">
+        <img src={auraLogo} alt="Aura Logo" className="h-10 md:h-14 w-auto" />
       </div>
-      
-      <div className="hidden md:flex items-center gap-8">
+
+      {/* Desktop nav — only shows on large screens where all items fit */}
+      <div className="hidden lg:flex items-center gap-6 xl:gap-8">
         {navLinks.map((link) => (
-          <a key={link.href} href={link.href} className="text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors">
+          <a
+            key={link.href}
+            href={link.href}
+            className="text-zinc-400 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors whitespace-nowrap"
+          >
             {link.label}
           </a>
         ))}
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="hidden md:flex items-center gap-4">
-          <a href="/login" className="text-white font-bold text-xs uppercase tracking-widest hover:text-primary transition-colors">Entrar</a>
-          <a href="/register" className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)]">Assinar</a>
+      {/* Right side actions */}
+      <div className="flex items-center gap-3 shrink-0">
+        {/* Desktop auth buttons */}
+        <div className="hidden lg:flex items-center gap-4">
+          <a href="/login" className="text-white font-bold text-xs uppercase tracking-widest hover:text-primary transition-colors whitespace-nowrap">
+            Entrar
+          </a>
+          <a href="/register" className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)] whitespace-nowrap">
+            Assinar
+          </a>
         </div>
 
-        {/* Mobile Menu */}
-        <div className="md:hidden flex items-center gap-3">
-          <a href="/login" className="text-white font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors">Entrar</a>
-          <a href="/register" className="bg-primary text-white font-black text-[10px] uppercase tracking-widest px-4 py-2 rounded-md shadow-[0_0_15px_rgba(0,229,255,0.3)]">Assinar</a>
-          
+        {/* Mobile/Tablet: compact auth + hamburger */}
+        <div className="lg:hidden flex items-center gap-2">
+          <a href="/login" className="text-white font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors whitespace-nowrap">
+            Entrar
+          </a>
+          <a href="/register" className="bg-primary text-white font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-md shadow-[0_0_15px_rgba(0,229,255,0.3)] whitespace-nowrap">
+            Assinar
+          </a>
+
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 p-0 h-9 w-9">
-                <Menu className="w-6 h-6" />
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-9 w-9 shrink-0">
+                <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="bg-zinc-950 border-white/10 p-0 w-[280px] z-[99999]">
@@ -185,7 +201,6 @@ function LandingNavigation() {
                       key={link.href}
                       href={link.href}
                       className="text-lg font-bold text-white/70 hover:text-primary transition-colors"
-                      onClick={() => {}}
                     >
                       {link.label}
                     </a>
@@ -194,14 +209,14 @@ function LandingNavigation() {
                 <div className="h-[1px] w-full bg-white/5" />
                 <div className="flex flex-col gap-4">
                   <p className="text-primary text-[10px] tracking-[0.4em] font-bold uppercase mb-2">Acesso</p>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-start border-white/10 text-white font-bold uppercase tracking-widest text-xs h-12"
                     onClick={() => setLocation("/login")}
                   >
                     Entrar
                   </Button>
-                  <Button 
+                  <Button
                     className="w-full justify-start bg-primary text-white font-black uppercase tracking-widest text-xs h-12"
                     onClick={() => setLocation("/register")}
                   >
