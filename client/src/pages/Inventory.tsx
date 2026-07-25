@@ -63,6 +63,8 @@ export default function InventoryPage() {
   const [viewMode, setViewMode] = useState<"package" | "unit">("package");
   const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
 
+  const [filterStatus, setFilterStatus] = useState<"todos" | "sem_estoque" | "urgente" | "atencao" | "em_breve">("todos");
+
   const [restockModalOpen, setRestockModalOpen] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
   const [reportOrientation, setReportOrientation] = useState<"portrait" | "landscape">("landscape");
@@ -280,10 +282,24 @@ export default function InventoryPage() {
 
     if (searchTerm) {
       const fuse = new Fuse(items, {
-        keys: ["name", "barcode"],
-        threshold: 0.3,
+        keys: ["name", "barcode", "unit", "codigoBalanca"],
+        threshold: 0.45,       // mais tolerante — acha mesmo com erros de digitação
+        ignoreLocation: true,  // busca em qualquer posição do texto
+        minMatchCharLength: 1,
       });
       items = fuse.search(searchTerm).map(result => result.item);
+    }
+
+    // Filtro de status
+    if (filterStatus !== "todos") {
+      items = items.filter((inv) => {
+        if (filterStatus === "sem_estoque") return inv.quantity <= 0 || inv.quantity < (inv.minStock || 0);
+        const urgency = getItemRestockUrgency(inv.id);
+        if (filterStatus === "urgente")   return urgency === "red";
+        if (filterStatus === "atencao")   return urgency === "yellow";
+        if (filterStatus === "em_breve")  return urgency === "blue";
+        return true;
+      });
     }
 
     // Sorting
@@ -295,7 +311,7 @@ export default function InventoryPage() {
     });
 
     return items;
-  }, [inventoryWithNames, searchTerm, viewMode, sortBy]);
+  }, [inventoryWithNames, searchTerm, viewMode, sortBy, filterStatus, restocksByInventoryId]);
 
   const handleEdit = (inv: any) => {
     if (!inv) return;
@@ -982,11 +998,83 @@ export default function InventoryPage() {
 
           {/* ── Lista de Produtos (cards) ── */}
           <CardContent className="p-3 md:p-4">
+
+            {/* ══ BARRA DE BUSCA + FILTROS ══ */}
+            <div className={`rounded-2xl border p-4 mb-4 space-y-3 transition-colors duration-300 ${isLight ? "bg-white border-slate-300 shadow-sm" : "bg-white/5 border-white/10"}`}>
+
+              {/* Campo de busca principal */}
+              <div className="relative">
+                <Search className={`absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 transition-colors duration-300 ${T.searchIcon}`} />
+                <input
+                  type="text"
+                  placeholder="Buscar produto por nome, código de barras, PLU... (pode digitar parte do nome)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`w-full h-12 pl-12 pr-12 rounded-xl border text-sm font-medium transition-all outline-none focus:ring-2 focus:ring-primary/30
+                    ${isLight
+                      ? "bg-slate-50 border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-cyan-500"
+                      : "bg-black/30 border-white/10 text-white placeholder:text-white/30 focus:border-primary/50"}
+                  `}
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className={`absolute right-4 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-colors
+                      ${isLight ? "bg-slate-200 hover:bg-slate-300 text-slate-600" : "bg-white/10 hover:bg-white/20 text-white/60"}`}
+                  >
+                    <span className="text-xs font-black leading-none">✕</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Chips de filtro rápido */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-black uppercase tracking-widest shrink-0 ${T.muted}`}>Filtrar:</span>
+
+                {([
+                  { key: "todos",       label: "Todos",        color: isLight ? "bg-slate-100 border-slate-300 text-slate-700 hover:border-slate-400" : "bg-white/5 border-white/10 text-white/60 hover:border-white/20" },
+                  { key: "sem_estoque", label: "Sem Estoque",  color: "bg-red-50 border-red-300 text-red-700 hover:border-red-400 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400" },
+                  { key: "urgente",     label: "🔴 Urgente",   color: "bg-red-50 border-red-400 text-red-700 hover:border-red-500" },
+                  { key: "atencao",     label: "🟡 Atenção",   color: "bg-amber-50 border-amber-400 text-amber-700 hover:border-amber-500" },
+                  { key: "em_breve",    label: "🔵 Em Breve",  color: "bg-blue-50 border-blue-400 text-blue-700 hover:border-blue-500" },
+                ] as const).map(({ key, label, color }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFilterStatus(key)}
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-black uppercase tracking-wide transition-all duration-150
+                      ${filterStatus === key
+                        ? "bg-primary border-primary text-black shadow-[0_0_12px_rgba(0,229,255,0.35)] scale-105"
+                        : color}
+                    `}
+                  >
+                    {label}
+                  </button>
+                ))}
+
+                {/* Contador de resultados */}
+                <span className={`ml-auto text-xs font-bold shrink-0 ${T.muted}`}>
+                  {filteredInventory.length} produto{filteredInventory.length !== 1 ? "s" : ""}
+                  {(searchTerm || filterStatus !== "todos") ? " encontrado" + (filteredInventory.length !== 1 ? "s" : "") : " no estoque"}
+                </span>
+              </div>
+            </div>
+
             {isLoadingInv ? (
               <div className="flex justify-center p-20"><Loader2 className="animate-spin h-12 w-12 text-primary" /></div>
             ) : filteredInventory.length === 0 ? (
-              <div className={`text-center py-20 italic uppercase text-sm font-black tracking-[0.4em] transition-colors duration-300 ${T.muted}`}>
-                {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
+              <div className={`text-center py-20 space-y-3`}>
+                <Search className={`h-12 w-12 mx-auto ${T.muted} opacity-30`} />
+                <p className={`italic uppercase text-sm font-black tracking-[0.3em] transition-colors duration-300 ${T.muted}`}>
+                  {searchTerm ? `Nenhum produto com "${searchTerm}"` : "Nenhum produto nesta categoria"}
+                </p>
+                {(searchTerm || filterStatus !== "todos") && (
+                  <button
+                    onClick={() => { setSearchTerm(""); setFilterStatus("todos"); }}
+                    className="text-xs font-black uppercase tracking-widest text-primary hover:underline"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
