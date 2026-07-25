@@ -980,193 +980,235 @@ export default function InventoryPage() {
             </div>
           </CardHeader>
 
-          {/* ── Table ── */}
-          <CardContent className="p-0">
+          {/* ── Lista de Produtos (cards) ── */}
+          <CardContent className="p-3 md:p-4">
             {isLoadingInv ? (
               <div className="flex justify-center p-20"><Loader2 className="animate-spin h-12 w-12 text-primary" /></div>
+            ) : filteredInventory.length === 0 ? (
+              <div className={`text-center py-20 italic uppercase text-sm font-black tracking-[0.4em] transition-colors duration-300 ${T.muted}`}>
+                {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
+              </div>
             ) : (
-              <div className="overflow-x-auto w-full scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-                <Table className="min-w-[800px] w-full table-fixed">
-                  <TableHeader>
-                    <TableRow className={`border-b transition-colors duration-300 ${T.tableHd}`}>
-                      <TableHead className={`font-black italic uppercase text-[10px] tracking-widest w-[30%] py-4 pl-4 transition-colors duration-300 ${T.tableHdText}`}>Item</TableHead>
-                      <TableHead className={`font-black italic uppercase text-[10px] tracking-widest w-[10%] py-4 transition-colors duration-300 ${T.tableHdText}`}>Qtd</TableHead>
-                      <TableHead className={`font-black italic uppercase text-[10px] tracking-widest w-[20%] py-4 transition-colors duration-300 ${T.tableHdText}`}>Preços</TableHead>
-                      <TableHead className={`font-black italic uppercase text-[10px] tracking-widest w-[20%] py-4 transition-colors duration-300 ${T.tableHdText}`}>Validade / Mín</TableHead>
-                      <TableHead className={`font-black italic uppercase text-[10px] tracking-widest text-right pr-4 w-[20%] py-4 transition-colors duration-300 ${T.tableHdText}`}>Ação</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredInventory.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className={`text-center py-20 italic uppercase text-xs font-black tracking-[0.4em] transition-colors duration-300 ${T.muted}`}>
-                          {searchTerm ? "Nenhum item aproximado" : "Base de dados vazia"}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredInventory.map((inv) => {
-                        const restocks = restocksByInventoryId[inv.id] || [];
-                        const hasRestocks = restocks.length > 0;
-                        const isExpanded = expandedItems.has(inv.id);
-                        const itemUrgency = getItemRestockUrgency(inv.id);
-                        
-                        const urgencyBorder = {
-                          safe: "",
-                          blue: "border-l-4 border-l-blue-400",
-                          yellow: "border-l-4 border-l-yellow-400",
-                          red: "border-l-4 border-l-red-500"
-                        };
+              <div className="flex flex-col gap-3">
+                {/* Cabeçalho das colunas */}
+                <div className={`hidden md:grid grid-cols-[2fr_0.6fr_1fr_1fr_1.2fr] gap-4 px-4 py-2 rounded-xl text-xs font-black italic uppercase tracking-widest transition-colors duration-300 ${T.tableHd} ${T.tableHdText}`}>
+                  <span>Produto</span>
+                  <span>Qtd</span>
+                  <span>Preços</span>
+                  <span>Validade / Mín</span>
+                  <span className="text-right">Ações</span>
+                </div>
 
-                        return (
-                          <Fragment key={inv.id}>
-                            <TableRow 
-                              key={inv.id} 
-                              className={`transition-all group border-b last:border-0 ${T.tableRow} ${urgencyBorder[itemUrgency]} ${hasRestocks ? 'cursor-pointer' : ''}`}
-                              onClick={() => hasRestocks && toggleExpanded(inv.id)}
-                            >
-                              <TableCell className={`font-black italic py-3 pl-4 group-hover:text-primary transition-colors tracking-tighter uppercase ${T.cellPrimary}`}>
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {hasRestocks && (
-                                    <div className="flex-shrink-0">
-                                      {isExpanded
-                                        ? <ChevronUp className="h-4 w-4 text-primary" />
-                                        : <ChevronDown className={`h-4 w-4 ${T.muted}`} />}
-                                    </div>
-                                  )}
-                                  <div className="flex flex-col min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <span className="truncate text-sm leading-tight">{inv.name}</span>
-                                      {itemUrgency !== "safe" && (
-                                        <Badge className={`text-[8px] px-1.5 py-0 ${
-                                          itemUrgency === "red"    ? "bg-red-500/20 text-red-500 border-red-500/40" :
-                                          itemUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-600 border-yellow-500/40" :
-                                                                     "bg-blue-500/20 text-blue-500 border-blue-500/40"
-                                        }`}>
-                                          <Clock className="h-2 w-2 mr-1" />
-                                          {itemUrgency === "red" ? "URGENTE" : itemUrgency === "yellow" ? "ATENÇÃO" : "EM BREVE"}
-                                        </Badge>
-                                      )}
-                                      {hasRestocks && (
-                                        <Badge className="text-[8px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20">
-                                          {restocks.length} reposi{restocks.length > 1 ? "ções" : "ção"}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    <span className={`text-[9px] font-bold truncate transition-colors duration-300 ${T.cellSub}`}>
-                                      {inv.unit} • {inv.barcode || "S/ CÓD"}
+                {filteredInventory.map((inv) => {
+                  const restocks = restocksByInventoryId[inv.id] || [];
+                  const hasRestocks = restocks.length > 0;
+                  const isExpanded = expandedItems.has(inv.id);
+                  const itemUrgency = getItemRestockUrgency(inv.id);
+
+                  const urgencyAccent = {
+                    safe:   isLight ? "border-slate-300" : "border-white/10",
+                    blue:   "border-l-4 border-l-blue-400",
+                    yellow: "border-l-4 border-l-yellow-400",
+                    red:    "border-l-4 border-l-red-500",
+                  };
+
+                  const cardBg = {
+                    safe:   isLight ? "bg-white" : "bg-white/5",
+                    blue:   isLight ? "bg-blue-50" : "bg-blue-500/5",
+                    yellow: isLight ? "bg-amber-50" : "bg-yellow-500/5",
+                    red:    isLight ? "bg-red-50"  : "bg-red-500/5",
+                  };
+
+                  return (
+                    <Fragment key={inv.id}>
+                      {/* ── Barra / card do produto ── */}
+                      <div
+                        className={`rounded-2xl border shadow-sm transition-all duration-200 overflow-hidden
+                          ${urgencyAccent[itemUrgency]} ${cardBg[itemUrgency]}
+                          ${isLight ? "hover:shadow-md hover:border-cyan-400" : "hover:border-primary/40"}
+                        `}
+                      >
+                        {/* Linha principal */}
+                        <div
+                          className={`grid grid-cols-1 md:grid-cols-[2fr_0.6fr_1fr_1fr_1.2fr] gap-3 md:gap-4 px-4 py-4 items-center ${hasRestocks ? "cursor-pointer" : ""}`}
+                          onClick={() => hasRestocks && toggleExpanded(inv.id)}
+                        >
+                          {/* ── Coluna: Nome + meta ── */}
+                          <div className="flex items-center gap-3 min-w-0">
+                            {hasRestocks && (
+                              <div className="shrink-0">
+                                {isExpanded
+                                  ? <ChevronUp className="h-5 w-5 text-primary" />
+                                  : <ChevronDown className={`h-5 w-5 ${T.muted}`} />}
+                              </div>
+                            )}
+                            <div className="flex flex-col min-w-0 gap-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`font-black italic uppercase tracking-tight text-base leading-tight truncate group-hover:text-primary transition-colors ${T.cellPrimary}`}>
+                                  {inv.name}
+                                </span>
+                                {itemUrgency !== "safe" && (
+                                  <Badge className={`text-[10px] px-2 py-0.5 font-black ${
+                                    itemUrgency === "red"    ? "bg-red-500/20 text-red-600 border-red-500/40" :
+                                    itemUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-700 border-yellow-500/40" :
+                                                               "bg-blue-500/20 text-blue-700 border-blue-500/40"
+                                  }`}>
+                                    <Clock className="h-2.5 w-2.5 mr-1" />
+                                    {itemUrgency === "red" ? "URGENTE" : itemUrgency === "yellow" ? "ATENÇÃO" : "EM BREVE"}
+                                  </Badge>
+                                )}
+                                {hasRestocks && (
+                                  <Badge className="text-[10px] px-2 py-0.5 bg-primary/10 text-primary border-primary/20 font-black">
+                                    {restocks.length} reposi{restocks.length > 1 ? "ções" : "ção"}
+                                  </Badge>
+                                )}
+                              </div>
+                              <span className={`text-xs font-semibold transition-colors duration-300 ${T.cellSub}`}>
+                                {inv.unit} · {inv.barcode || "S/ CÓD"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* ── Coluna: Quantidade ── */}
+                          <div className="flex md:flex-col items-center md:items-start gap-2">
+                            <span className={`md:hidden text-xs font-black uppercase ${T.tableHdText}`}>Qtd:</span>
+                            <span className={`font-black text-xl italic tracking-tighter ${inv.quantity < (inv.minStock || 0) ? "text-red-500" : "text-primary"}`}>
+                              {inv.quantity}
+                            </span>
+                          </div>
+
+                          {/* ── Coluna: Preços ── */}
+                          <div className="flex md:flex-col items-start gap-1.5">
+                            <span className={`md:hidden text-xs font-black uppercase ${T.tableHdText}`}>Preços:&nbsp;</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-sm font-bold text-red-600">
+                                C: R$ {(inv.costPrice / 100).toFixed(2)}
+                              </span>
+                              {inv.itemsPerUnit > 1 && (
+                                <span className={`text-xs font-semibold transition-colors duration-300 ${T.muted}`}>
+                                  Un: R$ {(inv.costPrice / 100 / inv.itemsPerUnit).toFixed(2)}
+                                </span>
+                              )}
+                              {inv.salePrice && (
+                                <span className="text-sm font-bold text-green-600">
+                                  V: R$ {(inv.salePrice / 100).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* ── Coluna: Validade / Mín ── */}
+                          <div className="flex md:flex-col items-start gap-1.5">
+                            <span className={`md:hidden text-xs font-black uppercase ${T.tableHdText}`}>Val:&nbsp;</span>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`text-sm font-bold transition-colors duration-300 ${T.bodyMd}`}>
+                                  {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "Sem val."}
+                                </span>
+                                {inv.expiryDate && (() => {
+                                  const badge = getExpiryBadge(inv.expiryDate);
+                                  if (!badge) return null;
+                                  return (
+                                    <span className="flex items-center gap-1">
+                                      <span className={`inline-block w-2.5 h-2.5 rounded-full ${badge.dot}`} />
+                                      <span className={`text-xs font-black uppercase tracking-wide ${badge.text}`}>{badge.label}</span>
                                     </span>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className={`${inv.quantity < (inv.minStock || 0) ? "text-red-500" : "text-primary"} font-black text-sm italic tracking-tighter`}>
-                                {inv.quantity}
-                              </TableCell>
-                              <TableCell className={`text-[10px] font-bold transition-colors duration-300 ${T.bodyMd}`}>
-                                <div className="flex flex-col leading-tight">
-                                  <span className="text-red-500 font-bold">C: R$ {(inv.costPrice / 100).toFixed(2)}</span>
-                                  {inv.itemsPerUnit > 1 && (
-                                    <span className={`text-[9px] transition-colors duration-300 ${T.muted}`}>Un: R$ {(inv.costPrice / 100 / inv.itemsPerUnit).toFixed(2)}</span>
-                                  )}
-                                  {inv.salePrice && <span className="text-green-600 font-bold">V: R$ {(inv.salePrice / 100).toFixed(2)}</span>}
-                                </div>
-                              </TableCell>
-                              <TableCell className={`text-[10px] font-bold transition-colors duration-300 ${T.bodyMd}`}>
-                                <div className="flex flex-col leading-tight gap-1">
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span>VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}</span>
-                                    {inv.expiryDate && (() => {
-                                      const badge = getExpiryBadge(inv.expiryDate);
-                                      if (!badge) return null;
-                                      return (
-                                        <span className="flex items-center gap-1">
-                                          <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${badge.dot}`} />
-                                          <span className={`text-[8px] font-black uppercase tracking-wide ${badge.text}`}>{badge.label}</span>
-                                        </span>
-                                      );
-                                    })()}
-                                  </div>
-                                  <span className={`transition-colors duration-300 ${T.muted}`}>MÍN: {inv.minStock || 5}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right pr-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <div className="flex justify-end items-center gap-2 flex-wrap">
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] font-black uppercase italic text-green-600 hover:bg-green-500/10"
-                                    onClick={() => openRestockModal(inv)} data-testid={`button-restock-${inv.id}`}>
-                                    <RefreshCw className="h-3 w-3 mr-1" /> Repor
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] font-black uppercase italic text-primary hover:bg-primary/10"
-                                    onClick={() => { handleEdit(inv); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                                    data-testid={`button-edit-${inv.id}`}>
-                                    Editar
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] font-black uppercase italic text-cyan-600 hover:bg-cyan-400/10"
-                                    onClick={() => handleDuplicate(inv)} data-testid={`button-duplicate-${inv.id}`}>
-                                    Duplicar
-                                  </Button>
-                                  <Button variant="ghost" size="sm" className="h-7 px-2 text-[10px] font-black uppercase italic text-red-500 hover:bg-red-500/10"
-                                    onClick={() => { if (window.confirm(`Você tem certeza que quer Deletar "${inv.name}" do estoque?`)) deleteMutation.mutate(inv.id); }}
-                                    disabled={deleteMutation.isPending} data-testid={`button-delete-${inv.id}`}>
-                                    {deleteMutation.isPending ? <Loader2 className="animate-spin h-3 w-3" /> : "Deletar"}
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                            
-                            {isExpanded && restocks.map((restock) => {
+                                  );
+                                })()}
+                              </div>
+                              <span className={`text-xs font-semibold transition-colors duration-300 ${T.muted}`}>
+                                Mín: {inv.minStock || 5} un.
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* ── Coluna: Ações ── */}
+                          <div className="flex items-center justify-start md:justify-end gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm"
+                              className="h-8 px-3 text-xs font-black uppercase italic text-green-600 hover:bg-green-500/10 rounded-lg"
+                              onClick={() => openRestockModal(inv)} data-testid={`button-restock-${inv.id}`}>
+                              <RefreshCw className="h-3.5 w-3.5 mr-1" /> Repor
+                            </Button>
+                            <Button variant="ghost" size="sm"
+                              className="h-8 px-3 text-xs font-black uppercase italic text-primary hover:bg-primary/10 rounded-lg"
+                              onClick={() => { handleEdit(inv); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              data-testid={`button-edit-${inv.id}`}>
+                              Editar
+                            </Button>
+                            <Button variant="ghost" size="sm"
+                              className="h-8 px-3 text-xs font-black uppercase italic text-cyan-600 hover:bg-cyan-400/10 rounded-lg"
+                              onClick={() => handleDuplicate(inv)} data-testid={`button-duplicate-${inv.id}`}>
+                              Duplicar
+                            </Button>
+                            <Button variant="ghost" size="sm"
+                              className="h-8 px-3 text-xs font-black uppercase italic text-red-500 hover:bg-red-500/10 rounded-lg"
+                              onClick={() => { if (window.confirm(`Você tem certeza que quer Deletar "${inv.name}" do estoque?`)) deleteMutation.mutate(inv.id); }}
+                              disabled={deleteMutation.isPending} data-testid={`button-delete-${inv.id}`}>
+                              {deleteMutation.isPending ? <Loader2 className="animate-spin h-3.5 w-3.5" /> : "Deletar"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* ── Reposições expandidas ── */}
+                        {isExpanded && restocks.length > 0 && (
+                          <div className={`border-t px-4 py-3 flex flex-col gap-2 transition-colors duration-300 ${isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-black/20"}`}>
+                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${T.tableHdText}`}>
+                              Histórico de Reposições
+                            </p>
+                            {restocks.map((restock) => {
                               const restockUrgency = getExpiryUrgency(restock.expiryDate);
                               return (
-                                <TableRow 
-                                  key={`restock-${restock.id}`} 
-                                  className={`border-b last:border-0 transition-colors duration-300 ${T.restockUrgencyBg[restockUrgency]} ${isLight ? "border-slate-100" : "border-white/5"}`}
+                                <div
+                                  key={`restock-${restock.id}`}
+                                  className={`flex items-center justify-between gap-4 rounded-xl px-3 py-2.5 border text-sm transition-colors duration-300
+                                    ${restockUrgency === "red"    ? (isLight ? "bg-red-50 border-red-200"    : "bg-red-500/10 border-red-500/20") :
+                                      restockUrgency === "yellow" ? (isLight ? "bg-amber-50 border-amber-200" : "bg-yellow-500/10 border-yellow-500/20") :
+                                      restockUrgency === "blue"   ? (isLight ? "bg-blue-50 border-blue-200"  : "bg-blue-500/10 border-blue-500/20") :
+                                                                     (isLight ? "bg-white border-slate-200"   : "bg-white/5 border-white/10")}
+                                  `}
                                 >
-                                  <TableCell className="py-2 pl-12" colSpan={5}>
-                                    <div className="flex items-center justify-between gap-4 text-[10px]">
-                                      <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-1">
-                                          <Clock className={`h-3 w-3 transition-colors duration-300 ${T.muted}`} />
-                                          <span className={`font-bold transition-colors duration-300 ${T.bodyMd}`}>
-                                            {format(new Date(restock.createdAt), "dd/MM/yy HH:mm")}
-                                          </span>
-                                        </div>
-                                        <div className={`transition-colors duration-300 ${T.bodyMd}`}>
-                                          <span className="font-bold">{restock.quantity}</span> {restock.unit}(s)
-                                          {restock.itemsPerUnit > 1 && (
-                                            <span className={`transition-colors duration-300 ${T.muted}`}> ({restock.itemsPerUnit} un/emb)</span>
-                                          )}
-                                        </div>
-                                        <div className="text-red-500 font-bold">
-                                          C: R$ {(restock.costPrice / 100).toFixed(2)}
-                                          {restock.itemsPerUnit > 1 && (
-                                            <span className={`ml-1 transition-colors duration-300 ${T.muted}`}>(R$ {(restock.costPrice / 100 / restock.itemsPerUnit).toFixed(2)}/un)</span>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        {restock.expiryDate && (
-                                          <Badge className={`text-[8px] px-2 py-0.5 ${
-                                            restockUrgency === "red"    ? "bg-red-500/20 text-red-500 border-red-500/30 animate-pulse" :
-                                            restockUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-600 border-yellow-500/30" :
-                                            restockUrgency === "blue"   ? "bg-blue-500/20 text-blue-500 border-blue-500/30" :
-                                                                          "bg-green-500/20 text-green-600 border-green-500/30"
-                                          }`}>
-                                            VAL: {format(new Date(restock.expiryDate), "dd/MM/yy")}
-                                            {restockUrgency !== "safe" && (
-                                              <span className="ml-1">({differenceInDays(new Date(restock.expiryDate), new Date())}d)</span>
-                                            )}
-                                          </Badge>
-                                        )}
-                                      </div>
+                                  <div className="flex items-center gap-4 flex-wrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <Clock className={`h-3.5 w-3.5 ${T.muted}`} />
+                                      <span className={`font-semibold ${T.bodyMd}`}>
+                                        {format(new Date(restock.createdAt), "dd/MM/yy HH:mm")}
+                                      </span>
                                     </div>
-                                  </TableCell>
-                                </TableRow>
+                                    <span className={`font-bold ${T.bodyMd}`}>
+                                      <span className="font-black">{restock.quantity}</span> {restock.unit}(s)
+                                      {restock.itemsPerUnit > 1 && (
+                                        <span className={`ml-1 font-semibold ${T.muted}`}>({restock.itemsPerUnit} un/emb)</span>
+                                      )}
+                                    </span>
+                                    <span className="text-red-600 font-bold">
+                                      C: R$ {(restock.costPrice / 100).toFixed(2)}
+                                      {restock.itemsPerUnit > 1 && (
+                                        <span className={`ml-1 font-semibold ${T.muted}`}>(R$ {(restock.costPrice / 100 / restock.itemsPerUnit).toFixed(2)}/un)</span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  {restock.expiryDate && (
+                                    <Badge className={`text-xs px-2 py-0.5 font-bold shrink-0 ${
+                                      restockUrgency === "red"    ? "bg-red-500/20 text-red-600 border-red-500/30 animate-pulse" :
+                                      restockUrgency === "yellow" ? "bg-yellow-500/20 text-yellow-700 border-yellow-500/30" :
+                                      restockUrgency === "blue"   ? "bg-blue-500/20 text-blue-700 border-blue-500/30" :
+                                                                    "bg-green-500/20 text-green-700 border-green-500/30"
+                                    }`}>
+                                      VAL: {format(new Date(restock.expiryDate), "dd/MM/yy")}
+                                      {restockUrgency !== "safe" && (
+                                        <span className="ml-1">({differenceInDays(new Date(restock.expiryDate), new Date())}d)</span>
+                                      )}
+                                    </Badge>
+                                  )}
+                                </div>
                               );
                             })}
-                          </Fragment>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
+                          </div>
+                        )}
+                      </div>
+                    </Fragment>
+                  );
+                })}
               </div>
             )}
           </CardContent>
