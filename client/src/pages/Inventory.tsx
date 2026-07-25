@@ -94,6 +94,98 @@ const emptyBatch = () => ({
 
 type FilterStatus = "todos" | "baixo" | "vencendo" | "vencidos" | "sem_lotes";
 
+// ─── Product Form fields (must be outside InventoryPage to avoid remount on re-render) ──
+
+const ProductFields = ({ form, setForm, T }: any) => (
+  <div className="grid grid-cols-2 gap-3">
+    <div className="col-span-2">
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome *</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="Ex: Coca-Cola 2L" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Coca-Cola" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Bebidas" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Sabor/Variação</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.flavor} onChange={e => setForm((f: any) => ({ ...f, flavor: e.target.value }))} placeholder="Ex: Original" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Peso/Volume</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 2L" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Unidade</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.unit} onChange={e => setForm((f: any) => ({ ...f, unit: e.target.value }))} placeholder="Unidade, kg, L..." />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Estoque Mínimo</Label>
+      <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.minStock} onChange={e => setForm((f: any) => ({ ...f, minStock: e.target.value }))} />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Preço de Venda (R$)</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))} placeholder="0,00" />
+    </div>
+    <div className="col-span-2">
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Descrição</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} placeholder="Opcional" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>NCM</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.ncm} onChange={e => setForm((f: any) => ({ ...f, ncm: e.target.value }))} placeholder="00000000" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>CFOP</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.cfop} onChange={e => setForm((f: any) => ({ ...f, cfop: e.target.value }))} placeholder="5102" />
+    </div>
+  </div>
+);
+
+const BatchFields = ({ form, setForm, T }: any) => (
+  <div className="grid grid-cols-2 gap-3">
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Quantidade *</Label>
+      <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.quantity} onChange={e => setForm((f: any) => ({ ...f, quantity: e.target.value }))} placeholder="0" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Custo de Compra (R$)</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.costPrice} onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))} placeholder="0,00" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.barcode} onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))} placeholder="EAN-13..." />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Número do Lote</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: LOT2025001" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fabricação</Label>
+      <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.manufactureDate} onChange={e => setForm((f: any) => ({ ...f, manufactureDate: e.target.value }))} />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
+      <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.expiryDate} onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))} />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fornecedor</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.supplier} onChange={e => setForm((f: any) => ({ ...f, supplier: e.target.value }))} placeholder="Nome do fornecedor" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Cód. Fornecedor</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.supplierCode} onChange={e => setForm((f: any) => ({ ...f, supplierCode: e.target.value }))} placeholder="Código interno" />
+    </div>
+    <div className="col-span-2">
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Data de Entrada</Label>
+      <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.entryDate} onChange={e => setForm((f: any) => ({ ...f, entryDate: e.target.value }))} />
+    </div>
+  </div>
+);
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
@@ -484,98 +576,6 @@ export default function InventoryPage() {
       </div>
     );
   }
-
-  // ─── Product Form fields ───────────────────────────────────────────────────
-
-  const ProductFields = ({ form, setForm, T }: any) => (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="col-span-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome *</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="Ex: Coca-Cola 2L" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Coca-Cola" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Bebidas" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Sabor/Variação</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.flavor} onChange={e => setForm((f: any) => ({ ...f, flavor: e.target.value }))} placeholder="Ex: Original" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Peso/Volume</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 2L" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Unidade</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.unit} onChange={e => setForm((f: any) => ({ ...f, unit: e.target.value }))} placeholder="Unidade, kg, L..." />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Estoque Mínimo</Label>
-        <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.minStock} onChange={e => setForm((f: any) => ({ ...f, minStock: e.target.value }))} />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Preço de Venda (R$)</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))} placeholder="0,00" />
-      </div>
-      <div className="col-span-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Descrição</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} placeholder="Opcional" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>NCM</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.ncm} onChange={e => setForm((f: any) => ({ ...f, ncm: e.target.value }))} placeholder="00000000" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>CFOP</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.cfop} onChange={e => setForm((f: any) => ({ ...f, cfop: e.target.value }))} placeholder="5102" />
-      </div>
-    </div>
-  );
-
-  const BatchFields = ({ form, setForm, T }: any) => (
-    <div className="grid grid-cols-2 gap-3">
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Quantidade *</Label>
-        <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.quantity} onChange={e => setForm((f: any) => ({ ...f, quantity: e.target.value }))} placeholder="0" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Custo de Compra (R$)</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.costPrice} onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))} placeholder="0,00" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.barcode} onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))} placeholder="EAN-13..." />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Número do Lote</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: LOT2025001" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fabricação</Label>
-        <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.manufactureDate} onChange={e => setForm((f: any) => ({ ...f, manufactureDate: e.target.value }))} />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
-        <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.expiryDate} onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))} />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fornecedor</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.supplier} onChange={e => setForm((f: any) => ({ ...f, supplier: e.target.value }))} placeholder="Nome do fornecedor" />
-      </div>
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Cód. Fornecedor</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.supplierCode} onChange={e => setForm((f: any) => ({ ...f, supplierCode: e.target.value }))} placeholder="Código interno" />
-      </div>
-      <div className="col-span-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Data de Entrada</Label>
-        <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.entryDate} onChange={e => setForm((f: any) => ({ ...f, entryDate: e.target.value }))} />
-      </div>
-    </div>
-  );
 
   // ─── Stats bar ─────────────────────────────────────────────────────────────
 
