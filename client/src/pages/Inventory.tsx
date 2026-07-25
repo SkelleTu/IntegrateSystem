@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon, Landmark, Building2 } from "lucide-react";
+import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon, Landmark, Building2, FileDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
@@ -98,6 +98,74 @@ export default function InventoryPage() {
     if (daysUntilExpiry <= 7) return "yellow";
     if (daysUntilExpiry <= 14) return "blue";
     return "safe";
+  };
+
+  const getExpiryBadge = (date: any): { label: string; dot: string; text: string } | null => {
+    if (!date) return null;
+    const days = differenceInDays(new Date(date), new Date());
+    if (days < 0)  return { label: "VENCIDO",   dot: "bg-red-500",    text: "text-red-400" };
+    if (days <= 7) return { label: "VENCE EM BREVE", dot: "bg-yellow-400", text: "text-yellow-400" };
+    return          { label: "VÁLIDO",    dot: "bg-green-400",  text: "text-green-400" };
+  };
+
+  const generateReport = () => {
+    const now = format(new Date(), "dd/MM/yyyy HH:mm");
+    const rows = inventoryWithNames.map(inv => {
+      const days = inv.expiryDate ? differenceInDays(new Date(inv.expiryDate), new Date()) : null;
+      const expiryStatus = days === null ? "—" : days < 0 ? "VENCIDO" : days <= 7 ? "VENCE EM BREVE" : "VÁLIDO";
+      const expiryColor = days === null ? "#888" : days < 0 ? "#f87171" : days <= 7 ? "#facc15" : "#4ade80";
+      const restocks = restocksByInventoryId[inv.id] || [];
+      const totalRestockQty = restocks.reduce((s: number, r: any) => s + (r.quantity || 0), 0);
+      return `
+        <tr>
+          <td>${inv.name}</td>
+          <td>${inv.barcode || "—"}</td>
+          <td>${inv.quantity} ${inv.unit}</td>
+          <td>${inv.itemsPerUnit > 1 ? inv.itemsPerUnit + " un/emb" : "—"}</td>
+          <td>R$ ${(inv.costPrice / 100).toFixed(2)}</td>
+          <td>${inv.salePrice ? "R$ " + (inv.salePrice / 100).toFixed(2) : "—"}</td>
+          <td>${inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yyyy") : "—"}</td>
+          <td style="color:${expiryColor};font-weight:bold">${expiryStatus}</td>
+          <td>${inv.minStock || 5}</td>
+          <td>${restocks.length > 0 ? restocks.length + " lote(s) / " + totalRestockQty + " un" : "—"}</td>
+          <td>${inv.ncm || "—"}</td>
+          <td>${inv.cfop || "—"}</td>
+        </tr>`;
+    }).join("");
+
+    const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+      <title>Relatório de Estoque — ${now}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 24px; }
+        h1 { font-size: 20px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; }
+        .subtitle { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        thead tr { background: #111; color: #fff; }
+        thead th { padding: 7px 8px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap; }
+        tbody tr { border-bottom: 1px solid #e5e7eb; }
+        tbody tr:nth-child(even) { background: #f9fafb; }
+        td { padding: 6px 8px; vertical-align: middle; }
+        .footer { margin-top: 24px; font-size: 9px; color: #aaa; text-align: right; }
+        @media print { body { padding: 12px; } }
+      </style>
+    </head><body>
+      <h1>Relatório de Estoque</h1>
+      <div class="subtitle">Gerado em ${now} &nbsp;|&nbsp; ${inventoryWithNames.length} produto(s)</div>
+      <table>
+        <thead><tr>
+          <th>Nome</th><th>Cód. Barras</th><th>Quantidade</th><th>Emb.</th>
+          <th>Custo</th><th>Venda</th><th>Validade</th><th>Status Val.</th>
+          <th>Estq. Mín.</th><th>Reposições</th><th>NCM</th><th>CFOP</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="footer">Aura System &mdash; Relatório de Estoque</div>
+      <script>window.onload = () => window.print();</script>
+    </body></html>`;
+
+    const win = window.open("", "_blank");
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
   const getItemRestockUrgency = (inventoryId: number): "safe" | "blue" | "yellow" | "red" => {
@@ -477,9 +545,19 @@ export default function InventoryPage() {
           <CardHeader className="border-b border-white/5 p-6 bg-white/5">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
               <div className="space-y-4">
-                <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
-                  <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
-                </CardTitle>
+                <div className="flex items-center justify-between gap-4">
+                  <CardTitle className="flex items-center gap-3 text-white font-black italic uppercase tracking-tighter text-xl lg:text-2xl">
+                    <Package className="h-6 w-6 lg:h-8 lg:w-8 text-primary" /> Inventário Geral
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    onClick={generateReport}
+                    className="flex items-center gap-2 h-9 px-4 text-[10px] font-black uppercase tracking-widest border border-primary/20 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/40 rounded-xl transition-all"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Relatório
+                  </Button>
+                </div>
                 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full sm:w-auto">
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
@@ -886,10 +964,20 @@ export default function InventoryPage() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-white/60 text-[10px] font-bold">
-                                <div className="flex flex-col leading-tight">
-                                  <span className={isExpiringSoon(inv.expiryDate) ? "text-red-500 animate-pulse" : ""}>
-                                    VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}
-                                  </span>
+                                <div className="flex flex-col leading-tight gap-1">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>VAL: {inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yy") : "N/A"}</span>
+                                    {inv.expiryDate && (() => {
+                                      const badge = getExpiryBadge(inv.expiryDate);
+                                      if (!badge) return null;
+                                      return (
+                                        <span className="flex items-center gap-1">
+                                          <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${badge.dot}`} />
+                                          <span className={`text-[8px] font-black uppercase tracking-wide ${badge.text}`}>{badge.label}</span>
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
                                   <span className="text-white/40">MÍN: {inv.minStock || 5}</span>
                                 </div>
                               </TableCell>
