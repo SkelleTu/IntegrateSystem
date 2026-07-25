@@ -184,6 +184,8 @@ export default function InventoryPage() {
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
     staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const batchesCache = new Map<number, Batch[]>();
