@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ShieldCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Loader2, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
@@ -13,6 +13,7 @@ export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const login = useLogin();
   const [, setLocation] = useLocation();
 
@@ -118,13 +119,24 @@ export default function Login() {
                   <div className="relative group/input">
                     <Input 
                       id="password"
-                      type="password" 
+                      type={showPassword ? "text" : "password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="bg-white/10 border-white/20 focus:border-primary/50 h-14 md:h-16 rounded-2xl text-white font-bold tracking-[0.5em] placeholder:tracking-normal placeholder:text-white/60 px-6 transition-all focus:ring-4 focus:ring-primary/5 focus:ring-offset-0"
+                      className="bg-white/10 border-white/20 focus:border-primary/50 h-14 md:h-16 rounded-2xl text-white font-bold tracking-[0.5em] placeholder:tracking-normal placeholder:text-white/60 px-6 pr-14 transition-all focus:ring-4 focus:ring-primary/5 focus:ring-offset-0"
                       placeholder="••••••••"
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 hover:text-primary transition-colors duration-200"
+                      tabIndex={-1}
+                      aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                    >
+                      {showPassword
+                        ? <EyeOff className="h-5 w-5" />
+                        : <Eye    className="h-5 w-5" />}
+                    </button>
                   </div>
                 </div>
 
