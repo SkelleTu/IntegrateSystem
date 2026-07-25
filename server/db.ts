@@ -309,6 +309,48 @@ const TABLE_DEFINITIONS = [
     rows_count INTEGER NOT NULL,
     filepath TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS products (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    brand TEXT,
+    category TEXT,
+    flavor TEXT,
+    unit TEXT NOT NULL DEFAULT 'Unidade',
+    weight TEXT,
+    description TEXT,
+    image_url TEXT,
+    min_stock INTEGER NOT NULL DEFAULT 5,
+    sale_price INTEGER,
+    ncm TEXT,
+    cfop TEXT,
+    codigo_balanca TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS batches (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    barcode TEXT,
+    supplier_code TEXT,
+    batch_number TEXT,
+    manufacture_date INTEGER,
+    expiry_date INTEGER,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    cost_price INTEGER NOT NULL DEFAULT 0,
+    supplier TEXT,
+    entry_date INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS batch_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    product_id INTEGER NOT NULL,
+    batch_id INTEGER,
+    type TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    reason TEXT,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
 ];
 
 export async function setupDatabase() {
@@ -339,6 +381,48 @@ export async function setupDatabase() {
       "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
       "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
       "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
+      `CREATE TABLE IF NOT EXISTS products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        brand TEXT,
+        category TEXT,
+        flavor TEXT,
+        unit TEXT NOT NULL DEFAULT 'Unidade',
+        weight TEXT,
+        description TEXT,
+        image_url TEXT,
+        min_stock INTEGER NOT NULL DEFAULT 5,
+        sale_price INTEGER,
+        ncm TEXT,
+        cfop TEXT,
+        codigo_balanca TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS batches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        barcode TEXT,
+        supplier_code TEXT,
+        batch_number TEXT,
+        manufacture_date INTEGER,
+        expiry_date INTEGER,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        cost_price INTEGER NOT NULL DEFAULT 0,
+        supplier TEXT,
+        entry_date INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS batch_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        batch_id INTEGER,
+        type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        reason TEXT,
+        user_id INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
       `CREATE TABLE IF NOT EXISTS data_backups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,

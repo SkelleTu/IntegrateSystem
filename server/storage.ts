@@ -5,6 +5,7 @@ import {
   cashRegisters, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
+  products, batches, batchLogs,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -24,9 +25,12 @@ import {
   type TimeClock, type InsertTimeClock,
   type UserSession,
   type FiscalSettings, type InsertFiscalSettings,
-  type Nfce, type InsertNfce
+  type Nfce, type InsertNfce,
+  type Product, type InsertProduct,
+  type Batch, type InsertBatch,
+  type BatchLog, type InsertBatchLog,
 } from "../shared/schema.js";
-import { eq, desc, asc, and, isNull, gte, lte, or, sql } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt } from "drizzle-orm";
 
 // Helper de escrita simultânea em TODOS os bancos ativos
 // Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
@@ -139,6 +143,22 @@ export interface IStorage {
   updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem>;
   getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined>;
   getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined>;
+
+  // Produto → Lotes
+  getProducts(): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null })[]>;
+  getProduct(id: number): Promise<Product | undefined>;
+  findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined>;
+  createProduct(data: InsertProduct): Promise<Product>;
+  updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
+  deleteProduct(id: number): Promise<void>;
+  getProductBatches(productId: number): Promise<Batch[]>;
+  createBatch(data: InsertBatch): Promise<Batch>;
+  updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch>;
+  deleteBatch(id: number): Promise<void>;
+  searchProducts(q: string): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null })[]>;
+  deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void>;
+  getBatchLogs(productId: number): Promise<BatchLog[]>;
+  createBatchLog(data: InsertBatchLog): Promise<BatchLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -964,6 +984,171 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
     return await db.select().from(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId)).orderBy(desc(inventoryRestocks.createdAt));
+  }
+
+  // ─── Produto → Lotes ──────────────────────────────────────────────────────
+
+  private async _enrichProducts(prods: Product[]) {
+    if (prods.length === 0) return [];
+    const allBatches = await db.select().from(batches);
+    return prods.map(p => {
+      const pb = allBatches.filter(b => b.productId === p.id && b.quantity > 0);
+      const totalQuantity = pb.reduce((s, b) => s + b.quantity, 0);
+      const sorted = pb.filter(b => b.expiryDate).sort((a, b) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
+      const nearestExpiry = sorted.length > 0 ? sorted[0].expiryDate : null;
+      return { ...p, totalQuantity, nearestExpiry };
+    });
+  }
+
+  async getProducts() {
+    this.logAction("Consulta produtos");
+    const prods = await db.select().from(products).orderBy(asc(products.name));
+    return this._enrichProducts(prods);
+  }
+
+  async getProduct(id: number): Promise<Product | undefined> {
+    const [p] = await db.select().from(products).where(eq(products.id, id));
+    return p;
+  }
+
+  async findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined> {
+    const all = await db.select().from(products);
+    const norm = (s?: string | null) => (s || "").trim().toLowerCase();
+    const match = all.find(p =>
+      norm(p.name) === norm(data.name) &&
+      norm(p.brand) === norm(data.brand) &&
+      norm(p.flavor) === norm(data.flavor) &&
+      norm(p.weight) === norm(data.weight) &&
+      norm(p.category) === norm(data.category)
+    );
+    return match;
+  }
+
+  async createProduct(data: InsertProduct): Promise<Product> {
+    this.logAction(`Novo produto: ${data.name}`);
+    return await dualWrite(async (database) => {
+      const now = new Date();
+      const [p] = await database.insert(products).values({ ...data, createdAt: now, updatedAt: now } as any).returning();
+      return p;
+    });
+  }
+
+  async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
+    this.logAction(`Atualização produto ID:${id}`);
+    return await dualWrite(async (database) => {
+      const [p] = await database.update(products).set({ ...data, updatedAt: new Date() } as any).where(eq(products.id, id)).returning();
+      return p;
+    });
+  }
+
+  async deleteProduct(id: number): Promise<void> {
+    this.logAction(`Exclusão produto ID:${id}`);
+    await dualWrite(async (database) => {
+      await database.delete(batchLogs).where(eq(batchLogs.productId, id));
+      await database.delete(batches).where(eq(batches.productId, id));
+      await database.delete(products).where(eq(products.id, id));
+    });
+  }
+
+  async getProductBatches(productId: number): Promise<Batch[]> {
+    return await db.select().from(batches)
+      .where(eq(batches.productId, productId))
+      .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
+  }
+
+  async createBatch(data: InsertBatch): Promise<Batch> {
+    this.logAction(`Novo lote produto ID:${data.productId}`);
+    return await dualWrite(async (database) => {
+      const now = new Date();
+      const [b] = await database.insert(batches).values({ ...data, createdAt: now } as any).returning();
+      // log entry
+      await database.insert(batchLogs).values({
+        productId: data.productId,
+        batchId: b.id,
+        type: "in",
+        quantity: data.quantity,
+        reason: "Entrada de lote",
+        userId: (data as any).userId || 0,
+        createdAt: now,
+      } as any);
+      return b;
+    });
+  }
+
+  async updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch> {
+    this.logAction(`Atualização lote ID:${id}`);
+    return await dualWrite(async (database) => {
+      const [b] = await database.update(batches).set(data as any).where(eq(batches.id, id)).returning();
+      return b;
+    });
+  }
+
+  async deleteBatch(id: number): Promise<void> {
+    this.logAction(`Exclusão lote ID:${id}`);
+    await dualWrite(async (database) => {
+      await database.delete(batchLogs).where(eq(batchLogs.batchId, id));
+      await database.delete(batches).where(eq(batches.id, id));
+    });
+  }
+
+  async searchProducts(q: string) {
+    const all = await db.select().from(products);
+    const allBatchesList = await db.select().from(batches);
+    const norm = (s?: string | null) => (s || "").toLowerCase();
+    const qn = norm(q);
+    // Also search by barcode across batches
+    const barcodeMatches = new Set(
+      allBatchesList.filter(b => norm(b.barcode).includes(qn) || norm(b.supplierCode).includes(qn)).map(b => b.productId)
+    );
+    const matched = all.filter(p =>
+      norm(p.name).includes(qn) ||
+      norm(p.brand).includes(qn) ||
+      norm(p.category).includes(qn) ||
+      norm(p.flavor).includes(qn) ||
+      norm(p.codigoBalanca).includes(qn) ||
+      barcodeMatches.has(p.id)
+    );
+    return this._enrichProducts(matched);
+  }
+
+  async deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void> {
+    this.logAction(`Baixa FEFO produto ID:${productId} qty:${qty}`);
+    await dualWrite(async (database) => {
+      // Load active batches sorted FEFO
+      const activeBatches = await database.select().from(batches)
+        .where(and(eq(batches.productId, productId), gte(batches.quantity, 1)))
+        .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
+      
+      let remaining = qty;
+      for (const batch of activeBatches) {
+        if (remaining <= 0) break;
+        const deduct = Math.min(remaining, batch.quantity);
+        await database.update(batches).set({ quantity: batch.quantity - deduct }).where(eq(batches.id, batch.id));
+        await database.insert(batchLogs).values({
+          productId,
+          batchId: batch.id,
+          type: "out",
+          quantity: deduct,
+          reason,
+          userId,
+          createdAt: new Date(),
+        } as any);
+        remaining -= deduct;
+      }
+    });
+  }
+
+  async getBatchLogs(productId: number): Promise<BatchLog[]> {
+    return await db.select().from(batchLogs)
+      .where(eq(batchLogs.productId, productId))
+      .orderBy(desc(batchLogs.createdAt));
+  }
+
+  async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
+    return await dualWrite(async (database) => {
+      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
+      return log;
+    });
   }
 }
 

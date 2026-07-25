@@ -209,6 +209,66 @@ export const inventoryRestocks = pgTable("inventory_restocks", {
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+// ─── Novo sistema Produto → Lotes ─────────────────────────────────────────────
+
+export const products = pgTable("products", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  category: text("category"),
+  flavor: text("flavor"),
+  unit: text("unit").notNull().default("Unidade"),
+  weight: text("weight"), // ex: "500g", "1L", "2kg"
+  description: text("description"),
+  imageUrl: text("image_url"),
+  minStock: integer("min_stock").notNull().default(5),
+  salePrice: integer("sale_price"), // in cents
+  ncm: text("ncm"),
+  cfop: text("cfop"),
+  codigoBalanca: text("codigo_balanca"),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const batches = pgTable("batches", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  productId: integer("product_id").notNull(),
+  barcode: text("barcode"),
+  supplierCode: text("supplier_code"),
+  batchNumber: text("batch_number"),
+  manufactureDate: integer("manufacture_date", { mode: 'timestamp' }),
+  expiryDate: integer("expiry_date", { mode: 'timestamp' }),
+  quantity: integer("quantity").notNull().default(0),
+  costPrice: integer("cost_price").notNull().default(0), // in cents
+  supplier: text("supplier"),
+  entryDate: integer("entry_date", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const batchLogs = pgTable("batch_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  productId: integer("product_id").notNull(),
+  batchId: integer("batch_id"),
+  type: text("type").notNull(), // "in","out","adjust","loss","cancel"
+  quantity: integer("quantity").notNull(),
+  reason: text("reason"),
+  userId: integer("user_id").notNull(),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+});
+
+export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertBatchSchema   = createInsertSchema(batches).omit({ id: true, createdAt: true });
+export const insertBatchLogSchema = createInsertSchema(batchLogs).omit({ id: true, createdAt: true });
+
+export type Product       = typeof products.$inferSelect;
+export type Batch         = typeof batches.$inferSelect;
+export type BatchLog      = typeof batchLogs.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type InsertBatch   = z.infer<typeof insertBatchSchema>;
+export type InsertBatchLog = z.infer<typeof insertBatchLogSchema>;
+
+// ─── Fim do sistema Produto → Lotes ───────────────────────────────────────────
+
 // Helper types and schemas
 export const fiscalSettings = pgTable("fiscal_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),

@@ -803,6 +803,156 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Produto → Lotes API ────────────────────────────────────────────────────
+
+  app.get("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const { q } = req.query;
+      const items = q
+        ? await storage.searchProducts(q as string)
+        : await storage.getProducts();
+      res.json(items);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao listar produtos" });
+    }
+  });
+
+  app.get("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      const p = await storage.getProduct(Number(req.params.id));
+      if (!p) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products/check-duplicate", isAuthenticated, async (req, res) => {
+    try {
+      const dup = await storage.findDuplicateProduct(req.body);
+      res.json(dup || null);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const { salePrice, minStock, ...rest } = req.body;
+      const data = {
+        ...rest,
+        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        minStock: minStock ? Number(minStock) : 5,
+      };
+      const p = await storage.createProduct(data);
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar produto" });
+    }
+  });
+
+  app.put("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { salePrice, minStock, ...rest } = req.body;
+      const data = {
+        ...rest,
+        salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
+        minStock: minStock !== undefined ? Number(minStock) : undefined,
+      };
+      const p = await storage.updateProduct(Number(req.params.id), data);
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar produto" });
+    }
+  });
+
+  app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteProduct(Number(req.params.id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao excluir produto" });
+    }
+  });
+
+  // Batches
+  app.get("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+    try {
+      const b = await storage.getProductBatches(Number(req.params.id));
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const productId = Number(req.params.id);
+      const { quantity, costPrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const b = await storage.createBatch({
+        productId,
+        ...rest,
+        quantity: Number(quantity) || 0,
+        costPrice: costPrice ? Math.round(Number(String(costPrice).replace(",", ".")) * 100) : 0,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
+        entryDate: entryDate ? new Date(entryDate) : new Date(),
+        userId: user.id,
+      } as any);
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar lote" });
+    }
+  });
+
+  app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { quantity, costPrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const data: any = { ...rest };
+      if (quantity !== undefined) data.quantity = Number(quantity);
+      if (costPrice !== undefined) data.costPrice = Math.round(Number(String(costPrice).replace(",", ".")) * 100);
+      if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
+      if (manufactureDate !== undefined) data.manufactureDate = manufactureDate ? new Date(manufactureDate) : null;
+      if (entryDate !== undefined) data.entryDate = new Date(entryDate);
+      const b = await storage.updateBatch(Number(req.params.id), data);
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar lote" });
+    }
+  });
+
+  app.delete("/api/batches/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteBatch(Number(req.params.id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao excluir lote" });
+    }
+  });
+
+  app.post("/api/products/:id/deduct", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { quantity, reason } = req.body;
+      await storage.deductBatchesFefo(Number(req.params.id), Number(quantity), user.id, reason || "Baixa manual");
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/products/:id/logs", isAuthenticated, async (req, res) => {
+    try {
+      const logs = await storage.getBatchLogs(Number(req.params.id));
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Fim Produto → Lotes API ────────────────────────────────────────────────
+
   app.get("/api/menu-items", async (req, res) => {
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,
