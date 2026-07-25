@@ -64,6 +64,13 @@ export default function InventoryPage() {
   const [sortBy, setSortBy] = useState<"name" | "price" | "quantity">("name");
 
   const [restockModalOpen, setRestockModalOpen] = useState(false);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportOrientation, setReportOrientation] = useState<"portrait" | "landscape">("landscape");
+  const [reportColumns, setReportColumns] = useState<Record<string, boolean>>({
+    nome: true, barcode: true, quantidade: true, embalagem: false,
+    custo: true, venda: true, validade: true, statusVal: true,
+    minStock: false, reposicoes: false, ncm: false, cfop: false,
+  });
   const [restockItem, setRestockItem] = useState<any>(null);
   const [restockQuantity, setRestockQuantity] = useState("");
   const [restockUnit, setRestockUnit] = useState("");
@@ -108,30 +115,56 @@ export default function InventoryPage() {
     return          { label: "VÁLIDO",    dot: "bg-green-400",  text: "text-green-400" };
   };
 
+  const REPORT_COLS = [
+    { key: "nome",       label: "Nome do Produto" },
+    { key: "barcode",    label: "Código de Barras" },
+    { key: "quantidade", label: "Quantidade" },
+    { key: "embalagem",  label: "Embalagem (Un/Emb)" },
+    { key: "custo",      label: "Preço de Custo" },
+    { key: "venda",      label: "Preço de Venda" },
+    { key: "validade",   label: "Data de Validade" },
+    { key: "statusVal",  label: "Status de Validade" },
+    { key: "minStock",   label: "Estoque Mínimo" },
+    { key: "reposicoes", label: "Reposições" },
+    { key: "ncm",        label: "NCM (Fiscal)" },
+    { key: "cfop",       label: "CFOP (Fiscal)" },
+  ];
+
   const generateReport = () => {
+    const cols = REPORT_COLS.filter(c => reportColumns[c.key]);
     const now = format(new Date(), "dd/MM/yyyy HH:mm");
+
+    const headerCells = cols.map(c => `<th>${c.label}</th>`).join("");
+
     const rows = inventoryWithNames.map(inv => {
       const days = inv.expiryDate ? differenceInDays(new Date(inv.expiryDate), new Date()) : null;
       const expiryStatus = days === null ? "—" : days < 0 ? "VENCIDO" : days <= 7 ? "VENCE EM BREVE" : "VÁLIDO";
-      const expiryColor = days === null ? "#888" : days < 0 ? "#f87171" : days <= 7 ? "#facc15" : "#4ade80";
+      const expiryColor = days === null ? "#888" : days < 0 ? "#f87171" : days <= 7 ? "#b45309" : "#16a34a";
       const restocks = restocksByInventoryId[inv.id] || [];
       const totalRestockQty = restocks.reduce((s: number, r: any) => s + (r.quantity || 0), 0);
-      return `
-        <tr>
-          <td>${inv.name}</td>
-          <td>${inv.barcode || "—"}</td>
-          <td>${inv.quantity} ${inv.unit}</td>
-          <td>${inv.itemsPerUnit > 1 ? inv.itemsPerUnit + " un/emb" : "—"}</td>
-          <td>R$ ${(inv.costPrice / 100).toFixed(2)}</td>
-          <td>${inv.salePrice ? "R$ " + (inv.salePrice / 100).toFixed(2) : "—"}</td>
-          <td>${inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yyyy") : "—"}</td>
-          <td style="color:${expiryColor};font-weight:bold">${expiryStatus}</td>
-          <td>${inv.minStock || 5}</td>
-          <td>${restocks.length > 0 ? restocks.length + " lote(s) / " + totalRestockQty + " un" : "—"}</td>
-          <td>${inv.ncm || "—"}</td>
-          <td>${inv.cfop || "—"}</td>
-        </tr>`;
+
+      const cellMap: Record<string, string> = {
+        nome:       inv.name,
+        barcode:    inv.barcode || "—",
+        quantidade: `${inv.quantity} ${inv.unit}`,
+        embalagem:  inv.itemsPerUnit > 1 ? `${inv.itemsPerUnit} un/emb` : "—",
+        custo:      `R$ ${(inv.costPrice / 100).toFixed(2)}`,
+        venda:      inv.salePrice ? `R$ ${(inv.salePrice / 100).toFixed(2)}` : "—",
+        validade:   inv.expiryDate ? format(new Date(inv.expiryDate), "dd/MM/yyyy") : "—",
+        statusVal:  `<span style="color:${expiryColor};font-weight:bold">${expiryStatus}</span>`,
+        minStock:   String(inv.minStock || 5),
+        reposicoes: restocks.length > 0 ? `${restocks.length} lote(s) / ${totalRestockQty} un` : "—",
+        ncm:        inv.ncm || "—",
+        cfop:       inv.cfop || "—",
+      };
+
+      const cells = cols.map(c => `<td>${cellMap[c.key]}</td>`).join("");
+      return `<tr>${cells}</tr>`;
     }).join("");
+
+    const orientCSS = reportOrientation === "landscape"
+      ? "@page { size: A4 landscape; } @media print { body { padding: 12px; } }"
+      : "@page { size: A4 portrait; }  @media print { body { padding: 12px; } }";
 
     const html = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
       <title>Relatório de Estoque — ${now}</title>
@@ -147,17 +180,13 @@ export default function InventoryPage() {
         tbody tr:nth-child(even) { background: #f9fafb; }
         td { padding: 6px 8px; vertical-align: middle; }
         .footer { margin-top: 24px; font-size: 9px; color: #aaa; text-align: right; }
-        @media print { body { padding: 12px; } }
+        ${orientCSS}
       </style>
     </head><body>
       <h1>Relatório de Estoque</h1>
-      <div class="subtitle">Gerado em ${now} &nbsp;|&nbsp; ${inventoryWithNames.length} produto(s)</div>
+      <div class="subtitle">Gerado em ${now} &nbsp;|&nbsp; ${inventoryWithNames.length} produto(s) &nbsp;|&nbsp; ${reportOrientation === "landscape" ? "Paisagem" : "Retrato"}</div>
       <table>
-        <thead><tr>
-          <th>Nome</th><th>Cód. Barras</th><th>Quantidade</th><th>Emb.</th>
-          <th>Custo</th><th>Venda</th><th>Validade</th><th>Status Val.</th>
-          <th>Estq. Mín.</th><th>Reposições</th><th>NCM</th><th>CFOP</th>
-        </tr></thead>
+        <thead><tr>${headerCells}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="footer">Aura System &mdash; Relatório de Estoque</div>
@@ -166,6 +195,7 @@ export default function InventoryPage() {
 
     const win = window.open("", "_blank");
     if (win) { win.document.write(html); win.document.close(); }
+    setReportModalOpen(false);
   };
 
   const getItemRestockUrgency = (inventoryId: number): "safe" | "blue" | "yellow" | "red" => {
@@ -551,7 +581,7 @@ export default function InventoryPage() {
                   </CardTitle>
                   <Button
                     variant="ghost"
-                    onClick={generateReport}
+                    onClick={() => setReportModalOpen(true)}
                     className="flex items-center gap-2 h-9 px-4 text-[10px] font-black uppercase tracking-widest border border-primary/20 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/40 rounded-xl transition-all"
                   >
                     <FileDown className="h-3.5 w-3.5" />
@@ -1223,6 +1253,131 @@ export default function InventoryPage() {
                     Confirmar Reposição
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Configuração do Relatório */}
+      <Dialog open={reportModalOpen} onOpenChange={setReportModalOpen}>
+        <DialogContent className="bg-[#0a0f0f] border-white/10 text-white max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary flex items-center gap-2">
+              <FileDown className="h-5 w-5" /> Configurar Relatório
+            </DialogTitle>
+            <DialogDescription className="text-white/50 text-xs uppercase tracking-widest font-bold">
+              Escolha as colunas e a orientação do relatório
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-2">
+            {/* Orientação */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary border-b border-primary/20 pb-2">
+                Orientação da Página
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {([
+                  { value: "portrait",  label: "Retrato",  desc: "Vertical (A4)" },
+                  { value: "landscape", label: "Paisagem", desc: "Horizontal (A4)" },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setReportOrientation(opt.value)}
+                    className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${
+                      reportOrientation === opt.value
+                        ? "border-primary/60 bg-primary/10 text-primary"
+                        : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"
+                    }`}
+                  >
+                    {/* Page icon */}
+                    <div className={`border-2 rounded-sm flex items-center justify-center ${
+                      opt.value === "portrait" ? "w-8 h-11" : "w-11 h-8"
+                    } ${reportOrientation === opt.value ? "border-primary/60" : "border-white/20"}`}>
+                      <div className={`rounded-[1px] ${
+                        opt.value === "portrait" ? "w-5 h-[3px]" : "w-[3px] h-5"
+                      } ${reportOrientation === opt.value ? "bg-primary/60" : "bg-white/20"}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[10px] font-black uppercase tracking-widest">{opt.label}</p>
+                      <p className="text-[8px] opacity-60">{opt.desc}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Colunas */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between border-b border-primary/20 pb-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.25em] text-primary">
+                  Colunas do Relatório
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setReportColumns(prev => Object.fromEntries(Object.keys(prev).map(k => [k, true])))}
+                    className="text-[8px] font-black uppercase tracking-widest text-primary/70 hover:text-primary transition-colors"
+                  >
+                    Todas
+                  </button>
+                  <span className="text-white/20 text-[8px]">|</span>
+                  <button
+                    onClick={() => setReportColumns(prev => Object.fromEntries(Object.keys(prev).map(k => [k, false])))}
+                    className="text-[8px] font-black uppercase tracking-widest text-white/40 hover:text-white/70 transition-colors"
+                  >
+                    Nenhuma
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-y-1 gap-x-4">
+                {REPORT_COLS.map(col => (
+                  <label
+                    key={col.key}
+                    className="flex items-center gap-2.5 py-2 px-3 rounded-lg cursor-pointer hover:bg-white/5 transition-colors group"
+                  >
+                    <div
+                      onClick={() => setReportColumns(prev => ({ ...prev, [col.key]: !prev[col.key] }))}
+                      className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all cursor-pointer ${
+                        reportColumns[col.key]
+                          ? "bg-primary border-primary"
+                          : "border-white/20 bg-transparent group-hover:border-white/40"
+                      }`}
+                    >
+                      {reportColumns[col.key] && (
+                        <svg className="w-2.5 h-2.5 text-black" viewBox="0 0 10 10" fill="none">
+                          <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      )}
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                        reportColumns[col.key] ? "text-white" : "text-white/40"
+                      }`}
+                    >
+                      {col.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+              <Button
+                variant="ghost"
+                onClick={() => setReportModalOpen(false)}
+                className="flex-1 h-10 text-[10px] font-black uppercase tracking-widest text-white/40 hover:text-white border border-white/10 hover:border-white/20 rounded-xl"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={generateReport}
+                disabled={!Object.values(reportColumns).some(Boolean)}
+                className="flex-1 h-10 bg-primary hover:bg-primary/90 text-black font-black text-[10px] uppercase tracking-widest rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.2)] disabled:opacity-40"
+              >
+                <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                Gerar Relatório
               </Button>
             </div>
           </div>
