@@ -292,12 +292,18 @@ export default function InventoryPage() {
 
     // Filtro de status
     if (filterStatus !== "todos") {
+      const urgencyPriority: Record<string, number> = { safe: 0, blue: 1, yellow: 2, red: 3 };
       items = items.filter((inv) => {
-        if (filterStatus === "sem_estoque") return inv.quantity <= 0 || inv.quantity < (inv.minStock || 0);
-        const urgency = getItemRestockUrgency(inv.id);
-        if (filterStatus === "urgente")   return urgency === "red";
-        if (filterStatus === "atencao")   return urgency === "yellow";
-        if (filterStatus === "em_breve")  return urgency === "blue";
+        if (filterStatus === "sem_estoque") return inv.quantity <= 0 || (inv.minStock > 0 && inv.quantity < inv.minStock);
+        // Considera a validade do próprio item E dos lotes de reposição — usa a pior urgência
+        const itemUrgency   = getExpiryUrgency(inv.expiryDate);
+        const restockUrgency = getItemRestockUrgency(inv.id);
+        const urgency = urgencyPriority[itemUrgency] >= urgencyPriority[restockUrgency]
+          ? itemUrgency
+          : restockUrgency;
+        if (filterStatus === "urgente")  return urgency === "red";
+        if (filterStatus === "atencao")  return urgency === "yellow";
+        if (filterStatus === "em_breve") return urgency === "blue";
         return true;
       });
     }
