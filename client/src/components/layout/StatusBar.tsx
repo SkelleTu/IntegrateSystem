@@ -82,19 +82,20 @@ export function StatusBar() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 w-full h-8 bg-black/80 backdrop-blur-md border-t border-white/10 z-[10000] px-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-zinc-400 select-none">
+    <div className="fixed bottom-0 left-0 w-full h-8 bg-black/80 backdrop-blur-md border-t border-white/10 z-[10000] px-2 md:px-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-zinc-400 select-none overflow-hidden">
       {/* Left side: DB Status & User */}
-      <div className="flex items-center gap-6">
+      <div className="flex items-center gap-3 md:gap-6 min-w-0 overflow-hidden">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="flex items-center gap-2 cursor-help">
+              <div className="flex items-center gap-1.5 cursor-help shrink-0">
                 <div className={cn("w-2 h-2 rounded-full animate-pulse", getStatusColor(dbStatus?.status || "online"))} />
                 <span className={cn(
+                  "hidden xs:inline",
                   dbStatus?.status === "online" ? "text-green-500" : 
                   dbStatus?.status === "unstable" ? "text-yellow-500" : "text-red-500"
                 )}>
-                  {dbStatus?.status === "online" ? "AURA ONLINE" : dbStatus?.status === "unstable" ? "INSTABILIDADE" : "OFFLINE"}
+                  {dbStatus?.status === "online" ? "AURA" : dbStatus?.status === "unstable" ? "INSTÁVEL" : "OFFLINE"}
                 </span>
               </div>
             </TooltipTrigger>
@@ -105,10 +106,10 @@ export function StatusBar() {
         </TooltipProvider>
 
         {user && (
-          <div className="flex items-center gap-2 border-l border-white/5 pl-6">
+          <div className="flex items-center gap-1.5 border-l border-white/5 pl-3 md:pl-6 shrink-0">
             <UserIcon className="w-3 h-3 text-primary" />
-            <span className="text-zinc-200">{user.username}</span>
-            <span className="text-[8px] bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">{user.role}</span>
+            <span className="text-zinc-200 truncate max-w-[80px] md:max-w-none">{user.username}</span>
+            <span className="hidden sm:inline text-[8px] bg-white/10 px-1.5 py-0.5 rounded text-zinc-400">{user.role}</span>
           </div>
         )}
 
@@ -118,10 +119,10 @@ export function StatusBar() {
               <TooltipTrigger asChild>
                 <button 
                   onClick={() => setLocation("/admin/windows-app")}
-                  className="flex items-center gap-2 border-l border-white/5 pl-6 hover:text-primary transition-colors cursor-pointer group"
+                  className="hidden md:flex items-center gap-2 border-l border-white/5 pl-6 hover:text-primary transition-colors cursor-pointer group"
                 >
                   <Monitor className="w-3 h-3 text-zinc-500 group-hover:text-primary transition-colors" />
-                  <span className="text-[9px] text-zinc-500 group-hover:text-primary transition-colors">AURA WINDOWS</span>
+                  <span className="text-[9px] text-zinc-500 group-hover:text-primary transition-colors">WINDOWS</span>
                 </button>
               </TooltipTrigger>
               <TooltipContent className="bg-zinc-900 border-white/10 text-white text-[10px] p-2">
@@ -131,36 +132,36 @@ export function StatusBar() {
           </TooltipProvider>
         )}
 
-        <div className="flex items-center gap-2 border-l border-white/5 pl-6 overflow-hidden">
-          <Database className={cn("w-3 h-3 transition-colors", isSyncing ? "text-primary" : "text-zinc-600")} />
-          <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 border-l border-white/5 pl-3 md:pl-6 overflow-hidden">
+          <Database className={cn("w-3 h-3 transition-colors shrink-0", isSyncing ? "text-primary" : "text-zinc-600")} />
+          <div className="flex items-center gap-2 min-w-0">
             {isSyncing ? (
               <span className="text-[9px] text-primary/80 animate-in fade-in slide-in-from-left-2 flex items-center gap-1">
-                <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                SINCRONIZANDO DADOS...
+                <RefreshCw className="w-2.5 h-2.5 animate-spin shrink-0" />
+                <span className="hidden md:inline">SINCRONIZANDO...</span>
               </span>
             ) : (
-              <span className="text-[9px] text-zinc-600">BANCO DE DADOS TURSO ATIVO</span>
+              <span className="text-[9px] text-zinc-600 truncate">BANCO DE DADOS TURSO ATIVO</span>
             )}
           </div>
         </div>
       </div>
 
       {/* Center: Real-time Data Feed */}
-      <div className="hidden lg:flex items-center gap-4 text-[9px] text-primary italic truncate max-w-md animate-in fade-in slide-in-from-bottom-1">
-        <div className="flex items-center gap-2">
-           <ArrowUpRight className="w-3 h-3 text-green-500" />
-           <span className="font-mono tracking-tighter">{displayAction}</span>
+      <div className="hidden lg:flex items-center gap-4 text-[9px] text-primary italic truncate max-w-md animate-in fade-in slide-in-from-bottom-1 px-4">
+        <div className="flex items-center gap-2 min-w-0">
+           <ArrowUpRight className="w-3 h-3 text-green-500 shrink-0" />
+           <span className="font-mono tracking-tighter truncate">{displayAction}</span>
         </div>
       </div>
 
       {/* Right side: Date & Time */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 md:gap-6 shrink-0">
+        <div className="hidden md:flex items-center gap-2">
           <Calendar className="w-3 h-3 text-zinc-500" />
           <span>{format(time, "dd 'DE' MMMM 'DE' yyyy", { locale: ptBR })}</span>
         </div>
-        <div className="flex items-center gap-2 border-l border-white/5 pl-6 min-w-[80px] justify-end">
+        <div className="flex items-center gap-1.5 md:gap-2 md:border-l md:border-white/5 md:pl-6">
           <Clock className="w-3 h-3 text-primary" />
           <span className="text-zinc-200 tabular-nums">{format(time, "HH:mm:ss")}</span>
         </div>

@@ -71,7 +71,7 @@ export default function Home() {
   const isInventoryLocked = user?.role !== "admin";
 
   return (
-    <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-32">
+    <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-20 md:pt-28">
       {/* Background Image with Overlay - Match Landing Page Style */}
       <div 
         className="absolute inset-0 z-[-2] bg-center bg-no-repeat opacity-40 blur-[2px] bg-fixed"
@@ -85,30 +85,34 @@ export default function Home() {
       <motion.div 
         initial={{ opacity: 0, y: -30 }}
         animate={{ opacity: 1, y: 0 }}
-        className="z-10 mb-8 md:mb-16 mt-4 md:mt-8 w-full max-w-[1400px] flex items-center justify-center relative"
+        className="z-10 mb-8 md:mb-16 mt-4 md:mt-8 w-full max-w-[1400px]"
       >
-        {/* Logo — absolutamente livre, bem à esquerda */}
-        <div className="absolute left-0 top-[28%] -translate-y-1/2 z-20 pointer-events-none select-none">
-          <img
-            src={auraLogo}
-            alt="Aura"
-            className="w-32 sm:w-44 md:w-56 lg:w-[276px] h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
-          />
-        </div>
+        {/* Mobile: logo centralizada em cima, texto abaixo. Desktop: logo à esquerda, texto à direita */}
+        <div className="flex flex-col items-center text-center sm:flex-row sm:items-center sm:justify-center sm:text-left sm:gap-8 lg:gap-12">
 
-        {/* Texto — BEM-VINDO e subtítulo */}
-        <div className="text-left relative z-10">
-          <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-4 md:mb-6">
-            <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
-              Plataforma Multi-Serviços
+          {/* Logo */}
+          <div className="shrink-0 pointer-events-none select-none mb-4 sm:mb-0">
+            <img
+              src={auraLogo}
+              alt="Aura"
+              className="w-24 sm:w-36 md:w-48 lg:w-[240px] xl:w-[276px] h-auto drop-shadow-[0_0_40px_rgba(0,229,255,0.25)] opacity-90"
+            />
+          </div>
+
+          {/* Texto — BEM-VINDO e subtítulo */}
+          <div className="relative z-10">
+            <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-3 md:mb-5">
+              <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
+                Plataforma Multi-Serviços
+              </p>
+            </div>
+            <h1 className="text-3xl sm:text-5xl md:text-7xl lg:text-8xl xl:text-9xl font-black mb-3 tracking-tighter text-white italic leading-none uppercase">
+              BEM-VINDO
+            </h1>
+            <p className="text-white/60 text-sm sm:text-base md:text-lg font-medium tracking-tight opacity-90 max-w-lg leading-relaxed">
+              Selecione o estabelecimento para iniciar seu atendimento personalizado.
             </p>
           </div>
-          <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-9xl font-black mb-4 tracking-tighter text-white italic leading-none uppercase">
-            BEM-VINDO
-          </h1>
-          <p className="text-white/60 text-sm sm:text-base md:text-lg font-medium tracking-tight opacity-90 max-w-lg leading-relaxed">
-            Selecione o estabelecimento para iniciar seu atendimento personalizado.
-          </p>
         </div>
       </motion.div>
 
