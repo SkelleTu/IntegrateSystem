@@ -544,40 +544,41 @@ export default function InventoryPage() {
 
   // ─── Theme tokens ──────────────────────────────────────────────────────────
   const T = isLight ? {
-    page:          "bg-slate-100",
-    surface:       "bg-white border-slate-200 shadow-md",
-    card:          "bg-white border-slate-200 shadow-md",
-    cardHd:        "bg-slate-50 border-slate-100",
-    formSection:   "bg-slate-50 border-slate-200",
-    input:         "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-cyan-500",
-    inputDate:     "bg-white border-slate-300 text-slate-900 [color-scheme:light]",
-    selectTrigger: "bg-white border-slate-300 text-slate-800",
-    dropdown:      "bg-white border-slate-200",
+    // Accessibility-first light theme — all text values meet WCAG AA (≥4.5:1)
+    page:          "bg-stone-100",
+    surface:       "bg-white border-slate-300 shadow-lg",
+    card:          "bg-white border-slate-300 shadow-lg",
+    cardHd:        "bg-slate-50 border-slate-200",
+    formSection:   "bg-slate-50 border-slate-300",
+    input:         "bg-white border-slate-400 text-slate-900 placeholder:text-slate-500 focus:border-cyan-600 text-sm",
+    inputDate:     "bg-white border-slate-400 text-slate-900 [color-scheme:light] text-sm",
+    selectTrigger: "bg-white border-slate-400 text-slate-900 text-sm",
+    dropdown:      "bg-white border-slate-300 shadow-lg",
     dropdownItem:  "text-slate-900 focus:bg-slate-100",
     h1:            "text-slate-900",
-    subtitle:      "text-slate-400",
-    body:          "text-slate-700",
-    bodyMd:        "text-slate-600",
-    muted:         "text-slate-400",
-    label:         "text-slate-500",
-    badge:         "bg-cyan-50 border-cyan-300 text-cyan-800",
+    subtitle:      "text-slate-600",          // era slate-400 — ilegível
+    body:          "text-slate-800",
+    bodyMd:        "text-slate-700",          // era slate-600
+    muted:         "text-slate-600",          // era slate-400 — ilegível
+    label:         "text-slate-700 !text-xs font-semibold",  // era slate-500 + [9px] — aumentei contraste e tamanho
+    badge:         "bg-cyan-100 border-cyan-500 text-cyan-900",
     tableHd:       "bg-slate-100 hover:bg-transparent",
-    tableHdText:   "text-slate-500",
-    tableRow:      "border-slate-100 hover:bg-cyan-50/60",
+    tableHdText:   "text-slate-700",          // era slate-500
+    tableRow:      "border-slate-200 hover:bg-cyan-50",
     cellPrimary:   "text-slate-900",
-    cellSub:       "text-slate-400",
-    fiscal:        "bg-cyan-50 border-cyan-100",
-    fiscalLabel:   "text-cyan-700",
-    dialog:        "bg-white border-slate-200 text-slate-900",
-    dialogDesc:    "text-slate-500",
-    dialogLabel:   "text-slate-500",
-    dialogInput:   "bg-white border-slate-300 text-slate-900 focus:border-cyan-500",
-    dialogInputDate:"bg-white border-slate-300 text-slate-900 [color-scheme:light]",
-    dialogDropdown:"bg-white border-slate-200",
-    toggleBtn:     "bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-200",
-    searchIcon:    "text-slate-400",
+    cellSub:       "text-slate-600",          // era slate-400 — ilegível
+    fiscal:        "bg-cyan-50 border-cyan-300",
+    fiscalLabel:   "text-cyan-800",           // era cyan-700
+    dialog:        "bg-white border-slate-300 text-slate-900",
+    dialogDesc:    "text-slate-700",          // era slate-500
+    dialogLabel:   "text-slate-700",          // era slate-500
+    dialogInput:   "bg-white border-slate-400 text-slate-900 focus:border-cyan-600 text-sm",
+    dialogInputDate:"bg-white border-slate-400 text-slate-900 [color-scheme:light] text-sm",
+    dialogDropdown:"bg-white border-slate-300 shadow-lg",
+    toggleBtn:     "bg-amber-100 border-amber-500 text-amber-900 hover:bg-amber-200",
+    searchIcon:    "text-slate-600",          // era slate-400
     cardTitleText: "text-slate-900",
-    restockUrgencyBg: { safe: "bg-slate-50", blue: "bg-blue-50", yellow: "bg-amber-50", red: "bg-red-50" },
+    restockUrgencyBg: { safe: "bg-white", blue: "bg-blue-50", yellow: "bg-amber-50", red: "bg-red-50" },
   } : {
     page:          "bg-transparent",
     surface:       "bg-black/40 backdrop-blur-md border-white/10 shadow-2xl",
@@ -1273,7 +1274,7 @@ export default function InventoryPage() {
             <div className="flex gap-3 mt-6">
               <Button
                 variant="ghost"
-                className={`flex-1 font-bold uppercase transition-colors duration-300 ${isLight ? "text-slate-500 hover:text-slate-900 border border-slate-200" : "text-white/60 hover:text-white"}`}
+                className={`flex-1 font-bold uppercase transition-colors duration-300 ${isLight ? "text-slate-700 hover:text-slate-900 border border-slate-300 bg-slate-50 hover:bg-slate-100" : "text-white/60 hover:text-white"}`}
                 onClick={() => setRestockModalOpen(false)}
                 data-testid="button-restock-cancel"
               >
@@ -1321,7 +1322,7 @@ export default function InventoryPage() {
                       reportOrientation === opt.value
                         ? "border-primary/60 bg-primary/10 text-primary"
                         : isLight
-                          ? "border-slate-200 bg-slate-50 text-slate-400 hover:border-slate-300"
+                          ? "border-slate-300 bg-slate-50 text-slate-700 hover:border-slate-400 hover:bg-white"
                           : "border-white/10 bg-white/5 text-white/50 hover:border-white/20"
                     }`}
                   >
@@ -1353,7 +1354,7 @@ export default function InventoryPage() {
                   </button>
                   <span className={`text-[8px] transition-colors duration-300 ${T.muted}`}>|</span>
                   <button onClick={() => setReportColumns(prev => Object.fromEntries(Object.keys(prev).map(k => [k, false])))}
-                    className={`text-[8px] font-black uppercase tracking-widest transition-colors ${isLight ? "text-slate-400 hover:text-slate-700" : "text-white/40 hover:text-white/70"}`}>
+                    className={`text-[8px] font-black uppercase tracking-widest transition-colors ${isLight ? "text-slate-600 hover:text-slate-900" : "text-white/40 hover:text-white/70"}`}>
                     Nenhuma
                   </button>
                 </div>
@@ -1391,7 +1392,7 @@ export default function InventoryPage() {
                 variant="ghost"
                 onClick={() => setReportModalOpen(false)}
                 className={`flex-1 h-10 text-[10px] font-black uppercase tracking-widest rounded-xl border transition-colors duration-300 ${
-                  isLight ? "text-slate-500 hover:text-slate-900 border-slate-200 hover:border-slate-300" : "text-white/40 hover:text-white border-white/10 hover:border-white/20"
+                  isLight ? "text-slate-700 hover:text-slate-900 border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400" : "text-white/40 hover:text-white border-white/10 hover:border-white/20"
                 }`}
               >
                 Cancelar
