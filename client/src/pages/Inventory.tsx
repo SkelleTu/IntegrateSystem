@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Package, AlertTriangle, Plus, Loader2, Search, RefreshCw, ChevronDown, ChevronUp, Clock, Upload, ImageIcon, Landmark, Building2, FileDown, Sun, Moon } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef, Fragment } from "react";
 import { format, addDays, isBefore, differenceInDays } from "date-fns";
 import Fuse from "fuse.js";
 
@@ -1017,7 +1017,7 @@ export default function InventoryPage() {
                         };
 
                         return (
-                          <>
+                          <Fragment key={inv.id}>
                             <TableRow 
                               key={inv.id} 
                               className={`transition-all group border-b last:border-0 ${T.tableRow} ${urgencyBorder[itemUrgency]} ${hasRestocks ? 'cursor-pointer' : ''}`}
@@ -1160,7 +1160,7 @@ export default function InventoryPage() {
                                 </TableRow>
                               );
                             })}
-                          </>
+                          </Fragment>
                         );
                       })
                     )}
