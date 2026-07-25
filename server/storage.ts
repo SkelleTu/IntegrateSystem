@@ -1,4 +1,5 @@
-import { db, dbLocal, isRemoteEnabled } from "./db.js";
+import { db, multiWrite } from "./db.js";
+import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
@@ -27,19 +28,12 @@ import {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql } from "drizzle-orm";
 
-// Helper para escrita dupla (Garante persistência)
+// Helper de escrita simultânea em TODOS os bancos ativos
+// Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
+// Após cada write crítico, agenda um auto-backup JSON (debounced 5s).
 async function dualWrite(operation: (database: any) => Promise<any>) {
-  const result = await operation(db); // Escreve no principal (Remoto se disponível)
-  
-  // Se o principal for o remoto, tentamos espelhar no local como cache/backup
-  if (isRemoteEnabled) {
-    try {
-      await operation(dbLocal).catch(() => {}); 
-    } catch (e) {
-      console.error("Falha no espelhamento local:", e);
-    }
-  }
-  
+  const result = await multiWrite(operation);
+  scheduleAutoBackup(); // salva snapshot JSON automaticamente
   return result;
 }
 

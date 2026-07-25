@@ -52,6 +52,7 @@ import {
 import MasterControl from "./pages/MasterControl";
 import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
 import AuraWindows from "./pages/AuraWindows";
+import Backup from "./pages/Backup";
 
 function Router() {
   const { data: user, isLoading } = useUser();
@@ -119,6 +120,7 @@ function Router() {
             <Route path="/admin/master" component={MasterControl} />
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
+            <Route path="/backup" component={Backup} />
             <Route component={NotFound} />
           </Switch>
         </main>

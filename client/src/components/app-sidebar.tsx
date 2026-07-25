@@ -29,7 +29,8 @@ import {
   History,
   X,
   FileText,
-  Monitor
+  Monitor,
+  ShieldCheck
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -464,6 +465,15 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                     >
                       <BarChart3 className="w-5 h-5" />
                       <span className="font-bold uppercase italic tracking-tighter">Monitoramento Global</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={() => { setLocation("/backup"); setOpen(false); }}
+                      className="hover:bg-primary/10 hover:text-primary transition-colors py-6"
+                    >
+                      <ShieldCheck className="w-5 h-5" />
+                      <span className="font-bold uppercase italic tracking-tighter">Backup & Dados</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </>

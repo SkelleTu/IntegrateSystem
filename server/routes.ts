@@ -1441,5 +1441,125 @@ export async function registerRoutes(
     console.log("Full business data seeded successfully");
   }
 
+  // ─── BACKUP / SAVE / LOAD ROUTES ────────────────────────────────────────────
+  const {
+    exportAllDataSync,
+    saveBackupToFile,
+    listBackups,
+    importDataFromSnapshot,
+    restoreFromFile,
+    getAutoBackupInfo,
+  } = await import("./backup.js");
+
+  // GET /api/backup/status — info do auto-backup e bancos ativos
+  const { isRemoteEnabled } = await import("./db.js");
+  app.get("/api/backup/status", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    res.json({
+      autoBackup: getAutoBackupInfo(),
+      databases: {
+        local: true,
+        remote: isRemoteEnabled,
+        count: isRemoteEnabled ? 2 : 1,
+      },
+    });
+  });
+
+  // GET /api/backup/export — baixa snapshot JSON completo
+  app.get("/api/backup/export", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const snapshot = exportAllDataSync();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="aura-backup-${timestamp}.json"`
+      );
+      res.send(JSON.stringify(snapshot, null, 2));
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao exportar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/save — salva snapshot nomeado em arquivo
+  app.post("/api/backup/save", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const { name } = req.body;
+      const filepath = saveBackupToFile(name || undefined);
+      const filename = filepath.split("/").pop()!;
+      res.json({ ok: true, filename, message: `Backup '${filename}' salvo com sucesso` });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao salvar backup: ${e.message}` });
+    }
+  });
+
+  // GET /api/backup/list — lista backups salvos
+  app.get("/api/backup/list", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      res.json(listBackups());
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao listar backups: ${e.message}` });
+    }
+  });
+
+  // GET /api/backup/download/:filename — baixa arquivo de backup específico
+  app.get("/api/backup/download/:filename", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    const { filename } = req.params;
+    // segurança: só permite nomes simples sem paths
+    if (filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ message: "Nome inválido" });
+    }
+    const filepath = path.join(process.cwd(), "attached_assets", "backups", filename);
+    if (!fs.existsSync(filepath)) return res.status(404).json({ message: "Arquivo não encontrado" });
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.sendFile(path.resolve(filepath));
+  });
+
+  // POST /api/backup/import — restaura a partir de JSON enviado no body
+  app.post("/api/backup/import", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const snapshot = req.body;
+      if (!snapshot || typeof snapshot !== "object") {
+        return res.status(400).json({ message: "JSON de backup inválido" });
+      }
+      const result = await importDataFromSnapshot(snapshot);
+      res.json({ ok: true, ...result });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/restore/:filename — restaura a partir de arquivo salvo
+  app.post("/api/backup/restore/:filename", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    const { filename } = req.params;
+    if (filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ message: "Nome inválido" });
+    }
+    try {
+      const result = await restoreFromFile(filename);
+      res.json({ ok: true, ...result, message: "Dados restaurados com sucesso" });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/restore-auto — restaura a partir do auto-backup
+  app.post("/api/backup/restore-auto", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const result = await restoreFromFile("auto-backup");
+      res.json({ ok: true, ...result, message: "Auto-backup restaurado com sucesso" });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar auto-backup: ${e.message}` });
+    }
+  });
+
   return httpServer;
 }
