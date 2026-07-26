@@ -9,7 +9,7 @@ import {
   Package, Search, Plus, Loader2, ChevronDown, ChevronUp,
   Sun, Moon, AlertTriangle, Trash2, Edit2, X, Tag,
   Calendar, Layers, TrendingDown, ShoppingCart, Clock, BarChart3,
-  ScanBarcode, CheckCircle2, XCircle, GripVertical
+  ScanBarcode, CheckCircle2, XCircle, GripVertical, Flame
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -246,6 +246,11 @@ export default function InventoryPage() {
   // ── "Novo Produto" extra: highlight flavor field when coming from variant flow ──
   const [highlightFlavor, setHighlightFlavor] = useState(false);
 
+  // ── Liquidar state ──
+  const [liquidarProduct, setLiquidarProduct] = useState<Product | null>(null);
+  const [liquidarPrice, setLiquidarPrice] = useState("");
+  const [liquidarReason, setLiquidarReason] = useState("");
+
   // ── Form state ──
   const [productForm, setProductForm] = useState(emptyProduct());
   const [batchForm, setBatchForm] = useState(emptyBatch());
@@ -386,6 +391,18 @@ export default function InventoryPage() {
   const deductMut = useMutation({
     mutationFn: ({ id, qty, reason }: any) => apiRequest("POST", `/api/products/${id}/deduct`, { quantity: qty, reason }),
     onSuccess: () => { invalidate(); setDeductFor(null); setDeductQty(""); setDeductReason(""); toast({ title: "Baixa realizada (FEFO)" }); },
+    onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
+  });
+
+  const liquidarMut = useMutation({
+    mutationFn: ({ id, salePrice }: any) => apiRequest("PUT", `/api/products/${id}`, { salePrice }),
+    onSuccess: () => {
+      invalidate();
+      setLiquidarProduct(null);
+      setLiquidarPrice("");
+      setLiquidarReason("");
+      toast({ title: "Produto em liquidação!", description: "Preço de venda atualizado." });
+    },
     onError: (e: any) => toast({ title: "Erro", description: e.message, variant: "destructive" }),
   });
 
@@ -1044,50 +1061,61 @@ export default function InventoryPage() {
                             <div key={product.id}>
                               {/* Product row */}
                               <div
-                                className={`flex items-center gap-3 pl-9 pr-5 py-3.5 cursor-pointer transition-colors
+                                className={`flex items-center pr-5 py-3.5 cursor-pointer transition-colors
                                   ${expanded ? (isLight ? "bg-slate-100" : "bg-primary/5") : "hover:bg-white/[0.02]"}
                                   ${lowStock && !expanded ? (isLight ? "bg-orange-100/60" : "bg-orange-500/5") : ""}
                                 `}
                                 onClick={() => toggleExpand(product.id)}
                               >
-                                <div className="shrink-0 text-primary">
-                                  {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                {/* LEFT PANEL: chevron + name */}
+                                <div
+                                  className="flex items-center gap-3 pl-9 min-w-0 overflow-hidden shrink-0"
+                                  style={{ width: `${nameColPct}%` }}
+                                >
+                                  <div className="shrink-0 text-primary">
+                                    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                      <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
+                                      {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
+                                      {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
+                                      {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <StockBadge product={product} />
+                                      {product.nearestExpiry && <ExpiryBadge date={product.nearestExpiry} />}
+                                    </div>
+                                  </div>
                                 </div>
 
-                                <div className="min-w-0 shrink-0 overflow-hidden" style={{ flexBasis: `${nameColPct}%` }}>
-                                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                                    <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
-                                    {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
-                                    {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
-                                    {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
+                                {/* RIGHT PANEL: qty + buttons */}
+                                <div className="flex-1 flex items-center justify-end gap-3">
+                                  <div className="text-right shrink-0">
+                                    <div className={`text-xl font-black ${lowStock ? "text-orange-400" : "text-primary"}`}>
+                                      {product.totalQuantity}
+                                    </div>
+                                    <div className={`text-[9px] font-bold uppercase ${T.muted}`}>{product.unit}</div>
+                                    <div className={`text-[9px] font-bold uppercase ${T.muted}`}>mín: {product.minStock}</div>
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <StockBadge product={product} />
-                                    {product.nearestExpiry && <ExpiryBadge date={product.nearestExpiry} />}
-                                  </div>
-                                </div>
 
-                                <div className="text-right shrink-0">
-                                  <div className={`text-xl font-black ${lowStock ? "text-orange-400" : "text-primary"}`}>
-                                    {product.totalQuantity}
+                                  <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                    <button title="Nova Variante" onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                                      <Plus className="h-4 w-4" />
+                                    </button>
+                                    <button title="Dar Baixa (FEFO)" onClick={() => { setDeductFor(product); setDeductQty(""); setDeductReason(""); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-orange-400 hover:bg-orange-400/10`}>
+                                      <ShoppingCart className="h-4 w-4" />
+                                    </button>
+                                    <button title="Liquidar Produto" onClick={() => { setLiquidarProduct(product); setLiquidarPrice(product.salePrice ? (product.salePrice / 100).toFixed(2).replace(".", ",") : ""); setLiquidarReason(""); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-amber-400 hover:bg-amber-400/10`}>
+                                      <Flame className="h-4 w-4" />
+                                    </button>
+                                    <button title="Editar Produto" onClick={() => openEditProduct(product)} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-blue-400 hover:bg-blue-400/10`}>
+                                      <Edit2 className="h-4 w-4" />
+                                    </button>
+                                    <button title="Excluir Produto" onClick={() => { if (confirm(`Excluir "${product.name}" e todos os seus lotes?`)) deleteProductMut.mutate(product.id); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-red-400 hover:bg-red-400/10`}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
                                   </div>
-                                  <div className={`text-[9px] font-bold uppercase ${T.muted}`}>{product.unit}</div>
-                                  <div className={`text-[9px] font-bold uppercase ${T.muted}`}>mín: {product.minStock}</div>
-                                </div>
-
-                                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                                  <button title="Nova Variante" onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
-                                    <Plus className="h-4 w-4" />
-                                  </button>
-                                  <button title="Dar Baixa (FEFO)" onClick={() => { setDeductFor(product); setDeductQty(""); setDeductReason(""); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-orange-400 hover:bg-orange-400/10`}>
-                                    <ShoppingCart className="h-4 w-4" />
-                                  </button>
-                                  <button title="Editar Produto" onClick={() => openEditProduct(product)} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-blue-400 hover:bg-blue-400/10`}>
-                                    <Edit2 className="h-4 w-4" />
-                                  </button>
-                                  <button title="Excluir Produto" onClick={() => { if (confirm(`Excluir "${product.name}" e todos os seus lotes?`)) deleteProductMut.mutate(product.id); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-red-400 hover:bg-red-400/10`}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </button>
                                 </div>
                               </div>
 
@@ -1558,6 +1586,57 @@ export default function InventoryPage() {
                 className="bg-orange-500 hover:bg-orange-600 text-white font-black uppercase tracking-widest px-6 rounded-xl"
               >
                 {deductMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Baixa"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Liquidar Dialog ── */}
+      <Dialog open={!!liquidarProduct} onOpenChange={() => setLiquidarProduct(null)}>
+        <DialogContent className={`max-w-sm rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-amber-400 flex items-center gap-2">
+              <Flame className="h-5 w-5" /> Liquidar Produto
+            </DialogTitle>
+            <DialogDescription className={T.muted}>
+              <strong className={T.cellPrimary}>{liquidarProduct?.name}</strong><br />
+              {liquidarProduct?.salePrice
+                ? <>Preço atual: <strong className="text-primary">{(liquidarProduct.salePrice / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></>
+                : "Sem preço cadastrado"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-3">
+            <div>
+              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Novo Preço de Venda (R$) *</Label>
+              <Input
+                className={`mt-1 ${T.dialogInput}`}
+                value={liquidarPrice}
+                onChange={e => setLiquidarPrice(e.target.value)}
+                placeholder="Ex: 1,99"
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Motivo da Liquidação (opcional)</Label>
+              <Input
+                className={`mt-1 ${T.dialogInput}`}
+                value={liquidarReason}
+                onChange={e => setLiquidarReason(e.target.value)}
+                placeholder="Ex: Próximo ao vencimento, excesso de estoque..."
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <Button variant="ghost" onClick={() => setLiquidarProduct(null)} className={T.muted}>Cancelar</Button>
+              <Button
+                onClick={() => {
+                  if (!liquidarProduct || !liquidarPrice) return;
+                  liquidarMut.mutate({ id: liquidarProduct.id, salePrice: liquidarPrice });
+                }}
+                disabled={liquidarMut.isPending || !liquidarPrice}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest px-6 rounded-xl gap-2"
+              >
+                {liquidarMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Flame className="h-4 w-4" /> Liquidar</>}
               </Button>
             </div>
           </div>
