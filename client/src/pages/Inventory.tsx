@@ -183,8 +183,9 @@ export default function InventoryPage() {
   const qc = useQueryClient();
 
   // ── Column resize state ──
-  const [nameColPct, setNameColPct] = useState(62);
-  const [colDrag, setColDrag] = useState<{ startX: number; startPct: number } | null>(null);
+  const [nameColPct, setNameColPct] = useState(48);
+  const [btnColPct,  setBtnColPct]  = useState(38);
+  const [colDrag, setColDrag] = useState<{ handle: 'left' | 'right'; startX: number; startPct: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
   // ── UI State ──
@@ -846,7 +847,11 @@ export default function InventoryPage() {
             if (!listRef.current) return;
             const rect = listRef.current.getBoundingClientRect();
             const delta = ((e.clientX - colDrag.startX) / rect.width) * 100;
-            setNameColPct(Math.max(20, Math.min(82, colDrag.startPct + delta)));
+            if (colDrag.handle === 'left') {
+              setNameColPct(Math.max(15, Math.min(75, colDrag.startPct + delta)));
+            } else {
+              setBtnColPct(Math.max(15, Math.min(75, colDrag.startPct - delta)));
+            }
           }}
           onMouseUp={() => setColDrag(null)}
           onMouseLeave={() => setColDrag(null)}
@@ -1001,27 +1006,32 @@ export default function InventoryPage() {
             <div ref={listRef}>
               {/* ── Column resize header ── */}
               <div className={`relative flex items-center h-7 border-b select-none ${isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-black/10"}`}>
-                <span className={`absolute left-9 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Produto</span>
-                {/* Draggable handle */}
+                <span className={`absolute left-9 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`} style={{ maxWidth: `${nameColPct - 5}%` }}>Produto</span>
+                {/* Alça esquerda — borda direita da coluna de nomes */}
                 <div
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setColDrag({ startX: e.clientX, startPct: nameColPct });
-                  }}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setColDrag({ handle: 'left', startX: e.clientX, startPct: nameColPct }); }}
                   className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group select-none"
-                  style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "28px" }}
-                  title="Arraste para ajustar colunas"
+                  style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "24px" }}
+                  title="Arraste para ajustar coluna de nomes"
                 >
-                  {/* linha separadora visível */}
-                  <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px transition-colors ${isLight ? "bg-slate-300 group-hover:bg-primary" : "bg-white/15 group-hover:bg-primary"}`} />
-                  {/* grip pill */}
-                  <div className={`relative z-10 flex items-center justify-center rounded-full w-5 h-5 transition-all shadow-sm
-                    ${isLight ? "bg-white border border-slate-300 group-hover:border-primary group-hover:bg-primary/10" : "bg-zinc-800 border border-white/20 group-hover:border-primary group-hover:bg-primary/10"}`}>
-                    <GripVertical className={`h-3 w-3 transition-colors ${isLight ? "text-slate-400 group-hover:text-primary" : "text-white/30 group-hover:text-primary"}`} />
+                  <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px ${isLight ? "bg-slate-300 group-hover:bg-primary" : "bg-white/20 group-hover:bg-primary"}`} />
+                  <div className={`relative z-10 flex items-center justify-center rounded-full w-4 h-4 ${isLight ? "bg-white border border-slate-300 group-hover:border-primary" : "bg-zinc-800 border border-white/20 group-hover:border-primary"}`}>
+                    <GripVertical className={`h-2.5 w-2.5 ${isLight ? "text-slate-400 group-hover:text-primary" : "text-white/30 group-hover:text-primary"}`} />
                   </div>
                 </div>
-                <span className={`absolute right-4 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Qtd · Ações</span>
+                {/* Alça direita — borda esquerda da coluna de botões */}
+                <div
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setColDrag({ handle: 'right', startX: e.clientX, startPct: btnColPct }); }}
+                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group select-none"
+                  style={{ right: `${btnColPct}%`, transform: "translateX(50%)", width: "24px" }}
+                  title="Arraste para ajustar coluna de botões"
+                >
+                  <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px ${isLight ? "bg-slate-300 group-hover:bg-primary" : "bg-white/20 group-hover:bg-primary"}`} />
+                  <div className={`relative z-10 flex items-center justify-center rounded-full w-4 h-4 ${isLight ? "bg-white border border-slate-300 group-hover:border-primary" : "bg-zinc-800 border border-white/20 group-hover:border-primary"}`}>
+                    <GripVertical className={`h-2.5 w-2.5 ${isLight ? "text-slate-400 group-hover:text-primary" : "text-white/30 group-hover:text-primary"}`} />
+                  </div>
+                </div>
+                <span className={`absolute right-4 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`} style={{ maxWidth: `${btnColPct - 5}%` }}>Qtd · Ações</span>
               </div>
 
               {groupedProducts.map(({ category, products: groupProds }) => {
@@ -1104,7 +1114,8 @@ export default function InventoryPage() {
                                 </div>
 
                                 {/* RIGHT PANEL: qty + buttons */}
-                                <div className="flex-1 flex items-center justify-end gap-3">
+                                <div className="flex-1" />
+                                <div className="flex items-center justify-end gap-3 shrink-0" style={{ width: `${btnColPct}%` }}>
                                   <div className="text-right shrink-0">
                                     <div className={`text-xl font-black ${lowStock ? "text-orange-400" : "text-primary"}`}>
                                       {product.totalQuantity}
