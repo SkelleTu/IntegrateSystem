@@ -1072,7 +1072,7 @@ export default function InventoryPage() {
                                 </div>
 
                                 <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                                  <button title="Adicionar Lote" onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                                  <button title="Nova Variante" onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
                                     <Plus className="h-4 w-4" />
                                   </button>
                                   <button title="Dar Baixa (FEFO)" onClick={() => { setDeductFor(product); setDeductQty(""); setDeductReason(""); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-orange-400 hover:bg-orange-400/10`}>
@@ -1095,11 +1095,8 @@ export default function InventoryPage() {
                                       Lotes ({batches.length})
                                     </span>
                                     <div className="flex items-center gap-3">
-                                      <button onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:underline">
-                                        <ScanBarcode className="h-3 w-3" /> Bipar
-                                      </button>
                                       <button onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary hover:underline">
-                                        <Plus className="h-3 w-3" /> Novo Lote
+                                        <Plus className="h-3 w-3" /> Nova Variante
                                       </button>
                                     </div>
                                   </div>
@@ -1249,7 +1246,7 @@ export default function InventoryPage() {
       <Dialog open={!!addBatchFor} onOpenChange={() => { setAddBatchFor(null); setInlineScanValue(""); setInlineScanResult(null); }}>
         <DialogContent className={`max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border ${T.dialog}`}>
           <DialogHeader>
-            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Novo Lote</DialogTitle>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Nova Variante</DialogTitle>
             <DialogDescription className={T.muted}>
               Produto: <strong className={T.cellPrimary}>{addBatchFor?.name}</strong>
             </DialogDescription>
