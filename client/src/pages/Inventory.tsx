@@ -188,22 +188,28 @@ export default function InventoryPage() {
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { nameColPctRef.current = nameColPct; }, [nameColPct]);
 
-  const onColHandleMouseDown = useCallback((e: React.MouseEvent) => {
+  const isDraggingCol = useRef(false);
+
+  const onColHandlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    isDraggingCol.current = true;
     const startX = e.clientX;
     const startPct = nameColPctRef.current;
-    const onMove = (ev: MouseEvent) => {
-      if (!listRef.current) return;
+
+    const onMove = (ev: PointerEvent) => {
+      if (!isDraggingCol.current || !listRef.current) return;
       const w = listRef.current.clientWidth;
       const delta = ((ev.clientX - startX) / w) * 100;
-      setNameColPct(Math.max(22, Math.min(84, startPct + delta)));
+      setNameColPct(Math.max(20, Math.min(82, startPct + delta)));
     };
     const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
+      isDraggingCol.current = false;
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
     };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
   }, []);
 
   // ── UI State ──
@@ -1008,12 +1014,18 @@ export default function InventoryPage() {
                 <span className={`absolute left-9 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Produto</span>
                 {/* Draggable handle */}
                 <div
-                  onMouseDown={onColHandleMouseDown}
-                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group"
-                  style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "20px" }}
+                  onPointerDown={onColHandlePointerDown}
+                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group touch-none"
+                  style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "28px" }}
                   title="Arraste para ajustar colunas"
                 >
-                  <GripVertical className={`h-4 w-4 transition-colors ${isLight ? "text-slate-300 group-hover:text-primary" : "text-white/20 group-hover:text-primary"}`} />
+                  {/* linha separadora visível */}
+                  <div className={`absolute inset-y-0 left-1/2 -translate-x-1/2 w-px transition-colors ${isLight ? "bg-slate-300 group-hover:bg-primary" : "bg-white/15 group-hover:bg-primary"}`} />
+                  {/* grip pill */}
+                  <div className={`relative z-10 flex items-center justify-center rounded-full w-5 h-5 transition-all shadow-sm
+                    ${isLight ? "bg-white border border-slate-300 group-hover:border-primary group-hover:bg-primary/10" : "bg-zinc-800 border border-white/20 group-hover:border-primary group-hover:bg-primary/10"}`}>
+                    <GripVertical className={`h-3 w-3 transition-colors ${isLight ? "text-slate-400 group-hover:text-primary" : "text-white/30 group-hover:text-primary"}`} />
+                  </div>
                 </div>
                 <span className={`absolute right-4 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Qtd · Ações</span>
               </div>
