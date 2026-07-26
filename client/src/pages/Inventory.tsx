@@ -248,6 +248,11 @@ export default function InventoryPage() {
   } | null>(null);
   const inlineScanRef = useRef<HTMLInputElement>(null);
 
+  // ── Inline variant creation (within "Novo Lote" modal) ──
+  const [showInlineVariant, setShowInlineVariant] = useState(false);
+  const [inlineVariantFlavor, setInlineVariantFlavor] = useState("");
+  const [inlineVariantName, setInlineVariantName] = useState("");
+
   // ── "Novo Produto" extra: highlight flavor field when coming from variant flow ──
   const [highlightFlavor, setHighlightFlavor] = useState(false);
 
@@ -589,10 +594,13 @@ export default function InventoryPage() {
     }
   }, [scanOpen]);
 
-  // Reset inline scan when the Add Batch modal opens/closes
+  // Reset inline scan + variant form when the Add Batch modal opens/closes
   useEffect(() => {
     setInlineScanValue("");
     setInlineScanResult(null);
+    setShowInlineVariant(false);
+    setInlineVariantFlavor("");
+    setInlineVariantName("");
     if (addBatchFor) {
       setTimeout(() => inlineScanRef.current?.focus(), 150);
     }
@@ -692,6 +700,71 @@ export default function InventoryPage() {
     setInlineScanValue("");
     setInlineScanResult(null);
     setAddProductOpen(true);
+  }
+
+  async function handleCreateVariantAndBatch() {
+    if (!addBatchFor) return;
+    if (!inlineVariantFlavor.trim() && !inlineVariantName.trim()) {
+      toast({ title: "Informe o sabor/variação ou o nome do novo produto", variant: "destructive" });
+      return;
+    }
+    if (!batchForm.quantity || Number(batchForm.quantity) <= 0) {
+      toast({ title: "Informe a quantidade do lote", variant: "destructive" });
+      return;
+    }
+
+    try {
+      // 1. Create the variant product (inherits all data from parent, overrides name/flavor)
+      const productPayload = {
+        name: inlineVariantName.trim() || addBatchFor.name,
+        brand: addBatchFor.brand || "",
+        category: addBatchFor.category || "",
+        flavor: inlineVariantFlavor.trim(),
+        unit: addBatchFor.unit || "Unidade",
+        weight: addBatchFor.weight || "",
+        description: addBatchFor.description || "",
+        minStock: addBatchFor.minStock || 5,
+        salePrice: addBatchFor.salePrice ? String((addBatchFor.salePrice / 100).toFixed(2)) : undefined,
+        ncm: addBatchFor.ncm || "",
+        cfop: addBatchFor.cfop || "",
+      };
+
+      const prodRes = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(productPayload),
+      });
+
+      if (!prodRes.ok) {
+        const err = await prodRes.json();
+        toast({ title: "Erro ao criar variante", description: err.message, variant: "destructive" });
+        return;
+      }
+
+      const newProduct = await prodRes.json();
+
+      // 2. Create the batch for the new variant
+      const batchPayload = { ...batchForm, barcode: inlineScanValue.trim() || batchForm.barcode };
+      await fetch(`/api/products/${newProduct.id}/batches`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(batchPayload),
+      });
+
+      invalidate();
+      setAddBatchFor(null);
+      setBatchForm(emptyBatch());
+      setShowInlineVariant(false);
+      setInlineVariantFlavor("");
+      setInlineVariantName("");
+      setInlineScanValue("");
+      setInlineScanResult(null);
+      toast({ title: `Variante "${inlineVariantFlavor.trim() || inlineVariantName.trim()}" criada com lote adicionado!` });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    }
   }
 
   function handleDupAddBatch() {
@@ -1197,20 +1270,71 @@ export default function InventoryPage() {
                     </>
                   )}
                   {inlineScanResult.status === "new" && (
-                    <div className="flex-1 space-y-2">
+                    <div className="flex-1 space-y-3">
                       <div className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
                         <span className="text-blue-400 font-bold">
                           Código novo — será registrado neste produto ao salvar o lote.
                         </span>
                       </div>
-                      <button
-                        onClick={handleRegisterAsNewVariant}
-                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:underline transition-colors"
-                      >
-                        <AlertTriangle className="h-3 w-3" />
-                        É outro sabor / modelo / variação? Cadastrar como novo produto
-                      </button>
+
+                      {/* ── Inline variant toggle ── */}
+                      {!showInlineVariant ? (
+                        <button
+                          onClick={() => {
+                            setShowInlineVariant(true);
+                            setInlineVariantName(addBatchFor?.name || "");
+                            setInlineVariantFlavor("");
+                          }}
+                          className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                        >
+                          <AlertTriangle className="h-3 w-3" />
+                          É outra variante / sabor / modelo? Cadastrar como nova variante desta categoria
+                        </button>
+                      ) : (
+                        <div className={`rounded-xl border p-3 space-y-3 ${isLight ? "border-amber-300/50 bg-amber-50" : "border-amber-400/30 bg-amber-400/5"}`}>
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              Nova variante em "{addBatchFor?.category || "mesma categoria"}"
+                            </span>
+                            <button
+                              onClick={() => { setShowInlineVariant(false); setInlineVariantFlavor(""); setInlineVariantName(""); }}
+                              className={`text-[10px] font-bold ${T.muted} hover:text-red-400`}
+                            >
+                              ✕ cancelar
+                            </button>
+                          </div>
+                          <div className="space-y-2">
+                            <div>
+                              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+                                Sabor / Variação / Modelo <span className="text-amber-400">*</span>
+                              </Label>
+                              <Input
+                                className={`mt-1 ${T.dialogInput} border-amber-400/40 focus:border-amber-400`}
+                                value={inlineVariantFlavor}
+                                onChange={e => setInlineVariantFlavor(e.target.value)}
+                                placeholder="Ex: Bacon, Queijo, Diet, Chef Chips..."
+                                autoFocus
+                              />
+                            </div>
+                            <div>
+                              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+                                Nome do produto (opcional — padrão: {addBatchFor?.name})
+                              </Label>
+                              <Input
+                                className={`mt-1 ${T.dialogInput}`}
+                                value={inlineVariantName}
+                                onChange={e => setInlineVariantName(e.target.value)}
+                                placeholder={addBatchFor?.name || "Nome do produto"}
+                              />
+                            </div>
+                          </div>
+                          <p className={`text-[9px] ${T.muted}`}>
+                            Categoria, marca, unidade e preço serão herdados de <strong>{addBatchFor?.name}</strong>. O lote abaixo será adicionado a esta variante.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1220,13 +1344,22 @@ export default function InventoryPage() {
             <BatchFields form={batchForm} setForm={setBatchForm} T={T} />
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setAddBatchFor(null)} className={T.muted}>Cancelar</Button>
-              <Button
-                onClick={() => addBatchFor && handleSubmitBatch(addBatchFor.id)}
-                disabled={createBatchMut.isPending}
-                className="bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
-              >
-                {createBatchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adicionar Lote"}
-              </Button>
+              {showInlineVariant ? (
+                <Button
+                  onClick={handleCreateVariantAndBatch}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest px-6 rounded-xl gap-2"
+                >
+                  <Plus className="h-4 w-4" /> Criar Variante + Lote
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => addBatchFor && handleSubmitBatch(addBatchFor.id)}
+                  disabled={createBatchMut.isPending}
+                  className="bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                >
+                  {createBatchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Adicionar Lote"}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>
