@@ -234,7 +234,7 @@ export default function InventoryPage() {
   // ─── Theme ────────────────────────────────────────────────────────────────
 
   const T = isLight ? {
-    page: "bg-slate-100 text-slate-900",
+    page: "light-stock bg-slate-100 text-slate-900",
     surface: "bg-white border-slate-300 shadow-sm",
     card: "bg-white border-slate-300",
     cardHd: "border-slate-200",

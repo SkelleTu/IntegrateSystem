@@ -215,6 +215,14 @@
 @layer utilities {
 }
 
+/* ── Light mode stock: increase all tiny text ─────────────────────────────── */
+.light-stock [class*="text-[8px]"]  { font-size: 11px !important; }
+.light-stock [class*="text-[9px]"]  { font-size: 12px !important; }
+.light-stock [class*="text-[10px]"] { font-size: 13px !important; }
+.light-stock [class*="text-[11px]"] { font-size: 13px !important; }
+.light-stock .text-xs               { font-size: 13px !important; }
+.light-stock [class*="tracking-widest"] { letter-spacing: 0.08em !important; }
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
