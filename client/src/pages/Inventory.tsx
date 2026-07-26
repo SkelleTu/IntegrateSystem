@@ -114,21 +114,6 @@ const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome *</Label>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="Ex: Salgadinho Bacon 45g" />
     </div>
-    {/* Sabor/Variação imediatamente após o nome — campo crítico para diferenciar variantes */}
-    <div className={`col-span-2 rounded-xl p-3 -mx-1 transition-all ${highlightFlavor ? "ring-2 ring-amber-400/60 bg-amber-400/5" : ""}`}>
-      <Label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${highlightFlavor ? "text-amber-400" : T.dialogLabel}`}>
-        {highlightFlavor && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
-        Sabor / Variação / Modelo
-        {highlightFlavor && <span className="text-amber-400 font-bold normal-case tracking-normal text-[10px]"> — preencha para diferenciar este produto</span>}
-      </Label>
-      <Input
-        className={`mt-1 ${T.dialogInput} ${highlightFlavor ? "border-amber-400/50 focus:border-amber-400" : ""}`}
-        value={form.flavor}
-        onChange={e => setForm((f: any) => ({ ...f, flavor: e.target.value }))}
-        placeholder="Ex: Bacon, Queijo, Diet, Zero, Natural..."
-        autoFocus={highlightFlavor}
-      />
-    </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca</Label>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Amavita" />
@@ -183,8 +168,8 @@ const BatchFields = ({ form, setForm, T }: any) => (
       <Input className={`mt-1 ${T.dialogInput}`} value={form.barcode} onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))} placeholder="EAN-13..." />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Número do Lote</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: LOT2025001" />
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variação</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: Chocolate, Diet, 500ml..." />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fabricação</Label>
@@ -1108,7 +1093,7 @@ export default function InventoryPage() {
                                       <table className="w-full text-xs">
                                         <thead>
                                           <tr className={T.tableHd}>
-                                            {["Cód Barras", "Lote", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
+                                            {["Cód Barras", "Variação", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
                                               <th key={h} className={`px-3 py-2 text-left font-black uppercase tracking-widest text-[9px] ${T.tableHdText}`}>{h}</th>
                                             ))}
                                           </tr>
@@ -1339,7 +1324,7 @@ export default function InventoryPage() {
                           <div className="space-y-2">
                             <div>
                               <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-                                Sabor / Variação / Modelo <span className="text-amber-400">*</span>
+                                Variação <span className="text-amber-400">*</span>
                               </Label>
                               <Input
                                 className={`mt-1 ${T.dialogInput} border-amber-400/40 focus:border-amber-400`}
