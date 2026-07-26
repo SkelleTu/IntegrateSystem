@@ -222,6 +222,7 @@ export default function InventoryPage() {
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("todos");
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<"name" | "qty" | "expiry">("name");
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
 
   // ── Modal state ──
   const [addProductOpen, setAddProductOpen] = useState(false);
@@ -497,6 +498,33 @@ export default function InventoryPage() {
       return next;
     });
   }, []);
+
+  const toggleCategory = useCallback((cat: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat); else next.add(cat);
+      return next;
+    });
+  }, []);
+
+  // Group filtered products by category
+  const groupedProducts = useMemo(() => {
+    const groups: { category: string; products: Product[] }[] = [];
+    const map = new Map<string, Product[]>();
+
+    for (const p of filteredProducts) {
+      const key = p.category?.trim() || "__none__";
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    }
+
+    // Named categories first (sorted), then uncategorized
+    const named = Array.from(map.keys()).filter(k => k !== "__none__").sort((a, b) => a.localeCompare(b));
+    for (const cat of named) groups.push({ category: cat, products: map.get(cat)! });
+    if (map.has("__none__")) groups.push({ category: "__none__", products: map.get("__none__")! });
+
+    return groups;
+  }, [filteredProducts]);
 
   // ─── Open edit modals ──────────────────────────────────────────────────────
 
@@ -965,161 +993,167 @@ export default function InventoryPage() {
               )}
             </div>
           ) : (
-            <div className="divide-y divide-white/5">
-              {filteredProducts.map(product => {
-                const expanded = expandedIds.has(product.id);
-                const batches: Batch[] = expandedBatches[product.id] || [];
-                const urgency = getExpiryUrgency(product.nearestExpiry);
-                const lowStock = product.totalQuantity < product.minStock;
+            <div>
+              {groupedProducts.map(({ category, products: groupProds }) => {
+                const catKey = category;
+                const catLabel = category === "__none__" ? "Sem Categoria" : category;
+                const isCatCollapsed = collapsedCategories.has(catKey);
+                const catTotal = groupProds.reduce((sum, p) => sum + p.totalQuantity, 0);
+                const catHasAlert = groupProds.some(p => p.totalQuantity < p.minStock);
 
                 return (
-                  <div key={product.id}>
-                    {/* Product row */}
+                  <div key={catKey} className={`border-b ${isLight ? "border-slate-100" : "border-white/5"}`}>
+                    {/* ── Category header row ── */}
                     <div
-                      className={`flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors
-                        ${expanded ? (isLight ? "bg-slate-50" : "bg-primary/5") : "hover:bg-white/[0.02]"}
-                        ${lowStock && !expanded ? (isLight ? "bg-orange-50/50" : "bg-orange-500/5") : ""}
+                      className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer select-none transition-colors
+                        ${isLight ? "bg-slate-100/80 hover:bg-slate-200/60" : "bg-white/[0.04] hover:bg-white/[0.07]"}
                       `}
-                      onClick={() => toggleExpand(product.id)}
+                      onClick={() => toggleCategory(catKey)}
                     >
-                      {/* Expand chevron */}
-                      <div className="shrink-0 text-primary">
-                        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      <div className={`shrink-0 ${isLight ? "text-slate-500" : "text-white/40"}`}>
+                        {isCatCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                       </div>
-
-                      {/* Product info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                          <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
-                          {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
-                          {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
-                          {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {product.category && (
-                            <span className={`flex items-center gap-1 text-[9px] font-bold uppercase tracking-widest ${T.muted}`}>
-                              <Tag className="h-2.5 w-2.5" />{product.category}
-                            </span>
-                          )}
-                          <StockBadge product={product} />
-                          {product.nearestExpiry && <ExpiryBadge date={product.nearestExpiry} />}
-                        </div>
-                      </div>
-
-                      {/* Quantity */}
-                      <div className="text-right shrink-0">
-                        <div className={`text-xl font-black ${lowStock ? "text-orange-400" : "text-primary"}`}>
-                          {product.totalQuantity}
-                        </div>
-                        <div className={`text-[9px] font-bold uppercase ${T.muted}`}>{product.unit}</div>
-                        <div className={`text-[9px] font-bold uppercase ${T.muted}`}>mín: {product.minStock}</div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                        <button
-                          title="Adicionar Lote"
-                          onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
-                          className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          title="Dar Baixa (FEFO)"
-                          onClick={() => { setDeductFor(product); setDeductQty(""); setDeductReason(""); }}
-                          className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-orange-400 hover:bg-orange-400/10`}
-                        >
-                          <ShoppingCart className="h-4 w-4" />
-                        </button>
-                        <button
-                          title="Editar Produto"
-                          onClick={() => openEditProduct(product)}
-                          className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-blue-400 hover:bg-blue-400/10`}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          title="Excluir Produto"
-                          onClick={() => {
-                            if (confirm(`Excluir "${product.name}" e todos os seus lotes?`))
-                              deleteProductMut.mutate(product.id);
-                          }}
-                          className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-red-400 hover:bg-red-400/10`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      <Tag className={`h-3 w-3 shrink-0 ${category === "__none__" ? (isLight ? "text-slate-400" : "text-white/30") : "text-primary"}`} />
+                      <span className={`font-black text-[11px] uppercase tracking-widest flex-1 ${category === "__none__" ? T.muted : (isLight ? "text-slate-700" : "text-white/80")}`}>
+                        {catLabel}
+                      </span>
+                      <span className={`text-[10px] font-bold ${T.muted}`}>
+                        {groupProds.length} produto{groupProds.length !== 1 ? "s" : ""}
+                      </span>
+                      {catHasAlert && (
+                        <span className="text-[9px] font-black uppercase tracking-widest text-orange-400 flex items-center gap-1">
+                          <TrendingDown className="h-3 w-3" /> Estoque baixo
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-black text-primary ml-2`}>{catTotal} un</span>
                     </div>
 
-                    {/* Expanded batches */}
-                    {expanded && (
-                      <div className={`px-5 pb-4 transition-colors ${T.expandedBg}`}>
-                        <div className="flex items-center justify-between py-2 mb-2">
-                          <span className={`text-[10px] font-black uppercase tracking-widest text-primary`}>
-                            Lotes ({batches.length})
-                          </span>
-                          <div className="flex items-center gap-3">
-                            <button
-                              title="Bipar para identificar produto"
-                              onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
-                              className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:underline"
-                            >
-                              <ScanBarcode className="h-3 w-3" /> Bipar
-                            </button>
-                            <button
-                              onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
-                              className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                            >
-                              <Plus className="h-3 w-3" /> Novo Lote
-                            </button>
-                          </div>
-                        </div>
+                    {/* ── Products in this category ── */}
+                    {!isCatCollapsed && (
+                      <div className={`divide-y ${isLight ? "divide-slate-100" : "divide-white/[0.03]"}`}>
+                        {groupProds.map(product => {
+                          const expanded = expandedIds.has(product.id);
+                          const batches: Batch[] = expandedBatches[product.id] || [];
+                          const lowStock = product.totalQuantity < product.minStock;
 
-                        {batches.length === 0 ? (
-                          <p className={`text-center py-4 text-[11px] font-bold italic ${T.muted}`}>Nenhum lote cadastrado</p>
-                        ) : (
-                          <div className="rounded-xl border overflow-hidden" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.07)" }}>
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className={T.tableHd}>
-                                  {["Cód Barras", "Lote", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
-                                    <th key={h} className={`px-3 py-2 text-left font-black uppercase tracking-widest text-[9px] ${T.tableHdText}`}>{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {batches.map(b => {
-                                  const u = getExpiryUrgency(b.expiryDate);
-                                  return (
-                                    <tr key={b.id} className={`border-t transition-colors ${T.tableRow} ${T.rowUrgency[u]}`}>
-                                      <td className={`px-3 py-2.5 font-mono text-[10px] ${T.cellPrimary}`}>{b.barcode || "—"}</td>
-                                      <td className={`px-3 py-2.5 font-bold ${T.cellSub}`}>{b.batchNumber || "—"}</td>
-                                      <td className="px-3 py-2.5">
-                                        {b.expiryDate ? (
-                                          <span className="flex flex-col gap-0.5">
-                                            <span className={T.cellPrimary}>{fmtDate(b.expiryDate)}</span>
-                                            <ExpiryBadge date={b.expiryDate} />
-                                          </span>
-                                        ) : "—"}
-                                      </td>
-                                      <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.manufactureDate)}</td>
-                                      <td className={`px-3 py-2.5 font-black text-sm ${b.quantity <= 0 ? "text-red-400" : "text-primary"}`}>{b.quantity}</td>
-                                      <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtCurrency(b.costPrice)}</td>
-                                      <td className={`px-3 py-2.5 ${T.cellSub}`}>{b.supplier || "—"}</td>
-                                      <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.entryDate)}</td>
-                                      <td className="px-3 py-2.5">
-                                        <div className="flex gap-1">
-                                          <button onClick={() => openEditBatch(b)} className={`p-1 rounded hover:text-blue-400 ${T.muted}`}><Edit2 className="h-3.5 w-3.5" /></button>
-                                          <button onClick={() => { if (confirm("Excluir este lote?")) deleteBatchMut.mutate(b.id); }} className={`p-1 rounded hover:text-red-400 ${T.muted}`}><Trash2 className="h-3.5 w-3.5" /></button>
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
+                          return (
+                            <div key={product.id}>
+                              {/* Product row */}
+                              <div
+                                className={`flex items-center gap-3 pl-9 pr-5 py-3.5 cursor-pointer transition-colors
+                                  ${expanded ? (isLight ? "bg-slate-50" : "bg-primary/5") : "hover:bg-white/[0.02]"}
+                                  ${lowStock && !expanded ? (isLight ? "bg-orange-50/50" : "bg-orange-500/5") : ""}
+                                `}
+                                onClick={() => toggleExpand(product.id)}
+                              >
+                                <div className="shrink-0 text-primary">
+                                  {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                </div>
+
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                    <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
+                                    {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
+                                    {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
+                                    {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <StockBadge product={product} />
+                                    {product.nearestExpiry && <ExpiryBadge date={product.nearestExpiry} />}
+                                  </div>
+                                </div>
+
+                                <div className="text-right shrink-0">
+                                  <div className={`text-xl font-black ${lowStock ? "text-orange-400" : "text-primary"}`}>
+                                    {product.totalQuantity}
+                                  </div>
+                                  <div className={`text-[9px] font-bold uppercase ${T.muted}`}>{product.unit}</div>
+                                  <div className={`text-[9px] font-bold uppercase ${T.muted}`}>mín: {product.minStock}</div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                                  <button title="Adicionar Lote" onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="p-1.5 rounded-lg text-primary hover:bg-primary/10 transition-colors">
+                                    <Plus className="h-4 w-4" />
+                                  </button>
+                                  <button title="Dar Baixa (FEFO)" onClick={() => { setDeductFor(product); setDeductQty(""); setDeductReason(""); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-orange-400 hover:bg-orange-400/10`}>
+                                    <ShoppingCart className="h-4 w-4" />
+                                  </button>
+                                  <button title="Editar Produto" onClick={() => openEditProduct(product)} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-blue-400 hover:bg-blue-400/10`}>
+                                    <Edit2 className="h-4 w-4" />
+                                  </button>
+                                  <button title="Excluir Produto" onClick={() => { if (confirm(`Excluir "${product.name}" e todos os seus lotes?`)) deleteProductMut.mutate(product.id); }} className={`p-1.5 rounded-lg transition-colors ${T.muted} hover:text-red-400 hover:bg-red-400/10`}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Expanded batches */}
+                              {expanded && (
+                                <div className={`pl-9 pr-5 pb-4 transition-colors ${T.expandedBg}`}>
+                                  <div className="flex items-center justify-between py-2 mb-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">
+                                      Lotes ({batches.length})
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      <button onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:underline">
+                                        <ScanBarcode className="h-3 w-3" /> Bipar
+                                      </button>
+                                      <button onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }} className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary hover:underline">
+                                        <Plus className="h-3 w-3" /> Novo Lote
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {batches.length === 0 ? (
+                                    <p className={`text-center py-4 text-[11px] font-bold italic ${T.muted}`}>Nenhum lote cadastrado</p>
+                                  ) : (
+                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.07)" }}>
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className={T.tableHd}>
+                                            {["Cód Barras", "Lote", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
+                                              <th key={h} className={`px-3 py-2 text-left font-black uppercase tracking-widest text-[9px] ${T.tableHdText}`}>{h}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {batches.map(b => {
+                                            const u = getExpiryUrgency(b.expiryDate);
+                                            return (
+                                              <tr key={b.id} className={`border-t transition-colors ${T.tableRow} ${T.rowUrgency[u]}`}>
+                                                <td className={`px-3 py-2.5 font-mono text-[10px] ${T.cellPrimary}`}>{b.barcode || "—"}</td>
+                                                <td className={`px-3 py-2.5 font-bold ${T.cellSub}`}>{b.batchNumber || "—"}</td>
+                                                <td className="px-3 py-2.5">
+                                                  {b.expiryDate ? (
+                                                    <span className="flex flex-col gap-0.5">
+                                                      <span className={T.cellPrimary}>{fmtDate(b.expiryDate)}</span>
+                                                      <ExpiryBadge date={b.expiryDate} />
+                                                    </span>
+                                                  ) : "—"}
+                                                </td>
+                                                <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.manufactureDate)}</td>
+                                                <td className={`px-3 py-2.5 font-black text-sm ${b.quantity <= 0 ? "text-red-400" : "text-primary"}`}>{b.quantity}</td>
+                                                <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtCurrency(b.costPrice)}</td>
+                                                <td className={`px-3 py-2.5 ${T.cellSub}`}>{b.supplier || "—"}</td>
+                                                <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.entryDate)}</td>
+                                                <td className="px-3 py-2.5">
+                                                  <div className="flex gap-1">
+                                                    <button onClick={() => openEditBatch(b)} className={`p-1 rounded hover:text-blue-400 ${T.muted}`}><Edit2 className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => { if (confirm("Excluir este lote?")) deleteBatchMut.mutate(b.id); }} className={`p-1 rounded hover:text-red-400 ${T.muted}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
