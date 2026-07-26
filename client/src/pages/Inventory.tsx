@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
@@ -8,7 +8,8 @@ import Fuse from "fuse.js";
 import {
   Package, Search, Plus, Loader2, ChevronDown, ChevronUp,
   Sun, Moon, AlertTriangle, Trash2, Edit2, X, Tag,
-  Calendar, Layers, TrendingDown, ShoppingCart, Clock, BarChart3
+  Calendar, Layers, TrendingDown, ShoppingCart, Clock, BarChart3,
+  ScanBarcode, CheckCircle2, XCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -218,6 +219,13 @@ export default function InventoryPage() {
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
   const [deductFor, setDeductFor] = useState<Product | null>(null);
   const [dupProduct, setDupProduct] = useState<Product | null>(null); // duplicate found
+
+  // ── Barcode scanner state ──
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanValue, setScanValue] = useState("");
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult] = useState<{ found: boolean; product?: Product } | null>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
 
   // ── Form state ──
   const [productForm, setProductForm] = useState(emptyProduct());
@@ -546,6 +554,55 @@ export default function InventoryPage() {
     toast({ title: "Produto criado com sucesso" });
   }
 
+  // ─── Barcode scanner logic ─────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (scanOpen) {
+      setScanValue("");
+      setScanResult(null);
+      setTimeout(() => scanInputRef.current?.focus(), 100);
+    }
+  }, [scanOpen]);
+
+  async function handleScan() {
+    const code = scanValue.trim();
+    if (!code) return;
+    setScanLoading(true);
+    setScanResult(null);
+    try {
+      const res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      if (res.ok) {
+        const product: Product = await res.json();
+        setScanResult({ found: true, product });
+      } else {
+        setScanResult({ found: false });
+      }
+    } catch {
+      setScanResult({ found: false });
+    } finally {
+      setScanLoading(false);
+    }
+  }
+
+  function handleScanConfirm() {
+    if (!scanResult) return;
+    if (scanResult.found && scanResult.product) {
+      // Product exists → open Add Batch modal with barcode pre-filled
+      setAddBatchFor(scanResult.product);
+      setBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
+      toast({ title: `Produto encontrado: ${scanResult.product.name}` });
+    } else {
+      // Product not found → open New Product modal with barcode pre-filled in first batch
+      setProductForm(emptyProduct());
+      setFirstBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
+      setAddProductOpen(true);
+      toast({ title: "Produto não cadastrado — preencha os dados para cadastrá-lo." });
+    }
+    setScanOpen(false);
+    setScanValue("");
+    setScanResult(null);
+  }
+
   function handleDupAddBatch() {
     if (dupProduct) {
       setAddBatchFor(dupProduct);
@@ -649,12 +706,20 @@ export default function InventoryPage() {
             <CardTitle className={`flex items-center gap-2 font-black italic uppercase tracking-tighter text-xl ${T.cellPrimary}`}>
               <Layers className="h-6 w-6 text-primary" /> Produtos e Lotes
             </CardTitle>
-            <Button
-              onClick={() => { setAddProductOpen(true); setProductForm(emptyProduct()); setFirstBatchForm(emptyBatch()); }}
-              className="h-9 px-5 bg-primary hover:bg-primary/90 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
-            >
-              <Plus className="h-4 w-4" /> Novo Produto
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => setScanOpen(true)}
+                className="h-9 px-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+              >
+                <ScanBarcode className="h-4 w-4" /> Bipar Produto
+              </Button>
+              <Button
+                onClick={() => { setAddProductOpen(true); setProductForm(emptyProduct()); setFirstBatchForm(emptyBatch()); }}
+                className="h-9 px-5 bg-primary hover:bg-primary/90 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+              >
+                <Plus className="h-4 w-4" /> Novo Produto
+              </Button>
+            </div>
           </div>
 
           {/* Search + filters */}
@@ -1011,6 +1076,92 @@ export default function InventoryPage() {
               >
                 {updateBatchMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Modal: Barcode Scanner ─────────────────────────────────────────── */}
+      <Dialog open={scanOpen} onOpenChange={open => { setScanOpen(open); if (!open) { setScanValue(""); setScanResult(null); } }}>
+        <DialogContent className={`max-w-md rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-emerald-400 flex items-center gap-2">
+              <ScanBarcode className="h-5 w-5" /> Bipar Produto
+            </DialogTitle>
+            <DialogDescription className={T.muted}>
+              Bipe o produto com o leitor de código de barras ou digite o código manualmente e pressione Enter.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            {/* Input */}
+            <div>
+              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  ref={scanInputRef}
+                  className={`flex-1 ${T.dialogInput} text-lg tracking-widest font-mono`}
+                  value={scanValue}
+                  onChange={e => { setScanValue(e.target.value); setScanResult(null); }}
+                  onKeyDown={e => { if (e.key === "Enter") handleScan(); }}
+                  placeholder="Aguardando bipagem..."
+                  autoComplete="off"
+                />
+                <Button
+                  onClick={handleScan}
+                  disabled={!scanValue.trim() || scanLoading}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl px-4"
+                >
+                  {scanLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
+
+            {/* Result */}
+            {scanResult && (
+              <div className={`rounded-xl border p-4 ${scanResult.found ? "border-emerald-500/30 bg-emerald-500/10" : "border-red-500/30 bg-red-500/10"}`}>
+                {scanResult.found && scanResult.product ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                      <span className="font-black text-emerald-400 text-sm uppercase tracking-widest">Produto Encontrado</span>
+                    </div>
+                    <p className={`font-bold text-base ${T.cellPrimary}`}>{scanResult.product.name}</p>
+                    <div className={`flex gap-4 text-xs ${T.muted}`}>
+                      <span>Estoque: <strong className="text-primary">{scanResult.product.totalQuantity} {scanResult.product.unit}</strong></span>
+                      {scanResult.product.nearestExpiry && (
+                        <span>Validade mais próx.: <strong>{fmtDate(scanResult.product.nearestExpiry)}</strong></span>
+                      )}
+                    </div>
+                    <p className={`text-[10px] uppercase tracking-widest ${T.muted}`}>→ Será aberto o formulário de <strong>Novo Lote</strong> para este produto.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-400 shrink-0" />
+                      <span className="font-black text-red-400 text-sm uppercase tracking-widest">Produto Não Cadastrado</span>
+                    </div>
+                    <p className={`text-xs ${T.muted}`}>Código <strong className="font-mono">{scanValue}</strong> não foi encontrado no estoque.</p>
+                    <p className={`text-[10px] uppercase tracking-widest ${T.muted}`}>→ Será aberto o formulário de <strong>Novo Produto</strong> com o código pré-preenchido.</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-1">
+              <Button variant="ghost" onClick={() => setScanOpen(false)} className={T.muted}>Cancelar</Button>
+              {scanResult && (
+                <Button
+                  onClick={handleScanConfirm}
+                  className={scanResult.found
+                    ? "bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                    : "bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                  }
+                >
+                  {scanResult.found ? "Adicionar Lote" : "Cadastrar Produto"}
+                </Button>
+              )}
             </div>
           </div>
         </DialogContent>

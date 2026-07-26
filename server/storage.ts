@@ -1091,6 +1091,18 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async findProductByBarcode(barcode: string) {
+    this.logAction(`Busca por código de barras: ${barcode}`);
+    const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
+    if (matchingBatches.length === 0) return null;
+    const productIds = [...new Set(matchingBatches.map(b => b.productId))];
+    const all = await db.select().from(products);
+    const matched = all.filter(p => productIds.includes(p.id));
+    if (matched.length === 0) return null;
+    const enriched = await this._enrichProducts(matched);
+    return enriched[0] || null;
+  }
+
   async searchProducts(q: string) {
     const all = await db.select().from(products);
     const allBatchesList = await db.select().from(batches);

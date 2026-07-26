@@ -817,6 +817,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/products/barcode/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const product = await storage.findProductByBarcode(req.params.barcode);
+      if (!product) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(product);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/products/:id", isAuthenticated, async (req, res) => {
     try {
       const p = await storage.getProduct(Number(req.params.id));
