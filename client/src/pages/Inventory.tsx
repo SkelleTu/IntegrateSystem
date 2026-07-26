@@ -234,28 +234,28 @@ export default function InventoryPage() {
   // ─── Theme ────────────────────────────────────────────────────────────────
 
   const T = isLight ? {
-    page: "bg-slate-50 text-slate-900",
-    surface: "bg-white border-slate-200 shadow-sm",
-    card: "bg-white border-slate-200",
-    cardHd: "border-slate-100",
+    page: "bg-slate-100 text-slate-900",
+    surface: "bg-white border-slate-300 shadow-sm",
+    card: "bg-white border-slate-300",
+    cardHd: "border-slate-200",
     h1: "text-slate-900",
-    subtitle: "text-slate-400",
-    muted: "text-slate-400",
-    badge: "border-slate-200 text-slate-600",
-    selectTrigger: "bg-white border-slate-200 text-slate-700",
-    dropdown: "bg-white border-slate-200",
-    dropdownItem: "text-slate-700 focus:bg-slate-100",
-    input: "bg-white border-slate-200 text-slate-800 focus:border-primary/50",
-    tableHd: "bg-slate-50",
-    tableHdText: "text-slate-500",
-    tableRow: "border-slate-100 hover:bg-slate-50",
-    cellPrimary: "text-slate-800",
-    cellSub: "text-slate-500",
-    toggleBtn: "bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200",
-    dialog: "bg-white border-slate-200 text-slate-900",
-    dialogLabel: "text-slate-600",
-    dialogInput: "bg-white border-slate-200 text-slate-800 focus:border-primary/50",
-    searchIcon: "text-slate-400",
+    subtitle: "text-slate-700 !text-xs",
+    muted: "text-slate-600",
+    badge: "border-slate-300 text-slate-700",
+    selectTrigger: "bg-white border-slate-300 text-slate-800",
+    dropdown: "bg-white border-slate-300",
+    dropdownItem: "text-slate-800 focus:bg-slate-100",
+    input: "bg-white border-slate-300 text-slate-900 focus:border-primary/60",
+    tableHd: "bg-slate-200",
+    tableHdText: "text-slate-800 !text-[11px]",
+    tableRow: "border-slate-200 hover:bg-slate-50",
+    cellPrimary: "text-slate-900",
+    cellSub: "text-slate-700",
+    toggleBtn: "bg-slate-200 border-slate-300 text-slate-700 hover:bg-slate-300",
+    dialog: "bg-white border-slate-300 text-slate-900",
+    dialogLabel: "text-slate-800 !text-[11px]",
+    dialogInput: "bg-white border-slate-300 text-slate-900 focus:border-primary/60",
+    searchIcon: "text-slate-500",
     expandedBg: "bg-slate-50",
     rowUrgency: { safe: "", blue: "bg-blue-50", yellow: "bg-amber-50", red: "bg-red-50" },
   } as const : {
@@ -967,19 +967,19 @@ export default function InventoryPage() {
                 const catHasAlert = groupProds.some(p => p.totalQuantity < p.minStock);
 
                 return (
-                  <div key={catKey} className={`border-b ${isLight ? "border-slate-100" : "border-white/5"}`}>
+                  <div key={catKey} className={`border-b ${isLight ? "border-slate-200" : "border-white/5"}`}>
                     {/* ── Category header row ── */}
                     <div
                       className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer select-none transition-colors
-                        ${isLight ? "bg-slate-100/80 hover:bg-slate-200/60" : "bg-white/[0.04] hover:bg-white/[0.07]"}
+                        ${isLight ? "bg-slate-200 hover:bg-slate-300/60" : "bg-white/[0.04] hover:bg-white/[0.07]"}
                       `}
                       onClick={() => toggleCategory(catKey)}
                     >
-                      <div className={`shrink-0 ${isLight ? "text-slate-500" : "text-white/40"}`}>
+                      <div className={`shrink-0 ${isLight ? "text-slate-700" : "text-white/40"}`}>
                         {isCatCollapsed ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                       </div>
-                      <Tag className={`h-3 w-3 shrink-0 ${category === "__none__" ? (isLight ? "text-slate-400" : "text-white/30") : "text-primary"}`} />
-                      <span className={`font-black text-[11px] uppercase tracking-widest flex-1 ${category === "__none__" ? T.muted : (isLight ? "text-slate-700" : "text-white/80")}`}>
+                      <Tag className={`h-3 w-3 shrink-0 ${category === "__none__" ? (isLight ? "text-slate-600" : "text-white/30") : "text-primary"}`} />
+                      <span className={`font-black text-[11px] uppercase tracking-widest flex-1 ${category === "__none__" ? T.muted : (isLight ? "text-slate-800" : "text-white/80")}`}>
                         {catLabel}
                       </span>
                       <span className={`text-[10px] font-bold ${T.muted}`}>
@@ -995,7 +995,7 @@ export default function InventoryPage() {
 
                     {/* ── Products in this category ── */}
                     {!isCatCollapsed && (
-                      <div className={`divide-y ${isLight ? "divide-slate-100" : "divide-white/[0.03]"}`}>
+                      <div className={`divide-y ${isLight ? "divide-slate-200" : "divide-white/[0.03]"}`}>
                         {groupProds.map(product => {
                           const expanded = expandedIds.has(product.id);
                           const batches: Batch[] = expandedBatches[product.id] || [];
@@ -1006,8 +1006,8 @@ export default function InventoryPage() {
                               {/* Product row */}
                               <div
                                 className={`flex items-center gap-3 pl-9 pr-5 py-3.5 cursor-pointer transition-colors
-                                  ${expanded ? (isLight ? "bg-slate-50" : "bg-primary/5") : "hover:bg-white/[0.02]"}
-                                  ${lowStock && !expanded ? (isLight ? "bg-orange-50/50" : "bg-orange-500/5") : ""}
+                                  ${expanded ? (isLight ? "bg-slate-100" : "bg-primary/5") : "hover:bg-white/[0.02]"}
+                                  ${lowStock && !expanded ? (isLight ? "bg-orange-100/60" : "bg-orange-500/5") : ""}
                                 `}
                                 onClick={() => toggleExpand(product.id)}
                               >
@@ -1069,7 +1069,7 @@ export default function InventoryPage() {
                                   {batches.length === 0 ? (
                                     <p className={`text-center py-4 text-[11px] font-bold italic ${T.muted}`}>Nenhum lote cadastrado</p>
                                   ) : (
-                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: isLight ? "#e2e8f0" : "rgba(255,255,255,0.07)" }}>
+                                    <div className="rounded-xl border overflow-hidden" style={{ borderColor: isLight ? "#94a3b8" : "rgba(255,255,255,0.07)" }}>
                                       <table className="w-full text-xs">
                                         <thead>
                                           <tr className={T.tableHd}>
