@@ -849,6 +849,7 @@ export default function InventoryPage() {
   const lowStockCount = products.filter(p => p.totalQuantity < p.minStock).length;
   const expiringCount = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7).length;
   const expiredCount  = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0).length;
+  const saleCount     = products.filter(p => p.salePrice != null && p.salePrice > 0).length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -880,12 +881,13 @@ export default function InventoryPage() {
       </div>
 
       {/* ── Stats Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         {[
           { icon: Package, label: "Produtos", value: totalProducts, color: "text-primary" },
           { icon: TrendingDown, label: "Estoque Baixo", value: lowStockCount, color: "text-orange-400" },
           { icon: AlertTriangle, label: "Vencendo (7d)", value: expiringCount, color: "text-yellow-400" },
           { icon: X, label: "Vencidos", value: expiredCount, color: "text-red-400" },
+          { icon: Flame, label: "Em Liquidação", value: saleCount, color: "text-orange-500" },
         ].map(({ icon: Icon, label, value, color }) => (
           <div key={label} className={`p-4 rounded-2xl border transition-colors ${T.surface}`}>
             <div className={`flex items-center gap-2 mb-1 ${T.muted}`}>
@@ -1078,6 +1080,11 @@ export default function InventoryPage() {
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-0.5">
                                       <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
+                                      {product.salePrice != null && product.salePrice > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide text-orange-500">
+                                          <Flame className="h-3 w-3" />Em Liquidação
+                                        </span>
+                                      )}
                                       {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
                                       {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
                                       {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}

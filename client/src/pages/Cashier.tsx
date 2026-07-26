@@ -85,7 +85,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play, RotateCw, Maximize } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play, RotateCw, Maximize, Flame } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
@@ -860,6 +860,11 @@ function CashierContent({
                       <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">
                         {item.name}
                       </h3>
+                      {(item as any).salePrice != null && (item as any).salePrice > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-orange-500 mb-1">
+                          <Flame className="h-2.5 w-2.5" />Em Liquidação
+                        </span>
+                      )}
                       <div className="flex items-center justify-between items-end">
                         <span className="text-white/40 text-[8px] font-bold uppercase tracking-wider italic">
                           {(item as any).unitType === "kg" ? "por Kg" : "Unid."}
