@@ -188,28 +188,28 @@ export default function InventoryPage() {
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => { nameColPctRef.current = nameColPct; }, [nameColPct]);
 
-  const isDraggingCol = useRef(false);
-
   const onColHandlePointerDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    isDraggingCol.current = true;
+    e.stopPropagation();
     const startX = e.clientX;
     const startPct = nameColPctRef.current;
 
     const onMove = (ev: PointerEvent) => {
-      if (!isDraggingCol.current || !listRef.current) return;
-      const w = listRef.current.clientWidth;
-      const delta = ((ev.clientX - startX) / w) * 100;
-      setNameColPct(Math.max(20, Math.min(82, startPct + delta)));
+      if (!listRef.current) return;
+      const rect = listRef.current.getBoundingClientRect();
+      const delta = ((ev.clientX - startX) / rect.width) * 100;
+      const next = Math.max(20, Math.min(82, startPct + delta));
+      nameColPctRef.current = next;
+      setNameColPct(next);
     };
+
     const onUp = () => {
-      isDraggingCol.current = false;
-      document.removeEventListener("pointermove", onMove);
-      document.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
     };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp);
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
   }, []);
 
   // ── UI State ──
