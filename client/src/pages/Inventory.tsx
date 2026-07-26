@@ -9,7 +9,7 @@ import {
   Package, Search, Plus, Loader2, ChevronDown, ChevronUp,
   Sun, Moon, AlertTriangle, Trash2, Edit2, X, Tag,
   Calendar, Layers, TrendingDown, ShoppingCart, Clock, BarChart3,
-  ScanBarcode, CheckCircle2, XCircle
+  ScanBarcode, CheckCircle2, XCircle, GripVertical
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -180,6 +180,30 @@ export default function InventoryPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  // ── Column resize state ──
+  const [nameColPct, setNameColPct] = useState(62);
+  const nameColPctRef = useRef(62);
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { nameColPctRef.current = nameColPct; }, [nameColPct]);
+
+  const onColHandleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startPct = nameColPctRef.current;
+    const onMove = (ev: MouseEvent) => {
+      if (!listRef.current) return;
+      const w = listRef.current.clientWidth;
+      const delta = ((ev.clientX - startX) / w) * 100;
+      setNameColPct(Math.max(22, Math.min(84, startPct + delta)));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, []);
 
   // ── UI State ──
   const [isLight, setIsLight] = useState(false);
@@ -958,7 +982,22 @@ export default function InventoryPage() {
               )}
             </div>
           ) : (
-            <div>
+            <div ref={listRef}>
+              {/* ── Column resize header ── */}
+              <div className={`relative flex items-center h-7 border-b select-none ${isLight ? "border-slate-200 bg-slate-50" : "border-white/5 bg-black/10"}`}>
+                <span className={`absolute left-9 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Produto</span>
+                {/* Draggable handle */}
+                <div
+                  onMouseDown={onColHandleMouseDown}
+                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group"
+                  style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "20px" }}
+                  title="Arraste para ajustar colunas"
+                >
+                  <GripVertical className={`h-4 w-4 transition-colors ${isLight ? "text-slate-300 group-hover:text-primary" : "text-white/20 group-hover:text-primary"}`} />
+                </div>
+                <span className={`absolute right-4 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Qtd · Ações</span>
+              </div>
+
               {groupedProducts.map(({ category, products: groupProds }) => {
                 const catKey = category;
                 const catLabel = category === "__none__" ? "Sem Categoria" : category;
@@ -1015,7 +1054,7 @@ export default function InventoryPage() {
                                   {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                 </div>
 
-                                <div className="flex-1 min-w-0">
+                                <div className="min-w-0 shrink-0 overflow-hidden" style={{ flexBasis: `${nameColPct}%` }}>
                                   <div className="flex flex-wrap items-center gap-2 mb-0.5">
                                     <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
                                     {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
