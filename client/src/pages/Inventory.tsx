@@ -99,7 +99,7 @@ const emptyProduct = () => ({
 const emptyBatch = () => ({
   barcode: "", supplierCode: "", batchNumber: "", supplier: "",
   quantity: "", costPrice: "", manufactureDate: "", expiryDate: "",
-  entryDate: new Date().toISOString().slice(0, 10),
+  entryDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
 });
 
 // ─── Filter types ─────────────────────────────────────────────────────────────
@@ -142,14 +142,6 @@ const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Descrição</Label>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.description} onChange={e => setForm((f: any) => ({ ...f, description: e.target.value }))} placeholder="Opcional" />
     </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>NCM</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.ncm} onChange={e => setForm((f: any) => ({ ...f, ncm: e.target.value }))} placeholder="00000000" />
-    </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>CFOP</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.cfop} onChange={e => setForm((f: any) => ({ ...f, cfop: e.target.value }))} placeholder="5102" />
-    </div>
   </div>
 );
 
@@ -168,24 +160,12 @@ const BatchFields = ({ form, setForm, T }: any) => (
       <Input className={`mt-1 ${T.dialogInput}`} value={form.barcode} onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))} placeholder="EAN-13..." />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variação</Label>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variante</Label>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: Chocolate, Diet, 500ml..." />
-    </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fabricação</Label>
-      <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.manufactureDate} onChange={e => setForm((f: any) => ({ ...f, manufactureDate: e.target.value }))} />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
       <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.expiryDate} onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))} />
-    </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fornecedor</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.supplier} onChange={e => setForm((f: any) => ({ ...f, supplier: e.target.value }))} placeholder="Nome do fornecedor" />
-    </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Cód. Fornecedor</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.supplierCode} onChange={e => setForm((f: any) => ({ ...f, supplierCode: e.target.value }))} placeholder="Código interno" />
     </div>
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Data de Entrada</Label>
@@ -1093,7 +1073,7 @@ export default function InventoryPage() {
                                       <table className="w-full text-xs">
                                         <thead>
                                           <tr className={T.tableHd}>
-                                            {["Cód Barras", "Variação", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
+                                            {["Cód Barras", "Variante", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
                                               <th key={h} className={`px-3 py-2 text-left font-black uppercase tracking-widest text-[9px] ${T.tableHdText}`}>{h}</th>
                                             ))}
                                           </tr>
@@ -1324,7 +1304,7 @@ export default function InventoryPage() {
                           <div className="space-y-2">
                             <div>
                               <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-                                Variação <span className="text-amber-400">*</span>
+                                Variante <span className="text-amber-400">*</span>
                               </Label>
                               <Input
                                 className={`mt-1 ${T.dialogInput} border-amber-400/40 focus:border-amber-400`}
