@@ -860,7 +860,7 @@ function CashierContent({
                       <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">
                         {item.name}
                       </h3>
-                      {(item as any).salePrice != null && (item as any).salePrice > 0 && (
+                      {(item as any).emLiquidacao && (
                         <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-orange-500 mb-1">
                           <Flame className="h-2.5 w-2.5" />Em Liquidação
                         </span>

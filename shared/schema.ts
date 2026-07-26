@@ -223,6 +223,7 @@ export const products = pgTable("products", {
   imageUrl: text("image_url"),
   minStock: integer("min_stock").notNull().default(5),
   salePrice: integer("sale_price"), // in cents
+  emLiquidacao: integer("em_liquidacao", { mode: "boolean" }).default(false),
   ncm: text("ncm"),
   cfop: text("cfop"),
   codigoBalanca: text("codigo_balanca"),

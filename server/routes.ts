@@ -863,11 +863,12 @@ export async function registerRoutes(
 
   app.put("/api/products/:id", isAuthenticated, async (req, res) => {
     try {
-      const { salePrice, minStock, ...rest } = req.body;
+      const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
       const data = {
         ...rest,
         salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
         minStock: minStock !== undefined ? Number(minStock) : undefined,
+        ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
       };
       const p = await storage.updateProduct(Number(req.params.id), data);
       res.json(p);

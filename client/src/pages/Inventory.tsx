@@ -33,6 +33,7 @@ interface Product {
   imageUrl?: string | null;
   minStock: number;
   salePrice?: number | null;
+  emLiquidacao?: boolean | null;
   ncm?: string | null;
   cfop?: string | null;
   codigoBalanca?: string | null;
@@ -395,7 +396,7 @@ export default function InventoryPage() {
   });
 
   const liquidarMut = useMutation({
-    mutationFn: ({ id, salePrice }: any) => apiRequest("PUT", `/api/products/${id}`, { salePrice }),
+    mutationFn: ({ id, salePrice }: any) => apiRequest("PUT", `/api/products/${id}`, { salePrice, emLiquidacao: true }),
     onSuccess: () => {
       invalidate();
       setLiquidarProduct(null);
@@ -849,7 +850,7 @@ export default function InventoryPage() {
   const lowStockCount = products.filter(p => p.totalQuantity < p.minStock).length;
   const expiringCount = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7).length;
   const expiredCount  = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0).length;
-  const saleCount     = products.filter(p => p.salePrice != null && p.salePrice > 0).length;
+  const saleCount     = products.filter(p => p.emLiquidacao).length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -1080,7 +1081,7 @@ export default function InventoryPage() {
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2 mb-0.5">
                                       <span className={`font-black text-sm tracking-tight ${T.cellPrimary}`}>{product.name}</span>
-                                      {product.salePrice != null && product.salePrice > 0 && (
+                                      {product.emLiquidacao && (
                                         <span className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-wide text-orange-500">
                                           <Flame className="h-3 w-3" />Em Liquidação
                                         </span>

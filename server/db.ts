@@ -321,6 +321,7 @@ const TABLE_DEFINITIONS = [
     image_url TEXT,
     min_stock INTEGER NOT NULL DEFAULT 5,
     sale_price INTEGER,
+    em_liquidacao INTEGER NOT NULL DEFAULT 0,
     ncm TEXT,
     cfop TEXT,
     codigo_balanca TEXT,
@@ -393,12 +394,14 @@ export async function setupDatabase() {
         image_url TEXT,
         min_stock INTEGER NOT NULL DEFAULT 5,
         sale_price INTEGER,
+        em_liquidacao INTEGER NOT NULL DEFAULT 0,
         ncm TEXT,
         cfop TEXT,
         codigo_balanca TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,
+      "ALTER TABLE products ADD COLUMN em_liquidacao INTEGER NOT NULL DEFAULT 0",
       `CREATE TABLE IF NOT EXISTS batches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
