@@ -184,33 +184,8 @@ export default function InventoryPage() {
 
   // ── Column resize state ──
   const [nameColPct, setNameColPct] = useState(62);
-  const nameColPctRef = useRef(62);
+  const [colDrag, setColDrag] = useState<{ startX: number; startPct: number } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { nameColPctRef.current = nameColPct; }, [nameColPct]);
-
-  const onColHandlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const startX = e.clientX;
-    const startPct = nameColPctRef.current;
-
-    const onMove = (ev: PointerEvent) => {
-      if (!listRef.current) return;
-      const rect = listRef.current.getBoundingClientRect();
-      const delta = ((ev.clientX - startX) / rect.width) * 100;
-      const next = Math.max(20, Math.min(82, startPct + delta));
-      nameColPctRef.current = next;
-      setNameColPct(next);
-    };
-
-    const onUp = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }, []);
 
   // ── UI State ──
   const [isLight, setIsLight] = useState(false);
@@ -863,6 +838,21 @@ export default function InventoryPage() {
   return (
     <div className={`p-4 md:p-6 lg:p-10 space-y-6 min-h-screen transition-colors duration-300 ${T.page}`}>
 
+      {/* ── Column resize drag overlay (fullscreen, only active while dragging) ── */}
+      {colDrag && (
+        <div
+          className="fixed inset-0 z-[9999] cursor-col-resize"
+          onMouseMove={(e) => {
+            if (!listRef.current) return;
+            const rect = listRef.current.getBoundingClientRect();
+            const delta = ((e.clientX - colDrag.startX) / rect.width) * 100;
+            setNameColPct(Math.max(20, Math.min(82, colDrag.startPct + delta)));
+          }}
+          onMouseUp={() => setColDrag(null)}
+          onMouseLeave={() => setColDrag(null)}
+        />
+      )}
+
       {/* ── Header ── */}
       <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center p-5 rounded-2xl border gap-4 transition-colors duration-300 ${T.surface}`}>
         <div>
@@ -1014,8 +1004,12 @@ export default function InventoryPage() {
                 <span className={`absolute left-9 text-[9px] font-black uppercase tracking-widest ${T.muted} pointer-events-none`}>Produto</span>
                 {/* Draggable handle */}
                 <div
-                  onPointerDown={onColHandlePointerDown}
-                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group touch-none"
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setColDrag({ startX: e.clientX, startPct: nameColPct });
+                  }}
+                  className="absolute inset-y-0 z-10 flex items-center justify-center cursor-col-resize group select-none"
                   style={{ left: `${nameColPct}%`, transform: "translateX(-50%)", width: "28px" }}
                   title="Arraste para ajustar colunas"
                 >
