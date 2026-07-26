@@ -56,9 +56,20 @@ interface Batch {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Datas são salvas como timestamp Unix (meia-noite UTC).
+ * Em fusos negativos (ex: Brasil UTC-3), meia-noite UTC vira 21h do dia anterior,
+ * fazendo o JS mostrar o dia errado ao usar horário local.
+ * Esta função constrói um Date local usando os componentes UTC, evitando o deslocamento.
+ */
+function utcDateOnly(d: string | Date): Date {
+  const dt = new Date(d);
+  return new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
+}
+
 function getExpiryUrgency(date: string | Date | null | undefined): "safe" | "blue" | "yellow" | "red" {
   if (!date) return "safe";
-  const days = differenceInDays(new Date(date), new Date());
+  const days = differenceInDays(utcDateOnly(date), new Date());
   if (days <= 0) return "red";
   if (days <= 3) return "red";
   if (days <= 7) return "yellow";
@@ -68,7 +79,7 @@ function getExpiryUrgency(date: string | Date | null | undefined): "safe" | "blu
 
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return "—";
-  try { return format(new Date(d), "dd/MM/yyyy"); } catch { return "—"; }
+  try { return format(utcDateOnly(d), "dd/MM/yyyy"); } catch { return "—"; }
 }
 
 function fmtCurrency(cents: number | null | undefined) {
@@ -388,8 +399,8 @@ export default function InventoryPage() {
       items = items.filter(p => {
         if (filterStatus === "baixo")     return p.totalQuantity < p.minStock;
         if (filterStatus === "sem_lotes") return p.totalQuantity <= 0;
-        if (filterStatus === "vencidos")  return p.nearestExpiry && differenceInDays(new Date(p.nearestExpiry), new Date()) <= 0;
-        if (filterStatus === "vencendo")  return p.nearestExpiry && differenceInDays(new Date(p.nearestExpiry), new Date()) > 0 && differenceInDays(new Date(p.nearestExpiry), new Date()) <= 7;
+        if (filterStatus === "vencidos")  return p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0;
+        if (filterStatus === "vencendo")  return p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7;
         return true;
       });
     }
@@ -415,7 +426,7 @@ export default function InventoryPage() {
   function ExpiryBadge({ date }: { date: string | Date | null | undefined }) {
     if (!date) return null;
     const u = getExpiryUrgency(date);
-    const days = differenceInDays(new Date(date), new Date());
+    const days = differenceInDays(utcDateOnly(date), new Date());
     const cfg = {
       red:    { cls: "bg-red-500/15 border-red-500/30 text-red-400", label: days <= 0 ? "VENCIDO" : `VENCE EM ${days}d` },
       yellow: { cls: "bg-yellow-500/15 border-yellow-500/30 text-yellow-400", label: `VENCE EM ${days}d` },
@@ -581,8 +592,8 @@ export default function InventoryPage() {
 
   const totalProducts = products.length;
   const lowStockCount = products.filter(p => p.totalQuantity < p.minStock).length;
-  const expiringCount = products.filter(p => p.nearestExpiry && differenceInDays(new Date(p.nearestExpiry), new Date()) > 0 && differenceInDays(new Date(p.nearestExpiry), new Date()) <= 7).length;
-  const expiredCount  = products.filter(p => p.nearestExpiry && differenceInDays(new Date(p.nearestExpiry), new Date()) <= 0).length;
+  const expiringCount = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7).length;
+  const expiredCount  = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0).length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
