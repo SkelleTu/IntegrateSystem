@@ -220,12 +220,21 @@ export default function InventoryPage() {
   const [deductFor, setDeductFor] = useState<Product | null>(null);
   const [dupProduct, setDupProduct] = useState<Product | null>(null); // duplicate found
 
-  // ── Barcode scanner state ──
+  // ── Barcode scanner state (global modal) ──
   const [scanOpen, setScanOpen] = useState(false);
   const [scanValue, setScanValue] = useState("");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState<{ found: boolean; product?: Product } | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Inline barcode scan (inside "Novo Lote" modal) ──
+  const [inlineScanValue, setInlineScanValue] = useState("");
+  const [inlineScanLoading, setInlineScanLoading] = useState(false);
+  const [inlineScanResult, setInlineScanResult] = useState<{
+    status: "match" | "other" | "new";
+    otherProduct?: Product;
+  } | null>(null);
+  const inlineScanRef = useRef<HTMLInputElement>(null);
 
   // ── Form state ──
   const [productForm, setProductForm] = useState(emptyProduct());
@@ -564,6 +573,15 @@ export default function InventoryPage() {
     }
   }, [scanOpen]);
 
+  // Reset inline scan when the Add Batch modal opens/closes
+  useEffect(() => {
+    setInlineScanValue("");
+    setInlineScanResult(null);
+    if (addBatchFor) {
+      setTimeout(() => inlineScanRef.current?.focus(), 150);
+    }
+  }, [addBatchFor]);
+
   async function handleScan() {
     const code = scanValue.trim();
     if (!code) return;
@@ -601,6 +619,36 @@ export default function InventoryPage() {
     setScanOpen(false);
     setScanValue("");
     setScanResult(null);
+  }
+
+  async function handleInlineScan() {
+    const code = inlineScanValue.trim();
+    if (!code) return;
+    setInlineScanLoading(true);
+    setInlineScanResult(null);
+    try {
+      const res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      if (res.ok) {
+        const found: Product = await res.json();
+        if (addBatchFor && found.id === addBatchFor.id) {
+          // Same product — pre-fill barcode and confirm
+          setBatchForm(f => ({ ...f, barcode: code }));
+          setInlineScanResult({ status: "match" });
+        } else {
+          // Different product in stock
+          setInlineScanResult({ status: "other", otherProduct: found });
+        }
+      } else {
+        // Barcode not registered — fill it as new
+        setBatchForm(f => ({ ...f, barcode: code }));
+        setInlineScanResult({ status: "new" });
+      }
+    } catch {
+      setBatchForm(f => ({ ...f, barcode: code }));
+      setInlineScanResult({ status: "new" });
+    } finally {
+      setInlineScanLoading(false);
+    }
   }
 
   function handleDupAddBatch() {
@@ -894,12 +942,21 @@ export default function InventoryPage() {
                           <span className={`text-[10px] font-black uppercase tracking-widest text-primary`}>
                             Lotes ({batches.length})
                           </span>
-                          <button
-                            onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
-                            className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
-                          >
-                            <Plus className="h-3 w-3" /> Novo Lote
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <button
+                              title="Bipar para identificar produto"
+                              onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
+                              className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:underline"
+                            >
+                              <ScanBarcode className="h-3 w-3" /> Bipar
+                            </button>
+                            <button
+                              onClick={() => { setAddBatchFor(product); setBatchForm(emptyBatch()); }}
+                              className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                            >
+                              <Plus className="h-3 w-3" /> Novo Lote
+                            </button>
+                          </div>
                         </div>
 
                         {batches.length === 0 ? (
@@ -1035,7 +1092,7 @@ export default function InventoryPage() {
       </Dialog>
 
       {/* ─── Modal: Add Batch ────────────────────────────────────────────────── */}
-      <Dialog open={!!addBatchFor} onOpenChange={() => setAddBatchFor(null)}>
+      <Dialog open={!!addBatchFor} onOpenChange={() => { setAddBatchFor(null); setInlineScanValue(""); setInlineScanResult(null); }}>
         <DialogContent className={`max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border ${T.dialog}`}>
           <DialogHeader>
             <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Novo Lote</DialogTitle>
@@ -1044,6 +1101,66 @@ export default function InventoryPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+
+            {/* ── Inline barcode scan strip ── */}
+            <div className={`rounded-xl border p-3 space-y-2 ${isLight ? "border-slate-200 bg-slate-50" : "border-white/10 bg-white/[0.03]"}`}>
+              <p className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${T.muted}`}>
+                <ScanBarcode className="h-3.5 w-3.5 text-emerald-400" /> Bipe para verificar o produto
+              </p>
+              <div className="flex gap-2">
+                <Input
+                  ref={inlineScanRef}
+                  className={`flex-1 font-mono text-sm tracking-widest ${T.dialogInput}`}
+                  value={inlineScanValue}
+                  onChange={e => { setInlineScanValue(e.target.value); setInlineScanResult(null); }}
+                  onKeyDown={e => { if (e.key === "Enter") handleInlineScan(); }}
+                  placeholder="Bipe ou digite o código de barras..."
+                  autoComplete="off"
+                />
+                <Button
+                  onClick={handleInlineScan}
+                  disabled={!inlineScanValue.trim() || inlineScanLoading}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-xl px-3 shrink-0"
+                >
+                  {inlineScanLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanBarcode className="h-4 w-4" />}
+                </Button>
+              </div>
+
+              {/* Inline result feedback */}
+              {inlineScanResult && (
+                <div className={`rounded-lg px-3 py-2 flex items-start gap-2 text-xs ${
+                  inlineScanResult.status === "match" ? "bg-emerald-500/15 border border-emerald-500/30" :
+                  inlineScanResult.status === "other"  ? "bg-yellow-500/15 border border-yellow-500/30" :
+                                                         "bg-blue-500/15 border border-blue-500/30"
+                }`}>
+                  {inlineScanResult.status === "match" && (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />
+                      <span className="text-emerald-400 font-bold">
+                        Produto confirmado — código de barras preenchido no lote.
+                      </span>
+                    </>
+                  )}
+                  {inlineScanResult.status === "other" && (
+                    <>
+                      <AlertTriangle className="h-4 w-4 text-yellow-400 shrink-0 mt-0.5" />
+                      <span className="text-yellow-400 font-bold">
+                        Este código pertence a outro produto: <strong className="text-white">{inlineScanResult.otherProduct?.name}</strong>. Verifique se está bipando o produto correto.
+                      </span>
+                    </>
+                  )}
+                  {inlineScanResult.status === "new" && (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                      <span className="text-blue-400 font-bold">
+                        Código novo — será registrado neste produto.
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             <BatchFields form={batchForm} setForm={setBatchForm} T={T} />
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setAddBatchFor(null)} className={T.muted}>Cancelar</Button>
