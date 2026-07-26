@@ -108,27 +108,38 @@ type FilterStatus = "todos" | "baixo" | "vencendo" | "vencidos" | "sem_lotes";
 
 // ─── Product Form fields (must be outside InventoryPage to avoid remount on re-render) ──
 
-const ProductFields = ({ form, setForm, T }: any) => (
+const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
   <div className="grid grid-cols-2 gap-3">
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome *</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="Ex: Coca-Cola 2L" />
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder="Ex: Salgadinho Bacon 45g" />
+    </div>
+    {/* Sabor/Variação imediatamente após o nome — campo crítico para diferenciar variantes */}
+    <div className={`col-span-2 rounded-xl p-3 -mx-1 transition-all ${highlightFlavor ? "ring-2 ring-amber-400/60 bg-amber-400/5" : ""}`}>
+      <Label className={`text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 ${highlightFlavor ? "text-amber-400" : T.dialogLabel}`}>
+        {highlightFlavor && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />}
+        Sabor / Variação / Modelo
+        {highlightFlavor && <span className="text-amber-400 font-bold normal-case tracking-normal text-[10px]"> — preencha para diferenciar este produto</span>}
+      </Label>
+      <Input
+        className={`mt-1 ${T.dialogInput} ${highlightFlavor ? "border-amber-400/50 focus:border-amber-400" : ""}`}
+        value={form.flavor}
+        onChange={e => setForm((f: any) => ({ ...f, flavor: e.target.value }))}
+        placeholder="Ex: Bacon, Queijo, Diet, Zero, Natural..."
+        autoFocus={highlightFlavor}
+      />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Coca-Cola" />
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Amavita" />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Bebidas" />
-    </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Sabor/Variação</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.flavor} onChange={e => setForm((f: any) => ({ ...f, flavor: e.target.value }))} placeholder="Ex: Original" />
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Salgadinhos" />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Peso/Volume</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 2L" />
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 45g" />
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Unidade</Label>
@@ -235,6 +246,9 @@ export default function InventoryPage() {
     otherProduct?: Product;
   } | null>(null);
   const inlineScanRef = useRef<HTMLInputElement>(null);
+
+  // ── "Novo Produto" extra: highlight flavor field when coming from variant flow ──
+  const [highlightFlavor, setHighlightFlavor] = useState(false);
 
   // ── Form state ──
   const [productForm, setProductForm] = useState(emptyProduct());
@@ -651,6 +665,32 @@ export default function InventoryPage() {
     }
   }
 
+  function handleRegisterAsNewVariant() {
+    // Pre-fill Novo Produto form with current product's data — user just fills the flavor
+    if (addBatchFor) {
+      setProductForm({
+        name: addBatchFor.name,
+        brand: addBatchFor.brand || "",
+        category: addBatchFor.category || "",
+        flavor: "",           // intentionally blank — user must fill this
+        unit: addBatchFor.unit || "Unidade",
+        weight: addBatchFor.weight || "",
+        description: addBatchFor.description || "",
+        minStock: String(addBatchFor.minStock || 5),
+        salePrice: addBatchFor.salePrice ? String((addBatchFor.salePrice / 100).toFixed(2)) : "",
+        ncm: addBatchFor.ncm || "",
+        cfop: addBatchFor.cfop || "",
+        codigoBalanca: "",
+      });
+      setFirstBatchForm({ ...emptyBatch(), barcode: inlineScanValue.trim() });
+    }
+    setHighlightFlavor(true);
+    setAddBatchFor(null);
+    setInlineScanValue("");
+    setInlineScanResult(null);
+    setAddProductOpen(true);
+  }
+
   function handleDupAddBatch() {
     if (dupProduct) {
       setAddBatchFor(dupProduct);
@@ -1015,17 +1055,21 @@ export default function InventoryPage() {
       </Card>
 
       {/* ─── Modal: Add Product ─────────────────────────────────────────────── */}
-      <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
+      <Dialog open={addProductOpen} onOpenChange={open => { setAddProductOpen(open); if (!open) setHighlightFlavor(false); }}>
         <DialogContent className={`max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border ${T.dialog}`}>
           <DialogHeader>
             <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Novo Produto</DialogTitle>
-            <DialogDescription className={T.muted}>Preencha os dados do produto. Se ele já existir, um novo lote será adicionado automaticamente.</DialogDescription>
+            <DialogDescription className={T.muted}>
+              {highlightFlavor
+                ? "Os dados foram pré-preenchidos com o produto existente. Preencha o Sabor/Variação para diferenciar este produto."
+                : "Preencha os dados do produto. Se ele já existir, um novo lote será adicionado automaticamente."}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5 mt-2">
             <div>
               <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${T.muted}`}>Dados do Produto</p>
-              <ProductFields form={productForm} setForm={setProductForm} T={T} />
+              <ProductFields form={productForm} setForm={setProductForm} T={T} highlightFlavor={highlightFlavor} />
             </div>
 
             <div className={`border-t pt-4 ${isLight ? "border-slate-200" : "border-white/10"}`}>
@@ -1150,12 +1194,21 @@ export default function InventoryPage() {
                     </>
                   )}
                   {inlineScanResult.status === "new" && (
-                    <>
-                      <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-                      <span className="text-blue-400 font-bold">
-                        Código novo — será registrado neste produto.
-                      </span>
-                    </>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
+                        <span className="text-blue-400 font-bold">
+                          Código novo — será registrado neste produto ao salvar o lote.
+                        </span>
+                      </div>
+                      <button
+                        onClick={handleRegisterAsNewVariant}
+                        className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-amber-400 hover:text-amber-300 hover:underline transition-colors"
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        É outro sabor / modelo / variação? Cadastrar como novo produto
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
