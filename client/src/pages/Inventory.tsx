@@ -236,6 +236,7 @@ export default function InventoryPage() {
   const [scanValue, setScanValue] = useState("");
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResult, setScanResult] = useState<{ found: boolean; product?: Product } | null>(null);
+  const [scanCategory, setScanCategory] = useState("");
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   // ── Inline barcode scan (inside "Novo Lote" modal) ──
@@ -583,6 +584,7 @@ export default function InventoryPage() {
     if (scanOpen) {
       setScanValue("");
       setScanResult(null);
+      setScanCategory("");
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [scanOpen]);
@@ -624,8 +626,8 @@ export default function InventoryPage() {
       setBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
       toast({ title: `Produto encontrado: ${scanResult.product.name}` });
     } else {
-      // Product not found → open New Product modal with barcode pre-filled in first batch
-      setProductForm(emptyProduct());
+      // Product not found → open New Product modal with barcode and category pre-filled
+      setProductForm({ ...emptyProduct(), category: scanCategory.trim() });
       setFirstBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
       setAddProductOpen(true);
       toast({ title: "Produto não cadastrado — preencha os dados para cadastrá-lo." });
@@ -633,6 +635,7 @@ export default function InventoryPage() {
     setScanOpen(false);
     setScanValue("");
     setScanResult(null);
+    setScanCategory("");
   }
 
   async function handleInlineScan() {
@@ -1306,13 +1309,33 @@ export default function InventoryPage() {
                     <p className={`text-[10px] uppercase tracking-widest ${T.muted}`}>→ Será aberto o formulário de <strong>Novo Lote</strong> para este produto.</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <XCircle className="h-5 w-5 text-red-400 shrink-0" />
                       <span className="font-black text-red-400 text-sm uppercase tracking-widest">Produto Não Cadastrado</span>
                     </div>
                     <p className={`text-xs ${T.muted}`}>Código <strong className="font-mono">{scanValue}</strong> não foi encontrado no estoque.</p>
-                    <p className={`text-[10px] uppercase tracking-widest ${T.muted}`}>→ Será aberto o formulário de <strong>Novo Produto</strong> com o código pré-preenchido.</p>
+                    {/* Category selector — ensures new product is created within the right category */}
+                    <div>
+                      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+                        Categoria do novo produto
+                      </Label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          className={`flex-1 ${T.dialogInput}`}
+                          value={scanCategory}
+                          onChange={e => setScanCategory(e.target.value)}
+                          placeholder="Ex: Salgadinhos, Bebidas..."
+                          list="scan-categories"
+                        />
+                        <datalist id="scan-categories">
+                          {Array.from(new Set(products.map(p => p.category).filter(Boolean))).map(cat => (
+                            <option key={cat} value={cat!} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <p className={`text-[10px] mt-1 ${T.muted}`}>→ O formulário de <strong>Novo Produto</strong> abrirá com esta categoria pré-preenchida.</p>
+                    </div>
                   </div>
                 )}
               </div>
