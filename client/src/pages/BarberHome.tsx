@@ -2,6 +2,7 @@ import { useLocation } from "wouter";
 import { Scissors, User, UserCheck, ShieldCheck, ArrowLeft, ChevronLeft, ChevronRight, Search, Plus, Trash2, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useSmartInterval } from "@/hooks/use-smart-interval";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,15 +51,12 @@ export default function BarberHome() {
     }
   };
 
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/queue/state"] });
-      if (currentTicket) {
-        fetchTicket(currentTicket.ticketNumber);
-      }
-    }, 5000);
-    return () => clearInterval(pollInterval);
-  }, [currentTicket]);
+  useSmartInterval(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/queue/state"] });
+    if (currentTicket) {
+      fetchTicket(currentTicket.ticketNumber);
+    }
+  }, 5000);
 
   useEffect(() => {
     if (queueState?.servingNumber) {

@@ -1,4 +1,26 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { QueryClient, QueryFunction, focusManager } from "@tanstack/react-query";
+
+// Integra o React Query com a Page Visibility API:
+// quando a aba fica oculta, TODOS os refetchInterval são pausados automaticamente.
+// Quando o usuário volta para a aba, as queries retomam imediatamente.
+focusManager.setEventListener((handleFocus) => {
+  const onVisibility = () => handleFocus(!document.hidden);
+  const onFocus = () => handleFocus(true);
+  const onBlur = () => handleFocus(false);
+
+  document.addEventListener("visibilitychange", onVisibility);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("blur", onBlur);
+
+  // Dispara imediatamente com o estado atual
+  handleFocus(!document.hidden);
+
+  return () => {
+    document.removeEventListener("visibilitychange", onVisibility);
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("blur", onBlur);
+  };
+});
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {

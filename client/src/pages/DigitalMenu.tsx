@@ -8,6 +8,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Loader2, Utensils, Info, QrCode } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useSmartInterval } from "@/hooks/use-smart-interval";
 
 const ItemCard = ({ item }: { item: MenuItem }) => (
   <motion.div
@@ -81,13 +82,10 @@ export default function DigitalMenu() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isCreatingTicket, setIsCreatingTicket] = useState(false);
 
-  useEffect(() => {
-    const pollInterval = setInterval(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/queue/state"] });
-    }, 5000);
-    return () => clearInterval(pollInterval);
-  }, []);
+  useSmartInterval(() => {
+    queryClient.invalidateQueries({ queryKey: ["/api/tickets"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/queue/state"] });
+  }, 5000);
 
   useEffect(() => {
     const savedTicket = localStorage.getItem("activeTicketNumber");

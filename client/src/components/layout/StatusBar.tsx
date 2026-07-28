@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useSmartInterval } from "@/hooks/use-smart-interval";
+import { usePageVisibility } from "@/hooks/use-page-visibility";
 import { useUser } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -51,26 +53,27 @@ export function StatusBar() {
     }
   }, [dbStatus?.lastAction, dbStatus?.timestamp]);
 
-  // Effect to update time every second
-  useEffect(() => {
-    const timer = setInterval(() => setTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const isVisible = usePageVisibility();
 
-  // Simulate real-time database activity (listening to query cache or specific events could be done better with WS)
-  // For now, we'll show a small animation when queries are fetching
+  // Relógio — pausa quando a aba está oculta, atualiza imediatamente ao voltar
+  useSmartInterval(() => setTime(new Date()), 1000);
+
   const [isSyncing, setIsSyncing] = useState(false);
   
-  // Real-time animation simulator for database writes/reads
+  // Animação de sincronização — só roda quando a aba está visível
   useEffect(() => {
+    if (!isVisible) return;
+    let timeoutId: ReturnType<typeof setTimeout>;
     const randomSync = () => {
       setIsSyncing(true);
-      setTimeout(() => setIsSyncing(false), 1000);
-      setTimeout(randomSync, Math.random() * 10000 + 5000);
+      timeoutId = setTimeout(() => {
+        setIsSyncing(false);
+        timeoutId = setTimeout(randomSync, Math.random() * 10000 + 5000);
+      }, 1000);
     };
-    const timeout = setTimeout(randomSync, 3000);
-    return () => clearTimeout(timeout);
-  }, []);
+    timeoutId = setTimeout(randomSync, 3000);
+    return () => clearTimeout(timeoutId);
+  }, [isVisible]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
