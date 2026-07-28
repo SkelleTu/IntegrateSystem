@@ -343,41 +343,7 @@ export default function Cashier() {
         }
       }
 
-      if (filteredMenuItems && filteredMenuItems.length === 1) {
-        const item = filteredMenuItems[0];
-        const matchesByCode = (item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term;
-        const matchesBySku = (item as any).sku && (item as any).sku.toLowerCase() === term;
-        if (
-          matchesByCode ||
-          matchesBySku ||
-          (item.barcode && item.barcode.toLowerCase() === term) ||
-          (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
-        ) {
-          // Try to extract weight from barcode for kg products
-          let weightFromBarcode: number | undefined;
-          if ((item as any).unitType === "kg" || (item as any).unit === "kg") {
-            const parsed = parseScaleBarcode(term);
-            if (parsed) {
-              weightFromBarcode = parsed.weightKg;
-            }
-          }
-          
-          addToCart(item as any, weightFromBarcode);
-          setSearchTerm("");
-          
-          if (weightFromBarcode !== undefined) {
-            toast({ 
-              title: "Produto BIPADO", 
-              description: `${item.name} - ${weightFromBarcode.toFixed(3)}kg` 
-            });
-          } else {
-            toast({ 
-              title: "Produto BIPADO", 
-              description: `${item.name} adicionado ao carrinho.` 
-            });
-          }
-        }
-      }
+      // Sem auto-add por código/SKU — o usuário vê o resultado filtrado e clica para adicionar
     }
   }, [searchTerm, filteredMenuItems, menuItems, addToCart, toast]);
 
