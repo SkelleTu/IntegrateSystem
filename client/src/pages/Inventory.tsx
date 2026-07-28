@@ -1224,12 +1224,8 @@ export default function InventoryPage() {
                       <div className={`divide-y ${isLight ? "divide-slate-200" : "divide-white/[0.03]"}`}>
                         {groupProds.map(product => {
                           const expanded = expandedIds.has(product.id);
-                          const allProductBatches: Batch[] = expandedBatches[product.id] || [];
-                          // When search matched a specific batch SKU/barcode, show only that batch
+                          const batches: Batch[] = expandedBatches[product.id] || [];
                           const skuFilter = skuMatchedBatchSkus.get(product.id);
-                          const batches: Batch[] = skuFilter && skuFilter.size > 0
-                            ? allProductBatches.filter(b => (b.sku && skuFilter.has(b.sku.toLowerCase())) || (b.barcode && skuFilter.has(b.barcode.toLowerCase())))
-                            : allProductBatches;
                           const lowStock = product.totalQuantity < product.minStock;
 
                           const isExactMatch = exactMatchProductIds.has(product.id);
@@ -1335,11 +1331,16 @@ export default function InventoryPage() {
                                         <tbody>
                                           {batches.map(b => {
                                             const u = getExpiryUrgency(b.expiryDate);
+                                            const isBatchHighlighted = !!skuFilter && (
+                                              (!!b.sku && skuFilter.has(b.sku.toLowerCase())) ||
+                                              (!!b.barcode && skuFilter.has(b.barcode.toLowerCase()))
+                                            );
                                             return (
-                                              <tr key={b.id} className={`border-t transition-colors ${T.tableRow} ${T.rowUrgency[u]}`}>
+                                              <tr key={b.id} className={`border-t transition-colors ${T.tableRow} ${isBatchHighlighted ? (isLight ? "bg-primary/10 ring-2 ring-inset ring-primary/40" : "bg-primary/15 ring-2 ring-inset ring-primary/50") : T.rowUrgency[u]}`}>
                                                 {/* SKU */}
-                                                <td className={`px-3 py-2.5 font-mono text-[10px] font-black ${b.sku ? "text-primary" : T.muted}`}>
+                                                <td className={`px-3 py-2.5 font-mono text-[10px] font-black ${isBatchHighlighted ? "text-primary" : b.sku ? "text-primary" : T.muted}`}>
                                                   {b.sku ? `#${b.sku}` : <span className="opacity-30">—</span>}
+                                                  {isBatchHighlighted && <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full bg-primary/20 text-primary text-[8px] font-black uppercase tracking-widest">● match</span>}
                                                 </td>
                                                 {/* Nome da variante */}
                                                 <td className={`px-3 py-2.5 font-bold text-[11px] ${T.cellPrimary}`}>
