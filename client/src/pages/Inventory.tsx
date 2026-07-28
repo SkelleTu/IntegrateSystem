@@ -233,6 +233,7 @@ export default function InventoryPage() {
   const [showInlineVariant, setShowInlineVariant] = useState(false);
   const [inlineVariantFlavor, setInlineVariantFlavor] = useState("");
   const [inlineVariantName, setInlineVariantName] = useState("");
+  const [inlineVariantCodigoProduto, setInlineVariantCodigoProduto] = useState("");
 
   // ── "Novo Produto" extra: highlight flavor field when coming from variant flow ──
   const [highlightFlavor, setHighlightFlavor] = useState(false);
@@ -636,6 +637,7 @@ export default function InventoryPage() {
     setShowInlineVariant(false);
     setInlineVariantFlavor("");
     setInlineVariantName("");
+    setInlineVariantCodigoProduto("");
     if (addBatchFor) {
       setTimeout(() => inlineScanRef.current?.focus(), 150);
     }
@@ -762,6 +764,7 @@ export default function InventoryPage() {
         salePrice: addBatchFor.salePrice ? String((addBatchFor.salePrice / 100).toFixed(2)) : undefined,
         ncm: addBatchFor.ncm || "",
         cfop: addBatchFor.cfop || "",
+        codigoProduto: inlineVariantCodigoProduto.trim() || undefined,
       };
 
       const prodRes = await fetch("/api/products", {
@@ -794,6 +797,7 @@ export default function InventoryPage() {
       setShowInlineVariant(false);
       setInlineVariantFlavor("");
       setInlineVariantName("");
+      setInlineVariantCodigoProduto("");
       setInlineScanValue("");
       setInlineScanResult(null);
       toast({ title: `Variante "${inlineVariantFlavor.trim() || inlineVariantName.trim()}" criada com lote adicionado!` });
@@ -1433,6 +1437,17 @@ export default function InventoryPage() {
                                 value={inlineVariantName}
                                 onChange={e => setInlineVariantName(e.target.value)}
                                 placeholder={addBatchFor?.name || "Nome do produto"}
+                              />
+                            </div>
+                            <div>
+                              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+                                Código do produto (opcional)
+                              </Label>
+                              <Input
+                                className={`mt-1 ${T.dialogInput}`}
+                                value={inlineVariantCodigoProduto}
+                                onChange={e => setInlineVariantCodigoProduto(e.target.value)}
+                                placeholder="Ex: 001, SKU-042..."
                               />
                             </div>
                           </div>
