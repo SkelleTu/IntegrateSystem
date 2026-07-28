@@ -41,6 +41,7 @@ interface Product {
   totalQuantity: number;
   nearestExpiry?: string | Date | null;
   createdAt: string;
+  batchSkus?: string[];
 }
 
 interface Batch {
@@ -473,30 +474,46 @@ export default function InventoryPage() {
 
   // ─── Filtered / sorted products ────────────────────────────────────────────
 
-  const { filteredProducts, exactMatchProductIds } = useMemo(() => {
+  const { filteredProducts, exactMatchProductIds, skuMatchedBatchSkus } = useMemo(() => {
     let items = [...products];
     let exactIds = new Set<number>();
+    // Maps productId → set of batch SKUs/barcodes that matched the search term
+    let skuMatchedBatchSkus = new Map<number, Set<string>>();
 
     // Text search
     if (searchTerm.trim()) {
-      const term = searchTerm.trim();
+      const term = searchTerm.trim().toLowerCase();
 
-      // Exact code match — se o termo bater exatamente com codigoProduto, destaca e auto-expande
-      const exactCode = items.filter(p =>
-        p.codigoProduto && p.codigoProduto.toLowerCase() === term.toLowerCase()
+      // 1. Exact batch SKU / barcode match — highest priority
+      const skuMatches = items.filter(p =>
+        p.batchSkus?.some(s => s.toLowerCase() === term)
       );
-      if (exactCode.length > 0) {
-        exactIds = new Set(exactCode.map(p => p.id));
-        items = exactCode;
+      if (skuMatches.length > 0) {
+        exactIds = new Set(skuMatches.map(p => p.id));
+        items = skuMatches;
+        // Track which specific SKUs matched so we can filter displayed batches
+        for (const p of skuMatches) {
+          const matched = new Set((p.batchSkus || []).filter(s => s.toLowerCase() === term));
+          skuMatchedBatchSkus.set(p.id, matched);
+        }
       } else {
-        // Fuzzy search nos demais campos
-        const fuse = new Fuse(items, {
-          keys: ["name", "brand", "category", "flavor", "codigoBalanca", "codigoProduto", "weight"],
-          threshold: 0.4,
-          ignoreLocation: true,
-          minMatchCharLength: 1,
-        });
-        items = fuse.search(term).map(r => r.item);
+        // 2. Exact codigoProduto match
+        const exactCode = items.filter(p =>
+          p.codigoProduto && p.codigoProduto.toLowerCase() === term
+        );
+        if (exactCode.length > 0) {
+          exactIds = new Set(exactCode.map(p => p.id));
+          items = exactCode;
+        } else {
+          // 3. Fuzzy search nos demais campos
+          const fuse = new Fuse(items, {
+            keys: ["name", "brand", "category", "flavor", "codigoBalanca", "codigoProduto", "weight"],
+            threshold: 0.4,
+            ignoreLocation: true,
+            minMatchCharLength: 1,
+          });
+          items = fuse.search(term).map(r => r.item);
+        }
       }
     }
 
@@ -524,7 +541,7 @@ export default function InventoryPage() {
       return 0;
     });
 
-    return { filteredProducts: items, exactMatchProductIds: exactIds };
+    return { filteredProducts: items, exactMatchProductIds: exactIds, skuMatchedBatchSkus };
   }, [products, searchTerm, filterStatus, sortBy]);
 
   // ─── Expiry badge ──────────────────────────────────────────────────────────
@@ -557,7 +574,7 @@ export default function InventoryPage() {
     return null;
   }
 
-  // ─── Auto-expand exact codigoProduto matches ───────────────────────────────
+  // ─── Auto-expand exact codigoProduto and batch SKU matches ────────────────
 
   useEffect(() => {
     if (exactMatchProductIds.size > 0) {
@@ -1207,7 +1224,12 @@ export default function InventoryPage() {
                       <div className={`divide-y ${isLight ? "divide-slate-200" : "divide-white/[0.03]"}`}>
                         {groupProds.map(product => {
                           const expanded = expandedIds.has(product.id);
-                          const batches: Batch[] = expandedBatches[product.id] || [];
+                          const allProductBatches: Batch[] = expandedBatches[product.id] || [];
+                          // When search matched a specific batch SKU/barcode, show only that batch
+                          const skuFilter = skuMatchedBatchSkus.get(product.id);
+                          const batches: Batch[] = skuFilter && skuFilter.size > 0
+                            ? allProductBatches.filter(b => (b.sku && skuFilter.has(b.sku.toLowerCase())) || (b.barcode && skuFilter.has(b.barcode.toLowerCase())))
+                            : allProductBatches;
                           const lowStock = product.totalQuantity < product.minStock;
 
                           const isExactMatch = exactMatchProductIds.has(product.id);

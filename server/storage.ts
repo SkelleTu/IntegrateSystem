@@ -994,10 +994,13 @@ export class DatabaseStorage implements IStorage {
     const allBatches = await db.select().from(batches);
     return prods.map(p => {
       const pb = allBatches.filter(b => b.productId === p.id && b.quantity > 0);
+      const allPb = allBatches.filter(b => b.productId === p.id);
       const totalQuantity = pb.reduce((s, b) => s + b.quantity, 0);
       const sorted = pb.filter(b => b.expiryDate).sort((a, b) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
       const nearestExpiry = sorted.length > 0 ? sorted[0].expiryDate : null;
-      return { ...p, totalQuantity, nearestExpiry };
+      // Include batch SKUs and barcodes so the frontend can filter by variant code
+      const batchSkus = allPb.flatMap(b => [b.sku, b.barcode].filter((v): v is string => !!v));
+      return { ...p, totalQuantity, nearestExpiry, batchSkus };
     });
   }
 
