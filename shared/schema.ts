@@ -59,6 +59,7 @@ export const menuItems = pgTable("menu_items", {
   imageUrl: text("image_url").notNull(),
   isAvailable: integer("is_available", { mode: 'boolean' }).default(true).notNull(),
   barcode: text("barcode"), // Código de barras para busca
+  codigoProduto: text("codigo_produto"), // Código interno do produto
   tags: text("tags"), // Store as JSON string
   ncm: text("ncm"), // Nomenclatura Comum do Mercosul
   cfop: text("cfop"), // Código Fiscal de Operações e Prestações
@@ -227,6 +228,7 @@ export const products = pgTable("products", {
   ncm: text("ncm"),
   cfop: text("cfop"),
   codigoBalanca: text("codigo_balanca"),
+  codigoProduto: text("codigo_produto"), // Código interno do produto
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   updatedAt: integer("updated_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });

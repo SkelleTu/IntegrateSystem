@@ -232,7 +232,8 @@ export default function Cashier() {
     return normalizedItems.filter(item => 
       (item.name && item.name.toLowerCase().includes(term)) ||
       (item.id && item.id.toString() === term) ||
-      (item.barcode && item.barcode.toLowerCase() === term)
+      (item.barcode && item.barcode.toLowerCase() === term) ||
+      ((item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term)
     );
   }, [menuItems, searchTerm]);
 
@@ -328,7 +329,9 @@ export default function Cashier() {
 
       if (filteredMenuItems && filteredMenuItems.length === 1) {
         const item = filteredMenuItems[0];
+        const matchesByCode = (item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term;
         if (
+          matchesByCode ||
           (item.barcode && item.barcode.toLowerCase() === term) ||
           (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
         ) {

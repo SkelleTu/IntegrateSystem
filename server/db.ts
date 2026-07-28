@@ -123,6 +123,7 @@ const TABLE_DEFINITIONS = [
     image_url TEXT NOT NULL,
     is_available INTEGER NOT NULL DEFAULT 1,
     barcode TEXT,
+    codigo_produto TEXT,
     tags TEXT,
     ncm TEXT,
     cfop TEXT,
@@ -325,6 +326,7 @@ const TABLE_DEFINITIONS = [
     ncm TEXT,
     cfop TEXT,
     codigo_balanca TEXT,
+    codigo_produto TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
@@ -378,6 +380,8 @@ export async function setupDatabase() {
       "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
       "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0",
       "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100",
+      "ALTER TABLE menu_items ADD COLUMN codigo_produto TEXT",
+      "ALTER TABLE products ADD COLUMN codigo_produto TEXT",
       "ALTER TABLE inventory ADD COLUMN codigo_balanca TEXT",
       "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
       "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
@@ -398,6 +402,7 @@ export async function setupDatabase() {
         ncm TEXT,
         cfop TEXT,
         codigo_balanca TEXT,
+        codigo_produto TEXT,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )`,

@@ -94,7 +94,7 @@ function fmtCurrency(cents: number | null | undefined) {
 const emptyProduct = () => ({
   name: "", brand: "", category: "", flavor: "", unit: "Unidade",
   weight: "", description: "", minStock: "5", salePrice: "",
-  ncm: "", cfop: "", codigoBalanca: "",
+  ncm: "", cfop: "", codigoBalanca: "", codigoProduto: "",
 });
 
 const emptyBatch = () => ({
@@ -138,6 +138,14 @@ const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Preço de Venda (R$)</Label>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))} placeholder="0,00" />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código do Produto</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoProduto ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoProduto: e.target.value }))} placeholder="Ex: 001, A-023..." />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoBalanca ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoBalanca: e.target.value }))} placeholder="Ex: 3780" />
     </div>
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Descrição</Label>
@@ -412,13 +420,22 @@ export default function InventoryPage() {
 
     // Text search
     if (searchTerm.trim()) {
+      const term = searchTerm.trim();
+
+      // Exact code match — se o termo bater exatamente com codigoProduto, mostra só esse
+      const exactCode = items.filter(p =>
+        p.codigoProduto && p.codigoProduto.toLowerCase() === term.toLowerCase()
+      );
+      if (exactCode.length > 0) return exactCode;
+
+      // Fuzzy search nos demais campos
       const fuse = new Fuse(items, {
-        keys: ["name", "brand", "category", "flavor", "codigoBalanca", "weight"],
+        keys: ["name", "brand", "category", "flavor", "codigoBalanca", "codigoProduto", "weight"],
         threshold: 0.4,
         ignoreLocation: true,
         minMatchCharLength: 1,
       });
-      items = fuse.search(searchTerm).map(r => r.item);
+      items = fuse.search(term).map(r => r.item);
     }
 
     // Status filter
@@ -524,6 +541,7 @@ export default function InventoryPage() {
       description: p.description || "", minStock: String(p.minStock),
       salePrice: p.salePrice ? String((p.salePrice / 100).toFixed(2)) : "",
       ncm: p.ncm || "", cfop: p.cfop || "", codigoBalanca: p.codigoBalanca || "",
+      codigoProduto: (p as any).codigoProduto || "",
     });
     setEditingProduct(p);
   }
