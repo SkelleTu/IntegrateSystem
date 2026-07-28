@@ -333,15 +333,18 @@ const TABLE_DEFINITIONS = [
   `CREATE TABLE IF NOT EXISTS batches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     product_id INTEGER NOT NULL,
+    sku TEXT,
+    variant_name TEXT,
     barcode TEXT,
-    supplier_code TEXT,
     batch_number TEXT,
+    supplier_code TEXT,
+    supplier TEXT,
     manufacture_date INTEGER,
     expiry_date INTEGER,
+    entry_date INTEGER NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 0,
     cost_price INTEGER NOT NULL DEFAULT 0,
-    supplier TEXT,
-    entry_date INTEGER NOT NULL,
+    sale_price INTEGER,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS batch_logs (
@@ -407,18 +410,25 @@ export async function setupDatabase() {
         updated_at INTEGER NOT NULL
       )`,
       "ALTER TABLE products ADD COLUMN em_liquidacao INTEGER NOT NULL DEFAULT 0",
+      // ── Novas colunas de variante por lote (sistema ERP/PDV) ────────────────
+      "ALTER TABLE batches ADD COLUMN sku TEXT",
+      "ALTER TABLE batches ADD COLUMN variant_name TEXT",
+      "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
       `CREATE TABLE IF NOT EXISTS batches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         product_id INTEGER NOT NULL,
+        sku TEXT,
+        variant_name TEXT,
         barcode TEXT,
-        supplier_code TEXT,
         batch_number TEXT,
+        supplier_code TEXT,
+        supplier TEXT,
         manufacture_date INTEGER,
         expiry_date INTEGER,
+        entry_date INTEGER NOT NULL,
         quantity INTEGER NOT NULL DEFAULT 0,
         cost_price INTEGER NOT NULL DEFAULT 0,
-        supplier TEXT,
-        entry_date INTEGER NOT NULL,
+        sale_price INTEGER,
         created_at INTEGER NOT NULL
       )`,
       `CREATE TABLE IF NOT EXISTS batch_logs (

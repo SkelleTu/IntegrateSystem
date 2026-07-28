@@ -827,6 +827,17 @@ export async function registerRoutes(
     }
   });
 
+  // Busca produto/variante por SKU (código interno da variante)
+  app.get("/api/products/sku/:sku", isAuthenticated, async (req, res) => {
+    try {
+      const product = await storage.findProductByVariantSku(req.params.sku);
+      if (!product) return res.status(404).json({ message: "Variante não encontrada pelo SKU informado" });
+      res.json(product);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/products/:id", isAuthenticated, async (req, res) => {
     try {
       const p = await storage.getProduct(Number(req.params.id));
@@ -900,12 +911,13 @@ export async function registerRoutes(
     try {
       const user = req.user as any;
       const productId = Number(req.params.id);
-      const { quantity, costPrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const b = await storage.createBatch({
         productId,
         ...rest,
         quantity: Number(quantity) || 0,
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(",", ".")) * 100) : 0,
+        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
         entryDate: entryDate ? new Date(entryDate) : new Date(),
@@ -919,10 +931,11 @@ export async function registerRoutes(
 
   app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
     try {
-      const { quantity, costPrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const data: any = { ...rest };
       if (quantity !== undefined) data.quantity = Number(quantity);
       if (costPrice !== undefined) data.costPrice = Math.round(Number(String(costPrice).replace(",", ".")) * 100);
+      if (salePrice !== undefined) data.salePrice = salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null;
       if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
       if (manufactureDate !== undefined) data.manufactureDate = manufactureDate ? new Date(manufactureDate) : null;
       if (entryDate !== undefined) data.entryDate = new Date(entryDate);
@@ -1337,7 +1350,7 @@ export async function registerRoutes(
         inventoryId: item.id,
         type: "in",
         quantity: Number(data.quantity) || 0,
-        reason: inventoryId ? "Update" : "Initial Stock",
+        reason: id ? "Update" : "Initial Stock",
         userId: user.id
       });
       

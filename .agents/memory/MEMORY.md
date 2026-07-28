@@ -1,0 +1,3 @@
+- [Variant/SKU model](variant-sku-model.md) — each batch IS a variant; sku+salePrice+variantName live on batches, not products; products = family grouper only.
+- [DB dual-write pattern](db-dual-write.md) — new columns must go in TABLE_DEFINITIONS (local SQLite) AND remoteMigrations array (Turso); both use ALTER TABLE ADD COLUMN.
+- [Set spread TS error](set-spread-fix.md) — use Array.from(new Set(...)) not [...new Set(...)]; tsconfig targets ES5/ES2014 where spread of iterables needs downlevelIteration.

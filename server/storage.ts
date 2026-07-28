@@ -159,6 +159,7 @@ export interface IStorage {
   deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void>;
   getBatchLogs(productId: number): Promise<BatchLog[]>;
   createBatchLog(data: InsertBatchLog): Promise<BatchLog>;
+  findProductByVariantSku(sku: string): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null; matchedBatch?: Batch }) | null>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1095,7 +1096,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca por código de barras: ${barcode}`);
     const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
     if (matchingBatches.length === 0) return null;
-    const productIds = [...new Set(matchingBatches.map(b => b.productId))];
+    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
     const all = await db.select().from(products);
     const matched = all.filter(p => productIds.includes(p.id));
     if (matched.length === 0) return null;
@@ -1108,9 +1109,14 @@ export class DatabaseStorage implements IStorage {
     const allBatchesList = await db.select().from(batches);
     const norm = (s?: string | null) => (s || "").toLowerCase();
     const qn = norm(q);
-    // Also search by barcode across batches
-    const barcodeMatches = new Set(
-      allBatchesList.filter(b => norm(b.barcode).includes(qn) || norm(b.supplierCode).includes(qn)).map(b => b.productId)
+    // Search by barcode, SKU, variant name and supplier code across batches
+    const batchMatchSet = new Set(
+      allBatchesList.filter(b =>
+        norm(b.barcode).includes(qn) ||
+        norm(b.supplierCode).includes(qn) ||
+        norm((b as any).sku).includes(qn) ||
+        norm((b as any).variantName).includes(qn)
+      ).map(b => b.productId)
     );
     const matched = all.filter(p =>
       norm(p.name).includes(qn) ||
@@ -1118,9 +1124,27 @@ export class DatabaseStorage implements IStorage {
       norm(p.category).includes(qn) ||
       norm(p.flavor).includes(qn) ||
       norm(p.codigoBalanca).includes(qn) ||
-      barcodeMatches.has(p.id)
+      norm(p.codigoProduto).includes(qn) ||
+      batchMatchSet.has(p.id)
     );
     return this._enrichProducts(matched);
+  }
+
+  async findProductByVariantSku(sku: string) {
+    this.logAction(`Busca por SKU de variante: ${sku}`);
+    const norm = (s?: string | null) => (s || "").toLowerCase();
+    const allBatchesList = await db.select().from(batches);
+    const matchingBatches = allBatchesList.filter(b => norm((b as any).sku) === norm(sku));
+    if (matchingBatches.length === 0) return null;
+    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
+    const all = await db.select().from(products);
+    const matched = all.filter(p => productIds.includes(p.id));
+    if (matched.length === 0) return null;
+    const enriched = await this._enrichProducts(matched);
+    const result = enriched[0];
+    if (!result) return null;
+    const matchedBatch = matchingBatches[0];
+    return { ...result, matchedBatch };
   }
 
   async deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void> {

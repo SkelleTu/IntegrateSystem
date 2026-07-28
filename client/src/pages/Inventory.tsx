@@ -46,15 +46,22 @@ interface Product {
 interface Batch {
   id: number;
   productId: number;
-  barcode?: string | null;
+  // ── Identidade da variante ────────────────────────────────────────────────
+  sku?: string | null;          // Código interno/SKU exclusivo desta variante
+  variantName?: string | null;  // Nome descritivo (ex: "Coca-Cola Zero 2L")
+  barcode?: string | null;      // Código de barras EAN/GTIN
+  // ── Lote / rastreabilidade ────────────────────────────────────────────────
+  batchNumber?: string | null;  // Número do lote do fabricante
   supplierCode?: string | null;
-  batchNumber?: string | null;
+  supplier?: string | null;
+  // ── Datas ─────────────────────────────────────────────────────────────────
   manufactureDate?: string | null;
   expiryDate?: string | null;
+  entryDate: string;
+  // ── Estoque e preços ──────────────────────────────────────────────────────
   quantity: number;
   costPrice: number;
-  supplier?: string | null;
-  entryDate: string;
+  salePrice?: number | null;    // Preço de venda por variante (sobrepõe produto)
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,8 +106,14 @@ const emptyProduct = () => ({
 });
 
 const emptyBatch = () => ({
-  barcode: "", supplierCode: "", batchNumber: "", supplier: "",
-  quantity: "", costPrice: "", manufactureDate: "", expiryDate: "",
+  // Identidade da variante
+  sku: "", variantName: "", barcode: "",
+  // Lote / rastreabilidade
+  batchNumber: "", supplierCode: "", supplier: "",
+  // Estoque e preços
+  quantity: "", costPrice: "", salePrice: "",
+  // Datas
+  manufactureDate: "", expiryDate: "",
   entryDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
 });
 
@@ -157,6 +170,37 @@ const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
 
 const BatchFields = ({ form, setForm, T }: any) => (
   <div className="grid grid-cols-2 gap-3">
+    {/* ── Identidade da variante ─────────────────────────────────────────── */}
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+        Código Interno (SKU) <span className="text-primary">*</span>
+      </Label>
+      <Input
+        className={`mt-1 ${T.dialogInput} font-mono`}
+        value={form.sku ?? ""}
+        onChange={e => setForm((f: any) => ({ ...f, sku: e.target.value }))}
+        placeholder="Ex: 1001, SKU-042..."
+      />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome da Variante</Label>
+      <Input
+        className={`mt-1 ${T.dialogInput}`}
+        value={form.variantName ?? ""}
+        onChange={e => setForm((f: any) => ({ ...f, variantName: e.target.value }))}
+        placeholder="Ex: Coca-Cola Zero 2L, Bacon 45g..."
+      />
+    </div>
+    <div className="col-span-2">
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras (EAN/GTIN)</Label>
+      <Input
+        className={`mt-1 ${T.dialogInput} font-mono tracking-widest`}
+        value={form.barcode ?? ""}
+        onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))}
+        placeholder="Ex: 7894900010011 (EAN-13)..."
+      />
+    </div>
+    {/* ── Estoque e preços ──────────────────────────────────────────────── */}
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Quantidade *</Label>
       <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.quantity} onChange={e => setForm((f: any) => ({ ...f, quantity: e.target.value }))} placeholder="0" />
@@ -166,20 +210,31 @@ const BatchFields = ({ form, setForm, T }: any) => (
       <Input className={`mt-1 ${T.dialogInput}`} value={form.costPrice} onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))} placeholder="0,00" />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.barcode} onChange={e => setForm((f: any) => ({ ...f, barcode: e.target.value }))} placeholder="EAN-13..." />
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Preço de Venda (R$)</Label>
+      <Input
+        className={`mt-1 ${T.dialogInput}`}
+        value={form.salePrice ?? ""}
+        onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
+        placeholder="0,00 (deixe em branco para usar o preço do produto)"
+      />
     </div>
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variante</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: Chocolate, Diet, 500ml..." />
-    </div>
+    {/* ── Datas ─────────────────────────────────────────────────────────── */}
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
       <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.expiryDate} onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))} />
     </div>
-    <div className="col-span-2">
+    <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Data de Entrada</Label>
       <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.entryDate} onChange={e => setForm((f: any) => ({ ...f, entryDate: e.target.value }))} />
+    </div>
+    {/* ── Rastreabilidade (opcional) ────────────────────────────────────── */}
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nº Lote Fabricante</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.batchNumber ?? ""} onChange={e => setForm((f: any) => ({ ...f, batchNumber: e.target.value }))} placeholder="Ex: LOT-2024-001..." />
+    </div>
+    <div>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Fornecedor</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.supplier ?? ""} onChange={e => setForm((f: any) => ({ ...f, supplier: e.target.value }))} placeholder="Ex: Distribuidora ABC..." />
     </div>
   </div>
 );
@@ -210,7 +265,6 @@ export default function InventoryPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addBatchFor, setAddBatchFor] = useState<Product | null>(null);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
-  const [editingBatchCodigoProduto, setEditingBatchCodigoProduto] = useState("");
   const [deductFor, setDeductFor] = useState<Product | null>(null);
   const [dupProduct, setDupProduct] = useState<Product | null>(null); // duplicate found
 
@@ -567,16 +621,19 @@ export default function InventoryPage() {
 
   function openEditBatch(b: Batch) {
     setBatchForm({
-      barcode: b.barcode || "", supplierCode: b.supplierCode || "",
-      batchNumber: b.batchNumber || "", supplier: b.supplier || "",
+      sku: b.sku || "",
+      variantName: b.variantName || "",
+      barcode: b.barcode || "",
+      supplierCode: b.supplierCode || "",
+      batchNumber: b.batchNumber || "",
+      supplier: b.supplier || "",
       quantity: String(b.quantity),
       costPrice: b.costPrice ? String((b.costPrice / 100).toFixed(2)) : "",
+      salePrice: b.salePrice ? String((b.salePrice / 100).toFixed(2)) : "",
       manufactureDate: b.manufactureDate ? new Date(b.manufactureDate).toISOString().slice(0, 10) : "",
       expiryDate: b.expiryDate ? new Date(b.expiryDate).toISOString().slice(0, 10) : "",
       entryDate: new Date(b.entryDate).toISOString().slice(0, 10),
     });
-    const parentProduct = products.find(p => p.id === b.productId);
-    setEditingBatchCodigoProduto((parentProduct as any)?.codigoProduto || "");
     setEditingBatch(b);
   }
 
@@ -749,6 +806,7 @@ export default function InventoryPage() {
         ncm: addBatchFor.ncm || "",
         cfop: addBatchFor.cfop || "",
         codigoBalanca: "",
+        codigoProduto: "",
       });
       setFirstBatchForm({ ...emptyBatch(), barcode: inlineScanValue.trim() });
     }
@@ -771,7 +829,7 @@ export default function InventoryPage() {
     }
 
     try {
-      // 1. Create the variant product (inherits all data from parent, overrides name/flavor)
+      // 1. Create the variant product (family grouper — inherits parent data)
       const productPayload = {
         name: inlineVariantName.trim() || addBatchFor.name,
         brand: addBatchFor.brand || "",
@@ -784,7 +842,7 @@ export default function InventoryPage() {
         salePrice: addBatchFor.salePrice ? String((addBatchFor.salePrice / 100).toFixed(2)) : undefined,
         ncm: addBatchFor.ncm || "",
         cfop: addBatchFor.cfop || "",
-        codigoProduto: inlineVariantCodigoProduto.trim() || undefined,
+        // codigoProduto fica no nível de família — não é o SKU da variante
       };
 
       const prodRes = await fetch("/api/products", {
@@ -802,8 +860,13 @@ export default function InventoryPage() {
 
       const newProduct = await prodRes.json();
 
-      // 2. Create the batch for the new variant
-      const batchPayload = { ...batchForm, barcode: inlineScanValue.trim() || batchForm.barcode };
+      // 2. Create the batch for the new variant — SKU and barcode go HERE (batch level)
+      const batchPayload = {
+        ...batchForm,
+        sku: inlineVariantCodigoProduto.trim() || batchForm.sku || "",
+        variantName: inlineVariantFlavor.trim() || inlineVariantName.trim() || batchForm.variantName || "",
+        barcode: inlineScanValue.trim() || batchForm.barcode,
+      };
       await fetch(`/api/products/${newProduct.id}/batches`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -843,18 +906,8 @@ export default function InventoryPage() {
 
   async function handleUpdateBatch() {
     if (!editingBatch) return;
+    // SKU, variantName e salePrice agora pertencem ao lote (variante), não ao produto
     updateBatchMut.mutate({ id: editingBatch.id, data: batchForm });
-    // Also persist codigoProduto back to the parent product
-    const parentProduct = products.find(p => p.id === editingBatch.productId);
-    if (parentProduct) {
-      const current = (parentProduct as any).codigoProduto || "";
-      if (editingBatchCodigoProduto !== current) {
-        await apiRequest("PUT", `/api/products/${parentProduct.id}`, {
-          codigoProduto: editingBatchCodigoProduto.trim() || null,
-        });
-        invalidate();
-      }
-    }
   }
 
   function handleDeduct() {
@@ -1224,7 +1277,7 @@ export default function InventoryPage() {
                                       <table className="w-full text-xs">
                                         <thead>
                                           <tr className={T.tableHd}>
-                                            {["Cód Barras", "Variante", "Validade", "Fabricação", "Qtd", "Custo", "Fornecedor", "Entrada", ""].map(h => (
+                                            {["SKU", "Nome da Variante", "EAN/GTIN", "Validade", "Qtd", "Custo", "Preço Venda", "Fornecedor", "Entrada", ""].map(h => (
                                               <th key={h} className={`px-3 py-2 text-left font-black uppercase tracking-widest text-[9px] ${T.tableHdText}`}>{h}</th>
                                             ))}
                                           </tr>
@@ -1234,8 +1287,17 @@ export default function InventoryPage() {
                                             const u = getExpiryUrgency(b.expiryDate);
                                             return (
                                               <tr key={b.id} className={`border-t transition-colors ${T.tableRow} ${T.rowUrgency[u]}`}>
-                                                <td className={`px-3 py-2.5 font-mono text-[10px] ${T.cellPrimary}`}>{b.barcode || "—"}</td>
-                                                <td className={`px-3 py-2.5 font-bold ${T.cellSub}`}>{b.batchNumber || "—"}</td>
+                                                {/* SKU */}
+                                                <td className={`px-3 py-2.5 font-mono text-[10px] font-black ${b.sku ? "text-primary" : T.muted}`}>
+                                                  {b.sku ? `#${b.sku}` : <span className="opacity-30">—</span>}
+                                                </td>
+                                                {/* Nome da variante */}
+                                                <td className={`px-3 py-2.5 font-bold text-[11px] ${T.cellPrimary}`}>
+                                                  {b.variantName || b.batchNumber || <span className={`${T.muted} font-normal opacity-60`}>—</span>}
+                                                </td>
+                                                {/* EAN/GTIN */}
+                                                <td className={`px-3 py-2.5 font-mono text-[10px] ${T.cellSub}`}>{b.barcode || "—"}</td>
+                                                {/* Validade */}
                                                 <td className="px-3 py-2.5">
                                                   {b.expiryDate ? (
                                                     <span className="flex flex-col gap-0.5">
@@ -1244,15 +1306,23 @@ export default function InventoryPage() {
                                                     </span>
                                                   ) : "—"}
                                                 </td>
-                                                <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.manufactureDate)}</td>
+                                                {/* Quantidade */}
                                                 <td className={`px-3 py-2.5 font-black text-sm ${b.quantity <= 0 ? "text-red-400" : "text-primary"}`}>{b.quantity}</td>
+                                                {/* Custo */}
                                                 <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtCurrency(b.costPrice)}</td>
+                                                {/* Preço de Venda */}
+                                                <td className={`px-3 py-2.5 font-bold ${b.salePrice ? "text-emerald-400" : T.muted}`}>
+                                                  {b.salePrice ? fmtCurrency(b.salePrice) : <span className="opacity-40 text-[10px]">—</span>}
+                                                </td>
+                                                {/* Fornecedor */}
                                                 <td className={`px-3 py-2.5 ${T.cellSub}`}>{b.supplier || "—"}</td>
+                                                {/* Entrada */}
                                                 <td className={`px-3 py-2.5 ${T.cellSub}`}>{fmtDate(b.entryDate)}</td>
+                                                {/* Ações */}
                                                 <td className="px-3 py-2.5">
                                                   <div className="flex gap-1">
                                                     <button onClick={() => openEditBatch(b)} className={`p-1 rounded hover:text-blue-400 ${T.muted}`}><Edit2 className="h-3.5 w-3.5" /></button>
-                                                    <button onClick={() => { if (confirm("Excluir este lote?")) deleteBatchMut.mutate(b.id); }} className={`p-1 rounded hover:text-red-400 ${T.muted}`}><Trash2 className="h-3.5 w-3.5" /></button>
+                                                    <button onClick={() => { if (confirm("Excluir esta variante?")) deleteBatchMut.mutate(b.id); }} className={`p-1 rounded hover:text-red-400 ${T.muted}`}><Trash2 className="h-3.5 w-3.5" /></button>
                                                   </div>
                                                 </td>
                                               </tr>
@@ -1478,13 +1548,13 @@ export default function InventoryPage() {
                             </div>
                             <div>
                               <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-                                Código do produto (opcional)
+                                SKU da variante (opcional)
                               </Label>
                               <Input
-                                className={`mt-1 ${T.dialogInput}`}
+                                className={`mt-1 ${T.dialogInput} font-mono`}
                                 value={inlineVariantCodigoProduto}
                                 onChange={e => setInlineVariantCodigoProduto(e.target.value)}
-                                placeholder="Ex: 001, SKU-042..."
+                                placeholder="Ex: 1001, SKU-042..."
                               />
                             </div>
                           </div>
@@ -1524,24 +1594,15 @@ export default function InventoryPage() {
       </Dialog>
 
       {/* ─── Modal: Edit Batch ───────────────────────────────────────────────── */}
-      <Dialog open={!!editingBatch} onOpenChange={() => { setEditingBatch(null); setEditingBatchCodigoProduto(""); }}>
+      <Dialog open={!!editingBatch} onOpenChange={() => setEditingBatch(null)}>
         <DialogContent className={`max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border ${T.dialog}`}>
           <DialogHeader>
-            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Editar Lote</DialogTitle>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Editar Variante</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <BatchFields form={batchForm} setForm={setBatchForm} T={T} />
-            <div>
-              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código do produto (opcional)</Label>
-              <Input
-                className={`mt-1 ${T.dialogInput}`}
-                value={editingBatchCodigoProduto}
-                onChange={e => setEditingBatchCodigoProduto(e.target.value)}
-                placeholder="Ex: 001, SKU-042..."
-              />
-            </div>
             <div className="flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => { setEditingBatch(null); setEditingBatchCodigoProduto(""); }} className={T.muted}>Cancelar</Button>
+              <Button variant="ghost" onClick={() => setEditingBatch(null)} className={T.muted}>Cancelar</Button>
               <Button
                 onClick={handleUpdateBatch}
                 disabled={updateBatchMut.isPending}

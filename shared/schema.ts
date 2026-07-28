@@ -236,15 +236,22 @@ export const products = pgTable("products", {
 export const batches = pgTable("batches", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull(),
-  barcode: text("barcode"),
-  supplierCode: text("supplier_code"),
-  batchNumber: text("batch_number"),
+  // ── Identidade da variante (obrigatório por regra de negócio ERP/PDV) ────────
+  sku: text("sku"),                       // Código interno/SKU exclusivo por variante
+  variantName: text("variant_name"),      // Nome descritivo da variante (ex: "Coca-Cola Zero 2L")
+  barcode: text("barcode"),              // Código de barras EAN/GTIN por variante
+  // ── Lote / rastreabilidade ───────────────────────────────────────────────────
+  batchNumber: text("batch_number"),     // Número do lote do fabricante (rastreabilidade)
+  supplierCode: text("supplier_code"),   // Código do fornecedor
+  supplier: text("supplier"),
+  // ── Datas ────────────────────────────────────────────────────────────────────
   manufactureDate: integer("manufacture_date", { mode: 'timestamp' }),
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
+  entryDate: integer("entry_date", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  // ── Estoque e preços ─────────────────────────────────────────────────────────
   quantity: integer("quantity").notNull().default(0),
   costPrice: integer("cost_price").notNull().default(0), // in cents
-  supplier: text("supplier"),
-  entryDate: integer("entry_date", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  salePrice: integer("sale_price"),                      // Preço de venda em centavos por variante (sobrepõe produto)
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
@@ -336,7 +343,6 @@ export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ saleId:
 export const insertPaymentSchema = createInsertSchema(payments).omit({ saleId: true });
 export const insertMenuItemSchema = createInsertSchema(menuItems, {
   tags: z.union([z.string(), z.array(z.string())]).optional().nullable(),
-  codigoBalanca: z.string().optional().nullable(),
 });
 export const insertTransactionSchema = createInsertSchema(transactions);
 export const insertTimeClockSchema = createInsertSchema(timeClock);
