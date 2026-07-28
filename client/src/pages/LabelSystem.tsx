@@ -37,7 +37,7 @@ export default function LabelSystem() {
   
   const { data: status } = useQuery<{ appConnected: boolean }>({
     queryKey: ["/api/labels/status"],
-    refetchInterval: 3000
+    refetchInterval: 10000
   });
 
   const { data: inventory = [] } = useQuery<Inventory[]>({

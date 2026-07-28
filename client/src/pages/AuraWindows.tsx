@@ -47,7 +47,7 @@ export default function AuraWindows() {
 
   const { data: errors } = useQuery<FileError[]>({
     queryKey: ["/api/windows/errors"],
-    refetchInterval: 5000
+    refetchInterval: 15000
   });
 
   const openFileMutation = useMutation({

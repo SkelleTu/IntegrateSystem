@@ -49,7 +49,7 @@ export default function Financeiro() {
       const res = await fetch(`/api/sales?start=${start.toISOString()}&end=${end.toISOString()}`);
       return res.json();
     },
-    refetchInterval: 5000,
+    refetchInterval: 30000,
   });
 
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
@@ -62,7 +62,7 @@ export default function Financeiro() {
       if (!res.ok) throw new Error("Erro ao buscar transações");
       return res.json();
     },
-    refetchInterval: 3000,
+    refetchInterval: 15000,
   });
 
   const form = useForm({

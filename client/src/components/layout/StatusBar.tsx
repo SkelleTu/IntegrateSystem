@@ -43,7 +43,7 @@ export function StatusBar() {
   // Poll for database status
   const { data: dbStatus } = useQuery<DBStatus>({
     queryKey: ["/api/db/status"],
-    refetchInterval: 2000,
+    refetchInterval: 10000,
     initialData: { status: "online", message: "Sistema operando normalmente" }
   });
 
