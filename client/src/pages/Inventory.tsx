@@ -209,6 +209,7 @@ export default function InventoryPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [addBatchFor, setAddBatchFor] = useState<Product | null>(null);
   const [editingBatch, setEditingBatch] = useState<Batch | null>(null);
+  const [editingBatchCodigoProduto, setEditingBatchCodigoProduto] = useState("");
   const [deductFor, setDeductFor] = useState<Product | null>(null);
   const [dupProduct, setDupProduct] = useState<Product | null>(null); // duplicate found
 
@@ -557,6 +558,8 @@ export default function InventoryPage() {
       expiryDate: b.expiryDate ? new Date(b.expiryDate).toISOString().slice(0, 10) : "",
       entryDate: new Date(b.entryDate).toISOString().slice(0, 10),
     });
+    const parentProduct = products.find(p => p.id === b.productId);
+    setEditingBatchCodigoProduto((parentProduct as any)?.codigoProduto || "");
     setEditingBatch(b);
   }
 
@@ -821,9 +824,22 @@ export default function InventoryPage() {
     createBatchMut.mutate({ productId, data: batchForm });
   }
 
-  function handleUpdateBatch() {
+  async function handleUpdateBatch() {
     if (!editingBatch) return;
     updateBatchMut.mutate({ id: editingBatch.id, data: batchForm });
+    // Also persist codigoProduto back to the parent product
+    const parentProduct = products.find(p => p.id === editingBatch.productId);
+    if (parentProduct) {
+      const current = (parentProduct as any).codigoProduto || "";
+      if (editingBatchCodigoProduto !== current) {
+        await apiRequest("PUT", `/api/products/${parentProduct.id}`, {
+          ...parentProduct,
+          salePrice: parentProduct.salePrice ? String((parentProduct.salePrice / 100).toFixed(2)) : undefined,
+          codigoProduto: editingBatchCodigoProduto.trim() || null,
+        });
+        invalidate();
+      }
+    }
   }
 
   function handleDeduct() {
@@ -1487,15 +1503,24 @@ export default function InventoryPage() {
       </Dialog>
 
       {/* ─── Modal: Edit Batch ───────────────────────────────────────────────── */}
-      <Dialog open={!!editingBatch} onOpenChange={() => setEditingBatch(null)}>
+      <Dialog open={!!editingBatch} onOpenChange={() => { setEditingBatch(null); setEditingBatchCodigoProduto(""); }}>
         <DialogContent className={`max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border ${T.dialog}`}>
           <DialogHeader>
             <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Editar Lote</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <BatchFields form={batchForm} setForm={setBatchForm} T={T} />
+            <div>
+              <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código do produto (opcional)</Label>
+              <Input
+                className={`mt-1 ${T.dialogInput}`}
+                value={editingBatchCodigoProduto}
+                onChange={e => setEditingBatchCodigoProduto(e.target.value)}
+                placeholder="Ex: 001, SKU-042..."
+              />
+            </div>
             <div className="flex justify-end gap-3">
-              <Button variant="ghost" onClick={() => setEditingBatch(null)} className={T.muted}>Cancelar</Button>
+              <Button variant="ghost" onClick={() => { setEditingBatch(null); setEditingBatchCodigoProduto(""); }} className={T.muted}>Cancelar</Button>
               <Button
                 onClick={handleUpdateBatch}
                 disabled={updateBatchMut.isPending}
