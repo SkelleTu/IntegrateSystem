@@ -160,24 +160,27 @@ export default function Cashier() {
     queryKey: ["/api/menu-items-combined"],
     queryFn: async () => {
       try {
-        const [menuRes, inventoryRes] = await Promise.all([
+        const [menuRes, inventoryRes, productBatchRes] = await Promise.all([
           fetch("/api/menu-items"),
-          fetch("/api/inventory")
+          fetch("/api/inventory"),
+          fetch("/api/products/cashier-items"),
         ]);
-        
+
         if (menuRes.status === 401 || inventoryRes.status === 401) return [];
-        
+
         const menuData = menuRes.ok ? await menuRes.json() : [];
         const inventoryData = inventoryRes.ok ? await inventoryRes.json() : [];
-        
+        const productBatchData = productBatchRes.ok ? await productBatchRes.json() : [];
+
         const combined = Array.isArray(menuData) ? [...menuData] : [];
+
+        // Adiciona itens do inventory antigo (sem duplicar por barcode)
         if (Array.isArray(inventoryData)) {
           inventoryData.forEach((invItem: any) => {
-            const exists = combined.find(m => 
-              (m.barcode && invItem.barcode && m.barcode === invItem.barcode) || 
+            const exists = combined.find(m =>
+              (m.barcode && invItem.barcode && m.barcode === invItem.barcode) ||
               (m.id === invItem.itemId)
             );
-            
             if (!exists) {
               combined.push({
                 id: invItem.id + 10000,
@@ -186,7 +189,7 @@ export default function Cashier() {
                 imageUrl: invItem.imageUrl,
                 barcode: invItem.barcode,
                 codigoBalanca: invItem.codigoBalanca,
-                isAvailable: true, // Always available if in inventory, even with 0 qty for some weighable items
+                isAvailable: true,
                 inventoryId: invItem.id,
                 unitType: invItem.unit === 'kg' ? 'kg' : 'unit',
                 unit: invItem.unit
@@ -194,6 +197,18 @@ export default function Cashier() {
             }
           });
         }
+
+        // Adiciona produtos+lotes do novo sistema (sem duplicar por barcode ou sku)
+        if (Array.isArray(productBatchData)) {
+          productBatchData.forEach((pbItem: any) => {
+            const exists = combined.find(m =>
+              (pbItem.barcode && m.barcode && m.barcode === pbItem.barcode) ||
+              (pbItem.sku && (m as any).sku && (m as any).sku === pbItem.sku)
+            );
+            if (!exists) combined.push(pbItem);
+          });
+        }
+
         return combined;
       } catch (err) {
         console.error("Error fetching menu items:", err);
@@ -229,10 +244,11 @@ export default function Cashier() {
     if (!searchTerm) return normalizedItems;
 
     const term = searchTerm.toLowerCase();
-    return normalizedItems.filter(item => 
+    return normalizedItems.filter(item =>
       (item.name && item.name.toLowerCase().includes(term)) ||
       (item.id && item.id.toString() === term) ||
       (item.barcode && item.barcode.toLowerCase() === term) ||
+      ((item as any).sku && (item as any).sku.toLowerCase() === term) ||
       ((item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term)
     );
   }, [menuItems, searchTerm]);
@@ -330,8 +346,10 @@ export default function Cashier() {
       if (filteredMenuItems && filteredMenuItems.length === 1) {
         const item = filteredMenuItems[0];
         const matchesByCode = (item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term;
+        const matchesBySku = (item as any).sku && (item as any).sku.toLowerCase() === term;
         if (
           matchesByCode ||
+          matchesBySku ||
           (item.barcode && item.barcode.toLowerCase() === term) ||
           (term.length >= 8 && item.barcode && item.barcode.toLowerCase().includes(term))
         ) {

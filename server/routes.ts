@@ -817,6 +817,43 @@ export async function registerRoutes(
     }
   });
 
+  // Produtos+lotes achatados para o caixa — cada lote vira um item vendável
+  app.get("/api/products/cashier-items", isAuthenticated, async (req, res) => {
+    try {
+      const prods = await storage.getProducts();
+      const result: any[] = [];
+      for (const prod of prods) {
+        const batchList = await storage.getProductBatches(prod.id);
+        if (batchList.length === 0) continue;
+        for (const batch of batchList) {
+          if (batch.quantity <= 0) continue;
+          const variantLabel = batch.variantName || batch.batchNumber || null;
+          const name = variantLabel ? `${prod.name} – ${variantLabel}` : prod.name;
+          result.push({
+            id: 500000 + batch.id,          // ID único sem colisão com menu/inventory
+            _source: "product-batch",
+            _productId: prod.id,
+            _batchId: batch.id,
+            name,
+            price: batch.salePrice ?? prod.salePrice ?? 0,
+            barcode: batch.barcode ?? null,
+            sku: batch.sku ?? null,
+            codigoProduto: (prod as any).codigoProduto ?? null,
+            codigoBalanca: prod.codigoBalanca ?? null,
+            imageUrl: prod.imageUrl ?? null,
+            isAvailable: true,
+            unitType: prod.unit === "kg" ? "kg" : "unit",
+            unit: prod.unit,
+            quantity: batch.quantity,
+          });
+        }
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao montar itens do caixa" });
+    }
+  });
+
   app.get("/api/products/barcode/:barcode", isAuthenticated, async (req, res) => {
     try {
       const product = await storage.findProductByBarcode(req.params.barcode);
