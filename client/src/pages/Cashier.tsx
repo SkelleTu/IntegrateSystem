@@ -85,7 +85,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play, RotateCw, Maximize, Flame } from "lucide-react";
+import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, ArrowLeft, Landmark, Search, Package, Printer, Image as ImageIcon, Play, RotateCw, Maximize, Flame, LayoutGrid, List } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
@@ -715,6 +715,7 @@ function CashierContent({
   });
 
   const [simulacaoReal, setSimulacaoReal] = useState(false);
+  const [viewMode, setViewMode] = useState<"cards" | "list">("cards");
 
   useEffect(() => {
     if (fiscalSettingsData) {
@@ -788,7 +789,7 @@ function CashierContent({
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
         {/* Area Principal de Produtos */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
-          <div className="w-full flex justify-end mb-4 shrink-0">
+          <div className="w-full flex items-center justify-between mb-4 shrink-0 gap-3">
             <Button 
               variant="outline" 
               size="sm"
@@ -797,74 +798,147 @@ function CashierContent({
             >
               <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
             </Button>
+
+            {/* Toggle cards / lista */}
+            <button
+              onClick={() => setViewMode(v => v === "cards" ? "list" : "cards")}
+              title={viewMode === "cards" ? "Alternar para lista" : "Alternar para cards"}
+              className="flex items-center gap-2 px-3 h-10 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 hover:border-primary/40 transition-all text-white/60 hover:text-primary"
+            >
+              {viewMode === "cards"
+                ? <><List className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Lista</span></>
+                : <><LayoutGrid className="h-4 w-4" /><span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Cards</span></>
+              }
+            </button>
           </div>
           
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-32 lg:pb-8">
-              {filteredMenuItems?.map((item: any) => (
-                <motion.div 
-                  key={item.id} 
-                  whileHover={{ y: -5 }} 
-                  whileTap={{ scale: 0.95 }} 
-                  onClick={() => addToCart(item as any)} 
-                  className="cursor-pointer h-full group"
-                >
-                  <Card className="h-full border-white/5 bg-zinc-900/40 overflow-hidden hover:border-primary/50 transition-all flex flex-col relative">
-                    {/* Botão de Ajuste no Canto Superior Direito */}
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-primary hover:bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedProductForAdjust(item);
-                        setAdjustProductModalOpen(true);
-                      }}
-                    >
-                      <RotateCw className="h-4 w-4" />
-                    </Button>
+            {viewMode === "cards" ? (
+              /* ── MODO CARDS ── */
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-32 lg:pb-8">
+                {filteredMenuItems?.map((item: any) => (
+                  <motion.div 
+                    key={item.id} 
+                    whileHover={{ y: -5 }} 
+                    whileTap={{ scale: 0.95 }} 
+                    onClick={() => addToCart(item as any)} 
+                    className="cursor-pointer h-full group"
+                  >
+                    <Card className="h-full border-white/5 bg-zinc-900/40 overflow-hidden hover:border-primary/50 transition-all flex flex-col relative">
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-primary hover:bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProductForAdjust(item);
+                          setAdjustProductModalOpen(true);
+                        }}
+                      >
+                        <RotateCw className="h-4 w-4" />
+                      </Button>
 
-                    {/* Imagem Pura sem Fundo/Bordas Internas */}
-                    <div className="aspect-square w-full flex items-center justify-center p-0 bg-transparent relative overflow-hidden shrink-0">
+                      <div className="aspect-square w-full flex items-center justify-center p-0 bg-transparent relative overflow-hidden shrink-0">
+                        {item.imageUrl ? (
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.name} 
+                            style={{ transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` }}
+                            className="w-full h-full object-contain transition-all duration-500 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)]"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-white/5">
+                            <Package className="h-10 w-10 text-white/5" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col justify-end flex-1 min-h-[70px]">
+                        <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">
+                          {item.name}
+                        </h3>
+                        {(item as any).emLiquidacao && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-orange-500 mb-1">
+                            <Flame className="h-2.5 w-2.5" />Em Liquidação
+                          </span>
+                        )}
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/40 text-[8px] font-bold uppercase tracking-wider italic">
+                            {(item as any).unitType === "kg" ? "por Kg" : "Unid."}
+                          </span>
+                          <p className="text-primary font-black text-sm md:text-base italic tracking-tighter">
+                            R$ {(item.price / 100).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+            ) : (
+              /* ── MODO LISTA ── */
+              <div className="flex flex-col gap-1 pb-32 lg:pb-8">
+                {filteredMenuItems?.map((item: any) => (
+                  <motion.div
+                    key={item.id}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => addToCart(item as any)}
+                    className="cursor-pointer group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-zinc-900/40 hover:border-primary/40 hover:bg-primary/5 transition-all"
+                  >
+                    {/* Miniatura ou ícone */}
+                    <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
                       {item.imageUrl ? (
-                        <img 
-                          src={item.imageUrl} 
-                          alt={item.name} 
-                          style={{ 
-                            transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` 
-                          }}
-                          className="w-full h-full object-contain transition-all duration-500 drop-shadow-[0_10px_20px_rgba(0,0,0,0.4)]"
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          style={{ transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` }}
+                          className="w-full h-full object-contain"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-white/5">
-                          <Package className="h-10 w-10 text-white/5" />
-                        </div>
+                        <Package className="h-4 w-4 text-white/20" />
                       )}
                     </div>
-                    
-                    {/* Barra de Informações na Parte de Baixo */}
-                    <div className="p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col justify-end flex-1 min-h-[70px]">
-                      <h3 className="text-white font-black text-[10px] md:text-xs uppercase italic line-clamp-2 leading-tight mb-1 group-hover:text-primary transition-colors">
+
+                    {/* Nome + badges */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-black text-xs uppercase italic tracking-tight truncate group-hover:text-primary transition-colors">
                         {item.name}
-                      </h3>
-                      {(item as any).emLiquidacao && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase tracking-wide text-orange-500 mb-1">
-                          <Flame className="h-2.5 w-2.5" />Em Liquidação
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-white/30 text-[9px] font-bold uppercase">
+                          {(item as any).unitType === "kg" ? "por Kg" : "Unidade"}
                         </span>
-                      )}
-                      <div className="flex items-center justify-between items-end">
-                        <span className="text-white/40 text-[8px] font-bold uppercase tracking-wider italic">
-                          {(item as any).unitType === "kg" ? "por Kg" : "Unid."}
-                        </span>
-                        <p className="text-primary font-black text-sm md:text-base italic tracking-tighter">
-                          R$ {(item.price / 100).toFixed(2)}
-                        </p>
+                        {(item as any).emLiquidacao && (
+                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase text-orange-500">
+                            <Flame className="h-2.5 w-2.5" />Liquidação
+                          </span>
+                        )}
+                        {(item as any).sku && (
+                          <span className="text-[9px] font-mono font-bold text-white/20">#{(item as any).sku}</span>
+                        )}
                       </div>
                     </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+
+                    {/* Preço + botão ajuste */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <p className="text-primary font-black text-sm italic tracking-tighter">
+                        R$ {(item.price / 100).toFixed(2)}
+                      </p>
+                      <button
+                        className="h-7 w-7 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/40 hover:text-primary transition-all opacity-0 group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedProductForAdjust(item);
+                          setAdjustProductModalOpen(true);
+                        }}
+                      >
+                        <RotateCw className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
