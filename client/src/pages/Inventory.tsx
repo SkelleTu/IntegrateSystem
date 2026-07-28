@@ -833,8 +833,6 @@ export default function InventoryPage() {
       const current = (parentProduct as any).codigoProduto || "";
       if (editingBatchCodigoProduto !== current) {
         await apiRequest("PUT", `/api/products/${parentProduct.id}`, {
-          ...parentProduct,
-          salePrice: parentProduct.salePrice ? String((parentProduct.salePrice / 100).toFixed(2)) : undefined,
           codigoProduto: editingBatchCodigoProduto.trim() || null,
         });
         invalidate();
