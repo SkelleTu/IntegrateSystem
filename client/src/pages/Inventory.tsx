@@ -37,6 +37,7 @@ interface Product {
   ncm?: string | null;
   cfop?: string | null;
   codigoBalanca?: string | null;
+  codigoProduto?: string | null;
   totalQuantity: number;
   nearestExpiry?: string | Date | null;
   createdAt: string;
@@ -417,27 +418,31 @@ export default function InventoryPage() {
 
   // ─── Filtered / sorted products ────────────────────────────────────────────
 
-  const filteredProducts = useMemo(() => {
+  const { filteredProducts, exactMatchProductIds } = useMemo(() => {
     let items = [...products];
+    let exactIds = new Set<number>();
 
     // Text search
     if (searchTerm.trim()) {
       const term = searchTerm.trim();
 
-      // Exact code match — se o termo bater exatamente com codigoProduto, mostra só esse
+      // Exact code match — se o termo bater exatamente com codigoProduto, destaca e auto-expande
       const exactCode = items.filter(p =>
         p.codigoProduto && p.codigoProduto.toLowerCase() === term.toLowerCase()
       );
-      if (exactCode.length > 0) return exactCode;
-
-      // Fuzzy search nos demais campos
-      const fuse = new Fuse(items, {
-        keys: ["name", "brand", "category", "flavor", "codigoBalanca", "codigoProduto", "weight"],
-        threshold: 0.4,
-        ignoreLocation: true,
-        minMatchCharLength: 1,
-      });
-      items = fuse.search(term).map(r => r.item);
+      if (exactCode.length > 0) {
+        exactIds = new Set(exactCode.map(p => p.id));
+        items = exactCode;
+      } else {
+        // Fuzzy search nos demais campos
+        const fuse = new Fuse(items, {
+          keys: ["name", "brand", "category", "flavor", "codigoBalanca", "codigoProduto", "weight"],
+          threshold: 0.4,
+          ignoreLocation: true,
+          minMatchCharLength: 1,
+        });
+        items = fuse.search(term).map(r => r.item);
+      }
     }
 
     // Status filter
@@ -464,7 +469,7 @@ export default function InventoryPage() {
       return 0;
     });
 
-    return items;
+    return { filteredProducts: items, exactMatchProductIds: exactIds };
   }, [products, searchTerm, filterStatus, sortBy]);
 
   // ─── Expiry badge ──────────────────────────────────────────────────────────
@@ -496,6 +501,18 @@ export default function InventoryPage() {
     if (low) return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border bg-orange-500/15 border-orange-500/30 text-orange-400 text-[9px] font-black uppercase tracking-widest"><TrendingDown className="h-2.5 w-2.5" />ESTOQUE BAIXO</span>;
     return null;
   }
+
+  // ─── Auto-expand exact codigoProduto matches ───────────────────────────────
+
+  useEffect(() => {
+    if (exactMatchProductIds.size > 0) {
+      setExpandedIds(prev => {
+        const next = new Set(prev);
+        exactMatchProductIds.forEach(id => next.add(id));
+        return next;
+      });
+    }
+  }, [exactMatchProductIds]);
 
   // ─── Toggle expand ─────────────────────────────────────────────────────────
 
@@ -1112,13 +1129,14 @@ export default function InventoryPage() {
                           const batches: Batch[] = expandedBatches[product.id] || [];
                           const lowStock = product.totalQuantity < product.minStock;
 
+                          const isExactMatch = exactMatchProductIds.has(product.id);
                           return (
-                            <div key={product.id}>
+                            <div key={product.id} className={isExactMatch ? `ring-2 ring-inset ${isLight ? "ring-primary/40" : "ring-primary/50"} rounded-xl mx-1 my-0.5` : ""}>
                               {/* Product row */}
                               <div
                                 className={`flex items-center pr-5 py-3.5 cursor-pointer transition-colors
-                                  ${expanded ? (isLight ? "bg-slate-100" : "bg-primary/5") : "hover:bg-white/[0.02]"}
-                                  ${lowStock && !expanded ? (isLight ? "bg-orange-100/60" : "bg-orange-500/5") : ""}
+                                  ${isExactMatch ? (isLight ? "bg-primary/5" : "bg-primary/10") : expanded ? (isLight ? "bg-slate-100" : "bg-primary/5") : "hover:bg-white/[0.02]"}
+                                  ${lowStock && !expanded && !isExactMatch ? (isLight ? "bg-orange-100/60" : "bg-orange-500/5") : ""}
                                 `}
                                 onClick={() => toggleExpand(product.id)}
                               >
@@ -1141,6 +1159,11 @@ export default function InventoryPage() {
                                       {product.brand && <span className={`text-[10px] font-bold ${T.cellSub}`}>{product.brand}</span>}
                                       {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
                                       {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
+                                      {product.codigoProduto && (
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black font-mono ${isExactMatch ? "bg-primary/20 text-primary border border-primary/40" : `border ${isLight ? "bg-black/5 border-black/10 text-black/40" : "bg-white/5 border-white/10 text-white/30"}`}`}>
+                                          #{product.codigoProduto}
+                                        </span>
+                                      )}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2">
                                       <StockBadge product={product} />
