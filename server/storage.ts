@@ -30,7 +30,7 @@ import {
   type Batch, type InsertBatch,
   type BatchLog, type InsertBatchLog,
 } from "../shared/schema.js";
-import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne } from "drizzle-orm";
 
 // Helper de escrita simultânea em TODOS os bancos ativos
 // Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
@@ -1059,6 +1059,22 @@ export class DatabaseStorage implements IStorage {
 
   async createBatch(data: InsertBatch): Promise<Batch> {
     this.logAction(`Novo lote produto ID:${data.productId}`);
+    // ── Unicidade: SKU exclusivo por variante ────────────────────────────────
+    if ((data as any).sku && String((data as any).sku).trim()) {
+      const skuTrim = String((data as any).sku).trim();
+      const [dupSku] = await db.select().from(batches).where(eq(batches.sku, skuTrim)).limit(1);
+      if (dupSku) {
+        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
+      }
+    }
+    // ── Unicidade: código de barras exclusivo por variante ───────────────────
+    if ((data as any).barcode && String((data as any).barcode).trim()) {
+      const bcTrim = String((data as any).barcode).trim();
+      const [dupBc] = await db.select().from(batches).where(eq(batches.barcode, bcTrim)).limit(1);
+      if (dupBc) {
+        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
+      }
+    }
     return await dualWrite(async (database) => {
       const now = new Date();
       const [b] = await database.insert(batches).values({ ...data, createdAt: now } as any).returning();
@@ -1078,6 +1094,26 @@ export class DatabaseStorage implements IStorage {
 
   async updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch> {
     this.logAction(`Atualização lote ID:${id}`);
+    // ── Unicidade: SKU exclusivo (excluindo o próprio lote) ──────────────────
+    if ((data as any).sku && String((data as any).sku).trim()) {
+      const skuTrim = String((data as any).sku).trim();
+      const [dupSku] = await db.select().from(batches)
+        .where(and(eq(batches.sku, skuTrim), ne(batches.id, id)))
+        .limit(1);
+      if (dupSku) {
+        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
+      }
+    }
+    // ── Unicidade: código de barras exclusivo (excluindo o próprio lote) ─────
+    if ((data as any).barcode && String((data as any).barcode).trim()) {
+      const bcTrim = String((data as any).barcode).trim();
+      const [dupBc] = await db.select().from(batches)
+        .where(and(eq(batches.barcode, bcTrim), ne(batches.id, id)))
+        .limit(1);
+      if (dupBc) {
+        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
+      }
+    }
     return await dualWrite(async (database) => {
       const [b] = await database.update(batches).set(data as any).where(eq(batches.id, id)).returning();
       return b;
@@ -1101,7 +1137,11 @@ export class DatabaseStorage implements IStorage {
     const matched = all.filter(p => productIds.includes(p.id));
     if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
-    return enriched[0] || null;
+    const result = enriched[0];
+    if (!result) return null;
+    // Return the specific matched batch (variant) so the caller knows which variant was found
+    const matchedBatch = matchingBatches[0];
+    return { ...result, matchedBatch };
   }
 
   async searchProducts(q: string) {

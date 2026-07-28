@@ -154,8 +154,9 @@ const ProductFields = ({ form, setForm, T, highlightFlavor = false }: any) => (
       <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))} placeholder="0,00" />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código do Produto</Label>
-      <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoProduto ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoProduto: e.target.value }))} placeholder="Ex: 001, A-023..." />
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Cód. Referência Família</Label>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoProduto ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoProduto: e.target.value }))} placeholder="Ex: REF-001 (agrupa variantes)" />
+      <p className="text-[9px] mt-1 text-yellow-500/80 font-bold">⚠ Este é o código da família do produto. O SKU exclusivo de cada variante fica no lote.</p>
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
@@ -663,6 +664,21 @@ export default function InventoryPage() {
   }
 
   async function handleCreateProductAndFirstBatch() {
+    // Validate required fields
+    if (!productForm.name.trim()) {
+      return toast({ title: "Nome do produto é obrigatório", variant: "destructive" });
+    }
+    if (!firstBatchForm.quantity || Number(firstBatchForm.quantity) <= 0) {
+      return toast({ title: "Informe a quantidade do primeiro lote", variant: "destructive" });
+    }
+    if (!firstBatchForm.sku?.trim()) {
+      return toast({
+        title: "SKU (Código Interno) obrigatório no lote",
+        description: "Cada variante deve ter seu próprio código interno exclusivo (SKU). Preencha o campo 'Código Interno' no primeiro lote.",
+        variant: "destructive",
+      });
+    }
+
     const productRes = await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -679,14 +695,18 @@ export default function InventoryPage() {
     }
     const newProd = await productRes.json();
 
-    // Create first batch if quantity provided
-    if (firstBatchForm.quantity && Number(firstBatchForm.quantity) > 0) {
-      await fetch(`/api/products/${newProd.id}/batches`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ ...firstBatchForm }),
-      });
+    // Create first batch
+    const batchRes = await fetch(`/api/products/${newProd.id}/batches`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ ...firstBatchForm }),
+    });
+    if (!batchRes.ok) {
+      const err = await batchRes.json();
+      // Product was created but batch failed — clean up by deleting the product
+      await fetch(`/api/products/${newProd.id}`, { method: "DELETE", credentials: "include" });
+      return toast({ title: "Erro ao criar lote", description: err.message, variant: "destructive" });
     }
 
     invalidate();
@@ -726,7 +746,11 @@ export default function InventoryPage() {
     setScanLoading(true);
     setScanResult(null);
     try {
-      const res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      // Try barcode first, then SKU
+      let res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      if (!res.ok) {
+        res = await fetch(`/api/products/sku/${encodeURIComponent(code)}`, { credentials: "include" });
+      }
       if (res.ok) {
         const product: Product = await res.json();
         setScanResult({ found: true, product });
@@ -766,7 +790,11 @@ export default function InventoryPage() {
     setInlineScanLoading(true);
     setInlineScanResult(null);
     try {
-      const res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      // Try barcode first, then SKU
+      let res = await fetch(`/api/products/barcode/${encodeURIComponent(code)}`, { credentials: "include" });
+      if (!res.ok) {
+        res = await fetch(`/api/products/sku/${encodeURIComponent(code)}`, { credentials: "include" });
+      }
       if (res.ok) {
         const found: Product = await res.json();
         if (addBatchFor && found.id === addBatchFor.id) {
@@ -778,7 +806,7 @@ export default function InventoryPage() {
           setInlineScanResult({ status: "other", otherProduct: found });
         }
       } else {
-        // Barcode not registered — fill it as new
+        // Code not registered — fill it as new
         setBatchForm(f => ({ ...f, barcode: code }));
         setInlineScanResult({ status: "new" });
       }
@@ -1036,7 +1064,7 @@ export default function InventoryPage() {
               <Search className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 ${T.searchIcon}`} />
               <input
                 className={`w-full pl-10 pr-4 py-2.5 rounded-xl border text-sm font-medium transition-colors outline-none ${T.input}`}
-                placeholder="Buscar por nome, marca, categoria, código de barras..."
+                placeholder="Buscar por nome, marca, categoria, SKU, código de barras..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
               />
@@ -1213,8 +1241,8 @@ export default function InventoryPage() {
                                       {product.flavor && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.flavor}</span>}
                                       {product.weight && <span className={`text-[10px] font-bold ${T.cellSub}`}>· {product.weight}</span>}
                                       {product.codigoProduto && (
-                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-black font-mono ${isExactMatch ? "bg-primary/20 text-primary border border-primary/40" : `border ${isLight ? "bg-black/5 border-black/10 text-black/40" : "bg-white/5 border-white/10 text-white/30"}`}`}>
-                                          #{product.codigoProduto}
+                                        <span title="Código de referência da família do produto (não é o SKU de variante)" className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-black font-mono ${isExactMatch ? "bg-primary/20 text-primary border border-primary/40" : `border ${isLight ? "bg-black/5 border-black/10 text-black/40" : "bg-white/5 border-white/10 text-white/30"}`}`}>
+                                          <span className="opacity-60 font-bold not-italic text-[8px]">FAM</span> {product.codigoProduto}
                                         </span>
                                       )}
                                     </div>
@@ -1623,7 +1651,7 @@ export default function InventoryPage() {
               <ScanBarcode className="h-5 w-5" /> Bipar Produto
             </DialogTitle>
             <DialogDescription className={T.muted}>
-              Bipe o produto com o leitor de código de barras ou digite o código manualmente e pressione Enter.
+              Bipe o produto ou digite o código de barras (EAN/GTIN) ou o SKU (código interno da variante) e pressione Enter.
             </DialogDescription>
           </DialogHeader>
 
