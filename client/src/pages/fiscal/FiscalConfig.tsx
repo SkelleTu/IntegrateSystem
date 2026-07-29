@@ -54,7 +54,7 @@ export default function FiscalConfig() {
 
   // Sincroniza o estado local se as configurações mudarem (ex: vindo do Caixa)
   if (settings && formData && settings.simulacaoReal !== formData.simulacaoReal) {
-    setFormData(prev => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
+    setFormData((prev: any) => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
   }
 
   const handleSave = () => {

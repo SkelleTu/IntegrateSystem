@@ -803,7 +803,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAdminMonitoringData(): Promise<{ sessions: (UserSession & { username: string })[], enterprises: Enterprise[] }> {
-    const sessionsList = await db.select({
+    const sessionsList = await (db as any).select({
       id: userSessions.id,
       userId: userSessions.userId,
       type: userSessions.type,
@@ -815,7 +815,7 @@ export class DatabaseStorage implements IStorage {
     .from(userSessions)
     .innerJoin(users, eq(userSessions.userId, users.id))
     .orderBy(desc(userSessions.createdAt))
-    .limit(50);
+    .limit(50) as (UserSession & { username: string })[];
 
     const enterprisesList = await db.select().from(enterprises);
 
@@ -835,7 +835,7 @@ export class DatabaseStorage implements IStorage {
     } catch (e: any) {
       console.warn(`Aviso: Falha na consulta de fiscal_settings (Empresa ${idToUse}). Tentando fallback raw.`);
       try {
-        const result = await db.execute(sql.raw(`SELECT * FROM fiscal_settings WHERE enterprise_id = ${idToUse} LIMIT 1`));
+        const result = await (db as any).execute(sql.raw(`SELECT * FROM fiscal_settings WHERE enterprise_id = ${idToUse} LIMIT 1`));
         
         if (result.rows && result.rows.length > 0) {
           const row = result.rows[0] as any;

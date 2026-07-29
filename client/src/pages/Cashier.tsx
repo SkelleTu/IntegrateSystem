@@ -712,6 +712,10 @@ function CashierContent({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  const removePayment = (index: number) => {
+    setPayments((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
+  };
+
   const { data: fiscalSettingsData, isLoading: isLoadingFiscal } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
     staleTime: 300000,
