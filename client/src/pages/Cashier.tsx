@@ -885,20 +885,6 @@ function CashierContent({
                     onClick={() => addToCart(item as any)}
                     className="cursor-pointer group flex items-center gap-3 px-4 py-3 rounded-xl border border-white/5 bg-zinc-900/40 hover:border-primary/40 hover:bg-primary/5 transition-all"
                   >
-                    {/* Miniatura ou ícone */}
-                    <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden bg-white/5 flex items-center justify-center">
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          style={{ transform: `rotate(${item.rotation || 0}deg) scale(${(item.imageScale || 100) / 100})` }}
-                          className="w-full h-full object-contain"
-                        />
-                      ) : (
-                        <Package className="h-4 w-4 text-white/20" />
-                      )}
-                    </div>
-
                     {/* Nome + badges */}
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-black text-xs uppercase italic tracking-tight truncate group-hover:text-primary transition-colors">
