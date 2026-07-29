@@ -499,8 +499,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "NFC-e já emitida para esta venda" });
       }
 
-      const [items, payments, settings] = await Promise.all([
-        storage.getSaleItems(saleId),
+      const [enrichedItems, salePayments, settings] = await Promise.all([
+        storage.getSaleItemsWithNames(saleId),
         storage.getPayments(saleId),
         storage.getFiscalSettings(user.enterpriseId)
       ]);
@@ -510,12 +510,12 @@ export async function registerRoutes(
       }
 
       // Add payments to sale object for XML generation
-      const saleWithPayments = { ...sale, payments };
+      const saleWithPayments = { ...sale, payments: salePayments };
 
-      // 1. Validar Venda (Garantir NCM/CFOP)
-      for (const item of items) {
+      // 1. Validar NCM/CFOP (aviso, não bloqueia — usa fallback no XML)
+      for (const item of enrichedItems) {
         if (!item.ncm || !item.cfop) {
-          return res.status(400).json({ message: `Item ${item.itemId} sem NCM ou CFOP configurado` });
+          console.warn(`[FISCAL] Item ${item.itemId} (${item.name}) sem NCM/CFOP — usando fallback 00000000/5102`);
         }
       }
 
@@ -527,30 +527,30 @@ export async function registerRoutes(
       // 3. Gerar Chave de Acesso
       const chave = generateChaveAcesso(settings, nNF);
 
-      // 4. Gerar XML
-      const xml = generateNFCeXML(saleWithPayments, items, settings, nNF, chave);
+      // 4. Gerar XML com itens enriquecidos (nome, NCM, CFOP)
+      const xml = generateNFCeXML(saleWithPayments, enrichedItems, settings, nNF, chave);
       
-      // 5. Assinar XML (Simulado)
+      // 5. Assinar XML (real se tiver certificado, simulado se não tiver)
       const xmlSigned = await signXML(xml, settings);
       
-      // 6. Transmitir (Simulado se simulacaoReal estiver ON)
+      // 6. Transmitir — simulacaoReal força bypass mesmo com certificado
       let result;
       if (settings.simulacaoReal) {
-        console.log("SIMULAÇÃO REAL SEFAZ ATIVA: Ignorando envio real, gerando protocolo local.");
+        console.log("[FISCAL] simulacaoReal=true — bypass SEFAZ, protocolo local");
         result = {
           success: true,
           protocol: "SIM" + Math.floor(Math.random() * 1000000000),
           key: chave,
           cStat: "100",
-          xMotivo: "Simulação Real Autorizada"
+          xMotivo: "Simulação Real Autorizada (configuração ativa)"
         };
       } else {
-        const { transmitToSefaz } = await import("./fiscal/nfce");
         result = await transmitToSefaz(xmlSigned, settings);
       }
       
       if (result.success) {
         const qrCode = generateQRCode(chave, settings);
+        const fiscalStatus = (settings.simulacaoReal || result.simulado) ? "simulated" : "authorized";
         
         const nfceData = await storage.createNfce({
           saleId,
@@ -560,25 +560,34 @@ export async function registerRoutes(
           xmlEnviado: xml,
           xmlAutorizado: xmlSigned,
           protocolo: result.protocol,
-          status: settings.simulacaoReal ? "simulated" : "authorized",
+          status: fiscalStatus,
           valorTotal: sale.totalAmount,
           dataEmissao: new Date(),
         });
 
         await storage.updateSaleFiscal(saleId, {
-          fiscalStatus: settings.simulacaoReal ? "simulated" : "authorized",
+          fiscalStatus,
           fiscalKey: chave,
           fiscalXml: xmlSigned,
           fiscalType: "NFCe"
         });
 
-        res.json({ success: true, key: chave, nfce: nfceData, qrCode });
+        // Retorna dados completos para impressão do DANFE
+        const saleData = {
+          ...sale,
+          items: enrichedItems,
+          payments: salePayments,
+          customerName: sale.customerName,
+          customerTaxId: sale.customerTaxId,
+        };
+
+        res.json({ success: true, key: chave, nfce: { ...nfceData, qrCode }, qrCode, saleData });
       } else {
         await storage.updateSaleFiscal(saleId, {
           fiscalStatus: "rejected",
           fiscalError: result.xMotivo
         });
-        res.status(400).json({ message: result.xMotivo });
+        res.status(400).json({ message: result.xMotivo, cStat: result.cStat });
       }
     } catch (err: any) {
       console.error("Erro na emissão fiscal:", err);

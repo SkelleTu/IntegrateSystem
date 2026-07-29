@@ -403,39 +403,43 @@ export default function Cashier() {
       });
 
       if (data.fiscal && data.fiscal.success) {
-        if (window.print) {
-          setTimeout(() => {
-            window.print();
-          }, 500);
-        }
+        // Dispara impressão automaticamente
+        setTimeout(async () => {
+          try {
+            const settingsRes = await fetch("/api/fiscal/settings");
+            const settings = await settingsRes.json();
+            await printNFCe(data.fiscal.nfce, data.fiscal.saleData, settings);
+          } catch (e) {
+            console.error("Erro na impressão automática:", e);
+          }
+        }, 600);
 
         toast({ 
-          title: "Venda Finalizada", 
-          description: "Clique em IMPRIMIR para selecionar a impressora.",
+          title: "NFC-e Autorizada!", 
+          description: "Imprimindo DANFE NFC-e...",
           action: (
             <Button 
               size="sm" 
               className="bg-primary text-black font-bold"
               onClick={async () => {
                 try {
-                  window.print();
                   const settingsRes = await fetch("/api/fiscal/settings");
                   const settings = await settingsRes.json();
-                  if (settings.printerWidth) {
-                    await printNFCe(data.fiscal.nfce, settings);
-                  }
-                  toast({ title: "Comando de impressão enviado!" });
-                } catch (e) {
+                  const result = await printNFCe(data.fiscal.nfce, data.fiscal.saleData, settings);
+                  toast({ 
+                    title: result.method === "usb" ? "Impresso via USB!" : "Diálogo de impressão aberto",
+                  });
+                } catch (e: any) {
                   console.error("Erro na impressão:", e);
                   toast({ 
-                    title: "Aviso de Impressão", 
-                    description: "Use o diálogo do sistema (Ctrl+P) se a impressora USB não responder.",
-                    variant: "default"
+                    title: "Erro na impressão", 
+                    description: e.message || "Verifique a conexão com a impressora.",
+                    variant: "destructive"
                   });
                 }
               }}
             >
-              <Printer className="w-4 h-4 mr-2" /> IMPRIMIR
+              <Printer className="w-4 h-4 mr-2" /> REIMPRIMIR
             </Button>
           )
         });

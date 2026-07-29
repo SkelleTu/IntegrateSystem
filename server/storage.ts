@@ -927,6 +927,50 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
   }
 
+  /** Retorna itens da venda enriquecidos com nome, NCM, CFOP e outros campos fiscais */
+  async getSaleItemsWithNames(saleId: number): Promise<(SaleItem & {
+    name: string;
+    barcode?: string | null;
+    ncm?: string | null;
+    cfop?: string | null;
+    icmsOrigem?: number | null;
+    icmsSituacaoTributaria?: string | null;
+  })[]> {
+    const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    if (items.length === 0) return [];
+
+    const ids = Array.from(new Set(items.map((i) => i.itemId)));
+
+    // Busca em menuItems e products em paralelo
+    const [menuList, productList] = await Promise.all([
+      db.select().from(menuItems).where(
+        ids.length === 1
+          ? eq(menuItems.id, ids[0])
+          : sql`${menuItems.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
+      ),
+      db.select().from(products).where(
+        ids.length === 1
+          ? eq(products.id, ids[0])
+          : sql`${products.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
+      ),
+    ]);
+
+    return items.map((item) => {
+      const mi = menuList.find((m) => m.id === item.itemId);
+      const pr = productList.find((p) => p.id === item.itemId);
+      const src = mi || pr;
+      return {
+        ...item,
+        name: src?.name || `Produto ${item.itemId}`,
+        barcode: (mi as any)?.barcode ?? null,
+        ncm: (mi as any)?.ncm ?? (pr as any)?.ncm ?? null,
+        cfop: (mi as any)?.cfop ?? (pr as any)?.cfop ?? null,
+        icmsOrigem: (mi as any)?.icmsOrigem ?? 0,
+        icmsSituacaoTributaria: (mi as any)?.icmsSituacaoTributaria ?? "400",
+      };
+    });
+  }
+
   async getPayments(saleId: number): Promise<Payment[]> {
     return await db.select().from(payments).where(eq(payments.saleId, saleId));
   }
