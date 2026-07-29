@@ -338,29 +338,29 @@ export default function InventoryPage() {
     expandedBg: "bg-slate-50",
     rowUrgency: { safe: "", blue: "bg-blue-50", yellow: "bg-amber-50", red: "bg-red-50" },
   } as const : {
-    page: "bg-[#090c0c] text-white",
-    surface: "bg-white/[0.03] border-white/10 shadow-none",
-    card: "bg-white/[0.03] border-white/10",
-    cardHd: "border-white/5",
+    page: "bg-[#090c0c] text-white isolate",
+    surface: "bg-[#0e1214] border-[#1e2527] shadow-none",
+    card: "bg-[#0e1214] border-[#1e2527]",
+    cardHd: "border-[#1a2022]",
     h1: "text-white",
     subtitle: "text-white/30",
     muted: "text-white/40",
     badge: "border-white/10 text-white/60",
-    selectTrigger: "bg-white/5 border-white/10 text-white/70",
-    dropdown: "bg-[#0d1212] border-white/10",
+    selectTrigger: "bg-[#141a1c] border-[#1e2527] text-white/70",
+    dropdown: "bg-[#0d1212] border-[#1e2527]",
     dropdownItem: "text-white/70 focus:bg-white/10",
-    input: "bg-white/5 border-white/10 text-white focus:border-primary/50",
-    tableHd: "bg-black/30",
+    input: "bg-[#141a1c] border-[#1e2527] text-white focus:border-primary/50",
+    tableHd: "bg-[#0b0f10]",
     tableHdText: "text-white/40",
-    tableRow: "border-white/5 hover:bg-white/[0.03]",
+    tableRow: "border-[#1a2022] hover:bg-white/[0.03]",
     cellPrimary: "text-white",
     cellSub: "text-white/40",
     toggleBtn: "bg-primary/10 border-primary/20 text-primary hover:bg-primary/20",
-    dialog: "bg-[#0a0f0f] border-white/10 text-white",
+    dialog: "bg-[#0a0f0f] border-[#1e2527] text-white",
     dialogLabel: "text-zinc-400",
-    dialogInput: "bg-black/40 border-white/10 text-white focus:border-primary/50",
+    dialogInput: "bg-[#141a1c] border-[#1e2527] text-white focus:border-primary/50",
     searchIcon: "text-white/40",
-    expandedBg: "bg-black/20",
+    expandedBg: "bg-[#0b0f10]",
     rowUrgency: { safe: "", blue: "bg-blue-500/5", yellow: "bg-yellow-500/5", red: "bg-red-500/5" },
   } as const;
 
@@ -1197,7 +1197,7 @@ export default function InventoryPage() {
                     {/* ── Category header row ── */}
                     <div
                       className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer select-none transition-colors
-                        ${isLight ? "bg-slate-200 hover:bg-slate-300/60" : "bg-white/[0.04] hover:bg-white/[0.07]"}
+                        ${isLight ? "bg-slate-200 hover:bg-slate-300/60" : "bg-[#111618] hover:bg-[#161d1f]"}
                       `}
                       onClick={() => toggleCategory(catKey)}
                     >
