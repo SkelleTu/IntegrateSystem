@@ -956,6 +956,26 @@ function CashierContent({
                     placeholder="BIPAR CÓDIGO OU BUSCAR..." 
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchTerm.trim()) {
+                        const term = searchTerm.toLowerCase().trim();
+                        // Scale barcodes are handled by the useEffect — skip
+                        if (isLikelyScaleBarcode(term)) return;
+                        // Auto-add only on exact code match (barcode scan)
+                        const exactMatch = filteredMenuItems?.find((item: any) =>
+                          (item.id?.toString() === term) ||
+                          (item.barcode?.toLowerCase() === term) ||
+                          (item.sku?.toLowerCase() === term) ||
+                          (item.codigoProduto?.toLowerCase() === term) ||
+                          (item.codigoBalanca?.toLowerCase?.() === term)
+                        );
+                        if (exactMatch) {
+                          addToCart(exactMatch as any);
+                          setSearchTerm("");
+                          e.preventDefault();
+                        }
+                      }
+                    }}
                     className="pl-10 h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 text-white" 
                     autoFocus
                   />
@@ -1236,16 +1256,45 @@ function CashierContent({
               <span className="text-4xl font-black italic text-red-500">R$ {(remainingTotal / 100).toFixed(2)}</span>
             </div>
             <div className="space-y-4">
-              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest pl-2">Valor a Pagar</label>
+              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest pl-2">
+                {currentMethod === "cash" ? "Valor Recebido em Dinheiro" : "Valor a Pagar"}
+              </label>
               <Input 
                 type="text" 
                 value={customerAmount} 
-                onChange={(e) => setCustomerAmount(e.target.value)} 
+                onChange={(e) => setCustomerAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addPayment(); }}
                 className="bg-black border-white/10 text-white text-5xl h-24 font-black italic rounded-3xl text-center focus:border-primary/50 shadow-inner" 
                 autoFocus 
               />
             </div>
-            <Button className="w-full h-20 bg-primary text-black font-black uppercase italic text-2xl rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" onClick={addPayment}>
+            {currentMethod === "cash" && (() => {
+              const received = Math.round(Number(customerAmount.replace(",", ".")) * 100);
+              const diff = received - remainingTotal;
+              if (isNaN(received) || received <= 0) return null;
+              if (diff > 0) return (
+                <div className="flex justify-between items-center bg-green-500/10 p-4 rounded-2xl border border-green-500/30">
+                  <span className="text-green-400 uppercase font-black text-xs tracking-widest">💰 TROCO</span>
+                  <span className="text-3xl font-black italic text-green-400">R$ {(diff / 100).toFixed(2)}</span>
+                </div>
+              );
+              if (diff < 0) return (
+                <div className="flex justify-between items-center bg-yellow-500/10 p-4 rounded-2xl border border-yellow-500/30">
+                  <span className="text-yellow-400 uppercase font-black text-xs tracking-widest">⚠️ FALTA</span>
+                  <span className="text-3xl font-black italic text-yellow-400">R$ {(Math.abs(diff) / 100).toFixed(2)}</span>
+                </div>
+              );
+              return (
+                <div className="flex justify-between items-center bg-green-500/10 p-4 rounded-2xl border border-green-500/30">
+                  <span className="text-green-400 uppercase font-black text-xs tracking-widest">✅ VALOR EXATO</span>
+                  <span className="text-3xl font-black italic text-green-400">Sem troco</span>
+                </div>
+              );
+            })()}
+            <Button 
+              className="w-full h-20 bg-primary text-black font-black uppercase italic text-2xl rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" 
+              onClick={addPayment}
+            >
               CONFIRMAR VALOR
             </Button>
           </div>
