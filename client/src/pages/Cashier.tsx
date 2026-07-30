@@ -243,13 +243,22 @@ export default function Cashier() {
 
     if (!searchTerm) return normalizedItems;
 
-    const term = searchTerm.toLowerCase();
-    return normalizedItems.filter(item =>
-      (item.name && item.name.toLowerCase().includes(term)) ||
+    const term = searchTerm.toLowerCase().trim();
+
+    // 1. Exact code match (barcode, SKU, ID, codigoProduto, codigoBalanca)
+    //    If any item matches exactly by code, return ONLY those — never mix with name results.
+    const exactCodeMatches = normalizedItems.filter(item =>
       (item.id && item.id.toString() === term) ||
       (item.barcode && item.barcode.toLowerCase() === term) ||
       ((item as any).sku && (item as any).sku.toLowerCase() === term) ||
-      ((item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term)
+      ((item as any).codigoProduto && (item as any).codigoProduto.toLowerCase() === term) ||
+      ((item as any).codigoBalanca && (item as any).codigoBalanca.toLowerCase?.() === term)
+    );
+    if (exactCodeMatches.length > 0) return exactCodeMatches;
+
+    // 2. Fallback: partial name search (only when no exact code matched)
+    return normalizedItems.filter(item =>
+      item.name && item.name.toLowerCase().includes(term)
     );
   }, [menuItems, searchTerm]);
 
