@@ -1164,27 +1164,49 @@ function CashierContent({
 
       {/* Weight Input Modal */}
       <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
-        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm">
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary">
-              {activeItemForWeight?.name}
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary flex items-center gap-2">
+              ⚖️ {activeItemForWeight?.name}
             </DialogTitle>
+            <p className="text-white/30 text-[10px] font-black uppercase tracking-widest">
+              R$ {activeItemForWeight ? (activeItemForWeight.price / 100).toFixed(2).replace(".", ",") : "0,00"} / kg
+            </p>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label className="text-xs font-black uppercase tracking-widest text-white/40">Informe o Peso (kg)</Label>
+              <Label className="text-xs font-black uppercase tracking-widest text-white/40">Peso em kg</Label>
               <Input
                 autoFocus
                 value={weightInputValue}
                 onChange={(e) => setWeightInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleWeightSubmit()}
-                className="bg-black border-white/10 h-14 text-3xl font-black text-center text-primary"
+                className="bg-black border-white/10 h-16 text-4xl font-black text-center text-primary tracking-widest rounded-xl"
                 placeholder="0.000"
               />
             </div>
+
+            {/* Preview do total em tempo real */}
+            {(() => {
+              const w = parseFloat(weightInputValue.replace(",", "."));
+              const pricePerKg = activeItemForWeight?.price || 0;
+              const total = !isNaN(w) && w > 0 ? w * pricePerKg : 0;
+              return (
+                <div className={`rounded-xl border px-4 py-3 flex items-center justify-between transition-all ${total > 0 ? "bg-primary/10 border-primary/30" : "bg-white/5 border-white/10"}`}>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                    {!isNaN(w) && w > 0 ? `${w.toFixed(3)} kg × R$ ${(pricePerKg / 100).toFixed(2).replace(".", ",")} =` : "Total"}
+                  </div>
+                  <div className={`text-2xl font-black italic ${total > 0 ? "text-primary" : "text-white/20"}`}>
+                    R$ {(total / 100).toFixed(2).replace(".", ",")}
+                  </div>
+                </div>
+              );
+            })()}
+
             <Button 
-              className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)]"
+              className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-40"
               onClick={handleWeightSubmit}
+              disabled={(() => { const w = parseFloat(weightInputValue.replace(",", ".")); return isNaN(w) || w <= 0; })()}
             >
               Confirmar Peso
             </Button>
