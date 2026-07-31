@@ -25,7 +25,7 @@ import {
   Trash2,
   RefreshCw
 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState } from "react";
 import { type Inventory } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
@@ -44,12 +44,15 @@ export default function LabelSystem() {
     queryKey: ["/api/inventory"]
   });
 
+  const [lastPrintTime, setLastPrintTime] = useState<string | null>(null);
+
   const printMutation = useMutation({
     mutationFn: async (labelData: any) => {
       const res = await apiRequest("POST", "/api/labels/print", labelData);
       return res.json();
     },
     onSuccess: () => {
+      setLastPrintTime(new Date().toLocaleTimeString());
       toast({ title: "Impressão enviada!", description: "Aguardando confirmação do app Windows." });
     },
     onError: (err: any) => {
@@ -93,10 +96,6 @@ export default function LabelSystem() {
 
     printMutation.mutate(labelData);
   };
-
-  if (inventory.length === 0 && !selectedItem) {
-     // Garantir que a interface renderize mesmo sem dados iniciais
-  }
 
   return (
     <div className="p-4 sm:p-8 space-y-8 max-w-7xl mx-auto min-h-screen bg-transparent">
@@ -142,7 +141,7 @@ export default function LabelSystem() {
               style={{ color: 'white' }}
               onClick={() => window.open("/attached_assets/dist_windows/AuraPrinter.exe", "_blank")}
             >
-              BAIXAR AGORA
+              <span className="hover:text-black">BAIXAR AGORA</span>
             </Button>
           </div>
         </div>
@@ -402,6 +401,10 @@ export default function LabelSystem() {
               <p className="text-white font-black italic text-xl">{Math.round(nutricaoBase.proteina * fator)} g</p>
             </div>
             <div className="p-4 bg-black/40 rounded-xl border border-white/5">
+              <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Gorduras Totais</p>
+              <p className="text-white font-black italic text-xl">{Math.round(nutricaoBase.gordura * fator)} g</p>
+            </div>
+            <div className="p-4 bg-black/40 rounded-xl border border-white/5">
               <p className="text-[10px] font-black uppercase text-zinc-500 mb-1">Sódio</p>
               <p className="text-white font-black italic text-xl">{Math.round(nutricaoBase.sodio * fator)} mg</p>
             </div>
@@ -418,7 +421,7 @@ export default function LabelSystem() {
               [WS] App Windows {status?.appConnected ? 'CONECTADO' : 'DESCONECTADO'}
             </p>
             <p>[DB] Inventário carregado: {inventory.length} itens.</p>
-            {printMutation.isSuccess && <p className="text-primary">[LOG] Etiqueta enviada com sucesso às {new Date().toLocaleTimeString()}</p>}
+            {lastPrintTime && <p className="text-primary">[LOG] Etiqueta enviada com sucesso às {lastPrintTime}</p>}
           </CardContent>
         </Card>
       </div>

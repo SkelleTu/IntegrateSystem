@@ -51,14 +51,16 @@ export default function LandingPage() {
     setLoading(true);
     try {
       // 1. Upload documents first if they exist
+      // Usa rota pública pois o usuário ainda não está autenticado durante o cadastro
       const uploadFile = async (file: File | null) => {
         if (!file) return null;
         const formData = new FormData();
         formData.append("file", file);
-        const res = await fetch("/api/admin/upload", {
+        const res = await fetch("/api/public/upload", {
           method: "POST",
           body: formData,
         });
+        if (!res.ok) throw new Error("Falha no upload de documento.");
         const data = await res.json();
         return data.url;
       };
@@ -94,14 +96,24 @@ export default function LandingPage() {
   };
 
   const handleFileChange = (field: string, file: File | null) => {
-    setFormData(prev => ({ ...prev, [field]: file }));
-    if (formData.addressProof || formData.rgFront || formData.rgBack) {
-      updateChecklist("documents", true);
-    }
+    setFormData(prev => {
+      const updated = { ...prev, [field]: file };
+      // Verifica com o estado atualizado (não o antigo)
+      if (updated.addressProof || updated.rgFront || updated.rgBack) {
+        updateChecklist("documents", true);
+      }
+      return updated;
+    });
   };
 
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "pix" | null>(null);
+
   const handlePayment = () => {
-    toast({ title: "Sucesso!", description: "Pagamento processado (Simulação). Bem-vindo ao Aura!" });
+    if (!paymentMethod) {
+      toast({ title: "Selecione um método", description: "Escolha Cartão ou PIX antes de finalizar.", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Cadastro realizado!", description: "Aguarde a aprovação da sua conta pelo administrador." });
     setLocation("/login");
   };
 
@@ -217,7 +229,11 @@ export default function LandingPage() {
                     value={formData.name}
                     onChange={(e) => {
                       const val = e.target.value;
-                      setFormData({...formData, name: val, slug: val.toLowerCase().replace(/ /g, "-")});
+                      const slug = val.toLowerCase()
+                        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                        .replace(/[^\w\s-]/g, "")
+                        .replace(/\s+/g, "-");
+                      setFormData({...formData, name: val, slug});
                       updateChecklist("name", val);
                     }}
                   />
@@ -425,12 +441,20 @@ export default function LandingPage() {
               <p className="text-4xl font-black text-white tracking-tighter">R$ 149,90<span className="text-sm font-normal text-zinc-500 ml-1">/mês</span></p>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <Button variant="outline" className="h-20 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/40 group">
-                <CreditCard className="w-6 h-6 text-zinc-500 group-hover:text-primary" />
+              <Button
+                variant="outline"
+                onClick={() => setPaymentMethod("card")}
+                className={`h-20 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/40 group transition-all ${paymentMethod === "card" ? "border-primary bg-primary/10" : ""}`}
+              >
+                <CreditCard className={`w-6 h-6 ${paymentMethod === "card" ? "text-primary" : "text-zinc-500 group-hover:text-primary"}`} />
                 <span className="text-[10px] font-black uppercase text-white">Cartão</span>
               </Button>
-              <Button variant="outline" className="h-20 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/40 group">
-                <Zap className="w-6 h-6 text-zinc-500 group-hover:text-primary" />
+              <Button
+                variant="outline"
+                onClick={() => setPaymentMethod("pix")}
+                className={`h-20 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/40 group transition-all ${paymentMethod === "pix" ? "border-primary bg-primary/10" : ""}`}
+              >
+                <Zap className={`w-6 h-6 ${paymentMethod === "pix" ? "text-primary" : "text-zinc-500 group-hover:text-primary"}`} />
                 <span className="text-[10px] font-black uppercase text-white">PIX</span>
               </Button>
             </div>

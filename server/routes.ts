@@ -376,6 +376,13 @@ export async function registerRoutes(
     res.json(s);
   });
 
+  // Rota pública de upload usada durante o cadastro (sem auth, pois o usuário ainda não está logado)
+  app.post("/api/public/upload", upload.single("file"), (req: any, res) => {
+    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+    res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+  });
+
+  // Rota de upload autenticada (para uso interno/admin)
   app.post("/api/admin/upload", isAuthenticated, upload.single("file"), (req: any, res) => {
     if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
     res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
