@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MenuItem, CashRegister, Inventory, Nfce, FiscalSettings } from "@shared/schema";
 import { queryClient, apiRequest } from "@/lib/queryClient";

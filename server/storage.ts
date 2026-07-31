@@ -1,4 +1,4 @@
-import { db, multiWrite } from "./db.js";
+import { db, multiWrite, localSqlite } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
