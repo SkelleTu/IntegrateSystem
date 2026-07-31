@@ -381,9 +381,16 @@ export default function InventoryPage() {
   const [scanResult, setScanResult] = useState<{ found: boolean; product?: Product } | null>(null);
   const [scanCategory, setScanCategory] = useState("");
   const scanInputRef = useRef<HTMLInputElement>(null);
-  const scanAutoRef = useRef(false);          // true when scan was triggered by scanner
+  const scanAutoRef = useRef(false);
   const scanLastKeystrokeRef = useRef(0);
   const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Counting mode (repeated scans of same product) ──
+  const [scanCountMode, setScanCountMode] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [scanCountedProduct, setScanCountedProduct] = useState<Product | null>(null);
+  const [scanCountedBarcode, setScanCountedBarcode] = useState("");
+  const [scanCountLoading, setScanCountLoading] = useState(false);
 
   // ── Inline barcode scan (inside "Novo Lote" modal) ──
   const [inlineScanValue, setInlineScanValue] = useState("");
@@ -848,6 +855,10 @@ export default function InventoryPage() {
       setScanResult(null);
       setScanCategory("");
       scanAutoRef.current = false;
+      setScanCountMode(false);
+      setScanCount(0);
+      setScanCountedProduct(null);
+      setScanCountedBarcode("");
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [scanOpen]);
@@ -901,21 +912,57 @@ export default function InventoryPage() {
   function handleScanConfirm() {
     if (!scanResult) return;
     if (scanResult.found && scanResult.product) {
-      // Product exists → open Add Batch modal with barcode pre-filled
-      setAddBatchFor(scanResult.product);
-      setBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
-      toast({ title: `Produto encontrado: ${scanResult.product.name}` });
+      // Product exists → enter counting mode (bip more = more units)
+      setScanCountedProduct(scanResult.product);
+      setScanCountedBarcode(scanValue.trim());
+      setScanCount(1);
+      setScanCountMode(true);
+      setScanResult(null);
+      setScanValue("");
+      setTimeout(() => scanInputRef.current?.focus(), 80);
     } else {
       // Product not found → open New Product modal with barcode and category pre-filled
       setProductForm({ ...emptyProduct(), category: scanCategory.trim() });
       setFirstBatchForm({ ...emptyBatch(), barcode: scanValue.trim() });
       setAddProductOpen(true);
+      setScanOpen(false);
+      setScanValue("");
+      setScanResult(null);
+      setScanCategory("");
       toast({ title: "Produto não cadastrado — preencha os dados para cadastrá-lo." });
     }
-    setScanOpen(false);
-    setScanValue("");
-    setScanResult(null);
-    setScanCategory("");
+  }
+
+  function handleConfirmCount() {
+    if (!scanCountedProduct || scanCount <= 0) return;
+    setScanCountLoading(true);
+    createBatchMut.mutate(
+      {
+        productId: scanCountedProduct.id,
+        data: {
+          quantity: String(scanCount),
+          barcode: scanCountedBarcode,
+          sku: "",
+          variantName: "",
+          costPrice: "",
+          salePrice: scanCountedProduct.salePrice ? String((scanCountedProduct.salePrice / 100).toFixed(2)) : "",
+          entryDate: new Date().toISOString().split("T")[0],
+          expiryDate: "",
+          batchNumber: "",
+          supplier: "",
+        },
+      },
+      {
+        onSettled: () => {
+          setScanCountLoading(false);
+          setScanCountMode(false);
+          setScanCount(0);
+          setScanCountedProduct(null);
+          setScanCountedBarcode("");
+          setScanOpen(false);
+        },
+      }
+    );
   }
 
   async function handleInlineScan() {
@@ -1808,10 +1855,24 @@ export default function InventoryPage() {
                     const now = Date.now();
                     const gap = now - scanLastKeystrokeRef.current;
                     scanLastKeystrokeRef.current = now;
+                    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+
+                    if (scanCountMode) {
+                      // ── Counting mode: each fast scan = +1 unit ──
+                      setScanValue(e.target.value);
+                      if (gap < 50 && e.target.value.trim().length >= 3) {
+                        scanTimerRef.current = setTimeout(() => {
+                          setScanCount(prev => prev + 1);
+                          setScanValue("");
+                          setTimeout(() => scanInputRef.current?.focus(), 50);
+                        }, 120);
+                      }
+                      return;
+                    }
+
+                    // ── Normal search mode ──
                     setScanValue(e.target.value);
                     setScanResult(null);
-                    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
-                    // Scanner types very fast (< 50ms between chars) — auto-trigger search
                     if (gap < 50 && e.target.value.trim().length >= 3) {
                       scanAutoRef.current = true;
                       const code = e.target.value;
@@ -1853,72 +1914,125 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            {/* Result */}
-            {scanResult && (
-              <div className={`rounded-xl border p-4 ${scanResult.found ? "border-emerald-500/30 bg-emerald-500/10" : "border-red-500/30 bg-red-500/10"}`}>
-                {scanResult.found && scanResult.product ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
-                      <span className="font-black text-emerald-400 text-sm uppercase tracking-widest">Produto Encontrado</span>
-                    </div>
-                    <p className={`font-bold text-base ${T.cellPrimary}`}>{scanResult.product.name}</p>
-                    <div className={`flex gap-4 text-xs ${T.muted}`}>
-                      <span>Estoque: <strong className="text-primary">{scanResult.product.totalQuantity} {scanResult.product.unit}</strong></span>
-                      {scanResult.product.nearestExpiry && (
-                        <span>Validade mais próx.: <strong>{fmtDate(scanResult.product.nearestExpiry)}</strong></span>
-                      )}
-                    </div>
-                    <p className={`text-[10px] uppercase tracking-widest ${T.muted}`}>→ Será aberto o formulário de <strong>Novo Lote</strong> para este produto.</p>
+            {/* ── Counting mode UI ── */}
+            {scanCountMode && scanCountedProduct && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                    <span className="font-black text-emerald-400 text-sm uppercase tracking-widest">Repondo Estoque</span>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <XCircle className="h-5 w-5 text-red-400 shrink-0" />
-                      <span className="font-black text-red-400 text-sm uppercase tracking-widest">Produto Não Cadastrado</span>
-                    </div>
-                    <p className={`text-xs ${T.muted}`}>Código <strong className="font-mono">{scanValue}</strong> não foi encontrado no estoque.</p>
-                    {/* Category selector — ensures new product is created within the right category */}
-                    <div>
-                      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-                        Categoria do novo produto
-                      </Label>
-                      <div className="flex gap-2 mt-1">
-                        <Input
-                          className={`flex-1 ${T.dialogInput}`}
-                          value={scanCategory}
-                          onChange={e => setScanCategory(e.target.value)}
-                          placeholder="Ex: Salgadinhos, Bebidas..."
-                          list="scan-categories"
-                        />
-                        <datalist id="scan-categories">
-                          {Array.from(new Set(products.map(p => p.category).filter(Boolean))).map(cat => (
-                            <option key={cat} value={cat!} />
-                          ))}
-                        </datalist>
-                      </div>
-                      <p className={`text-[10px] mt-1 ${T.muted}`}>→ O formulário de <strong>Novo Produto</strong> abrirá com esta categoria pré-preenchida.</p>
-                    </div>
+                  <p className={`font-bold text-base ${T.cellPrimary}`}>{scanCountedProduct.name}</p>
+                  <p className={`text-xs ${T.muted}`}>
+                    Estoque atual: <strong className="text-primary">{scanCountedProduct.totalQuantity} {scanCountedProduct.unit}</strong>
+                  </p>
+                </div>
+
+                {/* Big counter */}
+                <div className="flex flex-col items-center gap-2 py-4">
+                  <p className={`text-[10px] font-black uppercase tracking-widest ${T.muted}`}>Quantidade bipada</p>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => setScanCount(n => Math.max(1, n - 1))}
+                      className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 text-xl font-black transition-all"
+                    >−</button>
+                    <span className="text-7xl font-black text-emerald-400 tabular-nums w-24 text-center">{scanCount}</span>
+                    <button
+                      onClick={() => setScanCount(n => n + 1)}
+                      className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-white/60 hover:text-white hover:border-white/40 text-xl font-black transition-all"
+                    >+</button>
                   </div>
-                )}
+                  <p className={`text-[10px] ${T.muted}`}>Continue bipando para incrementar — ou ajuste manualmente</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => { setScanCountMode(false); setScanCount(0); setScanCountedProduct(null); }}
+                    className={`flex-1 ${T.muted}`}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleConfirmCount}
+                    disabled={scanCountLoading}
+                    className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest rounded-xl"
+                  >
+                    {scanCountLoading
+                      ? <Loader2 className="h-4 w-4 animate-spin" />
+                      : `Confirmar +${scanCount} ${scanCountedProduct.unit}`}
+                  </Button>
+                </div>
               </div>
             )}
 
-            {/* Actions */}
-            <div className="flex justify-end gap-3 pt-1">
-              <Button variant="ghost" onClick={() => setScanOpen(false)} className={T.muted}>Cancelar</Button>
-              {scanResult && (
-                <Button
-                  onClick={handleScanConfirm}
-                  className={scanResult.found
-                    ? "bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest px-6 rounded-xl"
-                    : "bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
-                  }
-                >
-                  {scanResult.found ? "Adicionar Lote" : "Cadastrar Produto"}
-                </Button>
-              )}
-            </div>
+            {/* ── Normal result + actions ── */}
+            {!scanCountMode && (
+              <>
+                {scanResult && (
+                  <div className={`rounded-xl border p-4 ${scanResult.found ? "border-emerald-500/30 bg-emerald-500/10" : "border-red-500/30 bg-red-500/10"}`}>
+                    {scanResult.found && scanResult.product ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
+                          <span className="font-black text-emerald-400 text-sm uppercase tracking-widest">Produto Encontrado</span>
+                        </div>
+                        <p className={`font-bold text-base ${T.cellPrimary}`}>{scanResult.product.name}</p>
+                        <div className={`flex gap-4 text-xs ${T.muted}`}>
+                          <span>Estoque: <strong className="text-primary">{scanResult.product.totalQuantity} {scanResult.product.unit}</strong></span>
+                          {scanResult.product.nearestExpiry && (
+                            <span>Validade mais próx.: <strong>{fmtDate(scanResult.product.nearestExpiry)}</strong></span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2">
+                          <XCircle className="h-5 w-5 text-red-400 shrink-0" />
+                          <span className="font-black text-red-400 text-sm uppercase tracking-widest">Produto Não Cadastrado</span>
+                        </div>
+                        <p className={`text-xs ${T.muted}`}>Código <strong className="font-mono">{scanValue}</strong> não foi encontrado no estoque.</p>
+                        <div>
+                          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
+                            Categoria do novo produto
+                          </Label>
+                          <div className="flex gap-2 mt-1">
+                            <Input
+                              className={`flex-1 ${T.dialogInput}`}
+                              value={scanCategory}
+                              onChange={e => setScanCategory(e.target.value)}
+                              placeholder="Ex: Salgadinhos, Bebidas..."
+                              list="scan-categories"
+                            />
+                            <datalist id="scan-categories">
+                              {Array.from(new Set(products.map(p => p.category).filter(Boolean))).map(cat => (
+                                <option key={cat} value={cat!} />
+                              ))}
+                            </datalist>
+                          </div>
+                          <p className={`text-[10px] mt-1 ${T.muted}`}>→ O formulário de <strong>Novo Produto</strong> abrirá com esta categoria pré-preenchida.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 pt-1">
+                  <Button variant="ghost" onClick={() => setScanOpen(false)} className={T.muted}>Cancelar</Button>
+                  {scanResult && (
+                    <Button
+                      onClick={handleScanConfirm}
+                      className={scanResult.found
+                        ? "bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                        : "bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                      }
+                    >
+                      {scanResult.found ? "Contar unidades →" : "Cadastrar Produto"}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
