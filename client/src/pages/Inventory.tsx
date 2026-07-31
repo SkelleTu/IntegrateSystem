@@ -381,6 +381,9 @@ export default function InventoryPage() {
   const [scanResult, setScanResult] = useState<{ found: boolean; product?: Product } | null>(null);
   const [scanCategory, setScanCategory] = useState("");
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanAutoRef = useRef(false);          // true when scan was triggered by scanner
+  const scanLastKeystrokeRef = useRef(0);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Inline barcode scan (inside "Novo Lote" modal) ──
   const [inlineScanValue, setInlineScanValue] = useState("");
@@ -844,9 +847,19 @@ export default function InventoryPage() {
       setScanValue("");
       setScanResult(null);
       setScanCategory("");
+      scanAutoRef.current = false;
       setTimeout(() => scanInputRef.current?.focus(), 100);
     }
   }, [scanOpen]);
+
+  // Auto-confirm when scanner triggered the search and result arrived
+  useEffect(() => {
+    if (scanResult && scanAutoRef.current) {
+      scanAutoRef.current = false;
+      handleScanConfirm();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanResult]);
 
   // Reset inline scan + variant form when the Add Batch modal opens/closes
   useEffect(() => {
@@ -1791,9 +1804,43 @@ export default function InventoryPage() {
                   ref={scanInputRef}
                   className={`flex-1 ${T.dialogInput} text-lg tracking-widest font-mono`}
                   value={scanValue}
-                  onChange={e => { setScanValue(e.target.value); setScanResult(null); }}
+                  onChange={e => {
+                    const now = Date.now();
+                    const gap = now - scanLastKeystrokeRef.current;
+                    scanLastKeystrokeRef.current = now;
+                    setScanValue(e.target.value);
+                    setScanResult(null);
+                    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+                    // Scanner types very fast (< 50ms between chars) — auto-trigger search
+                    if (gap < 50 && e.target.value.trim().length >= 3) {
+                      scanAutoRef.current = true;
+                      const code = e.target.value;
+                      scanTimerRef.current = setTimeout(() => {
+                        (async () => {
+                          setScanLoading(true);
+                          setScanResult(null);
+                          try {
+                            let res = await fetch(`/api/products/barcode/${encodeURIComponent(code.trim())}`, { credentials: "include" });
+                            if (!res.ok) res = await fetch(`/api/products/sku/${encodeURIComponent(code.trim())}`, { credentials: "include" });
+                            if (res.ok) {
+                              const product: Product = await res.json();
+                              setScanResult({ found: true, product });
+                            } else {
+                              setScanResult({ found: false });
+                            }
+                          } catch {
+                            setScanResult({ found: false });
+                          } finally {
+                            setScanLoading(false);
+                          }
+                        })();
+                      }, 120);
+                    } else {
+                      scanAutoRef.current = false;
+                    }
+                  }}
                   onKeyDown={e => { if (e.key === "Enter") handleScan(); }}
-                  placeholder="Aguardando bipagem..."
+                  placeholder="Bipe o produto ou digite e pressione Enter..."
                   autoComplete="off"
                 />
                 <Button
