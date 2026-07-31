@@ -151,7 +151,9 @@ export interface IStorage {
   createProduct(data: InsertProduct): Promise<Product>;
   updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
-  clearAllProducts(): Promise<void>;
+  clearAllProducts(clearedBy: string): Promise<void>;
+  getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null>;
+  restoreStockSnapshot(): Promise<{ productsRestored: number }>;
   getProductBatches(productId: number): Promise<Batch[]>;
   createBatch(data: InsertBatch): Promise<Batch>;
   updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch>;
@@ -1099,13 +1101,106 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async clearAllProducts(): Promise<void> {
-    this.logAction(`LIMPEZA TOTAL DO ESTOQUE`);
+  async clearAllProducts(clearedBy: string): Promise<void> {
+    this.logAction(`LIMPEZA TOTAL DO ESTOQUE por ${clearedBy}`);
+
+    // 1. Salva snapshot antes de deletar
+    const allProducts = await db.select().from(products);
+    const allBatches  = await db.select().from(batches);
+
+    const snapshotSql = `
+      INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+      VALUES (?, ?, ?, ?, ?)
+    `;
+    const now = Math.floor(Date.now() / 1000);
+    (db as any).$client
+      ? await (db as any).$client.execute({
+          sql: snapshotSql,
+          args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
+        })
+      : db.run(sql`
+          INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+          VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
+        `);
+
+    // Salvar também no SQLite local se o primário for remoto
+    try {
+      localSqlite.prepare(
+        `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
+      ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
+    } catch { /* ignora se já inserido ou tabela não existe */ }
+
+    // 2. Deleta tudo
     await dualWrite(async (database) => {
       await database.delete(batchLogs);
       await database.delete(batches);
       await database.delete(products);
     });
+  }
+
+  async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
+    const row = localSqlite.prepare(
+      `SELECT id, created_at, created_by, product_count FROM stock_snapshots ORDER BY id DESC LIMIT 1`
+    ).get() as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      createdAt: new Date(row.created_at * 1000),
+      createdBy: row.created_by,
+      productCount: row.product_count,
+    };
+  }
+
+  async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
+    const row = localSqlite.prepare(
+      `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
+    ).get() as any;
+    if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
+
+    const savedProducts: any[] = JSON.parse(row.products_json);
+    const savedBatches:  any[] = JSON.parse(row.batches_json);
+
+    // Limpa estoque atual antes de restaurar
+    await dualWrite(async (database) => {
+      await database.delete(batchLogs);
+      await database.delete(batches);
+      await database.delete(products);
+    });
+
+    // Reinserir produtos e mapear IDs antigos → novos
+    const idMap = new Map<number, number>();
+    for (const p of savedProducts) {
+      const oldId = p.id;
+      const { id: _id, ...rest } = p;
+      const [inserted] = await dualWrite(async (database) =>
+        database.insert(products).values({
+          ...rest,
+          createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
+          updatedAt: new Date(),
+        }).returning()
+      );
+      idMap.set(oldId, inserted.id);
+    }
+
+    // Reinserir lotes com product_id remapeado
+    for (const b of savedBatches) {
+      const newProductId = idMap.get(b.productId);
+      if (!newProductId) continue;
+      const { id: _id, ...rest } = b;
+      await dualWrite(async (database) =>
+        database.insert(batches).values({
+          ...rest,
+          productId: newProductId,
+          entryDate: b.entryDate ? new Date(b.entryDate) : new Date(),
+          expiryDate: b.expiryDate ? new Date(b.expiryDate) : null,
+          manufactureDate: b.manufactureDate ? new Date(b.manufactureDate) : null,
+          createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+        }).returning()
+      );
+    }
+
+    this.logAction(`RESTAURAÇÃO DO ESTOQUE — ${savedProducts.length} produtos`);
+    return { productsRestored: savedProducts.length };
   }
 
   async getProductBatches(productId: number): Promise<Batch[]> {

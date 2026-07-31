@@ -415,6 +415,13 @@ export default function InventoryPage() {
   const [clearStockPassword, setClearStockPassword] = useState("");
   const [clearStockStep, setClearStockStep] = useState<"password" | "confirm">("password");
   const [clearStockLoading, setClearStockLoading] = useState(false);
+  const [clearStockConfirmText, setClearStockConfirmText] = useState("");
+
+  // ── Restaurar estoque state ──
+  const [restoreOpen, setRestoreOpen] = useState(false);
+  const [restorePassword, setRestorePassword] = useState("");
+  const [restoreStep, setRestoreStep] = useState<"password" | "confirm">("password");
+  const [restoreLoading, setRestoreLoading] = useState(false);
 
   // ── Liquidar state ──
   const [liquidarProduct, setLiquidarProduct] = useState<Product | null>(null);
@@ -491,6 +498,12 @@ export default function InventoryPage() {
     staleTime: 0,
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
+  });
+
+  const { data: latestSnapshot } = useQuery<{ id: number; createdAt: string; createdBy: string; productCount: number } | null>({
+    queryKey: ["/api/products/snapshot"],
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 
   const batchesCache = new Map<number, Batch[]>();
@@ -1230,8 +1243,17 @@ export default function InventoryPage() {
               <Layers className="h-6 w-6 text-primary" /> Produtos e Lotes
             </CardTitle>
             <div className="flex items-center gap-2">
+              {latestSnapshot && (
+                <Button
+                  onClick={() => { setRestoreOpen(true); setRestorePassword(""); setRestoreStep("password"); }}
+                  className="h-9 px-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                  title={`Restaurar snapshot de ${new Date(latestSnapshot.createdAt).toLocaleString("pt-BR")} (${latestSnapshot.productCount} produtos)`}
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Restaurar
+                </Button>
+              )}
               <Button
-                onClick={() => { setClearStockOpen(true); setClearStockPassword(""); setClearStockStep("password"); }}
+                onClick={() => { setClearStockOpen(true); setClearStockPassword(""); setClearStockStep("password"); setClearStockConfirmText(""); }}
                 className="h-9 px-4 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
               >
                 <Trash2 className="h-4 w-4" /> Limpar Estoque
@@ -2137,21 +2159,38 @@ export default function InventoryPage() {
       </Dialog>
 
       {/* ── Modal: Limpar Estoque ── */}
-      <Dialog open={clearStockOpen} onOpenChange={(o) => { if (!clearStockLoading) { setClearStockOpen(o); setClearStockStep("password"); setClearStockPassword(""); } }}>
-        <DialogContent className={`max-w-md border ${T.dialog}`}>
+      <Dialog open={clearStockOpen} onOpenChange={(o) => { if (!clearStockLoading) { setClearStockOpen(o); setClearStockStep("password"); setClearStockPassword(""); setClearStockConfirmText(""); } }}>
+        <DialogContent className={`max-w-lg border ${T.dialog}`}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 font-black italic uppercase tracking-tighter text-red-500">
-              <Trash2 className="h-5 w-5" /> Limpar Todo o Estoque
+            <DialogTitle className="flex items-center gap-2 font-black italic uppercase tracking-tighter text-red-500 text-xl">
+              <Trash2 className="h-6 w-6" /> Limpar Todo o Estoque
             </DialogTitle>
             <DialogDescription className={T.muted}>
-              {clearStockStep === "password"
-                ? "Digite sua senha de administrador para prosseguir."
-                : "Leia com atenção antes de confirmar."}
+              {clearStockStep === "password" ? "Autentique-se para prosseguir com esta operação crítica." : "Leia com atenção. Esta ação é permanente."}
             </DialogDescription>
           </DialogHeader>
 
           {clearStockStep === "password" ? (
             <div className="space-y-4 mt-2">
+              {/* Bloco de aviso visível ANTES de confirmar */}
+              <div className="rounded-xl border-2 border-red-500 bg-red-950/60 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-400 shrink-0" />
+                  <p className="text-red-300 font-black uppercase text-[12px] tracking-widest">Atenção — Operação de Alto Risco</p>
+                </div>
+                <p className="text-red-200 text-sm font-semibold leading-relaxed">
+                  Você está prestes a <strong className="text-white">apagar permanentemente todos os {products.length} produto{products.length !== 1 ? "s" : ""}</strong> do estoque, incluindo todos os seus lotes, preços, quantidades e histórico de movimentações.
+                </p>
+                <ul className="text-red-300 text-xs space-y-1 list-disc list-inside">
+                  <li>Todo o catálogo de produtos será apagado</li>
+                  <li>Todos os lotes e quantidades em estoque somem</li>
+                  <li>O histórico de entradas e saídas será removido</li>
+                  <li>O caixa não encontrará nenhum produto para venda</li>
+                </ul>
+                <p className="text-red-400 text-[11px] font-black uppercase tracking-widest border-t border-red-500/30 pt-2">
+                  Um snapshot será salvo automaticamente para restauração emergencial.
+                </p>
+              </div>
               <div>
                 <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Senha do Administrador</Label>
                 <Input
@@ -2161,9 +2200,7 @@ export default function InventoryPage() {
                   onChange={e => setClearStockPassword(e.target.value)}
                   placeholder="••••••••"
                   autoFocus
-                  onKeyDown={e => {
-                    if (e.key === "Enter" && clearStockPassword) setClearStockStep("confirm");
-                  }}
+                  onKeyDown={e => { if (e.key === "Enter" && clearStockPassword) setClearStockStep("confirm"); }}
                 />
               </div>
               <div className="flex justify-end gap-3 pt-1">
@@ -2179,21 +2216,30 @@ export default function InventoryPage() {
             </div>
           ) : (
             <div className="space-y-4 mt-2">
-              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 space-y-2">
-                <p className="text-red-400 font-black uppercase text-[11px] tracking-widest">⚠️ Ação irreversível</p>
-                <p className={`text-sm font-medium leading-relaxed ${T.cellPrimary}`}>
-                  Ao confirmar, <strong>todos os {products.length} produto{products.length !== 1 ? "s" : ""}</strong> e seus respectivos lotes serão permanentemente excluídos do estoque.
+              {/* Aviso final reforçado */}
+              <div className="rounded-xl border-2 border-red-600 bg-red-950/80 p-5 space-y-3">
+                <p className="text-red-300 font-black uppercase text-[13px] tracking-widest text-center">🚨 Última chance — confirme a exclusão</p>
+                <p className="text-white text-sm font-bold leading-relaxed text-center">
+                  Isso vai apagar <span className="text-red-400">{products.length} produto{products.length !== 1 ? "s" : ""}</span> e todos os seus dados do estoque.<br/>
+                  <span className="text-red-300">Não é possível desfazer esta ação diretamente.</span>
                 </p>
-                <p className={`text-xs ${T.muted}`}>
-                  Essa operação não pode ser desfeita. O histórico de movimentações também será apagado.
-                </p>
+                <div className={`text-xs leading-relaxed p-3 rounded-lg border ${isLight ? "bg-red-50 border-red-200 text-red-700" : "bg-red-900/30 border-red-700/40 text-red-300"}`}>
+                  Para continuar, digite <strong className="font-black">LIMPAR</strong> no campo abaixo:
+                </div>
+                <Input
+                  className={`text-center font-black tracking-[0.5em] uppercase ${T.dialogInput} border-red-500 focus:border-red-400`}
+                  placeholder="LIMPAR"
+                  value={clearStockConfirmText}
+                  onChange={e => setClearStockConfirmText(e.target.value.toUpperCase())}
+                  autoFocus
+                />
               </div>
               <div className="flex justify-end gap-3 pt-1">
-                <Button variant="ghost" onClick={() => { setClearStockStep("password"); setClearStockPassword(""); }} className={T.muted}>
+                <Button variant="ghost" onClick={() => { setClearStockStep("password"); setClearStockPassword(""); setClearStockConfirmText(""); }} className={T.muted}>
                   Voltar
                 </Button>
                 <Button
-                  disabled={clearStockLoading}
+                  disabled={clearStockLoading || clearStockConfirmText !== "LIMPAR"}
                   onClick={async () => {
                     setClearStockLoading(true);
                     try {
@@ -2208,12 +2254,15 @@ export default function InventoryPage() {
                         toast({ title: "Erro", description: err.message, variant: "destructive" });
                         setClearStockStep("password");
                         setClearStockPassword("");
+                        setClearStockConfirmText("");
                       } else {
                         qc.invalidateQueries({ queryKey: ["/api/products"] });
+                        qc.invalidateQueries({ queryKey: ["/api/products/snapshot"] });
                         setClearStockOpen(false);
                         setClearStockPassword("");
                         setClearStockStep("password");
-                        toast({ title: "Estoque limpo com sucesso!", description: "Todos os produtos foram removidos." });
+                        setClearStockConfirmText("");
+                        toast({ title: "Estoque limpo.", description: "Use o botão Restaurar se precisar reverter." });
                       }
                     } catch {
                       toast({ title: "Erro de conexão", variant: "destructive" });
@@ -2221,9 +2270,104 @@ export default function InventoryPage() {
                       setClearStockLoading(false);
                     }
                   }}
-                  className="bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest px-6 rounded-xl gap-2"
+                  className="bg-red-600 hover:bg-red-500 text-white font-black uppercase tracking-widest px-6 rounded-xl gap-2 disabled:opacity-40"
                 >
-                  {clearStockLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4" /> Confirmar e Limpar</>}
+                  {clearStockLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Trash2 className="h-4 w-4" /> Apagar Tudo</>}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Restaurar Estoque ── */}
+      <Dialog open={restoreOpen} onOpenChange={(o) => { if (!restoreLoading) { setRestoreOpen(o); setRestoreStep("password"); setRestorePassword(""); } }}>
+        <DialogContent className={`max-w-md border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black italic uppercase tracking-tighter text-amber-400 text-xl">
+              <CheckCircle2 className="h-6 w-6" /> Restaurar Estoque
+            </DialogTitle>
+            <DialogDescription className={T.muted}>
+              Restaura o último snapshot salvo antes da limpeza.
+            </DialogDescription>
+          </DialogHeader>
+
+          {latestSnapshot && (
+            <div className={`rounded-xl border p-3 text-xs space-y-1 ${isLight ? "bg-amber-50 border-amber-200" : "bg-amber-900/20 border-amber-700/30"}`}>
+              <p className="text-amber-500 font-black uppercase text-[10px] tracking-widest">Snapshot disponível</p>
+              <p className={T.cellPrimary}><strong>{latestSnapshot.productCount} produtos</strong> salvos em {new Date(latestSnapshot.createdAt).toLocaleString("pt-BR")}</p>
+              <p className={T.muted}>Criado por: {latestSnapshot.createdBy}</p>
+            </div>
+          )}
+
+          {restoreStep === "password" ? (
+            <div className="space-y-4 mt-1">
+              <div className={`rounded-xl border p-3 text-xs ${isLight ? "bg-slate-50 border-slate-200" : "bg-white/5 border-white/10"}`}>
+                <p className={`${T.cellPrimary} font-semibold`}>O estoque atual será substituído pelos dados do snapshot. Produtos adicionados após a limpeza serão perdidos.</p>
+              </div>
+              <div>
+                <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Senha do Administrador</Label>
+                <Input
+                  type="password"
+                  className={`mt-1 ${T.dialogInput}`}
+                  value={restorePassword}
+                  onChange={e => setRestorePassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && restorePassword) setRestoreStep("confirm"); }}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setRestoreOpen(false)} className={T.muted}>Cancelar</Button>
+                <Button
+                  disabled={!restorePassword}
+                  onClick={() => setRestoreStep("confirm")}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                >
+                  Prosseguir
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-1">
+              <div className={`rounded-xl border-2 border-amber-500 p-4 text-sm font-semibold text-center ${isLight ? "bg-amber-50" : "bg-amber-900/30"}`}>
+                <p className={T.cellPrimary}>Confirma a restauração de <strong className="text-amber-500">{latestSnapshot?.productCount} produtos</strong> para o estoque?</p>
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => { setRestoreStep("password"); setRestorePassword(""); }} className={T.muted}>Voltar</Button>
+                <Button
+                  disabled={restoreLoading}
+                  onClick={async () => {
+                    setRestoreLoading(true);
+                    try {
+                      const res = await fetch("/api/products/restore", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ password: restorePassword }),
+                      });
+                      if (!res.ok) {
+                        const err = await res.json();
+                        toast({ title: "Erro", description: err.message, variant: "destructive" });
+                        setRestoreStep("password");
+                        setRestorePassword("");
+                      } else {
+                        const data = await res.json();
+                        qc.invalidateQueries({ queryKey: ["/api/products"] });
+                        setRestoreOpen(false);
+                        setRestorePassword("");
+                        setRestoreStep("password");
+                        toast({ title: `Estoque restaurado!`, description: `${data.productsRestored} produto${data.productsRestored !== 1 ? "s" : ""} recuperado${data.productsRestored !== 1 ? "s" : ""}.` });
+                      }
+                    } catch {
+                      toast({ title: "Erro de conexão", variant: "destructive" });
+                    } finally {
+                      setRestoreLoading(false);
+                    }
+                  }}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest px-6 rounded-xl gap-2"
+                >
+                  {restoreLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CheckCircle2 className="h-4 w-4" /> Restaurar Agora</>}
                 </Button>
               </div>
             </div>

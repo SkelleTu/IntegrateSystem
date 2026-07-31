@@ -357,6 +357,14 @@ const TABLE_DEFINITIONS = [
     user_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS stock_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at INTEGER NOT NULL,
+    created_by TEXT NOT NULL,
+    products_json TEXT NOT NULL,
+    batches_json TEXT NOT NULL,
+    product_count INTEGER NOT NULL
+  )`,
 ];
 
 export async function setupDatabase() {
@@ -449,6 +457,14 @@ export async function setupDatabase() {
         tables_count INTEGER NOT NULL,
         rows_count INTEGER NOT NULL,
         filepath TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS stock_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL,
+        created_by TEXT NOT NULL,
+        products_json TEXT NOT NULL,
+        batches_json TEXT NOT NULL,
+        product_count INTEGER NOT NULL
       )`,
     ];
 
