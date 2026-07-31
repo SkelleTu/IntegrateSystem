@@ -721,6 +721,43 @@ function CashierContent({
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
+  // Scanner detection: scanners type characters very fast (< 50ms between each char)
+  const lastKeystrokeTimeRef = useRef<number>(0);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const filteredMenuItemsRef = useRef<any[]>(filteredMenuItems || []);
+  useEffect(() => { filteredMenuItemsRef.current = filteredMenuItems || []; }, [filteredMenuItems]);
+
+  const handleSearchChange = (newValue: string) => {
+    const now = Date.now();
+    const gap = now - lastKeystrokeTimeRef.current;
+    lastKeystrokeTimeRef.current = now;
+    setSearchTerm(newValue);
+
+    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+
+    // Fast input = scanner (gap < 50ms). After a brief pause, auto-add if exact match.
+    const isFast = gap < 50 && newValue.trim().length >= 3;
+    if (isFast) {
+      scanTimerRef.current = setTimeout(() => {
+        const term = newValue.toLowerCase().trim();
+        if (isLikelyScaleBarcode(term)) return; // already handled by parent useEffect
+        const items = filteredMenuItemsRef.current;
+        if (items.length === 1) {
+          const item = items[0];
+          const isExactCode =
+            (item.barcode?.toLowerCase() === term) ||
+            (item.sku?.toLowerCase() === term) ||
+            (item.codigoProduto?.toLowerCase() === term) ||
+            (item.codigoBalanca?.toLowerCase?.() === term);
+          if (isExactCode) {
+            addToCart(item as any);
+            setSearchTerm("");
+          }
+        }
+      }, 120);
+    }
+  };
+
   const removePayment = (index: number) => {
     setPayments((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
   };
@@ -955,27 +992,7 @@ function CashierContent({
                   <Input 
                     placeholder="BIPAR CÓDIGO OU BUSCAR..." 
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && searchTerm.trim()) {
-                        const term = searchTerm.toLowerCase().trim();
-                        // Scale barcodes are handled by the useEffect — skip
-                        if (isLikelyScaleBarcode(term)) return;
-                        // Auto-add only on exact code match (barcode scan)
-                        const exactMatch = filteredMenuItems?.find((item: any) =>
-                          (item.id?.toString() === term) ||
-                          (item.barcode?.toLowerCase() === term) ||
-                          (item.sku?.toLowerCase() === term) ||
-                          (item.codigoProduto?.toLowerCase() === term) ||
-                          (item.codigoBalanca?.toLowerCase?.() === term)
-                        );
-                        if (exactMatch) {
-                          addToCart(exactMatch as any);
-                          setSearchTerm("");
-                          e.preventDefault();
-                        }
-                      }
-                    }}
+                    onChange={(e) => handleSearchChange(e.target.value)}
                     className="pl-10 h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 text-white" 
                     autoFocus
                   />
