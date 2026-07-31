@@ -151,6 +151,7 @@ export interface IStorage {
   createProduct(data: InsertProduct): Promise<Product>;
   updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
+  clearAllProducts(): Promise<void>;
   getProductBatches(productId: number): Promise<Batch[]>;
   createBatch(data: InsertBatch): Promise<Batch>;
   updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch>;
@@ -1095,6 +1096,15 @@ export class DatabaseStorage implements IStorage {
       await database.delete(batchLogs).where(eq(batchLogs.productId, id));
       await database.delete(batches).where(eq(batches.productId, id));
       await database.delete(products).where(eq(products.id, id));
+    });
+  }
+
+  async clearAllProducts(): Promise<void> {
+    this.logAction(`LIMPEZA TOTAL DO ESTOQUE`);
+    await dualWrite(async (database) => {
+      await database.delete(batchLogs);
+      await database.delete(batches);
+      await database.delete(products);
     });
   }
 

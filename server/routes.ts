@@ -934,6 +934,23 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      await storage.clearAllProducts();
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao limpar estoque" });
+    }
+  });
+
   app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
     try {
       await storage.deleteProduct(Number(req.params.id));
