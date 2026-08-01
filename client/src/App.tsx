@@ -53,6 +53,7 @@ import MasterControl from "./pages/MasterControl";
 import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
 import AuraWindows from "./pages/AuraWindows";
 import Backup from "./pages/Backup";
+import SetupEnterprise from "./pages/SetupEnterprise";
 import { TourProvider } from "@/components/tour/TourContext";
 import { TourEngine } from "@/components/tour/TourEngine";
 
@@ -61,10 +62,15 @@ function Router() {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
-    const publicPages = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms", "/login", "/register"];
+    const publicPages = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms", "/login", "/register", "/setup"];
     const isPublicPage = publicPages.includes(location) || location.startsWith("/blog/");
     if (!isLoading && !user && !isPublicPage) {
       setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    // Usuário logado mas sem estabelecimento → forçar setup
+    if (!isLoading && user && !user.enterpriseId && location !== "/setup") {
+      setLocation("/setup");
     }
   }, [user, isLoading, location, setLocation]);
 
@@ -77,13 +83,14 @@ function Router() {
   }
 
   // Routes that should be full screen without the main layout
-  const isAuthPage = ["/login", "/register"].includes(location);
+  const isAuthPage = ["/login", "/register", "/setup"].includes(location);
 
   if (isAuthPage) {
     return (
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/register" component={LandingPage} />
+        <Route path="/setup" component={SetupEnterprise} />
         <Route component={NotFound} />
       </Switch>
     );

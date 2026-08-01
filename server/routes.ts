@@ -288,6 +288,69 @@ export async function registerRoutes(
     }
   });
 
+  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
+  app.get("/api/my-enterprises", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const list = await storage.getEnterprisesByOwner(user.id);
+    res.json(list);
+  });
+
+  app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    try {
+      const owned = await storage.getEnterprisesByOwner(user.id);
+      if (owned.length >= 5) {
+        return res.status(400).json({ message: "Limite de 5 estabelecimentos por conta atingido." });
+      }
+
+      const { name, businessType, taxId, phone, address, city, state } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Nome do estabelecimento é obrigatório." });
+
+      const baseSlug = name.trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+      
+      // Garantir slug único
+      let slug = baseSlug;
+      let attempt = 1;
+      while (await storage.getEnterpriseBySlug(slug)) {
+        slug = `${baseSlug}-${attempt++}`;
+      }
+
+      const enterprise = await storage.createEnterprise({
+        ownerId: user.id,
+        name: name.trim(),
+        businessType: businessType || "barbearia",
+        taxId: taxId || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        slug,
+        status: "active",
+      });
+
+      // Ativar este estabelecimento para o usuário
+      await storage.updateUser(user.id, { enterpriseId: enterprise.id });
+
+      res.status(201).json(enterprise);
+    } catch (err) {
+      console.error("Erro ao criar estabelecimento:", err);
+      res.status(500).json({ message: "Erro ao criar estabelecimento." });
+    }
+  });
+
+  app.put("/api/my-enterprises/:id/select", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const enterpriseId = Number(req.params.id);
+    const owned = await storage.getEnterprisesByOwner(user.id);
+    if (!owned.find(e => e.id === enterpriseId)) {
+      return res.status(403).json({ message: "Este estabelecimento não pertence a você." });
+    }
+    await storage.updateUser(user.id, { enterpriseId });
+    res.json({ ok: true });
+  });
+
   // Enterprise Routes
   app.get("/api/admin/enterprises", async (req, res) => {
     const list = await storage.getEnterprises();

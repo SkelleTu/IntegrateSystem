@@ -379,6 +379,10 @@ export async function setupDatabase() {
 
   // ── SQLite local: migrações incrementais (espelho das remotas) ───────────
   const localMigrations = [
+    "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
+    "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
+    "ALTER TABLE enterprises ADD COLUMN city TEXT",
+    "ALTER TABLE enterprises ADD COLUMN state TEXT",
     "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
     "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER DEFAULT 0",
     "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
@@ -414,6 +418,10 @@ export async function setupDatabase() {
   // ── Turso (remoto): migrações incrementais ────────────────────────────────
   if (isRemoteEnabled && dbRemote) {
     const remoteMigrations = [
+      "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
+      "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
+      "ALTER TABLE enterprises ADD COLUMN city TEXT",
+      "ALTER TABLE enterprises ADD COLUMN state TEXT",
       "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
       "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER DEFAULT 0",
       "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",

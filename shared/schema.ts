@@ -142,16 +142,20 @@ export const timeClock = pgTable("time_clock", {
 
 export const enterprises = pgTable("enterprises", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  ownerId: integer("owner_id"), // usuário que criou este estabelecimento
   name: text("name").notNull(),
+  businessType: text("business_type").default("barbearia"), // tipo do negócio
   taxId: text("tax_id"), 
   email: text("email"),
   phone: text("phone"),
   address: text("address"),
+  city: text("city"),
+  state: text("state"),
   addressProofUrl: text("address_proof_url"),
   rgFrontUrl: text("rg_front_url"),
   rgBackUrl: text("rg_back_url"),
   slug: text("slug").notNull().unique(), 
-  status: text("status").notNull().default("pending"), 
+  status: text("status").notNull().default("active"), 
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 

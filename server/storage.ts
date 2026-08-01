@@ -46,7 +46,8 @@ export interface IStorage {
   getEnterprises(): Promise<Enterprise[]>;
   getEnterprise(id: number): Promise<Enterprise | undefined>;
   getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined>;
-  createEnterprise(enterprise: InsertEnterprise): Promise<Enterprise>;
+  getEnterprisesByOwner(ownerId: number): Promise<Enterprise[]>;
+  createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise>;
   updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise>;
   deleteEnterprise(id: number): Promise<void>;
 
@@ -54,6 +55,7 @@ export interface IStorage {
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: number, update: Partial<User>): Promise<User>;
 
   // Services
   getServices(): Promise<Service[]>;
@@ -192,6 +194,19 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca instituição por slug: ${slug}`);
     const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.slug, slug));
     return enterprise;
+  }
+
+  async getEnterprisesByOwner(ownerId: number): Promise<Enterprise[]> {
+    this.logAction(`Busca estabelecimentos do usuário ID:${ownerId}`);
+    return await db.select().from(enterprises).where(eq(enterprises.ownerId, ownerId));
+  }
+
+  async updateUser(id: number, update: Partial<User>): Promise<User> {
+    this.logAction(`Atualização usuário ID:${id}`);
+    const [updated] = await dualWrite((database: any) =>
+      database.update(users).set(update).where(eq(users.id, id)).returning()
+    );
+    return updated;
   }
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
