@@ -241,14 +241,14 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
       />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome Completo (Marca + Detalhes)</Label>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variante</Label>
       <Input
         className={`mt-1 ${T.dialogInput}`}
         value={form.variantName ?? ""}
         onChange={e => setForm((f: any) => ({ ...f, variantName: e.target.value }))}
         placeholder={isKg ? "Ex: Carne Bovina Traseira, Frango Inteiro..." : "Ex: Louê Essências Vanilla 500ml, Triex Fresh 500ml..."}
       />
-      <p className="text-[9px] mt-1 text-white/30 font-bold">Escreva aqui: marca, tamanho, sabor — tudo que diferencia este item</p>
+      <p className="text-[9px] mt-1 text-white/30 font-bold">Escreva aqui a marca, tamanho, sabor — tudo que diferencia este item do grupo</p>
     </div>
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras (EAN/GTIN)</Label>
