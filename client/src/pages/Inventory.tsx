@@ -193,43 +193,16 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
         <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.minStock} onChange={e => setForm((f: any) => ({ ...f, minStock: e.target.value }))} placeholder={isKg ? "Ex: 1.5" : "5"} />
       </div>
 
-      {/* ── Preço de venda (label dinâmico) ────────────────────────────────── */}
+      {/* ── Código Balança (PLU) ────────────────────────────────────────────── */}
       <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-          {isKg ? "Preço de Venda (R$/kg)" : "Preço de Venda (R$)"}
-        </Label>
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
         <Input
           className={`mt-1 ${T.dialogInput}`}
-          value={form.salePrice}
-          onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
-          placeholder={isKg ? "Ex: 29,90 por kg" : "0,00"}
+          value={form.codigoBalanca ?? ""}
+          onChange={e => setForm((f: any) => ({ ...f, codigoBalanca: e.target.value }))}
+          placeholder={isKg ? "Ex: 3780 (etiqueta Urano)" : "Ex: 3780"}
         />
-        {isKg && (
-          <p className="text-[9px] mt-1 text-white/30 font-bold">Preço por quilograma. Ex: R$ 29,90/kg</p>
-        )}
       </div>
-
-      {/* ── Código Balança (só para kg) ou Cód. Referência (unidade) ─────── */}
-      {isKg ? (
-        <div>
-          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
-          <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoBalanca ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoBalanca: e.target.value }))} placeholder="Ex: 3780 (etiqueta Urano)" />
-        </div>
-      ) : (
-        <div>
-          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Cód. Referência Família</Label>
-          <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoProduto ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoProduto: e.target.value }))} placeholder="Ex: REF-001" />
-          <p className="text-[9px] mt-1 text-yellow-500/80 font-bold">⚠ Código da família. SKU exclusivo fica no lote.</p>
-        </div>
-      )}
-
-      {/* ── Código Balança para unidade (se tiver) ─────────────────────────── */}
-      {!isKg && (
-        <div>
-          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
-          <Input className={`mt-1 ${T.dialogInput}`} value={form.codigoBalanca ?? ""} onChange={e => setForm((f: any) => ({ ...f, codigoBalanca: e.target.value }))} placeholder="Ex: 3780" />
-        </div>
-      )}
 
       {/* ── Descrição ─────────────────────────────────────────────────────── */}
       <div className="col-span-2">
