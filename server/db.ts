@@ -377,6 +377,40 @@ export async function setupDatabase() {
     }
   }
 
+  // ── SQLite local: migrações incrementais (espelho das remotas) ───────────
+  const localMigrations = [
+    "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
+    "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER DEFAULT 0",
+    "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN csc_token TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN csc_id TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
+    "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER DEFAULT 1",
+    "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
+    "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0",
+    "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100",
+    "ALTER TABLE menu_items ADD COLUMN codigo_produto TEXT",
+    "ALTER TABLE products ADD COLUMN codigo_produto TEXT",
+    "ALTER TABLE products ADD COLUMN em_liquidacao INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE inventory ADD COLUMN codigo_balanca TEXT",
+    "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
+    "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
+    "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
+    "ALTER TABLE batches ADD COLUMN sku TEXT",
+    "ALTER TABLE batches ADD COLUMN variant_name TEXT",
+    "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
+  ];
+  for (const migration of localMigrations) {
+    try {
+      localSqlite.prepare(migration).run();
+    } catch (e: any) {
+      if (!e.message?.includes("duplicate column") && !e.message?.includes("already exists")) {
+        console.warn(`[DB] Migração local avisou: ${e.message}`);
+      }
+    }
+  }
+
   // ── Turso (remoto): migrações incrementais ────────────────────────────────
   if (isRemoteEnabled && dbRemote) {
     const remoteMigrations = [
