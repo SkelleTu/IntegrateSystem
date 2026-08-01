@@ -1244,45 +1244,45 @@ export default function InventoryPage() {
 
       {/* ── Main Card ── */}
       <Card className={`rounded-2xl border transition-colors ${T.card}`}>
-        <CardHeader className={`border-b p-5 transition-colors ${T.cardHd}`}>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <CardHeader className={`border-b p-4 transition-colors ${T.cardHd}`}>
+          <div className="flex flex-col gap-3">
             <CardTitle className={`flex items-center gap-2 font-black italic uppercase tracking-tighter text-xl ${T.cellPrimary}`}>
               <Layers className="h-6 w-6 text-primary" /> Produtos e Lotes
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap gap-2">
               {latestSnapshot && (
                 <Button
                   onClick={() => { setRestoreOpen(true); setRestorePassword(""); setRestoreStep("password"); }}
-                  className="h-9 px-4 bg-amber-500 hover:bg-amber-400 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                  className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-white border border-primary/40 hover:border-primary/70 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2 shadow-[0_0_10px_rgba(0,229,255,0.25)] hover:shadow-[0_0_18px_rgba(0,229,255,0.5)] transition-all"
                   title={`Restaurar snapshot de ${new Date(latestSnapshot.createdAt).toLocaleString("pt-BR")} (${latestSnapshot.productCount} produtos)`}
                 >
-                  <CheckCircle2 className="h-4 w-4" /> Restaurar
+                  <CheckCircle2 className="h-4 w-4 text-primary" /> Restaurar
                 </Button>
               )}
               <Button
                 onClick={() => { setZeroQtyOpen(true); setZeroQtyPassword(""); setZeroQtyStep("password"); setZeroQtyConfirmText(""); }}
-                className="h-9 px-4 bg-orange-600 hover:bg-orange-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-white border border-primary/40 hover:border-primary/70 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2 shadow-[0_0_10px_rgba(0,229,255,0.25)] hover:shadow-[0_0_18px_rgba(0,229,255,0.5)] transition-all"
                 title="Zera somente as quantidades. Produtos, categorias e dados permanecem intactos."
               >
-                <BarChart3 className="h-4 w-4" /> Zerar Quantidades
+                <BarChart3 className="h-4 w-4 text-primary" /> Zerar Qtd
               </Button>
               <Button
                 onClick={() => { setClearStockOpen(true); setClearStockPassword(""); setClearStockStep("password"); setClearStockConfirmText(""); }}
-                className="h-9 px-4 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-white border border-primary/40 hover:border-primary/70 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2 shadow-[0_0_10px_rgba(0,229,255,0.25)] hover:shadow-[0_0_18px_rgba(0,229,255,0.5)] transition-all"
               >
-                <Trash2 className="h-4 w-4" /> Limpar Estoque
+                <Trash2 className="h-4 w-4 text-primary" /> Limpar Estoque
               </Button>
               <Button
                 onClick={() => setScanOpen(true)}
-                className="h-9 px-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-white border border-primary/40 hover:border-primary/70 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2 shadow-[0_0_10px_rgba(0,229,255,0.25)] hover:shadow-[0_0_18px_rgba(0,229,255,0.5)] transition-all"
               >
-                <ScanBarcode className="h-4 w-4" /> Bipar Produto
+                <ScanBarcode className="h-4 w-4 text-primary" /> Bipar Produto
               </Button>
               <Button
                 onClick={() => { setAddProductOpen(true); setProductForm(emptyProduct()); setFirstBatchForm(emptyBatch()); }}
-                className="h-9 px-5 bg-primary hover:bg-primary/90 text-black font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-white border border-primary/40 hover:border-primary/70 font-black text-[10px] uppercase tracking-widest rounded-xl gap-2 shadow-[0_0_10px_rgba(0,229,255,0.25)] hover:shadow-[0_0_18px_rgba(0,229,255,0.5)] transition-all"
               >
-                <Plus className="h-4 w-4" /> Novo Produto
+                <Plus className="h-4 w-4 text-primary" /> Novo Produto
               </Button>
             </div>
           </div>
