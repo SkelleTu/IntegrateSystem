@@ -53,6 +53,8 @@ import MasterControl from "./pages/MasterControl";
 import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
 import AuraWindows from "./pages/AuraWindows";
 import Backup from "./pages/Backup";
+import { TourProvider } from "@/components/tour/TourContext";
+import { TourEngine } from "@/components/tour/TourEngine";
 
 function Router() {
   const { data: user, isLoading } = useUser();
@@ -266,7 +268,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AppContent />
+        <TourProvider>
+          <AppContent />
+          <TourEngine />
+        </TourProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

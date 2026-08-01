@@ -377,6 +377,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   return (
     <Sidebar 
+      data-tour="sidebar-area"
       side={side} 
       collapsible="icon" 
       onMouseEnter={() => setOpen(true)}

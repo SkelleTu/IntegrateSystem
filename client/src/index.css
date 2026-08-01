@@ -223,3 +223,16 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-white/10 rounded-full border-2 border-transparent bg-clip-padding hover:bg-white/20;
 }
+
+/* ── Tour spotlight pulse animation ─────────────────────────────────────── */
+@keyframes tour-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(0,229,255,0.15), 0 0 24px rgba(0,229,255,0.4), inset 0 0 20px rgba(0,229,255,0.05);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0,229,255,0.25), 0 0 40px rgba(0,229,255,0.6), inset 0 0 30px rgba(0,229,255,0.08);
+  }
+}
+.tour-spotlight-border {
+  animation: tour-pulse 2s ease-in-out infinite;
+}
