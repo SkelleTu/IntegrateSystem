@@ -165,25 +165,26 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
 
       {/* ── Nome ────────────────────────────────────────────────────────────── */}
       <div className="col-span-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome *</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder={isKg ? "Ex: Carne Bovina, Frango, Queijo Minas" : "Ex: Salgadinho Bacon 45g"} />
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome do Grupo *</Label>
+        <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder={isKg ? "Ex: Carne Bovina, Frango, Queijo Minas" : "Ex: Amaciantes, Detergente, Papel Higiênico"} />
+        <p className="text-[9px] mt-1 text-white/30 font-bold">Nome genérico do tipo de produto — os detalhes (marca, tamanho, sabor) vão nas variantes</p>
       </div>
 
       {/* ── Marca + Categoria ─────────────────────────────────────────────── */}
       <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Amavita" />
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca Geral</Label>
+        <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Veja, Omo (opcional)" />
       </div>
       <div>
         <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Salgadinhos" />
+        <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Limpeza, Higiene, Bebidas" />
       </div>
 
       {/* ── Peso/Volume da embalagem (só para unidade) ─────────────────────── */}
       {!isKg && (
         <div>
-          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Peso/Volume da Embalagem</Label>
-          <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 45g, 1L, 500ml" />
+          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Tamanho Padrão da Embalagem</Label>
+          <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 500ml, 1L, 45g (opcional)" />
         </div>
       )}
 
@@ -240,13 +241,14 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
       />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome da Variante</Label>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome Completo (Marca + Detalhes)</Label>
       <Input
         className={`mt-1 ${T.dialogInput}`}
         value={form.variantName ?? ""}
         onChange={e => setForm((f: any) => ({ ...f, variantName: e.target.value }))}
-        placeholder={isKg ? "Ex: Carne Bovina Traseira, Frango Inteiro..." : "Ex: Coca-Cola Zero 2L, Bacon 45g..."}
+        placeholder={isKg ? "Ex: Carne Bovina Traseira, Frango Inteiro..." : "Ex: Louê Essências Vanilla 500ml, Triex Fresh 500ml..."}
       />
+      <p className="text-[9px] mt-1 text-white/30 font-bold">Escreva aqui: marca, tamanho, sabor — tudo que diferencia este item</p>
     </div>
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras (EAN/GTIN)</Label>
