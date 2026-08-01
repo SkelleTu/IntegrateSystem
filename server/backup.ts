@@ -35,6 +35,11 @@ const TABLES = [
   "settings",
   "fiscal_settings",
   "nfce",
+  // ── Sistema de estoque ERP (products/batches) ─────────────────────────────
+  "products",       // catálogo de produtos
+  "batches",        // lotes/variantes com quantidade e preço
+  "batch_logs",     // histórico de movimentações
+  "stock_snapshots", // snapshots de restauração do estoque
 ];
 
 function ensureBackupDir() {
