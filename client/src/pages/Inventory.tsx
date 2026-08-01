@@ -410,6 +410,13 @@ export default function InventoryPage() {
   // ── "Novo Produto" extra: highlight flavor field when coming from variant flow ──
   const [highlightFlavor, setHighlightFlavor] = useState(false);
 
+  // ── Zerar quantidades state ──
+  const [zeroQtyOpen, setZeroQtyOpen] = useState(false);
+  const [zeroQtyPassword, setZeroQtyPassword] = useState("");
+  const [zeroQtyStep, setZeroQtyStep] = useState<"password" | "confirm">("password");
+  const [zeroQtyLoading, setZeroQtyLoading] = useState(false);
+  const [zeroQtyConfirmText, setZeroQtyConfirmText] = useState("");
+
   // ── Limpar estoque state ──
   const [clearStockOpen, setClearStockOpen] = useState(false);
   const [clearStockPassword, setClearStockPassword] = useState("");
@@ -1252,6 +1259,13 @@ export default function InventoryPage() {
                   <CheckCircle2 className="h-4 w-4" /> Restaurar
                 </Button>
               )}
+              <Button
+                onClick={() => { setZeroQtyOpen(true); setZeroQtyPassword(""); setZeroQtyStep("password"); setZeroQtyConfirmText(""); }}
+                className="h-9 px-4 bg-orange-600 hover:bg-orange-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
+                title="Zera somente as quantidades. Produtos, categorias e dados permanecem intactos."
+              >
+                <BarChart3 className="h-4 w-4" /> Zerar Quantidades
+              </Button>
               <Button
                 onClick={() => { setClearStockOpen(true); setClearStockPassword(""); setClearStockStep("password"); setClearStockConfirmText(""); }}
                 className="h-9 px-4 bg-red-600 hover:bg-red-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl gap-2"
@@ -2155,6 +2169,128 @@ export default function InventoryPage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Modal: Zerar Quantidades ── */}
+      <Dialog open={zeroQtyOpen} onOpenChange={(o) => { if (!zeroQtyLoading) { setZeroQtyOpen(o); setZeroQtyStep("password"); setZeroQtyPassword(""); setZeroQtyConfirmText(""); } }}>
+        <DialogContent className={`max-w-lg border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-black italic uppercase tracking-tighter text-orange-400 text-xl">
+              <BarChart3 className="h-6 w-6" /> Zerar Quantidades do Estoque
+            </DialogTitle>
+            <DialogDescription className={T.muted}>
+              {zeroQtyStep === "password" ? "Autentique-se para prosseguir com esta operação." : "Confirme a zeragem de quantidades."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {zeroQtyStep === "password" ? (
+            <div className="space-y-4 mt-2">
+              <div className="rounded-xl border-2 border-orange-500 bg-orange-950/40 p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-400 shrink-0" />
+                  <p className="text-orange-300 font-black uppercase text-[12px] tracking-widest">Operação de Inventário</p>
+                </div>
+                <p className="text-orange-100 text-sm font-semibold leading-relaxed">
+                  Isso vai <strong className="text-white">zerar a quantidade de todos os lotes</strong> do estoque.
+                </p>
+                <ul className={`text-sm space-y-1.5 list-none ${isLight ? "text-orange-800" : "text-orange-200/80"}`}>
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" /><span>Todos os produtos são <strong>mantidos</strong> com suas categorias e informações</span></li>
+                  <li className="flex items-start gap-2"><CheckCircle2 className="h-4 w-4 text-emerald-400 mt-0.5 shrink-0" /><span>Códigos de barras, SKUs e preços são <strong>preservados</strong></span></li>
+                  <li className="flex items-start gap-2"><XCircle className="h-4 w-4 text-orange-400 mt-0.5 shrink-0" /><span>Apenas as <strong>quantidades</strong> de todos os lotes são zeradas</span></li>
+                </ul>
+                <p className={`text-[11px] font-black uppercase tracking-widest border-t pt-2 ${isLight ? "border-orange-300 text-orange-600" : "border-orange-500/30 text-orange-400"}`}>
+                  Ideal para inventário: organize os produtos e insira as quantidades depois.
+                </p>
+              </div>
+              <div>
+                <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Senha do Administrador</Label>
+                <Input
+                  type="password"
+                  className={`mt-1 ${T.dialogInput}`}
+                  value={zeroQtyPassword}
+                  onChange={e => setZeroQtyPassword(e.target.value)}
+                  placeholder="••••••••"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === "Enter" && zeroQtyPassword) setZeroQtyStep("confirm"); }}
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setZeroQtyOpen(false)} className={T.muted}>Cancelar</Button>
+                <Button
+                  disabled={!zeroQtyPassword}
+                  onClick={() => setZeroQtyStep("confirm")}
+                  className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest px-6 rounded-xl"
+                >
+                  Prosseguir
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 mt-2">
+              <div className="rounded-xl border-2 border-orange-500 bg-orange-950/60 p-5 space-y-3">
+                <p className="text-orange-300 font-black uppercase text-[13px] tracking-widest text-center">Confirme a zeragem</p>
+                <p className="text-white text-sm font-bold leading-relaxed text-center">
+                  As quantidades de <span className="text-orange-400">todos os {products.length} produto{products.length !== 1 ? "s" : ""}</span> serão zeradas.<br/>
+                  <span className={`text-sm font-medium ${isLight ? "text-orange-700" : "text-orange-300/80"}`}>Dados e cadastros permanecem intactos.</span>
+                </p>
+                <div className={`text-xs leading-relaxed p-3 rounded-lg border ${isLight ? "bg-orange-50 border-orange-200 text-orange-700" : "bg-orange-900/30 border-orange-700/40 text-orange-300"}`}>
+                  Para continuar, digite <strong className="font-black">ZERAR</strong> no campo abaixo:
+                </div>
+                <Input
+                  className={`text-center font-black tracking-[0.5em] uppercase ${T.dialogInput} border-orange-500 focus:border-orange-400`}
+                  placeholder="ZERAR"
+                  value={zeroQtyConfirmText}
+                  onChange={e => setZeroQtyConfirmText(e.target.value.toUpperCase())}
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => { setZeroQtyStep("password"); setZeroQtyPassword(""); setZeroQtyConfirmText(""); }} className={T.muted}>
+                  Voltar
+                </Button>
+                <Button
+                  disabled={zeroQtyLoading || zeroQtyConfirmText !== "ZERAR"}
+                  onClick={async () => {
+                    setZeroQtyLoading(true);
+                    try {
+                      const res = await fetch("/api/products/zero-quantities", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ password: zeroQtyPassword }),
+                      });
+                      if (!res.ok) {
+                        const err = await res.json();
+                        toast({ title: "Erro", description: err.message, variant: "destructive" });
+                        setZeroQtyStep("password");
+                        setZeroQtyPassword("");
+                        setZeroQtyConfirmText("");
+                      } else {
+                        const data = await res.json();
+                        qc.invalidateQueries({ queryKey: ["/api/products"] });
+                        setZeroQtyOpen(false);
+                        setZeroQtyPassword("");
+                        setZeroQtyStep("password");
+                        setZeroQtyConfirmText("");
+                        toast({
+                          title: "Quantidades zeradas!",
+                          description: `${data.batchesZeroed} lote${data.batchesZeroed !== 1 ? "s" : ""} zerado${data.batchesZeroed !== 1 ? "s" : ""}. Produtos e dados preservados.`,
+                        });
+                      }
+                    } catch {
+                      toast({ title: "Erro de conexão", variant: "destructive" });
+                    } finally {
+                      setZeroQtyLoading(false);
+                    }
+                  }}
+                  className="bg-orange-600 hover:bg-orange-500 text-white font-black uppercase tracking-widest px-6 rounded-xl gap-2 disabled:opacity-40"
+                >
+                  {zeroQtyLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <><BarChart3 className="h-4 w-4" /> Zerar Agora</>}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

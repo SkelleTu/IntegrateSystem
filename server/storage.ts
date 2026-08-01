@@ -154,6 +154,7 @@ export interface IStorage {
   updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
   deleteProduct(id: number): Promise<void>;
   clearAllProducts(clearedBy: string): Promise<void>;
+  zeroAllBatchQuantities(zeroedBy: string): Promise<number>;
   getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null>;
   restoreStockSnapshot(): Promise<{ productsRestored: number }>;
   getProductBatches(productId: number): Promise<Batch[]>;
@@ -1112,6 +1113,15 @@ export class DatabaseStorage implements IStorage {
       await database.delete(batches).where(eq(batches.productId, id));
       await database.delete(products).where(eq(products.id, id));
     });
+  }
+
+  async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
+    this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
+    const result = await dualWrite(async (database) => {
+      const updated = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
+      return updated.length;
+    });
+    return result as number;
   }
 
   async clearAllProducts(clearedBy: string): Promise<void> {
