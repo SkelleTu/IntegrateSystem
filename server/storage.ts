@@ -211,21 +211,19 @@ export class DatabaseStorage implements IStorage {
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
     this.logAction(`Criação de instituição: ${enterprise.name}`);
-    return await db.transaction(async (tx: any) => {
-      const [newEnterprise] = await tx.insert(enterprises).values(enterprise).returning();
-      // Initialize settings for new enterprise
-      await tx.insert(settings).values({ enterpriseId: newEnterprise.id });
-      
-      if (adminData) {
-        await tx.insert(users).values({
-          ...adminData,
-          enterpriseId: newEnterprise.id,
-          role: "admin"
-        });
-      }
-      
-      return newEnterprise;
-    });
+    const [newEnterprise] = await db.insert(enterprises).values(enterprise).returning();
+    // Initialize settings for new enterprise
+    await db.insert(settings).values({ enterpriseId: newEnterprise.id });
+    
+    if (adminData) {
+      await db.insert(users).values({
+        ...adminData,
+        enterpriseId: newEnterprise.id,
+        role: "admin"
+      });
+    }
+    
+    return newEnterprise;
   }
 
   async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
