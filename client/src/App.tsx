@@ -253,7 +253,7 @@ function AppContent() {
       <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
         <main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage && !isCashierPage ? "mb-12 sm:mb-0" : ""}`}>
           <LandingNavigation />
-          {user && !isLandingPage && <Navbar />}
+          {user && !isLandingPage && location !== "/setup" && <Navbar />}
           <Router />
         </main>
       </div>
