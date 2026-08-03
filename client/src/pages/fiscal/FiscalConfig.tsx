@@ -221,8 +221,10 @@ export default function FiscalConfig() {
   };
 
   // ── Disparo automático assim que o CNPJ do cadastro estiver disponível ──
+  // Só busca se os campos de endereço ainda não estiverem preenchidos
   useEffect(() => {
     if (!settings?.cnpj) return;
+    if (settings.bairro && settings.cep && settings.codigoIbge) return; // já tem dados completos
     fetchCnpjData(settings.cnpj);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.cnpj]);
