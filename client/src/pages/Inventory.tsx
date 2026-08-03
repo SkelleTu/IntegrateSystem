@@ -124,7 +124,20 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
   const usedMap = useMemo(() => {
     const m: Record<string, Product> = {};
     for (const p of allProducts) {
-      if (p.codigoProduto && p.id !== currentProductId) m[p.codigoProduto] = p;
+      // Marca codigoProduto como ocupado
+      if (p.codigoProduto && p.id !== currentProductId) {
+        m[String(p.codigoProduto).trim()] = p;
+      }
+      // Marca SKUs numéricos (1–1000) dos lotes como ocupados
+      if (p.batchSkus) {
+        for (const raw of p.batchSkus) {
+          const s = raw.trim();
+          const n = Number(s);
+          if (Number.isInteger(n) && n >= 1 && n <= 1000 && String(n) === s && !m[s]) {
+            m[s] = p;
+          }
+        }
+      }
     }
     return m;
   }, [allProducts, currentProductId]);
