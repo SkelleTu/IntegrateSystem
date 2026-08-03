@@ -194,16 +194,6 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
         <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.minStock} onChange={e => setForm((f: any) => ({ ...f, minStock: e.target.value }))} placeholder={isKg ? "Ex: 1.5" : "5"} />
       </div>
 
-      {/* ── Código Balança (PLU) ────────────────────────────────────────────── */}
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código Balança (PLU)</Label>
-        <Input
-          className={`mt-1 ${T.dialogInput}`}
-          value={form.codigoBalanca ?? ""}
-          onChange={e => setForm((f: any) => ({ ...f, codigoBalanca: e.target.value }))}
-          placeholder={isKg ? "Ex: 3780 (etiqueta Urano)" : "Ex: 3780"}
-        />
-      </div>
 
       {/* ── Descrição ─────────────────────────────────────────────────────── */}
       <div className="col-span-2">
