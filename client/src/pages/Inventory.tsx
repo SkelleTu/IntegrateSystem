@@ -176,13 +176,6 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
         <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Limpeza, Higiene, Bebidas" />
       </div>
 
-      {/* ── Peso/Volume da embalagem (só para unidade) ─────────────────────── */}
-      {!isKg && (
-        <div>
-          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Tamanho Padrão da Embalagem</Label>
-          <Input className={`mt-1 ${T.dialogInput}`} value={form.weight} onChange={e => setForm((f: any) => ({ ...f, weight: e.target.value }))} placeholder="Ex: 500ml, 1L, 45g (opcional)" />
-        </div>
-      )}
 
       {/* ── Estoque mínimo ─────────────────────────────────────────────────── */}
       <div>
