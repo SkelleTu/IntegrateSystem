@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye, Wand2 } from "lucide-react";
+import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye, Wand2, Search, ExternalLink, Info } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -39,6 +39,37 @@ export default function FiscalConfig() {
   });
 
   const [formData, setFormData] = useState<any>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+
+  const buscarCep = async () => {
+    const cep = (formData?.cep || "").replace(/\D/g, "");
+    if (cep.length !== 8) {
+      toast({ title: "CEP inválido", description: "Digite um CEP com 8 dígitos.", variant: "destructive" });
+      return;
+    }
+    setCepLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const data = await res.json();
+      if (data.erro) {
+        toast({ title: "CEP não encontrado", description: "Verifique o CEP digitado.", variant: "destructive" });
+        return;
+      }
+      setFormData((prev: any) => ({
+        ...prev,
+        logradouro: data.logradouro || prev.logradouro,
+        bairro: data.bairro || prev.bairro,
+        municipio: data.localidade || prev.municipio,
+        uf: data.uf || prev.uf,
+        codigoIbge: data.ibge || prev.codigoIbge,
+      }));
+      toast({ title: "CEP encontrado!", description: "Endereço preenchido automaticamente." });
+    } catch {
+      toast({ title: "Erro ao buscar CEP", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
+    } finally {
+      setCepLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -226,6 +257,10 @@ export default function FiscalConfig() {
                     placeholder="Ex: 123456789"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
+                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Consta no seu <a href="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">Cartão CNPJ <ExternalLink className="w-2.5 h-2.5" /></a> ou no portal da SEFAZ do seu estado.
+                  </p>
                 </div>
               </div>
 
@@ -242,6 +277,10 @@ export default function FiscalConfig() {
                       ))}
                     </SelectContent>
                   </Select>
+                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Preenchido automaticamente ao buscar o CEP.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Município</Label>
@@ -251,6 +290,10 @@ export default function FiscalConfig() {
                     placeholder="Ex: São Paulo"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
+                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Preenchido automaticamente ao buscar o CEP.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Código IBGE</Label>
@@ -260,45 +303,72 @@ export default function FiscalConfig() {
                     placeholder="Ex: 3550308"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
+                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Preenchido automaticamente ao buscar o CEP. Ou consulte em{" "}
+                    <a href="https://www.ibge.gov.br/explica/codigos-dos-municipios.php" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">IBGE <ExternalLink className="w-2.5 h-2.5" /></a>.
+                  </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Logradouro</Label>
-                  <Input 
-                    value={formData?.logradouro || ""} 
-                    onChange={e => setFormData({...formData, logradouro: e.target.value})}
-                    placeholder="Ex: Av. Paulista"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Número</Label>
-                  <Input 
-                    value={formData?.numero || ""} 
-                    onChange={e => setFormData({...formData, numero: e.target.value})}
-                    placeholder="Ex: 1000"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Bairro</Label>
-                  <Input 
-                    value={formData?.bairro || ""} 
-                    onChange={e => setFormData({...formData, bairro: e.target.value})}
-                    placeholder="Ex: Bela Vista"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CEP</Label>
-                  <Input 
-                    value={formData?.cep || ""} 
-                    onChange={e => setFormData({...formData, cep: e.target.value})}
-                    placeholder="Ex: 01310-100"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
+              {/* Bloco de endereço com CEP no topo */}
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                  <div className="space-y-2">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CEP</Label>
+                    <div className="flex gap-2">
+                      <Input 
+                        value={formData?.cep || ""} 
+                        onChange={e => setFormData({...formData, cep: e.target.value})}
+                        onKeyDown={e => e.key === "Enter" && buscarCep()}
+                        placeholder="Ex: 01310-100"
+                        className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl flex-1"
+                        maxLength={9}
+                      />
+                      <Button
+                        type="button"
+                        onClick={buscarCep}
+                        disabled={cepLoading}
+                        className="h-12 px-3 bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-black transition-all rounded-xl"
+                        title="Buscar endereço pelo CEP"
+                      >
+                        {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-white/30 flex items-center gap-1">
+                      <Info className="w-3 h-3 flex-shrink-0" />
+                      Consulte em{" "}
+                      <a href="https://buscacepinter.correios.com.br/" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">Correios <ExternalLink className="w-2.5 h-2.5" /></a>.
+                      Ao digitar e clicar em 🔍, o endereço é preenchido automaticamente.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Logradouro</Label>
+                    <Input 
+                      value={formData?.logradouro || ""} 
+                      onChange={e => setFormData({...formData, logradouro: e.target.value})}
+                      placeholder="Preenchido pelo CEP"
+                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Número</Label>
+                    <Input 
+                      value={formData?.numero || ""} 
+                      onChange={e => setFormData({...formData, numero: e.target.value})}
+                      placeholder="Ex: 1000"
+                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Bairro</Label>
+                    <Input 
+                      value={formData?.bairro || ""} 
+                      onChange={e => setFormData({...formData, bairro: e.target.value})}
+                      placeholder="Preenchido pelo CEP"
+                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -311,6 +381,12 @@ export default function FiscalConfig() {
                     placeholder="Ex: 0123456789ABCDEF"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
+                  <p className="text-[10px] text-white/30 flex items-start gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                    <span>Gerado no portal da SEFAZ do seu estado. Busque por <strong className="text-white/40">"credenciamento CSC NFC-e [seu estado]"</strong> ou acesse o portal{" "}
+                    <a href="https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=Ox6PXIG4nqs=" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">NF-e Nacional <ExternalLink className="w-2.5 h-2.5" /></a>{" "}
+                    e localize o link do seu estado.</span>
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CSC ID</Label>
@@ -320,6 +396,10 @@ export default function FiscalConfig() {
                     placeholder="Ex: 000001"
                     className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
                   />
+                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
+                    <Info className="w-3 h-3 flex-shrink-0" />
+                    Número sequencial fornecido junto com o CSC Token no portal da SEFAZ estadual. Geralmente é <strong className="text-white/40">000001</strong>.
+                  </p>
                 </div>
                 <div className="flex items-end">
                   <Button 
