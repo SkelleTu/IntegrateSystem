@@ -964,6 +964,26 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/products/swap-codigo", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password, displacedProductId, displacedNewCode } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      // Update displaced product's code
+      await storage.updateProduct(Number(displacedProductId), {
+        codigoProduto: displacedNewCode || null,
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao trocar código" });
+    }
+  });
+
   app.post("/api/products/check-duplicate", isAuthenticated, async (req, res) => {
     try {
       const dup = await storage.findDuplicateProduct(req.body);

@@ -98,6 +98,213 @@ function fmtCurrency(cents: number | null | undefined) {
   return `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`;
 }
 
+// ─── CodigoProdutoPicker ──────────────────────────────────────────────────────
+
+function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T }: {
+  value: string;
+  onChange: (v: string) => void;
+  currentProductId?: number;
+  allProducts: Product[];
+  T: any;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
+
+  // Swap flow
+  const [swapPhase, setSwapPhase] = useState<"confirm" | "pick-displaced" | "password" | null>(null);
+  const [pendingCode, setPendingCode] = useState("");
+  const [displaced, setDisplaced] = useState<Product | null>(null);
+  const [displacedPage, setDisplacedPage] = useState(1);
+  const [newCodeForDisplaced, setNewCodeForDisplaced] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [pwError, setPwError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const usedMap = useMemo(() => {
+    const m: Record<string, Product> = {};
+    for (const p of allProducts) {
+      if (p.codigoProduto && p.id !== currentProductId) m[p.codigoProduto] = p;
+    }
+    return m;
+  }, [allProducts, currentProductId]);
+
+  const PER_PAGE = 100;
+  const PAGES = 10;
+  const pageNums = (p: number) => Array.from({ length: PER_PAGE }, (_, i) => String((p - 1) * PER_PAGE + 1 + i));
+
+  function handleCodeClick(code: string) {
+    if (!usedMap[code]) { onChange(code); setOpen(false); }
+    else { setPendingCode(code); setDisplaced(usedMap[code]); setSwapPhase("confirm"); }
+  }
+
+  function handleDisplacedClick(code: string) {
+    if (!usedMap[code]) { setNewCodeForDisplaced(code); setSwapPhase("password"); }
+  }
+
+  function resetSwap() {
+    setSwapPhase(null); setPendingCode(""); setDisplaced(null);
+    setNewCodeForDisplaced(""); setAdminPassword(""); setPwError(""); setDisplacedPage(1);
+  }
+
+  async function handleFinalSwap() {
+    if (!adminPassword.trim()) { setPwError("Digite a senha"); return; }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/products/swap-codigo", {
+        method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ password: adminPassword, displacedProductId: displaced!.id, displacedNewCode: newCodeForDisplaced }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setPwError(data.message || "Erro"); return; }
+      onChange(pendingCode);
+      toast({ title: `Código ${pendingCode} atribuído. ${displaced!.name} recebeu o código ${newCodeForDisplaced || "(nenhum)"}.` });
+      resetSwap(); setOpen(false);
+    } finally { setSubmitting(false); }
+  }
+
+  function renderGrid(nums: string[], clickFn: (c: string) => void, onlyFree = false) {
+    return (
+      <div className="grid grid-cols-10 gap-1">
+        {nums.map(code => {
+          const owner = usedMap[code];
+          const isOwn = value === code;
+          const isUsed = !!owner;
+          const isDisabled = onlyFree && isUsed;
+          return (
+            <button
+              key={code} type="button"
+              title={owner ? `Em uso: ${owner.name}` : `Código ${code}`}
+              disabled={isDisabled}
+              onClick={() => clickFn(code)}
+              className={`h-8 rounded text-[10px] font-black border transition-all ${
+                isOwn
+                  ? "bg-primary text-black border-primary"
+                  : isUsed
+                    ? isDisabled
+                      ? "bg-red-900/20 text-red-400/30 border-red-900/20 cursor-not-allowed"
+                      : "bg-amber-900/20 text-amber-400 border-amber-800/40 hover:bg-amber-900/40 cursor-pointer"
+                    : "bg-white/5 text-white/50 border-white/10 hover:bg-primary/20 hover:text-primary hover:border-primary/40"
+              }`}
+            >
+              {code}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function renderPagination(cur: number, set: (p: number) => void) {
+    return (
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex gap-3 text-[9px] font-bold text-white/30">
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white/10 border border-white/10 inline-block" />Livre</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-900/30 border border-amber-800/40 inline-block" />Ocupado</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary inline-block" />Selecionado</span>
+        </div>
+        <div className="flex gap-1">
+          {Array.from({ length: PAGES }, (_, i) => i + 1).map(p => (
+            <button key={p} type="button" onClick={() => set(p)}
+              className={`w-7 h-7 rounded text-[10px] font-black border transition-all ${cur === p ? "bg-primary text-black border-primary" : "bg-white/5 text-white/40 border-white/10 hover:border-white/30"}`}>
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => { setOpen(true); setPage(1); }}
+        className={`mt-1 w-full h-9 px-3 rounded-md border text-left text-sm font-mono flex items-center justify-between transition-all ${T.dialogInput} ${value ? "text-primary font-black" : "text-white/30"}`}>
+        <span>{value || "Selecionar código..."}</span>
+        <span className="text-[10px] text-white/30">▼</span>
+      </button>
+
+      {/* Main picker */}
+      <Dialog open={open && !swapPhase} onOpenChange={o => { if (!o) { setOpen(false); } }}>
+        <DialogContent className={`max-w-2xl rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-primary">Código do Produto</DialogTitle>
+            <DialogDescription className="text-white/40 text-[11px]">
+              Clique em um número livre para selecionar. Números em laranja já estão em uso — clique para substituir (requer senha de admin).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            {renderGrid(pageNums(page), handleCodeClick)}
+            {renderPagination(page, setPage)}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm swap */}
+      <Dialog open={swapPhase === "confirm"} onOpenChange={o => { if (!o) resetSwap(); }}>
+        <DialogContent className={`max-w-sm rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-amber-400">⚠️ Código em uso</DialogTitle>
+            <DialogDescription className="text-white/50 text-[12px]">
+              O código <strong className="text-amber-400">#{pendingCode}</strong> está atribuído a{" "}
+              <strong className="text-white">{displaced?.name}</strong>. Deseja substituir e atribuir este código ao produto atual?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 mt-3">
+            <Button onClick={() => setSwapPhase("pick-displaced")} className="bg-amber-500 hover:bg-amber-400 text-black font-black uppercase tracking-widest rounded-xl">
+              Sim, substituir
+            </Button>
+            <Button variant="ghost" onClick={resetSwap} className="text-white/40 font-black uppercase tracking-widest">Cancelar</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pick new code for displaced product */}
+      <Dialog open={swapPhase === "pick-displaced"} onOpenChange={o => { if (!o) resetSwap(); }}>
+        <DialogContent className={`max-w-2xl rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-primary">Novo código para "{displaced?.name}"</DialogTitle>
+            <DialogDescription className="text-white/40 text-[11px]">
+              Escolha um código <strong className="text-white">livre</strong> para <strong className="text-white">{displaced?.name}</strong>, que perderá o código <strong className="text-amber-400">#{pendingCode}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-1">
+            {renderGrid(pageNums(displacedPage), handleDisplacedClick, true)}
+            {renderPagination(displacedPage, setDisplacedPage)}
+          </div>
+          <Button variant="ghost" onClick={resetSwap} className="text-white/40 font-black uppercase tracking-widest mt-1 w-full">Cancelar</Button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Admin password */}
+      <Dialog open={swapPhase === "password"} onOpenChange={o => { if (!o) resetSwap(); }}>
+        <DialogContent className={`max-w-sm rounded-2xl border ${T.dialog}`}>
+          <DialogHeader>
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-primary">Confirmar troca</DialogTitle>
+            <DialogDescription className="text-white/40 text-[11px]">
+              <strong className="text-white">{displaced?.name}</strong> passará do código <strong className="text-amber-400">#{pendingCode}</strong> para <strong className="text-primary">#{newCodeForDisplaced}</strong>. O produto atual receberá <strong className="text-primary">#{pendingCode}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 mt-3">
+            <div>
+              <Label className="text-[10px] font-black uppercase tracking-widest text-zinc-400">Senha de Administrador</Label>
+              <Input type="password" autoFocus className={`mt-1 ${T.dialogInput}`}
+                value={adminPassword} onChange={e => { setAdminPassword(e.target.value); setPwError(""); }}
+                onKeyDown={e => e.key === "Enter" && handleFinalSwap()} placeholder="Digite a senha..." />
+              {pwError && <p className="text-[11px] text-red-400 font-bold mt-1">{pwError}</p>}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={resetSwap} className="flex-1 text-white/40 font-black uppercase tracking-widest">Cancelar</Button>
+              <Button onClick={handleFinalSwap} disabled={submitting} className="flex-1 bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest rounded-xl">
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ─── Product Form defaults ────────────────────────────────────────────────────
 
 const emptyProduct = () => ({
@@ -124,7 +331,7 @@ type FilterStatus = "todos" | "baixo" | "vencendo" | "vencidos" | "sem_lotes";
 
 // ─── Product Form fields (must be outside InventoryPage to avoid remount on re-render) ──
 
-function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
+function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts = [], currentProductId }: any) {
   const isKg = form.unit === "kg";
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -183,6 +390,19 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
         <Input type="number" className={`mt-1 ${T.dialogInput}`} value={form.minStock} onChange={e => setForm((f: any) => ({ ...f, minStock: e.target.value }))} placeholder={isKg ? "Ex: 1.5" : "5"} />
       </div>
 
+
+      {/* ── Código do Produto ─────────────────────────────────────────────── */}
+      <div className="col-span-2">
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código do Produto</Label>
+        <CodigoProdutoPicker
+          value={form.codigoProduto ?? ""}
+          onChange={v => setForm((f: any) => ({ ...f, codigoProduto: v }))}
+          currentProductId={currentProductId}
+          allProducts={allProducts}
+          T={T}
+        />
+        <p className="text-[9px] mt-1 text-white/30 font-bold">Número único que identifica este grupo no sistema</p>
+      </div>
 
       {/* ── Descrição ─────────────────────────────────────────────────────── */}
       <div className="col-span-2">
@@ -1579,7 +1799,7 @@ export default function InventoryPage() {
           <div className="space-y-5 mt-2">
             <div>
               <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${T.muted}`}>Dados do Produto</p>
-              <ProductFields form={productForm} setForm={setProductForm} T={T} highlightFlavor={highlightFlavor} />
+              <ProductFields form={productForm} setForm={setProductForm} T={T} highlightFlavor={highlightFlavor} allProducts={products} />
             </div>
 
             <div className={`border-t pt-4 ${isLight ? "border-slate-200" : "border-white/10"}`}>
@@ -1630,7 +1850,7 @@ export default function InventoryPage() {
             <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Editar Produto</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <ProductFields form={productForm} setForm={setProductForm} T={T} />
+            <ProductFields form={productForm} setForm={setProductForm} T={T} allProducts={products} currentProductId={editingProduct?.id} />
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setEditingProduct(null)} className={T.muted}>Cancelar</Button>
               <Button
