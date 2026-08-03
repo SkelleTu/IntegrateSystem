@@ -417,9 +417,9 @@ export default function FiscalConfig() {
                   <p className="text-[10px] text-white/30 flex items-start gap-1.5 leading-relaxed">
                     <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
                     Consulte o regime no seu{" "}
-                    <a href="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp" target="_blank" rel="noopener noreferrer"
+                    <a href="https://solucoes.receita.fazenda.gov.br/Servicos/cnpjreva/Cnpjreva_Solicitacao.asp" target="_blank" rel="noopener noreferrer"
                       className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">
-                      Cartão CNPJ <ExternalLink className="w-2.5 h-2.5" />
+                      Cartão CNPJ (Receita Federal) <ExternalLink className="w-2.5 h-2.5" />
                     </a> ou com seu contador.
                   </p>
                 </div>
@@ -454,9 +454,9 @@ export default function FiscalConfig() {
                   value={formData?.inscricaoEstadual || ""}
                   onChange={v => set("inscricaoEstadual", v)}
                   placeholder="Ex: 123456789"
-                  help="Consta no Cartão CNPJ ou no certificado de inscrição estadual fornecido pela SEFAZ do seu estado."
-                  link="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp"
-                  linkLabel="Consultar Cartão CNPJ"
+                  help="Consta no Cartão CNPJ emitido pela Receita Federal ou no certificado de inscrição estadual da SEFAZ do seu estado."
+                  link="https://solucoes.receita.fazenda.gov.br/Servicos/cnpjreva/Cnpjreva_Solicitacao.asp"
+                  linkLabel="Emitir Cartão CNPJ (Receita Federal)"
                 />
               </div>
             </CardContent>
@@ -502,9 +502,9 @@ export default function FiscalConfig() {
                   <p className="text-[10px] text-white/30 flex items-start gap-1.5 leading-relaxed">
                     <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
                     Não sabe o CEP?{" "}
-                    <a href="https://buscacepinter.correios.com.br/" target="_blank" rel="noopener noreferrer"
+                    <a href="https://buscacepinter.correios.com.br/app/endereco/index.php" target="_blank" rel="noopener noreferrer"
                       className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">
-                      Consultar nos Correios <ExternalLink className="w-2.5 h-2.5" />
+                      Buscar CEP nos Correios <ExternalLink className="w-2.5 h-2.5" />
                     </a>
                   </p>
                 </div>
@@ -625,9 +625,9 @@ export default function FiscalConfig() {
                   value={formData?.cscToken || ""}
                   onChange={v => set("cscToken", v)}
                   placeholder="Ex: 0123456789ABCDEF"
-                  help='Gerado no portal da SEFAZ estadual ao credenciar o CNPJ para NFC-e. Pesquise: "credenciamento CSC NFC-e + [seu estado]" ou acesse o portal nacional:'
-                  link="https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=Ox6PXIG4nqs="
-                  linkLabel="Portal NF-e Nacional → selecione seu estado"
+                  help='Gerado no portal da SEFAZ do seu estado ao credenciar o CNPJ para emissão de NFC-e. Cada estado tem um portal próprio — pesquise no Google por: "credenciamento CSC NFC-e [seu estado]" (ex: "credenciamento CSC NFC-e São Paulo"). Pelo portal nacional abaixo você encontra o link da SEFAZ do seu estado:'
+                  link="https://www.nfe.fazenda.gov.br/portal/principal.aspx"
+                  linkLabel="Portal NF-e Nacional"
                 />
                 <ManualField
                   label="CSC ID"
