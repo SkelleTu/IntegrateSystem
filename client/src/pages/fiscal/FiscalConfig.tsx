@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2,
   ShieldCheck, History, Download, Eye, Wand2, Search, ExternalLink,
-  Info, Lock, RefreshCw, Pencil, Building2
+  Info, Lock, RefreshCw, Pencil, Building2, AlertCircle
 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -120,14 +120,15 @@ export default function FiscalConfig() {
     },
   });
 
-  const [formData, setFormData]       = useState<any>(null);
-  const [cepLoading, setCepLoading]   = useState(false);
-  const [cepFilled, setCepFilled]     = useState(false);
-  const [cnpjFetched, setCnpjFetched] = useState(false);
-  const [cnpjLoading, setCnpjLoading] = useState(false);
-  const [unlocked, setUnlocked]       = useState<Set<string>>(new Set());
+  const [formData, setFormData]         = useState<any>(null);
+  const [cepLoading, setCepLoading]     = useState(false);
+  const [cepFilled, setCepFilled]       = useState(false);
+  const [cnpjFetched, setCnpjFetched]   = useState(false);
+  const [cnpjLoading, setCnpjLoading]   = useState(false);
+  const [cnpjNotFound, setCnpjNotFound] = useState(false);
+  const [unlocked, setUnlocked]         = useState<Set<string>>(new Set());
 
-  const unlock = (field: string) => setUnlocked(prev => new Set([...prev, field]));
+  const unlock = (field: string) => setUnlocked(prev => new Set(Array.from(prev).concat(field)));
   const set    = (field: string, value: any) => setFormData((prev: any) => ({ ...prev, [field]: value }));
 
   // Inicializa formData quando settings chegam
@@ -144,73 +145,85 @@ export default function FiscalConfig() {
     setFormData((prev: any) => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
   }
 
-  // ── Busca automática pela Receita Federal assim que o CNPJ estiver disponível ──
+  // ── Busca CNPJ na Receita Federal (auto ou manual) ──
+  const fetchCnpjData = async (cnpjRaw: string) => {
+    const cnpjLimpo = cnpjRaw.replace(/\D/g, "");
+    if (cnpjLimpo.length !== 14) return;
+    setCnpjLoading(true);
+    setCnpjNotFound(false);
+    try {
+      const res  = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
+      const data = await res.json();
+
+      if (data.message || !data.razao_social) {
+        setCnpjNotFound(true);
+        toast({
+          title: "⚠️ CNPJ não encontrado na Receita Federal",
+          description: "Verifique se o CNPJ está correto ou preencha os campos de endereço manualmente.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Formatações
+      const cepFmt  = data.cep
+        ? data.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")
+        : "";
+      const cnpjFmt = data.cnpj
+        ? data.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
+        : cnpjRaw;
+      const logradouro = [data.descricao_tipo_de_logradouro, data.logradouro]
+        .filter(Boolean).join(" ");
+
+      // Regime tributário
+      let regime = "3";
+      if (data.opcao_pelo_mei)      regime = "1";
+      else if (data.opcao_pelo_simples) regime = "1";
+      else if (Array.isArray(data.regime_tributario) && data.regime_tributario.length > 0) {
+        const ultimo = data.regime_tributario[data.regime_tributario.length - 1];
+        const forma  = (ultimo.forma_de_tributacao ?? "").toUpperCase();
+        if (forma.includes("SIMPLES")) regime = forma.includes("EXCESSO") ? "2" : "1";
+      }
+
+      setFormData((prev: any) => ({
+        ...(prev ?? settings),
+        razaoSocial:      data.razao_social                             ?? prev?.razaoSocial ?? "",
+        nomeFantasia:     (data.nome_fantasia || data.razao_social)     ?? prev?.nomeFantasia ?? "",
+        cnpj:             cnpjFmt,
+        cep:              cepFmt,
+        logradouro:       logradouro                                    || (prev?.logradouro ?? ""),
+        numero:           data.numero                                   ?? prev?.numero ?? "",
+        bairro:           data.bairro                                   ?? prev?.bairro ?? "",
+        municipio:        data.municipio                                ?? prev?.municipio ?? "",
+        uf:               data.uf                                       ?? prev?.uf ?? "SP",
+        codigoIbge:       data.codigo_municipio_ibge ? String(data.codigo_municipio_ibge) : prev?.codigoIbge ?? "",
+        regimeTributario: regime,
+      }));
+      setCnpjFetched(true);
+      setCepFilled(true);
+      setCnpjNotFound(false);
+      setUnlocked(new Set());
+
+      toast({
+        title: "✅ Dados preenchidos automaticamente",
+        description: `${data.razao_social} — informações obtidas direto da Receita Federal.`,
+      });
+    } catch {
+      setCnpjNotFound(true);
+      toast({
+        title: "⚠️ Erro ao consultar a Receita Federal",
+        description: "Sem conexão ou serviço indisponível. Preencha os campos manualmente.",
+        variant: "destructive",
+      });
+    } finally {
+      setCnpjLoading(false);
+    }
+  };
+
+  // ── Disparo automático assim que o CNPJ do cadastro estiver disponível ──
   useEffect(() => {
     if (!settings?.cnpj) return;
-    const cnpjLimpo = settings.cnpj.replace(/\D/g, "");
-    if (cnpjLimpo.length !== 14) return;
-
-    const autoFetch = async () => {
-      setCnpjLoading(true);
-      try {
-        const res  = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
-        const data = await res.json();
-
-        if (data.message || !data.razao_social) {
-          // CNPJ não encontrado na base — provavelmente de teste; sem toast de erro
-          return;
-        }
-
-        // Formatações
-        const cepFmt  = data.cep
-          ? data.cep.replace(/^(\d{5})(\d{3})$/, "$1-$2")
-          : "";
-        const cnpjFmt = data.cnpj
-          ? data.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5")
-          : settings.cnpj;
-        const logradouro = [data.descricao_tipo_de_logradouro, data.logradouro]
-          .filter(Boolean).join(" ");
-
-        // Regime tributário
-        let regime = "3";
-        if (data.opcao_pelo_mei)      regime = "1";
-        else if (data.opcao_pelo_simples) regime = "1";
-        else if (Array.isArray(data.regime_tributario) && data.regime_tributario.length > 0) {
-          const ultimo = data.regime_tributario[data.regime_tributario.length - 1];
-          const forma  = (ultimo.forma_de_tributacao ?? "").toUpperCase();
-          if (forma.includes("SIMPLES")) regime = forma.includes("EXCESSO") ? "2" : "1";
-        }
-
-        setFormData((prev: any) => ({
-          ...(prev ?? settings),
-          razaoSocial:      data.razao_social                                   ?? prev?.razaoSocial ?? "",
-          nomeFantasia:     (data.nome_fantasia || data.razao_social)              ?? prev?.nomeFantasia ?? "",
-          cnpj:             cnpjFmt,
-          cep:              cepFmt,
-          logradouro:       logradouro                                           || (prev?.logradouro ?? ""),
-          numero:           data.numero                                          ?? prev?.numero ?? "",
-          bairro:           data.bairro                                          ?? prev?.bairro ?? "",
-          municipio:        data.municipio                                       ?? prev?.municipio ?? "",
-          uf:               data.uf                                              ?? prev?.uf ?? "SP",
-          codigoIbge:       data.codigo_municipio_ibge ? String(data.codigo_municipio_ibge) : prev?.codigoIbge ?? "",
-          regimeTributario: regime,
-        }));
-        setCnpjFetched(true);
-        setCepFilled(true);
-        setUnlocked(new Set()); // reseta overrides manuais — dados vêm da Receita Federal
-
-        toast({
-          title: "✅ Dados preenchidos automaticamente",
-          description: `${data.razao_social} — informações obtidas direto da Receita Federal.`,
-        });
-      } catch {
-        // falha silenciosa — sem conexão ou CNPJ não encontrado
-      } finally {
-        setCnpjLoading(false);
-      }
-    };
-
-    autoFetch();
+    fetchCnpjData(settings.cnpj);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings?.cnpj]);
 
@@ -304,6 +317,28 @@ export default function FiscalConfig() {
           <p className="text-[11px] text-violet-400/80 font-bold">
             Consultando dados na Receita Federal... Aguarde.
           </p>
+        </div>
+      )}
+
+      {/* Banner de CNPJ não encontrado */}
+      {cnpjNotFound && !cnpjLoading && (
+        <div className="flex items-center justify-between gap-3 p-4 rounded-xl border border-orange-500/30 bg-orange-500/5">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-4 h-4 text-orange-400 flex-shrink-0" />
+            <p className="text-[11px] text-orange-400/90 font-bold">
+              CNPJ não encontrado na Receita Federal — preencha o endereço fiscal manualmente ou verifique se o CNPJ está correto.
+            </p>
+          </div>
+          {formData?.cnpj && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fetchCnpjData(formData.cnpj)}
+              className="flex-shrink-0 h-8 px-3 text-[10px] font-black uppercase tracking-widest border-orange-500/30 text-orange-400 hover:bg-orange-500 hover:text-black transition-all"
+            >
+              <RefreshCw className="w-3 h-3 mr-1" /> Tentar novamente
+            </Button>
+          )}
         </div>
       )}
 
