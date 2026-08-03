@@ -184,10 +184,10 @@ export default function FiscalConfig() {
         setFormData((prev: any) => ({
           ...(prev ?? settings),
           razaoSocial:      data.razao_social                                   ?? prev?.razaoSocial ?? "",
-          nomeFantasia:     data.nome_fantasia || data.razao_social              ?? prev?.nomeFantasia ?? "",
+          nomeFantasia:     (data.nome_fantasia || data.razao_social)              ?? prev?.nomeFantasia ?? "",
           cnpj:             cnpjFmt,
           cep:              cepFmt,
-          logradouro:       logradouro                                           || prev?.logradouro ?? "",
+          logradouro:       logradouro                                           || (prev?.logradouro ?? ""),
           numero:           data.numero                                          ?? prev?.numero ?? "",
           bairro:           data.bairro                                          ?? prev?.bairro ?? "",
           municipio:        data.municipio                                       ?? prev?.municipio ?? "",
