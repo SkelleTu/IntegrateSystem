@@ -476,19 +476,20 @@ export async function registerRoutes(
     if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
     const settings = await storage.getFiscalSettings(user.enterpriseId);
     if (!settings) {
-      // Create default settings if they don't exist
+      // Pré-preenche com os dados já cadastrados no estabelecimento
+      const enterprise = await storage.getEnterprise(user.enterpriseId);
       const defaultSettings = {
         enterpriseId: user.enterpriseId,
-        razaoSocial: "",
-        nomeFantasia: "",
-        cnpj: "",
+        razaoSocial: enterprise?.name ?? "",
+        nomeFantasia: enterprise?.name ?? "",
+        cnpj: enterprise?.taxId ?? "",
         inscricaoEstadual: "",
-        logradouro: "",
+        logradouro: enterprise?.address ?? "",
         numero: "",
         bairro: "",
-        municipio: "",
+        municipio: enterprise?.city ?? "",
         codigoIbge: "",
-        uf: "SP",
+        uf: enterprise?.state ?? "SP",
         cep: "",
         regimeTributario: "1",
         ambiente: "homologacao",
@@ -496,6 +497,22 @@ export async function registerRoutes(
       };
       const created = await storage.upsertFiscalSettings(defaultSettings as any);
       return res.json(created);
+    }
+    // Se já existe mas os campos principais estão vazios, sincroniza com dados do estabelecimento
+    if (!settings.cnpj && !settings.razaoSocial) {
+      const enterprise = await storage.getEnterprise(user.enterpriseId);
+      if (enterprise) {
+        const updated = await storage.upsertFiscalSettings({
+          ...settings,
+          razaoSocial: settings.razaoSocial || enterprise.name || "",
+          nomeFantasia: settings.nomeFantasia || enterprise.name || "",
+          cnpj: settings.cnpj || enterprise.taxId || "",
+          logradouro: settings.logradouro || enterprise.address || "",
+          municipio: settings.municipio || enterprise.city || "",
+          uf: settings.uf || enterprise.state || "SP",
+        } as any);
+        return res.json(updated);
+      }
     }
     res.json(settings);
   });
