@@ -170,12 +170,8 @@ function ProductFields({ form, setForm, T, highlightFlavor = false }: any) {
         <p className="text-[9px] mt-1 text-white/30 font-bold">Nome genérico do tipo de produto — os detalhes (marca, tamanho, sabor) vão nas variantes</p>
       </div>
 
-      {/* ── Marca + Categoria ─────────────────────────────────────────────── */}
-      <div>
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Marca Geral</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.brand} onChange={e => setForm((f: any) => ({ ...f, brand: e.target.value }))} placeholder="Ex: Veja, Omo (opcional)" />
-      </div>
-      <div>
+      {/* ── Categoria ─────────────────────────────────────────────────────── */}
+      <div className="col-span-2">
         <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
         <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Limpeza, Higiene, Bebidas" />
       </div>
