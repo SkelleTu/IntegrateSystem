@@ -331,6 +331,107 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
   );
 }
 
+// ─── NCM Auto-detector ───────────────────────────────────────────────────────
+// Retorna { ncm, cfop, descricao } com base no nome e categoria do produto.
+// CFOP padrão: 5102 (venda de mercadoria adquirida).
+
+const NCM_RULES: Array<{ keywords: string[]; ncm: string; descricao: string }> = [
+  // ── Limpeza ──────────────────────────────────────────────────────────────
+  { keywords: ["agua sanitaria","água sanitária","hipoclorito","cloro"], ncm: "2828.90.11", descricao: "Água sanitária / Hipoclorito" },
+  { keywords: ["alcool","álcool","alcohol"], ncm: "2207.20.10", descricao: "Álcool etílico desnaturado" },
+  { keywords: ["amaciante","amaciador","suavizante"], ncm: "3809.91.10", descricao: "Amaciante de roupas" },
+  { keywords: ["sabao em pedra","sabão em pedra","sabao barra","sabão barra","sabao em barra","sabão em barra"], ncm: "3401.11.90", descricao: "Sabão em barra/pedra" },
+  { keywords: ["sabao em po","sabão em pó","detergente em po","detergente em pó"], ncm: "3402.11.10", descricao: "Detergente em pó" },
+  { keywords: ["desinfetante","desinfetante"], ncm: "3808.94.19", descricao: "Desinfetante" },
+  { keywords: ["odorizante","aromatizante","ar freshener","freshener","bom ar","ambipur","glade"], ncm: "3307.41.00", descricao: "Odorizante de ambiente" },
+  { keywords: ["detergente","lava-louça","lava louça","lava loucas","lava louças"], ncm: "3402.20.00", descricao: "Detergente líquido" },
+  { keywords: ["multiuso","multi uso","limpador","limpa","triex","cif","veja","flash","poliflor"], ncm: "3402.90.00", descricao: "Produto de limpeza multiuso" },
+  { keywords: ["esponja","palha de aco","palha de aço"], ncm: "3924.90.00", descricao: "Artigo de limpeza doméstica" },
+  { keywords: ["luva","luvas"], ncm: "3926.20.00", descricao: "Luvas de borracha/plástico" },
+  // ── Higiene Pessoal ───────────────────────────────────────────────────────
+  { keywords: ["papel higienico","papel higiênico","papel hig"], ncm: "4818.10.00", descricao: "Papel higiênico" },
+  { keywords: ["fralda","fraldas"], ncm: "4818.40.10", descricao: "Fraldas" },
+  { keywords: ["absorvente"], ncm: "5601.10.00", descricao: "Absorvente higiênico" },
+  { keywords: ["sabonete"], ncm: "3401.11.90", descricao: "Sabonete" },
+  { keywords: ["shampoo","xampu","sham"], ncm: "3305.10.00", descricao: "Xampu" },
+  { keywords: ["condicionador"], ncm: "3305.90.00", descricao: "Condicionador capilar" },
+  { keywords: ["creme de cabelo","creme pra cabelo","creme p/ cabelo"], ncm: "3305.90.00", descricao: "Creme capilar" },
+  { keywords: ["pasta de dente","creme dental","dentifricio","colgate","sorriso","oral-b"], ncm: "3306.10.00", descricao: "Creme dental" },
+  { keywords: ["fio dental","fio dent"], ncm: "3306.20.00", descricao: "Fio dental" },
+  { keywords: ["enxaguante","enxaguatorio","listerine","scope"], ncm: "3306.90.00", descricao: "Enxaguante bucal" },
+  { keywords: ["desodorante","desodorant","antitranspirante"], ncm: "3307.20.10", descricao: "Desodorante" },
+  { keywords: ["perfume","colonia","colônia","eau de"], ncm: "3303.00.20", descricao: "Perfume / Colônia" },
+  { keywords: ["creme hidratante","hidratante","loção corporal","locao corporal","nívea","nivea","dove body"], ncm: "3304.99.90", descricao: "Creme hidratante corporal" },
+  { keywords: ["protetor solar","filtro solar"], ncm: "3304.99.10", descricao: "Protetor solar" },
+  { keywords: ["papel toalha","papel-toalha"], ncm: "4818.20.00", descricao: "Papel toalha" },
+  { keywords: ["lenco","lenço","guardanapo de papel"], ncm: "4818.90.90", descricao: "Lenço / guardanapo de papel" },
+  { keywords: ["algodao","algodão","cotonete"], ncm: "5601.22.00", descricao: "Algodão / cotonete" },
+  { keywords: ["gilete","barbeador","barbear","aparelho de barba"], ncm: "8212.10.10", descricao: "Aparelho de barbear" },
+  // ── Alimentos ─────────────────────────────────────────────────────────────
+  { keywords: ["arroz"], ncm: "1006.30.21", descricao: "Arroz beneficiado" },
+  { keywords: ["feijao","feijão"], ncm: "0713.33.19", descricao: "Feijão" },
+  { keywords: ["acucar","açúcar","açucar"], ncm: "1701.99.00", descricao: "Açúcar" },
+  { keywords: ["sal ","sal,","sal-","sal "], ncm: "2501.00.19", descricao: "Sal de cozinha" },
+  { keywords: ["oleo de soja","óleo de soja","oleo vegetal","óleo vegetal"], ncm: "1512.19.00", descricao: "Óleo vegetal" },
+  { keywords: ["azeite"], ncm: "1509.10.00", descricao: "Azeite de oliva" },
+  { keywords: ["farinha de trigo","farinha trigo"], ncm: "1101.00.10", descricao: "Farinha de trigo" },
+  { keywords: ["farinha de mandioca","farinha mandioca","farinha de milho","farinha milho","fuba","fubá"], ncm: "1102.90.00", descricao: "Farinha de mandioca/milho" },
+  { keywords: ["macarrao","macarrão","massa","espaguete","talharim","lasanha"], ncm: "1902.19.00", descricao: "Macarrão / massa" },
+  { keywords: ["pao","pão","bisnaga","baguete"], ncm: "1905.90.90", descricao: "Pão" },
+  { keywords: ["biscoito","bolacha","cookie"], ncm: "1905.31.00", descricao: "Biscoito / bolacha" },
+  { keywords: ["bolo","cake"], ncm: "1905.90.20", descricao: "Bolo" },
+  { keywords: ["chocolate","achocolatado"], ncm: "1806.90.00", descricao: "Chocolate" },
+  { keywords: ["cafe","café","capuccino","cappuccino"], ncm: "0901.21.00", descricao: "Café" },
+  { keywords: ["cha ","chá ","cha-","chá-"], ncm: "0902.30.00", descricao: "Chá" },
+  { keywords: ["leite em po","leite em pó"], ncm: "0402.21.10", descricao: "Leite em pó" },
+  { keywords: ["leite"], ncm: "0401.10.10", descricao: "Leite" },
+  { keywords: ["queijo"], ncm: "0406.10.10", descricao: "Queijo" },
+  { keywords: ["manteiga"], ncm: "0405.10.00", descricao: "Manteiga" },
+  { keywords: ["margarina"], ncm: "1517.10.00", descricao: "Margarina" },
+  { keywords: ["iogurte","yogurte"], ncm: "0403.10.00", descricao: "Iogurte" },
+  { keywords: ["carne bovina","carne de boi","alcatra","picanha","costela","contrafile","contrafilé","patinho","acém","acem","coxao","coxão","maminha","fraldinha"], ncm: "0201.10.00", descricao: "Carne bovina" },
+  { keywords: ["carne suina","carne suína","porco","linguica","linguiça","salsicha","bacon"], ncm: "0203.11.00", descricao: "Carne suína / embutidos" },
+  { keywords: ["frango","galinha","pato","peru"], ncm: "0207.11.00", descricao: "Carne de frango/aves" },
+  { keywords: ["peixe","tilapia","tilápia","salmao","salmão","atum","sardinha"], ncm: "0302.00.00", descricao: "Peixe" },
+  { keywords: ["ovo","ovos"], ncm: "0407.21.00", descricao: "Ovos" },
+  { keywords: ["presunto","mortadela","salame"], ncm: "1601.00.00", descricao: "Embutidos (presunto/mortadela)" },
+  { keywords: ["molho de tomate","extrato de tomate","ketchup"], ncm: "2103.20.10", descricao: "Molho de tomate / ketchup" },
+  { keywords: ["mayonese","maionese","mayo"], ncm: "2103.90.11", descricao: "Maionese" },
+  { keywords: ["mostarda"], ncm: "2103.30.00", descricao: "Mostarda" },
+  { keywords: ["vinagre"], ncm: "2209.00.00", descricao: "Vinagre" },
+  { keywords: ["salgadinho","chips","batata frita emb","snack"], ncm: "1905.90.60", descricao: "Salgadinho / snack" },
+  { keywords: ["amendoim"], ncm: "2008.11.00", descricao: "Amendoim" },
+  { keywords: ["bala","balas","caramelo","goma","chiclete"], ncm: "1704.90.20", descricao: "Balas / chicletes" },
+  // ── Bebidas ───────────────────────────────────────────────────────────────
+  { keywords: ["agua mineral","água mineral","agua sem gas","água sem gás"], ncm: "2201.10.00", descricao: "Água mineral" },
+  { keywords: ["agua com gas","água com gás"], ncm: "2201.10.00", descricao: "Água com gás" },
+  { keywords: ["refrigerante","coca-cola","coca cola","pepsi","guarana","guaraná","sprite","fanta"], ncm: "2202.10.00", descricao: "Refrigerante" },
+  { keywords: ["suco de fruta","suco natural","néctar","nectar","suco pronto"], ncm: "2009.89.00", descricao: "Suco de fruta" },
+  { keywords: ["isotônico","isotonico","gatorade","powerade","energetico","energético","red bull","monster"], ncm: "2202.99.00", descricao: "Bebida isotônica / energética" },
+  { keywords: ["cerveja","beer","skol","brahma","antartica","heineken","itaipava"], ncm: "2203.00.00", descricao: "Cerveja" },
+  { keywords: ["vinho","wine","espumante","champagne","prosecco"], ncm: "2204.21.00", descricao: "Vinho / espumante" },
+  { keywords: ["whisky","whiskey","vodka","gin","rum","cachaca","cachaça"], ncm: "2208.40.00", descricao: "Bebida destilada" },
+  // ── Descartáveis / Utilidades ─────────────────────────────────────────────
+  { keywords: ["saco de lixo","saco lixo","sacola","saco plastico","saco plástico"], ncm: "3923.29.90", descricao: "Sacos plásticos" },
+  { keywords: ["prato descartavel","copo descartavel","garfo descartavel","talher descartavel"], ncm: "3924.10.00", descricao: "Utensílios descartáveis" },
+  { keywords: ["papel aluminio","papel alumínio","papel manteiga","papel vegetal"], ncm: "4823.20.00", descricao: "Papel alumínio / manteiga" },
+  { keywords: ["pilha","bateria aa","bateria aaa"], ncm: "8506.10.10", descricao: "Pilhas" },
+  { keywords: ["lampada","lâmpada","led ","lampada led","lâmpada led"], ncm: "8543.70.99", descricao: "Lâmpada LED" },
+];
+
+function detectNCM(name: string, category: string): { ncm: string; descricao: string; cfop: string } {
+  const text = (name + " " + category).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  for (const rule of NCM_RULES) {
+    for (const kw of rule.keywords) {
+      const kwNorm = kw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      if (text.includes(kwNorm)) {
+        return { ncm: rule.ncm.replace(".", "").replace(".", ""), descricao: rule.descricao, cfop: "5102" };
+      }
+    }
+  }
+  return { ncm: "", descricao: "", cfop: "5102" };
+}
+
 // ─── Product Form defaults ────────────────────────────────────────────────────
 
 const emptyProduct = () => ({
@@ -359,6 +460,17 @@ type FilterStatus = "todos" | "baixo" | "vencendo" | "vencidos" | "sem_lotes";
 
 function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts = [], currentProductId }: any) {
   const isKg = form.unit === "kg";
+
+  // Auto-preenche NCM e CFOP sempre que nome ou categoria mudar
+  useEffect(() => {
+    const detected = detectNCM(form.name || "", form.category || "");
+    if (detected.ncm) {
+      setForm((f: any) => ({ ...f, ncm: detected.ncm, cfop: detected.cfop }));
+    }
+  }, [form.name, form.category]);
+
+  const ncmInfo = detectNCM(form.name || "", form.category || "");
+
   return (
     <div className="grid grid-cols-2 gap-3">
 
@@ -409,6 +521,28 @@ function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts 
         <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Limpeza, Higiene, Bebidas" />
       </div>
 
+      {/* ── NCM (auto-detectado) ───────────────────────────────────────────── */}
+      <div className="col-span-2">
+        <div className="flex items-center gap-2 mb-1">
+          <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>NCM</Label>
+          <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-primary/10 text-primary/70 border border-primary/20">
+            Automático
+          </span>
+        </div>
+        <div className={`flex items-center gap-2 h-9 px-3 rounded-md border text-sm font-mono ${
+          ncmInfo.ncm
+            ? "bg-white/[0.02] border-white/10 text-white/40"
+            : "bg-white/[0.02] border-white/5 text-white/20"
+        }`}>
+          <span className="flex-1">{form.ncm || "— será detectado ao digitar o nome —"}</span>
+          {ncmInfo.descricao && (
+            <span className="text-[10px] text-white/30 font-bold truncate max-w-[180px]">{ncmInfo.descricao}</span>
+          )}
+        </div>
+        {!ncmInfo.ncm && form.name && (
+          <p className="text-[9px] mt-1 text-amber-400/60 font-bold">Produto não reconhecido — será usado NCM genérico 00000000 na nota fiscal</p>
+        )}
+      </div>
 
       {/* ── Estoque mínimo ─────────────────────────────────────────────────── */}
       <div>
