@@ -8,18 +8,139 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2, ShieldCheck, History, Download, Eye, Wand2, Search, ExternalLink, Info } from "lucide-react";
+import {
+  FileText, Printer, Barcode, Terminal, Play, Settings2, Loader2,
+  ShieldCheck, History, Download, Eye, Wand2, Search, ExternalLink,
+  Info, Lock, RefreshCw, Pencil
+} from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// ─── helpers visuais ──────────────────────────────────────────────────────────
+
+/** Campo travado — preenchido automaticamente pelo sistema ou via CEP */
+function AutoField({
+  label,
+  value,
+  origin,      // "cadastro" | "cep" | "sistema"
+  onUnlock,    // se definido, mostra botão de editar
+}: {
+  label: string;
+  value: string | number | undefined;
+  origin: "cadastro" | "cep" | "sistema";
+  onUnlock?: () => void;
+}) {
+  const originLabel: Record<string, string> = {
+    cadastro: "Do cadastro",
+    cep: "Via CEP",
+    sistema: "Sistema",
+  };
+  const originColor: Record<string, string> = {
+    cadastro: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    cep: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    sistema: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-white/30 uppercase font-black text-[10px] tracking-widest">{label}</Label>
+        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${originColor[origin]} flex items-center gap-1`}>
+          <Lock className="w-2.5 h-2.5" />
+          {originLabel[origin]}
+        </span>
+      </div>
+      <div className="relative">
+        <Input
+          value={value ?? ""}
+          readOnly
+          className="bg-black/20 border-white/5 text-white/40 font-bold h-12 rounded-xl cursor-not-allowed pr-10"
+        />
+        {onUnlock && (
+          <button
+            type="button"
+            onClick={onUnlock}
+            title="Editar manualmente"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20 hover:text-primary transition-colors"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Campo manual — o usuário precisa preencher */
+function ManualField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  help,
+  link,
+  linkLabel,
+  type = "text",
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  help: string;
+  link?: string;
+  linkLabel?: string;
+  type?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">{label}</Label>
+        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1">
+          <Pencil className="w-2.5 h-2.5" />
+          Manual
+        </span>
+      </div>
+      <Input
+        type={type}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl focus:border-primary/50 transition-colors"
+      />
+      <p className="text-[10px] text-white/30 flex items-start gap-1.5 mt-1 leading-relaxed">
+        <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
+        <span>
+          {help}
+          {link && (
+            <>
+              {" "}
+              <a
+                href={link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5"
+              >
+                {linkLabel ?? "Acessar"} <ExternalLink className="w-2.5 h-2.5" />
+              </a>
+            </>
+          )}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+// ─── componente principal ─────────────────────────────────────────────────────
+
 export default function FiscalConfig() {
   const { toast } = useToast();
+
   const { data: settings, isLoading } = useQuery<any>({
     queryKey: ["/api/fiscal/settings"],
     refetchOnWindowFocus: true,
-    staleTime: 0
+    staleTime: 0,
   });
 
   const { data: history, isLoading: isLoadingHistory } = useQuery<any[]>({
@@ -40,6 +161,36 @@ export default function FiscalConfig() {
 
   const [formData, setFormData] = useState<any>(null);
   const [cepLoading, setCepLoading] = useState(false);
+  // Campos travados por CEP (desbloqueiam se o usuário editar manualmente após busca)
+  const [cepFilled, setCepFilled] = useState(false);
+  // Campos do cadastro que o usuário optou por editar manualmente
+  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+
+  const unlock = (field: string) =>
+    setUnlocked(prev => new Set([...prev, field]));
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-10 h-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (settings && !formData) {
+    setFormData(settings);
+    // Se já tem endereço preenchido, considera como "via CEP" para manter a experiência consistente
+    if (settings.logradouro && settings.codigoIbge) setCepFilled(true);
+  }
+
+  if (settings && formData && settings.simulacaoReal !== formData.simulacaoReal) {
+    setFormData((prev: any) => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
+  }
+
+  const set = (field: string, value: any) =>
+    setFormData((prev: any) => ({ ...prev, [field]: value }));
+
+  const handleSave = () => mutation.mutate(formData);
 
   const buscarCep = async () => {
     const cep = (formData?.cep || "").replace(/\D/g, "");
@@ -63,33 +214,13 @@ export default function FiscalConfig() {
         uf: data.uf || prev.uf,
         codigoIbge: data.ibge || prev.codigoIbge,
       }));
+      setCepFilled(true);
       toast({ title: "CEP encontrado!", description: "Endereço preenchido automaticamente." });
     } catch {
       toast({ title: "Erro ao buscar CEP", description: "Verifique sua conexão e tente novamente.", variant: "destructive" });
     } finally {
       setCepLoading(false);
     }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (settings && !formData) {
-    setFormData(settings);
-  }
-
-  // Sincroniza o estado local se as configurações mudarem (ex: vindo do Caixa)
-  if (settings && formData && settings.simulacaoReal !== formData.simulacaoReal) {
-    setFormData((prev: any) => ({ ...prev, simulacaoReal: settings.simulacaoReal }));
-  }
-
-  const handleSave = () => {
-    mutation.mutate(formData);
   };
 
   const handleFillFakeData = () => {
@@ -108,33 +239,54 @@ export default function FiscalConfig() {
       logradouro: "AVENIDA PAULISTA",
       numero: "1000",
       bairro: "BELA VISTA",
+      cep: "01310-100",
       ultimoNumeroNfce: 1,
       cscToken: "ABC123DEF456GHI789",
-      cscId: "000001"
+      cscId: "000001",
     };
     setFormData(fakeData);
-    
-    // Auto-save when generating fake data to ensure backend has it
+    setCepFilled(true);
     mutation.mutate(fakeData);
-    
-    toast({
-      title: "Dados Gerados e Salvos",
-      description: "Campos preenchidos e configurações atualizadas para teste.",
-    });
+    toast({ title: "Dados de Teste Gerados", description: "Campos preenchidos e configurações salvas para homologação." });
   };
+
+  // Decide se um campo "via CEP" deve aparecer travado
+  const isCepLocked = (field: string) =>
+    cepFilled && !unlocked.has(field) && !!formData?.[field];
 
   return (
     <div className="p-4 md:p-8 lg:p-12 space-y-8 max-w-[1600px] mx-auto bg-transparent">
+      {/* Cabeçalho */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 panel-translucent p-6">
         <div className="flex items-center gap-6">
           <div className="p-3 bg-primary/10 rounded-2xl border border-primary/20">
             <FileText className="w-8 h-8 text-primary" />
           </div>
           <div>
-            <h1 className="text-white text-3xl md:text-5xl font-black uppercase italic tracking-tighter leading-none">📄 Fiscal / <span className="text-primary">Impressão</span></h1>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] mt-2">Módulo de Gestão Tributária e Hardware</p>
+            <h1 className="text-white text-3xl md:text-5xl font-black uppercase italic tracking-tighter leading-none">
+              📄 Fiscal / <span className="text-primary">Impressão</span>
+            </h1>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.4em] mt-2">
+              Módulo de Gestão Tributária e Hardware
+            </p>
           </div>
         </div>
+      </div>
+
+      {/* Legenda de cores */}
+      <div className="flex flex-wrap gap-3 px-1">
+        <span className="text-[10px] font-bold flex items-center gap-1.5 text-white/30">
+          <span className="w-2.5 h-2.5 rounded-full bg-blue-400/60 inline-block" /> Pré-preenchido do cadastro — editável
+        </span>
+        <span className="text-[10px] font-bold flex items-center gap-1.5 text-white/30">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/60 inline-block" /> Preenchido via CEP automaticamente
+        </span>
+        <span className="text-[10px] font-bold flex items-center gap-1.5 text-white/30">
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-400/60 inline-block" /> Gerenciado pelo sistema — não altere
+        </span>
+        <span className="text-[10px] font-bold flex items-center gap-1.5 text-white/30">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-400/60 inline-block" /> Necessita preenchimento manual
+        </span>
       </div>
 
       <Tabs defaultValue="config" className="w-full">
@@ -159,269 +311,390 @@ export default function FiscalConfig() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="config">
+        {/* ─── ABA CONFIG ──────────────────────────────────────────────────── */}
+        <TabsContent value="config" className="space-y-6">
+
+          {/* Botão de teste + salvar no topo */}
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFillFakeData}
+              className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[10px] h-10 px-4 gap-2 hover:bg-primary hover:text-black transition-all"
+            >
+              <Wand2 className="w-4 h-4" />
+              Modo Teste — Dados Fictícios
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={mutation.isPending}
+              className="h-10 px-6 bg-primary text-black font-black uppercase italic tracking-widest text-[10px] rounded-xl hover:bg-primary/90 transition-all"
+            >
+              {mutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Salvar Configurações"}
+            </Button>
+          </div>
+
+          {/* ── Seção 1: Dados da Empresa ── */}
           <Card className="panel-translucent border-white/10">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <div>
-                <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
-                  <ShieldCheck className="w-6 h-6 text-primary" /> Dados da Instituição
-                </CardTitle>
-                <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Preencha os dados conforme registro na SEFAZ</CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleFillFakeData}
-                  className="bg-primary/10 border-primary/20 text-primary font-black uppercase italic tracking-widest text-[10px] h-10 px-4 gap-2 hover:bg-primary hover:text-black transition-all shadow-[0_0_15px_rgba(0,255,102,0.1)] hover:shadow-[0_0_20px_rgba(0,255,102,0.3)]"
-                >
-                  <Wand2 className="w-4 h-4" /> 
-                  <div className="flex flex-col items-start leading-none">
-                    <span>Modo Teste</span>
-                    <span className="text-[7px] opacity-60">Gerar Dados Fictícios</span>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-xl flex items-center gap-3">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+                Dados da Empresa
+              </CardTitle>
+              <CardDescription className="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                Pré-preenchidos do cadastro do estabelecimento — clique em ✏️ para corrigir se necessário
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {unlocked.has("razaoSocial") ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">Razão Social</Label>
+                    <Input value={formData?.razaoSocial || ""} onChange={e => set("razaoSocial", e.target.value)}
+                      className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl" />
                   </div>
-                </Button>
+                ) : (
+                  <AutoField label="Razão Social" value={formData?.razaoSocial} origin="cadastro"
+                    onUnlock={() => unlock("razaoSocial")} />
+                )}
+
+                {unlocked.has("nomeFantasia") ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">Nome Fantasia</Label>
+                    <Input value={formData?.nomeFantasia || ""} onChange={e => set("nomeFantasia", e.target.value)}
+                      className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl" />
+                  </div>
+                ) : (
+                  <AutoField label="Nome Fantasia" value={formData?.nomeFantasia} origin="cadastro"
+                    onUnlock={() => unlock("nomeFantasia")} />
+                )}
+
+                {unlocked.has("cnpj") ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">CNPJ</Label>
+                    <Input value={formData?.cnpj || ""} onChange={e => set("cnpj", e.target.value)}
+                      className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl" />
+                  </div>
+                ) : (
+                  <AutoField label="CNPJ" value={formData?.cnpj} origin="cadastro"
+                    onUnlock={() => unlock("cnpj")} />
+                )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Seção 2: Regime e Ambiente ── */}
+          <Card className="panel-translucent border-white/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-xl flex items-center gap-3">
+                <Settings2 className="w-5 h-5 text-orange-400" />
+                Regime Tributário e Ambiente
+              </CardTitle>
+              <CardDescription className="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                Escolha conforme o registro da empresa na Receita Federal
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Regime Tributário */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">Regime Tributário</Label>
+                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1">
+                      <Pencil className="w-2.5 h-2.5" /> Manual
+                    </span>
+                  </div>
+                  <Select value={formData?.regimeTributario} onValueChange={v => set("regimeTributario", v)}>
+                    <SelectTrigger className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                      <SelectItem value="1">1 — Simples Nacional</SelectItem>
+                      <SelectItem value="2">2 — Simples Nacional (Excesso de Sublimite)</SelectItem>
+                      <SelectItem value="3">3 — Regime Normal (Lucro Presumido/Real)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-white/30 flex items-start gap-1.5 leading-relaxed">
+                    <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
+                    Consulte o regime no seu{" "}
+                    <a href="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp" target="_blank" rel="noopener noreferrer"
+                      className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">
+                      Cartão CNPJ <ExternalLink className="w-2.5 h-2.5" />
+                    </a> ou com seu contador.
+                  </p>
+                </div>
+
+                {/* Ambiente */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">Ambiente NFC-e</Label>
+                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1">
+                      <Pencil className="w-2.5 h-2.5" /> Manual
+                    </span>
+                  </div>
+                  <Select value={formData?.ambiente} onValueChange={v => set("ambiente", v)}>
+                    <SelectTrigger className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                      <SelectItem value="homologacao">🧪 Homologação — testes, sem valor fiscal</SelectItem>
+                      <SelectItem value="producao">✅ Produção — emissão real, válida juridicamente</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-white/30 flex items-start gap-1.5 leading-relaxed">
+                    <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
+                    Use <strong className="text-white/40">Homologação</strong> durante os testes. Mude para{" "}
+                    <strong className="text-white/40">Produção</strong> somente quando tudo estiver validado.
+                  </p>
+                </div>
+
+                {/* Inscrição Estadual */}
+                <ManualField
+                  label="Inscrição Estadual"
+                  value={formData?.inscricaoEstadual || ""}
+                  onChange={v => set("inscricaoEstadual", v)}
+                  placeholder="Ex: 123456789"
+                  help="Consta no Cartão CNPJ ou no certificado de inscrição estadual fornecido pela SEFAZ do seu estado."
+                  link="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp"
+                  linkLabel="Consultar Cartão CNPJ"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Seção 3: Endereço Fiscal ── */}
+          <Card className="panel-translucent border-white/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-xl flex items-center gap-3">
+                <Search className="w-5 h-5 text-emerald-400" />
+                Endereço Fiscal
+              </CardTitle>
+              <CardDescription className="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                Digite o CEP e clique em 🔍 — logradouro, bairro, município, UF e código IBGE são preenchidos automaticamente
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Razão Social</Label>
-                  <Input 
-                    value={formData?.razaoSocial || ""} 
-                    onChange={e => setFormData({...formData, razaoSocial: e.target.value})}
-                    placeholder="Ex: Empresa de Teste LTDA"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Nome Fantasia</Label>
-                  <Input 
-                    value={formData?.nomeFantasia || ""} 
-                    onChange={e => setFormData({...formData, nomeFantasia: e.target.value})}
-                    placeholder="Ex: Minha Loja"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CNPJ</Label>
-                  <Input 
-                    value={formData?.cnpj || ""} 
-                    onChange={e => setFormData({...formData, cnpj: e.target.value})}
-                    placeholder="Ex: 00.000.000/0001-00"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-              </div>
-
+              {/* CEP + Número (manuais) */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Regime Tributário</Label>
-                  <Select value={formData?.regimeTributario} onValueChange={v => setFormData({...formData, regimeTributario: v})}>
-                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
-                      <SelectValue placeholder="Regime" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
-                      <SelectItem value="1">Simples Nacional</SelectItem>
-                      <SelectItem value="2">Simples Nacional - Excesso</SelectItem>
-                      <SelectItem value="3">Regime Normal</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Ambiente</Label>
-                  <Select value={formData?.ambiente} onValueChange={v => setFormData({...formData, ambiente: v})}>
-                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
-                      <SelectValue placeholder="Ambiente" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
-                      <SelectItem value="homologacao">Homologação</SelectItem>
-                      <SelectItem value="producao">Produção</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Série NFC-e</Label>
-                  <Input 
-                    type="number"
-                    value={formData?.serieNfce || 1} 
-                    onChange={e => setFormData({...formData, serieNfce: parseInt(e.target.value)})}
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Inscrição Estadual</Label>
-                  <Input 
-                    value={formData?.inscricaoEstadual || ""} 
-                    onChange={e => setFormData({...formData, inscricaoEstadual: e.target.value})}
-                    placeholder="Ex: 123456789"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0" />
-                    Consta no seu <a href="https://www.receita.fazenda.gov.br/pessoajuridica/cnpj/cnpjreva/cnpjrevaiso.asp" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">Cartão CNPJ <ExternalLink className="w-2.5 h-2.5" /></a> ou no portal da SEFAZ do seu estado.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">UF</Label>
-                  <Select value={formData?.uf} onValueChange={v => setFormData({...formData, uf: v})}>
-                    <SelectTrigger className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl">
-                      <SelectValue placeholder="UF" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
-                      {["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"].map(uf => (
-                        <SelectItem key={uf} value={uf}>{uf}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0" />
-                    Preenchido automaticamente ao buscar o CEP.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Município</Label>
-                  <Input 
-                    value={formData?.municipio || ""} 
-                    onChange={e => setFormData({...formData, municipio: e.target.value})}
-                    placeholder="Ex: São Paulo"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0" />
-                    Preenchido automaticamente ao buscar o CEP.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Código IBGE</Label>
-                  <Input 
-                    value={formData?.codigoIbge || ""} 
-                    onChange={e => setFormData({...formData, codigoIbge: e.target.value})}
-                    placeholder="Ex: 3550308"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                  />
-                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0" />
-                    Preenchido automaticamente ao buscar o CEP. Ou consulte em{" "}
-                    <a href="https://www.ibge.gov.br/explica/codigos-dos-municipios.php" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">IBGE <ExternalLink className="w-2.5 h-2.5" /></a>.
-                  </p>
-                </div>
-              </div>
-
-              {/* Bloco de endereço com CEP no topo */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-                  <div className="space-y-2">
-                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CEP</Label>
-                    <div className="flex gap-2">
-                      <Input 
-                        value={formData?.cep || ""} 
-                        onChange={e => setFormData({...formData, cep: e.target.value})}
-                        onKeyDown={e => e.key === "Enter" && buscarCep()}
-                        placeholder="Ex: 01310-100"
-                        className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl flex-1"
-                        maxLength={9}
-                      />
-                      <Button
-                        type="button"
-                        onClick={buscarCep}
-                        disabled={cepLoading}
-                        className="h-12 px-3 bg-primary/10 border border-primary/20 text-primary hover:bg-primary hover:text-black transition-all rounded-xl"
-                        title="Buscar endereço pelo CEP"
-                      >
-                        {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-white/30 flex items-center gap-1">
-                      <Info className="w-3 h-3 flex-shrink-0" />
-                      Consulte em{" "}
-                      <a href="https://buscacepinter.correios.com.br/" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">Correios <ExternalLink className="w-2.5 h-2.5" /></a>.
-                      Ao digitar e clicar em 🔍, o endereço é preenchido automaticamente.
-                    </p>
+                {/* CEP */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-white/60 uppercase font-black text-[10px] tracking-widest">CEP</Label>
+                    <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border bg-orange-500/10 text-orange-400 border-orange-500/20 flex items-center gap-1">
+                      <Pencil className="w-2.5 h-2.5" /> Manual
+                    </span>
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={formData?.cep || ""}
+                      onChange={e => { set("cep", e.target.value); setCepFilled(false); }}
+                      onKeyDown={e => e.key === "Enter" && buscarCep()}
+                      placeholder="00000-000"
+                      maxLength={9}
+                      className="bg-black/40 border-white/20 text-white font-bold h-12 rounded-xl flex-1"
+                    />
+                    <Button type="button" onClick={buscarCep} disabled={cepLoading}
+                      className="h-12 px-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500 hover:text-black transition-all rounded-xl"
+                      title="Buscar endereço pelo CEP">
+                      {cepLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-white/30 flex items-start gap-1.5 leading-relaxed">
+                    <Info className="w-3 h-3 flex-shrink-0 mt-0.5 text-orange-400/60" />
+                    Não sabe o CEP?{" "}
+                    <a href="https://buscacepinter.correios.com.br/" target="_blank" rel="noopener noreferrer"
+                      className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">
+                      Consultar nos Correios <ExternalLink className="w-2.5 h-2.5" />
+                    </a>
+                  </p>
+                </div>
+
+                {/* Número */}
+                <ManualField
+                  label="Número"
+                  value={formData?.numero || ""}
+                  onChange={v => set("numero", v)}
+                  placeholder="Ex: 1000"
+                  help="Número do imóvel — o CEP não inclui esse dado, precisa ser informado manualmente."
+                />
+
+                {/* Logradouro — auto via CEP */}
+                {isCepLocked("logradouro") ? (
+                  <AutoField label="Logradouro" value={formData?.logradouro} origin="cep"
+                    onUnlock={() => unlock("logradouro")} />
+                ) : (
+                  <div className="space-y-1.5">
                     <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Logradouro</Label>
-                    <Input 
-                      value={formData?.logradouro || ""} 
-                      onChange={e => setFormData({...formData, logradouro: e.target.value})}
+                    <Input value={formData?.logradouro || ""} onChange={e => set("logradouro", e.target.value)}
                       placeholder="Preenchido pelo CEP"
-                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                    />
+                      className="bg-black/40 border-white/10 text-white/60 font-bold h-12 rounded-xl border-dashed" />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Número</Label>
-                    <Input 
-                      value={formData?.numero || ""} 
-                      onChange={e => setFormData({...formData, numero: e.target.value})}
-                      placeholder="Ex: 1000"
-                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                    />
-                  </div>
-                  <div className="space-y-2">
+                )}
+
+                {/* Bairro — auto via CEP */}
+                {isCepLocked("bairro") ? (
+                  <AutoField label="Bairro" value={formData?.bairro} origin="cep"
+                    onUnlock={() => unlock("bairro")} />
+                ) : (
+                  <div className="space-y-1.5">
                     <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Bairro</Label>
-                    <Input 
-                      value={formData?.bairro || ""} 
-                      onChange={e => setFormData({...formData, bairro: e.target.value})}
+                    <Input value={formData?.bairro || ""} onChange={e => set("bairro", e.target.value)}
                       placeholder="Preenchido pelo CEP"
-                      className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
-                    />
+                      className="bg-black/40 border-white/10 text-white/60 font-bold h-12 rounded-xl border-dashed" />
                   </div>
-                </div>
+                )}
               </div>
 
+              {/* Município / UF / IBGE — auto via CEP */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CSC Token (NFC-e)</Label>
-                  <Input 
-                    value={formData?.cscToken || ""} 
-                    onChange={e => setFormData({...formData, cscToken: e.target.value})}
-                    placeholder="Ex: 0123456789ABCDEF"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+                {isCepLocked("municipio") ? (
+                  <AutoField label="Município" value={formData?.municipio} origin="cep"
+                    onUnlock={() => unlock("municipio")} />
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">Município</Label>
+                    <Input value={formData?.municipio || ""} onChange={e => set("municipio", e.target.value)}
+                      placeholder="Preenchido pelo CEP"
+                      className="bg-black/40 border-white/10 text-white/60 font-bold h-12 rounded-xl border-dashed" />
+                  </div>
+                )}
+
+                {/* UF */}
+                {isCepLocked("uf") ? (
+                  <AutoField label="UF" value={formData?.uf} origin="cep"
+                    onUnlock={() => unlock("uf")} />
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">UF</Label>
+                    <Select value={formData?.uf} onValueChange={v => set("uf", v)}>
+                      <SelectTrigger className="bg-black/40 border-white/10 text-white/60 font-bold h-12 rounded-xl border-dashed">
+                        <SelectValue placeholder="Preenchido pelo CEP" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-900 border-white/10 text-white font-bold">
+                        {["AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"].map(uf => (
+                          <SelectItem key={uf} value={uf}>{uf}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Código IBGE */}
+                {isCepLocked("codigoIbge") ? (
+                  <AutoField label="Código IBGE" value={formData?.codigoIbge} origin="cep"
+                    onUnlock={() => unlock("codigoIbge")} />
+                ) : (
+                  <ManualField
+                    label="Código IBGE"
+                    value={formData?.codigoIbge || ""}
+                    onChange={v => set("codigoIbge", v)}
+                    placeholder="Preenchido pelo CEP (ex: 3550308)"
+                    help="Preenchido automaticamente ao buscar o CEP. Se precisar manualmente:"
+                    link="https://www.ibge.gov.br/explica/codigos-dos-municipios.php"
+                    linkLabel="Tabela de municípios IBGE"
                   />
-                  <p className="text-[10px] text-white/30 flex items-start gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0 mt-0.5" />
-                    <span>Gerado no portal da SEFAZ do seu estado. Busque por <strong className="text-white/40">"credenciamento CSC NFC-e [seu estado]"</strong> ou acesse o portal{" "}
-                    <a href="https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=Ox6PXIG4nqs=" target="_blank" rel="noopener noreferrer" className="text-primary/70 underline hover:text-primary inline-flex items-center gap-0.5">NF-e Nacional <ExternalLink className="w-2.5 h-2.5" /></a>{" "}
-                    e localize o link do seu estado.</span>
+                )}
+              </div>
+
+              {!cepFilled && (
+                <div className="flex items-center gap-3 p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5">
+                  <RefreshCw className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                  <p className="text-[11px] text-emerald-400/80 font-bold">
+                    Digite o CEP acima e clique em 🔍 para preencher logradouro, bairro, município, UF e código IBGE automaticamente.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-white/40 uppercase font-black text-[10px] tracking-widest">CSC ID</Label>
-                  <Input 
-                    value={formData?.cscId || ""} 
-                    onChange={e => setFormData({...formData, cscId: e.target.value})}
-                    placeholder="Ex: 000001"
-                    className="bg-black/40 border-white/10 text-white font-bold h-12 rounded-xl"
+              )}
+            </CardContent>
+          </Card>
+
+          {/* ── Seção 4: CSC / Credencial NFC-e ── */}
+          <Card className="panel-translucent border-white/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-xl flex items-center gap-3">
+                <Lock className="w-5 h-5 text-orange-400" />
+                Credenciais NFC-e (CSC)
+              </CardTitle>
+              <CardDescription className="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                Obtidos no portal da SEFAZ do seu estado — necessários para emissão de NFC-e
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <ManualField
+                  label="CSC Token"
+                  value={formData?.cscToken || ""}
+                  onChange={v => set("cscToken", v)}
+                  placeholder="Ex: 0123456789ABCDEF"
+                  help='Gerado no portal da SEFAZ estadual ao credenciar o CNPJ para NFC-e. Pesquise: "credenciamento CSC NFC-e + [seu estado]" ou acesse o portal nacional:'
+                  link="https://www.nfe.fazenda.gov.br/portal/listaConteudo.aspx?tipoConteudo=Ox6PXIG4nqs="
+                  linkLabel="Portal NF-e Nacional → selecione seu estado"
+                />
+                <ManualField
+                  label="CSC ID"
+                  value={formData?.cscId || ""}
+                  onChange={v => set("cscId", v)}
+                  placeholder="Ex: 000001"
+                  help="Número sequencial gerado junto com o CSC Token no mesmo portal da SEFAZ. Geralmente é 000001 para o primeiro credenciamento."
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Seção 5: Numeração NFC-e — sistema gerencia ── */}
+          <Card className="panel-translucent border-white/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-xl flex items-center gap-3">
+                <RefreshCw className="w-5 h-5 text-yellow-400" />
+                Numeração NFC-e
+              </CardTitle>
+              <CardDescription className="text-white/30 text-[10px] font-bold uppercase tracking-widest">
+                Controlado automaticamente pelo sistema a cada emissão — não altere manualmente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AutoField
+                  label="Série NFC-e"
+                  value={formData?.serieNfce ?? 1}
+                  origin="sistema"
+                />
+                <div className="space-y-1.5">
+                  <AutoField
+                    label="Último Número NFC-e Emitido"
+                    value={formData?.ultimoNumeroNfce ?? 0}
+                    origin="sistema"
                   />
-                  <p className="text-[10px] text-white/30 flex items-center gap-1 mt-1">
-                    <Info className="w-3 h-3 flex-shrink-0" />
-                    Número sequencial fornecido junto com o CSC Token no portal da SEFAZ estadual. Geralmente é <strong className="text-white/40">000001</strong>.
+                  <p className="text-[10px] text-white/20 flex items-center gap-1.5 mt-1">
+                    <RefreshCw className="w-3 h-3 text-yellow-400/50" />
+                    Incrementado automaticamente a cada NFC-e emitida com sucesso.
                   </p>
-                </div>
-                <div className="flex items-end">
-                  <Button 
-                    onClick={handleSave}
-                    disabled={mutation.isPending}
-                    className="w-full h-12 bg-primary text-black font-black uppercase italic tracking-widest rounded-xl hover:bg-primary/90 transition-all"
-                  >
-                    {mutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
-                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {/* Salvar */}
+          <div className="flex justify-end">
+            <Button
+              onClick={handleSave}
+              disabled={mutation.isPending}
+              className="h-12 px-10 bg-primary text-black font-black uppercase italic tracking-widest rounded-xl hover:bg-primary/90 transition-all"
+            >
+              {mutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
+            </Button>
+          </div>
         </TabsContent>
 
+        {/* ─── ABA HISTÓRICO ────────────────────────────────────────────── */}
         <TabsContent value="history">
           <Card className="panel-translucent border-white/10">
             <CardHeader>
               <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
                 <History className="w-6 h-6 text-primary" /> Histórico de Emissões
               </CardTitle>
-              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">Lista de todas as NFC-e emitidas</CardDescription>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">
+                Lista de todas as NFC-e emitidas
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoadingHistory ? (
@@ -458,12 +731,12 @@ export default function FiscalConfig() {
                           </TableCell>
                           <TableCell>
                             <Badge className={
-                              doc.status === 'authorized' ? 'bg-primary/20 text-primary border-primary/20' :
-                              (doc.status === 'simulated' || doc.status === 'simulation') ? 'bg-blue-500/20 text-blue-400 border-blue-500/20' :
-                              'bg-red-500/20 text-red-500 border-red-500/20'
+                              doc.status === "authorized" ? "bg-primary/20 text-primary border-primary/20" :
+                              (doc.status === "simulated" || doc.status === "simulation") ? "bg-blue-500/20 text-blue-400 border-blue-500/20" :
+                              "bg-red-500/20 text-red-500 border-red-500/20"
                             }>
-                              {doc.status === 'authorized' ? 'AUTORIZADO' : 
-                               (doc.status === 'simulated' || doc.status === 'simulation') ? 'SIMULADO' : 'REJEITADO'}
+                              {doc.status === "authorized" ? "AUTORIZADO" :
+                               (doc.status === "simulated" || doc.status === "simulation") ? "SIMULADO" : "REJEITADO"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -480,7 +753,9 @@ export default function FiscalConfig() {
                       ))}
                       {(!history || history.length === 0) && (
                         <TableRow>
-                          <TableCell colSpan={6} className="text-center py-12 text-white/20 font-bold uppercase tracking-widest">Nenhum documento encontrado</TableCell>
+                          <TableCell colSpan={6} className="text-center py-12 text-white/20 font-bold uppercase tracking-widest">
+                            Nenhum documento encontrado
+                          </TableCell>
                         </TableRow>
                       )}
                     </TableBody>
