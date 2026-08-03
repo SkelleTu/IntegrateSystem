@@ -178,7 +178,7 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
 
   function renderGrid(nums: string[], clickFn: (c: string) => void, onlyFree = false) {
     return (
-      <div className="grid grid-cols-10 gap-1">
+      <div className="grid grid-cols-10 gap-2">
         {nums.map(code => {
           const owner = usedMap[code];
           const isOwn = value === code;
@@ -190,17 +190,22 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
               title={owner ? `Em uso: ${owner.name}` : `Código ${code}`}
               disabled={isDisabled}
               onClick={() => clickFn(code)}
-              className={`h-8 rounded text-[10px] font-black border transition-all ${
+              className={`h-14 rounded-xl text-base font-black border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${
                 isOwn
-                  ? "bg-primary text-black border-primary"
+                  ? "bg-primary text-black border-primary shadow-[0_0_14px_rgba(0,229,255,0.35)]"
                   : isUsed
                     ? isDisabled
                       ? "bg-red-900/20 text-red-400/30 border-red-900/20 cursor-not-allowed"
-                      : "bg-amber-900/20 text-amber-400 border-amber-800/40 hover:bg-amber-900/40 cursor-pointer"
-                    : "bg-white/5 text-white/50 border-white/10 hover:bg-primary/20 hover:text-primary hover:border-primary/40"
+                      : "bg-amber-900/30 text-amber-300 border-amber-700/50 hover:bg-amber-900/50 cursor-pointer"
+                    : "bg-white/5 text-white/70 border-white/10 hover:bg-primary/20 hover:text-primary hover:border-primary/50"
               }`}
             >
-              {code}
+              <span className="leading-none">{code}</span>
+              {isUsed && !isDisabled && (
+                <span className="text-[8px] font-bold text-amber-400/70 leading-none truncate w-full text-center px-0.5">
+                  {owner.name.length > 8 ? owner.name.slice(0, 7) + "…" : owner.name}
+                </span>
+              )}
             </button>
           );
         })}
@@ -210,16 +215,16 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
 
   function renderPagination(cur: number, set: (p: number) => void) {
     return (
-      <div className="flex items-center justify-between pt-1">
-        <div className="flex gap-3 text-[9px] font-bold text-white/30">
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-white/10 border border-white/10 inline-block" />Livre</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-amber-900/30 border border-amber-800/40 inline-block" />Ocupado</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-primary inline-block" />Selecionado</span>
+      <div className="flex items-center justify-between pt-2">
+        <div className="flex gap-4 text-xs font-bold text-white/40">
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-white/10 border border-white/10 inline-block" />Livre</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-amber-900/30 border border-amber-700/50 inline-block" />Ocupado</span>
+          <span className="flex items-center gap-1.5"><span className="w-4 h-4 rounded bg-primary inline-block" />Selecionado</span>
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           {Array.from({ length: PAGES }, (_, i) => i + 1).map(p => (
             <button key={p} type="button" onClick={() => set(p)}
-              className={`w-7 h-7 rounded text-[10px] font-black border transition-all ${cur === p ? "bg-primary text-black border-primary" : "bg-white/5 text-white/40 border-white/10 hover:border-white/30"}`}>
+              className={`w-10 h-10 rounded-lg text-sm font-black border-2 transition-all ${cur === p ? "bg-primary text-black border-primary" : "bg-white/5 text-white/50 border-white/10 hover:border-primary/40 hover:text-white"}`}>
               {p}
             </button>
           ))}
@@ -238,16 +243,20 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
 
       {/* Main picker */}
       <Dialog open={open && !swapPhase} onOpenChange={o => { if (!o) { setOpen(false); } }}>
-        <DialogContent className={`max-w-2xl rounded-2xl border ${T.dialog}`}>
-          <DialogHeader>
-            <DialogTitle className="font-black italic uppercase tracking-tighter text-primary">Código do Produto</DialogTitle>
-            <DialogDescription className="text-white/40 text-[11px]">
-              Clique em um número livre para selecionar. Números em laranja já estão em uso — clique para substituir (requer senha de admin).
+        <DialogContent className={`w-[96vw] max-w-[96vw] h-[94vh] max-h-[94vh] rounded-2xl border flex flex-col ${T.dialog}`}>
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Código do Produto</DialogTitle>
+            <DialogDescription className="text-white/40 text-xs">
+              Toque em um número livre para selecionar. <span className="text-amber-400 font-bold">Laranja = ocupado</span> — toque para substituir (requer senha de admin).
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 mt-1">
-            {renderGrid(pageNums(page), handleCodeClick)}
-            {renderPagination(page, setPage)}
+          <div className="flex flex-col flex-1 min-h-0 gap-3 mt-1">
+            <div className="flex-1 min-h-0">
+              {renderGrid(pageNums(page), handleCodeClick)}
+            </div>
+            <div className="shrink-0">
+              {renderPagination(page, setPage)}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -273,18 +282,22 @@ function CodigoProdutoPicker({ value, onChange, currentProductId, allProducts, T
 
       {/* Pick new code for displaced product */}
       <Dialog open={swapPhase === "pick-displaced"} onOpenChange={o => { if (!o) resetSwap(); }}>
-        <DialogContent className={`max-w-2xl rounded-2xl border ${T.dialog}`}>
-          <DialogHeader>
-            <DialogTitle className="font-black italic uppercase tracking-tighter text-primary">Novo código para "{displaced?.name}"</DialogTitle>
-            <DialogDescription className="text-white/40 text-[11px]">
-              Escolha um código <strong className="text-white">livre</strong> para <strong className="text-white">{displaced?.name}</strong>, que perderá o código <strong className="text-amber-400">#{pendingCode}</strong>.
+        <DialogContent className={`w-[96vw] max-w-[96vw] h-[94vh] max-h-[94vh] rounded-2xl border flex flex-col ${T.dialog}`}>
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="font-black italic uppercase tracking-tighter text-xl text-primary">Novo código para "{displaced?.name}"</DialogTitle>
+            <DialogDescription className="text-white/40 text-xs">
+              Escolha um número <strong className="text-white">livre</strong> para <strong className="text-white">{displaced?.name}</strong>, que perderá o <strong className="text-amber-400">#{pendingCode}</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 mt-1">
-            {renderGrid(pageNums(displacedPage), handleDisplacedClick, true)}
-            {renderPagination(displacedPage, setDisplacedPage)}
+          <div className="flex flex-col flex-1 min-h-0 gap-3 mt-1">
+            <div className="flex-1 min-h-0">
+              {renderGrid(pageNums(displacedPage), handleDisplacedClick, true)}
+            </div>
+            <div className="shrink-0">
+              {renderPagination(displacedPage, setDisplacedPage)}
+            </div>
           </div>
-          <Button variant="ghost" onClick={resetSwap} className="text-white/40 font-black uppercase tracking-widest mt-1 w-full">Cancelar</Button>
+          <Button variant="ghost" onClick={resetSwap} className="shrink-0 text-white/40 font-black uppercase tracking-widest w-full">Cancelar</Button>
         </DialogContent>
       </Dialog>
 
