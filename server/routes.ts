@@ -498,10 +498,19 @@ export async function registerRoutes(
       const created = await storage.upsertFiscalSettings(defaultSettings as any);
       return res.json(created);
     }
-    // Se já existe mas os campos principais estão vazios, sincroniza com dados do estabelecimento
-    if (!settings.cnpj && !settings.razaoSocial) {
-      const enterprise = await storage.getEnterprise(user.enterpriseId);
-      if (enterprise) {
+    // Se já existe mas campos estão vazios, sincroniza com dados do estabelecimento
+    // Verifica cada campo individualmente para não sobrescrever dados que o usuário preencheu manualmente
+    const enterprise = await storage.getEnterprise(user.enterpriseId);
+    if (enterprise) {
+      const needsSync =
+        (!settings.cnpj && enterprise.taxId) ||
+        (!settings.razaoSocial && enterprise.name) ||
+        (!settings.nomeFantasia && enterprise.name) ||
+        (!settings.logradouro && enterprise.address) ||
+        (!settings.municipio && enterprise.city) ||
+        (!settings.uf && enterprise.state);
+
+      if (needsSync) {
         const updated = await storage.upsertFiscalSettings({
           ...settings,
           razaoSocial: settings.razaoSocial || enterprise.name || "",
