@@ -472,6 +472,45 @@ export class DatabaseStorage implements IStorage {
       await database.insert(payments).values(paymentsWithSaleId);
 
       for (const item of items) {
+        // Itens vindos do catálogo Produto → Lote usam um ID virtual
+        // (500000 + batch.id) no PDV. A tabela antiga `inventory` não
+        // conhece esse ID, então a baixa precisa atingir o lote real.
+        const batchId = item.itemType === "product" && item.itemId >= 500000
+          ? item.itemId - 500000
+          : null;
+
+        if (batchId !== null) {
+          const [batch] = await database.select()
+            .from(batches)
+            .where(eq(batches.id, batchId))
+            .limit(1);
+
+          if (!batch) {
+            throw new Error(`Lote ${batchId} não encontrado para a venda #${insertedSale.id}`);
+          }
+
+          if (batch.quantity < item.quantity) {
+            throw new Error(
+              `Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`
+            );
+          }
+
+          await database.update(batches)
+            .set({ quantity: batch.quantity - item.quantity })
+            .where(eq(batches.id, batchId));
+
+          await database.insert(batchLogs).values({
+            productId: batch.productId,
+            batchId: batch.id,
+            type: "out",
+            quantity: item.quantity,
+            reason: `Venda #${insertedSale.id}`,
+            userId: sale.userId || 0,
+            createdAt: new Date(),
+          } as any);
+          continue;
+        }
+
         const [inventoryItem] = await database.select()
           .from(inventory)
           .where(
@@ -539,6 +578,34 @@ export class DatabaseStorage implements IStorage {
 
       const items = await database.select().from(saleItems).where(eq(saleItems.saleId, id));
       for (const item of items) {
+        const batchId = item.itemType === "product" && item.itemId >= 500000
+          ? item.itemId - 500000
+          : null;
+
+        if (batchId !== null) {
+          const [batch] = await database.select()
+            .from(batches)
+            .where(eq(batches.id, batchId))
+            .limit(1);
+
+          if (batch) {
+            await database.update(batches)
+              .set({ quantity: batch.quantity + item.quantity })
+              .where(eq(batches.id, batchId));
+
+            await database.insert(batchLogs).values({
+              productId: batch.productId,
+              batchId: batch.id,
+              type: "cancel",
+              quantity: item.quantity,
+              reason: `Estorno Venda Cancelada #${id}`,
+              userId: sale.userId || 0,
+              createdAt: new Date(),
+            } as any);
+          }
+          continue;
+        }
+
         const [inventoryItem] = await database.select()
           .from(inventory)
           .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, item.itemType === 'product' ? 'product' : 'service')))
