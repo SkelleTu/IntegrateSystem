@@ -433,8 +433,18 @@ export class DatabaseStorage implements IStorage {
       if (!register) throw new Error("Caixa não encontrado");
 
       const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
-      const totalSales = salesList.filter((s: any) => s.status === "completed").reduce((sum: number, s: any) => sum + s.totalAmount, 0);
-      const expectedAmount = (register.openingAmount || 0) + totalSales;
+      const completedSales = salesList.filter((s: any) => s.status === "completed");
+      const cashPayments = await Promise.all(
+        completedSales.map(async (sale: any) => {
+          const salePayments = await database
+            .select()
+            .from(payments)
+            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+        })
+      );
+      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
+      const expectedAmount = (register.openingAmount || 0) + totalCashSales;
       const difference = closingAmount - expectedAmount;
 
       const [updated] = await database.update(cashRegisters)
@@ -511,14 +521,25 @@ export class DatabaseStorage implements IStorage {
           continue;
         }
 
+        // Itens do inventário antigo também chegam ao PDV com um ID virtual
+        // (10000 + inventory.id). Resolva para a linha real antes de baixar.
+        const legacyInventoryId = item.itemId >= 10000 && item.itemId < 500000
+          ? item.itemId - 10000
+          : null;
         const [inventoryItem] = await database.select()
           .from(inventory)
           .where(
-            item.itemType === 'product' 
+            legacyInventoryId !== null
+              ? eq(inventory.id, legacyInventoryId)
+              : item.itemType === 'product'
               ? eq(inventory.itemId, item.itemId)
               : eq(inventory.customName, item.itemId.toString())
           )
           .limit(1);
+
+        if (legacyInventoryId !== null && !inventoryItem) {
+          throw new Error(`Item de estoque ${legacyInventoryId} não encontrado para a venda #${insertedSale.id}`);
+        }
 
         if (inventoryItem) {
           await database.update(inventory)
@@ -567,79 +588,112 @@ export class DatabaseStorage implements IStorage {
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
     return await dualWrite(async (database) => {
-      const [sale] = await database.select().from(sales).where(eq(sales.id, id));
-      if (!sale) throw new Error("Venda não encontrada");
-      if (sale.status === "cancelled") return sale;
+      // A reversão é feita em uma transação para não deixar a venda cancelada
+      // sem o estoque/financeiro correspondente se algum item estiver inválido.
+      return await database.transaction(async (transaction: any) => {
+        const [sale] = await transaction.select().from(sales).where(eq(sales.id, id));
+        if (!sale) throw new Error("Venda não encontrada");
+        if (sale.status === "cancelled") return sale;
 
-      const [updatedSale] = await database.update(sales)
-        .set({ status: "cancelled" })
-        .where(eq(sales.id, id))
-        .returning();
+        const items = await transaction.select().from(saleItems).where(eq(saleItems.saleId, id));
+        const stockReversals: Array<
+          | { kind: "batch"; item: SaleItem; stock: Batch }
+          | { kind: "inventory"; item: SaleItem; stock: Inventory }
+        > = [];
 
-      const items = await database.select().from(saleItems).where(eq(saleItems.saleId, id));
-      for (const item of items) {
-        const batchId = item.itemType === "product" && item.itemId >= 500000
-          ? item.itemId - 500000
-          : null;
+        // Primeiro resolve todas as origens de estoque. Itens de serviço/menu
+        // sem estoque continuam válidos e não geram movimentação.
+        for (const item of items) {
+          const batchId = item.itemType === "product" && item.itemId >= 500000
+            ? item.itemId - 500000
+            : null;
 
-        if (batchId !== null) {
-          const [batch] = await database.select()
-            .from(batches)
-            .where(eq(batches.id, batchId))
+          if (batchId !== null) {
+            const [batch] = await transaction.select()
+              .from(batches)
+              .where(eq(batches.id, batchId))
+              .limit(1);
+            if (!batch) {
+              throw new Error(`Lote ${batchId} não encontrado para estornar a venda #${id}`);
+            }
+            stockReversals.push({ kind: "batch", item, stock: batch });
+            continue;
+          }
+
+          const legacyInventoryId = item.itemId >= 10000 && item.itemId < 500000
+            ? item.itemId - 10000
+            : null;
+          const [inventoryItem] = await transaction.select()
+            .from(inventory)
+            .where(
+              legacyInventoryId !== null
+                ? eq(inventory.id, legacyInventoryId)
+                : and(
+                    eq(inventory.itemId, item.itemId),
+                    eq(inventory.itemType, item.itemType === "product" ? "product" : "service")
+                  )
+            )
             .limit(1);
 
-          if (batch) {
-            await database.update(batches)
-              .set({ quantity: batch.quantity + item.quantity })
-              .where(eq(batches.id, batchId));
+          if (legacyInventoryId !== null && !inventoryItem) {
+            throw new Error(`Item de estoque ${legacyInventoryId} não encontrado para estornar a venda #${id}`);
+          }
+          if (inventoryItem) {
+            stockReversals.push({ kind: "inventory", item, stock: inventoryItem });
+          }
+        }
 
-            await database.insert(batchLogs).values({
-              productId: batch.productId,
-              batchId: batch.id,
+        const [updatedSale] = await transaction.update(sales)
+          .set({ status: "cancelled" })
+          .where(eq(sales.id, id))
+          .returning();
+
+        for (const reversal of stockReversals) {
+          const { item, stock } = reversal;
+          if (reversal.kind === "batch") {
+            await transaction.update(batches)
+              .set({ quantity: stock.quantity + item.quantity })
+              .where(eq(batches.id, stock.id));
+
+            await transaction.insert(batchLogs).values({
+              productId: (stock as Batch).productId,
+              batchId: stock.id,
               type: "cancel",
               quantity: item.quantity,
               reason: `Estorno Venda Cancelada #${id}`,
               userId: sale.userId || 0,
               createdAt: new Date(),
             } as any);
+          } else {
+            await transaction.update(inventory)
+              .set({
+                quantity: stock.quantity + item.quantity,
+                updatedAt: new Date()
+              })
+              .where(eq(inventory.id, stock.id));
+
+            await transaction.insert(inventoryLogs).values({
+              inventoryId: stock.id,
+              type: "in",
+              quantity: item.quantity,
+              reason: `Estorno Venda Cancelada #${id}`,
+              userId: sale.userId || 0,
+              createdAt: new Date()
+            });
           }
-          continue;
         }
 
-        const [inventoryItem] = await database.select()
-          .from(inventory)
-          .where(and(eq(inventory.itemId, item.itemId), eq(inventory.itemType, item.itemType === 'product' ? 'product' : 'service')))
-          .limit(1);
+        await transaction.insert(transactions).values({
+          businessType: "padaria",
+          type: "expense",
+          category: "vendas",
+          description: `ESTORNO: Venda PDV #${id} CANCELADA`,
+          amount: sale.totalAmount,
+          createdAt: new Date()
+        });
 
-        if (inventoryItem) {
-          await database.update(inventory)
-            .set({ 
-              quantity: inventoryItem.quantity + item.quantity,
-              updatedAt: new Date()
-            })
-            .where(eq(inventory.id, inventoryItem.id));
-          
-          await database.insert(inventoryLogs).values({
-            inventoryId: inventoryItem.id,
-            type: "in",
-            quantity: item.quantity,
-            reason: `Estorno Venda Cancelada #${id}`,
-            userId: sale.userId || 0,
-            createdAt: new Date()
-          });
-        }
-      }
-
-      await database.insert(transactions).values({
-        businessType: "padaria",
-        type: "expense",
-        category: "vendas",
-        description: `ESTORNO: Venda PDV #${id} CANCELADA`,
-        amount: sale.totalAmount,
-        createdAt: new Date()
+        return updatedSale;
       });
-
-      return updatedSale;
     });
   }
 

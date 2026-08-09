@@ -29,21 +29,26 @@ export default function CashierClose() {
     queryKey: ["/api/cash-register/open"],
   });
 
-  const { data: sales = [] } = useQuery<Sale[]>({
-    queryKey: ["/api/sales"],
+  const { data: registers = [] } = useQuery<(CashRegister & { sales?: (Sale & { payments?: { method: string; amount: number }[] })[] })[]>({
+    queryKey: ["/api/cash-registers/history"],
+    queryFn: async () => {
+      const res = await fetch("/api/cash-registers/history");
+      if (!res.ok) return [];
+      return res.json();
+    },
     enabled: !!register,
   });
 
-  // Calculate expected total based on cash sales only
+  // O caixa físico recebe apenas pagamentos em dinheiro. Cartão e Pix
+  // permanecem na venda, mas não entram no valor esperado da gaveta.
   const totalCashSales = useMemo(() => {
-    return sales
-      .filter(s => 
-        s.status === "completed" && 
-        s.cashRegisterId === register?.id &&
-        (s as any).paymentMethod === "cash"
-      )
-      .reduce((sum, s) => sum + s.totalAmount, 0);
-  }, [sales, register?.id]);
+    const registerSales = registers.find((item) => item.id === register?.id)?.sales ?? [];
+    return registerSales
+      .filter((sale) => sale.status === "completed")
+      .reduce((sum, sale) => sum + (sale.payments ?? [])
+        .filter((payment) => payment.method === "cash")
+        .reduce((paymentSum, payment) => paymentSum + Number(payment.amount || 0), 0), 0);
+  }, [registers, register?.id]);
   
   const expectedTotal = (register?.openingAmount || 0) + totalCashSales;
 
