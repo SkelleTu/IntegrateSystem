@@ -1365,6 +1365,23 @@ export async function registerRoutes(
     res.json(salesList);
   });
 
+  app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ message: "ID de venda inválido" });
+      }
+
+      const cancelledSale = await storage.cancelSale(id);
+      res.json(cancelledSale);
+    } catch (err: any) {
+      console.error(`Erro ao cancelar venda #${req.params.id}:`, err);
+      const message = err?.message || "Erro ao cancelar venda";
+      const status = message === "Venda não encontrada" ? 404 : 500;
+      res.status(status).json({ message });
+    }
+  });
+
   app.post("/api/sales/:id/emit-fiscal", isAuthenticated, async (req, res) => {
     try {
       const id = Number(req.params.id);
