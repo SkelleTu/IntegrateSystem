@@ -1,13 +1,7 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-
 title IntegrateSystem - Start All
-
-rem ============================================================
-rem INTEGRATESYSTEM - LAUNCHER WINDOWS ROBUSTO
-rem Executa tudo nesta mesma janela para nunca esconder erros.
-rem ============================================================
 
 echo ============================================================
 echo IntegrateSystem - inicializacao local
@@ -17,29 +11,21 @@ echo.
 
 set "APP_DIR=%~dp0"
 set "NODE_CMD="
-set "NPM_CLI="
+set "NPM_CMD="
 
-rem 1. Node disponivel no PATH
-node.exe --version >nul 2>&1
-if not errorlevel 1 set "NODE_CMD=node.exe"
+rem Resolve o executavel REAL do Node pelo PATH, sem where.exe.
+for %%I in (node.exe) do if not "%%~$PATH:I"=="" set "NODE_CMD=%%~$PATH:I"
 
-rem 2. NVM for Windows via NVM_SYMLINK
+rem Fallbacks para NVM for Windows e instalacoes convencionais.
 if not defined NODE_CMD if defined NVM_SYMLINK if exist "%NVM_SYMLINK%\node.exe" set "NODE_CMD=%NVM_SYMLINK%\node.exe"
-
-rem 3. NVM for Windows instalacao comum
 if not defined NODE_CMD if exist "C:\nvm4w\nodejs\node.exe" set "NODE_CMD=C:\nvm4w\nodejs\node.exe"
-
-rem 4. Instalacoes convencionais
 if not defined NODE_CMD if exist "%ProgramFiles%\nodejs\node.exe" set "NODE_CMD=%ProgramFiles%\nodejs\node.exe"
 if not defined NODE_CMD if exist "%ProgramFiles(x86)%\nodejs\node.exe" set "NODE_CMD=%ProgramFiles(x86)%\nodejs\node.exe"
 if not defined NODE_CMD if exist "%LocalAppData%\Programs\nodejs\node.exe" set "NODE_CMD=%LocalAppData%\Programs\nodejs\node.exe"
 
 if not defined NODE_CMD (
   echo [ERRO] Node.js nao foi encontrado nesta maquina.
-  echo.
   echo Instale Node.js 20.x LTS ou NVM for Windows.
-  echo O launcher procurou PATH, NVM e instalacoes comuns.
-  echo.
   pause
   exit /b 1
 )
@@ -47,13 +33,14 @@ if not defined NODE_CMD (
 for %%I in ("%NODE_CMD%") do set "NODE_DIR=%%~dpI"
 set "PATH=%NODE_DIR%;%APP_DIR%;%PATH%"
 
-rem npm-cli.js e mais confiavel que npm.ps1/npm.cmd em maquinas com PowerShell restrito.
-if exist "%NODE_DIR%node_modules\npm\bin\npm-cli.js" set "NPM_CLI=%NODE_DIR%node_modules\npm\bin\npm-cli.js"
-if not defined NPM_CLI if exist "%NODE_DIR%node_modules\npm\bin\npm-cli.js" set "NPM_CLI=%NODE_DIR%node_modules\npm\bin\npm-cli.js"
+rem Agora resolve npm.cmd pelo PATH atualizado.
+for %%I in (npm.cmd) do if not "%%~$PATH:I"=="" set "NPM_CMD=%%~$PATH:I"
+if not defined NPM_CMD if exist "%NODE_DIR%npm.cmd" set "NPM_CMD=%NODE_DIR%npm.cmd"
 
-if not defined NPM_CLI (
-  echo [ERRO] npm-cli.js nao foi encontrado junto do Node.js.
+if not defined NPM_CMD (
+  echo [ERRO] npm.cmd nao foi encontrado.
   echo Node detectado em: %NODE_CMD%
+  echo Diretorio detectado: %NODE_DIR%
   echo.
   pause
   exit /b 1
@@ -63,10 +50,9 @@ echo [INFO] Node detectado em: %NODE_CMD%
 "%NODE_CMD%" --version
 if errorlevel 1 goto :fatal
 
-echo [INFO] npm CLI detectado em: %NPM_CLI%
-"%NODE_CMD%" "%NPM_CLI%" --version
+echo [INFO] npm detectado em: %NPM_CMD%
+"%NPM_CMD%" --version
 if errorlevel 1 goto :fatal
-
 echo.
 
 for /f "tokens=1 delims=." %%A in ('"%NODE_CMD%" --version') do set "NODE_MAJOR=%%A"
@@ -74,23 +60,20 @@ set "NODE_MAJOR=!NODE_MAJOR:v=!"
 if not "!NODE_MAJOR!"=="20" (
   echo [AVISO] O projeto declara Node.js 20.x.
   echo [AVISO] Versao ativa: !NODE_MAJOR!
-  echo [AVISO] Continuando para diagnostico. Node 20 LTS e recomendado.
+  echo [AVISO] Continuando para diagnostico; Node 20 LTS e recomendado.
   echo.
 )
 
 if not exist "package.json" (
   echo [ERRO] package.json nao foi encontrado.
   echo A pasta atual nao parece ser o IntegrateSystem.
-  echo.
   pause
   exit /b 1
 )
 
 if not exist "node_modules" (
-  echo [INFO] node_modules nao existe.
-  echo [INFO] Instalando dependencias via npm CLI direto pelo Node...
-  echo.
-  "%NODE_CMD%" "%NPM_CLI%" install
+  echo [INFO] node_modules nao existe. Instalando dependencias...
+  call "%NPM_CMD%" install
   if errorlevel 1 (
     echo.
     echo [ERRO] npm install falhou.
@@ -106,8 +89,8 @@ echo [INFO] Porta esperada: 5000
 echo ============================================================
 echo.
 
-rem Executa na mesma janela. Nenhum erro e escondido.
-"%NODE_CMD%" "%NPM_CLI%" run dev
+rem Executa na mesma janela. O log completo permanece visivel.
+call "%NPM_CMD%" run dev
 set "EXIT_CODE=%ERRORLEVEL%"
 
 echo.
