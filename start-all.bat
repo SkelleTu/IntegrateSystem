@@ -1,49 +1,20 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 cd /d "%~dp0"
-
 title IntegrateSystem - Start All
 
-echo ============================================================
-echo IntegrateSystem - inicializacao local
-echo Pasta: %CD%
-echo ============================================================
-echo.
-
-rem ============================================================
-rem Detecta Node.js mesmo quando instalado pelo NVM for Windows.
-rem Nao usamos 'where', porque o PATH desta maquina nao o resolve.
-rem ============================================================
+set "APP_DIR=%~dp0"
 set "NODE_CMD="
 set "NPM_CMD="
 
-if exist "%NVM_SYMLINK%\node.exe" (
-  set "NODE_CMD=%NVM_SYMLINK%\node.exe"
-  if exist "%NVM_SYMLINK%\npm.cmd" set "NPM_CMD=%NVM_SYMLINK%\npm.cmd"
-)
-
-if not defined NODE_CMD if exist "C:\nvm4w\nodejs\node.exe" (
-  set "NODE_CMD=C:\nvm4w\nodejs\node.exe"
-  if exist "C:\nvm4w\nodejs\npm.cmd" set "NPM_CMD=C:\nvm4w\nodejs\npm.cmd"
-)
-
-if not defined NODE_CMD if exist "%ProgramFiles%\nodejs\node.exe" (
-  set "NODE_CMD=%ProgramFiles%\nodejs\node.exe"
-  if exist "%ProgramFiles%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles%\nodejs\npm.cmd"
-)
-
-if not defined NODE_CMD if exist "%ProgramFiles(x86)%\nodejs\node.exe" (
-  set "NODE_CMD=%ProgramFiles(x86)%\nodejs\node.exe"
-  if exist "%ProgramFiles(x86)%\nodejs\npm.cmd" set "NPM_CMD=%ProgramFiles(x86)%\nodejs\npm.cmd"
-)
-
+call :banner
+call :find_node
 if not defined NODE_CMD (
-  echo [ERRO] Node.js nao foi encontrado.
   echo.
-  echo Procurado em:
-  echo   - NVM_SYMLINK
-  echo   - C:\nvm4w\nodejs
-  echo   - Program Files\nodejs
+  echo [ERRO] Node.js nao foi encontrado nesta maquina.
+  echo.
+  echo O launcher tentou PATH, NVM for Windows e instalacoes comuns.
+  echo Para executar o IntegrateSystem, instale Node.js 20.x LTS.
   echo.
   pause
   exit /b 1
@@ -58,62 +29,140 @@ if not defined NPM_CMD (
 )
 
 for %%I in ("%NODE_CMD%") do set "NODE_DIR=%%~dpI"
-set "PATH=%NODE_DIR%;%PATH%"
+set "PATH=%NODE_DIR%;%APP_DIR%;%PATH%"
 
-echo [INFO] Node detectado em:
-echo %NODE_CMD%
-echo [INFO] Node:
-"%NODE_CMD%" --version
+call :show_versions
+call :check_node_major
+call :check_dependencies
+if errorlevel 1 exit /b 1
 
-echo [INFO] npm:
-"%NPM_CMD%" --version
+call :start_server
+exit /b %ERRORLEVEL%
 
+:banner
+echo ============================================================
+echo IntegrateSystem - inicializacao local
+echo Pasta: %APP_DIR%
+echo ============================================================
 echo.
+exit /b 0
 
-rem O projeto declara Node 20.x. Nao bloqueamos o inicio se outra versao
-rem estiver ativa, mas deixamos um aviso visivel para diagnostico.
-for /f "tokens=1,2 delims=.v" %%A in ('"%NODE_CMD%" --version') do set "NODE_MAJOR=%%A"
-if defined NODE_MAJOR if not "!NODE_MAJOR!"=="20" (
-  echo [AVISO] Este projeto declara Node.js 20.x, mas a versao ativa nao e 20.x.
-  echo [AVISO] Versao atual: !NODE_MAJOR!
-  echo [AVISO] O inicio continuara para permitir diagnostico e compatibilidade.
-  echo.
+:find_node
+rem 1) PATH atual, usando executaveis diretamente e sem 'where'.
+node.exe --version >nul 2>&1
+if not errorlevel 1 (
+  set "NODE_CMD=node.exe"
+  if exist "%~dp0..
+pm.cmd" set "NPM_CMD=%~dp0..\npm.cmd"
+  call :find_npm_near_node
+  if defined NPM_CMD exit /b 0
 )
 
-if not exist "node_modules" (
-  echo [INFO] node_modules nao existe. Instalando dependencias...
-  call "%NPM_CMD%" install
-  if errorlevel 1 (
-    echo.
-    echo [ERRO] Falha ao instalar as dependencias.
-    echo.
-    pause
-    exit /b 1
+rem 2) NVM for Windows: usa NVM_SYMLINK quando disponivel.
+if defined NVM_SYMLINK if exist "%NVM_SYMLINK%\node.exe" (
+  set "NODE_CMD=%NVM_SYMLINK%\node.exe"
+  if exist "%NVM_SYMLINK%\npm.cmd" set "NPM_CMD=%NVM_SYMLINK%\npm.cmd"
+  if defined NPM_CMD exit /b 0
+)
+
+rem 3) Caminho comum do NVM for Windows 4W e outras instalacoes.
+for %%P in (
+  "C:\nvm4w\nodejs"
+  "%ProgramFiles%\nodejs"
+  "%ProgramFiles(x86)%\nodejs"
+  "%LocalAppData%\Programs\nodejs"
+) do (
+  if not defined NODE_CMD if exist "%%~P\node.exe" (
+    set "NODE_CMD=%%~P\node.exe"
+    if exist "%%~P\npm.cmd" set "NPM_CMD=%%~P\npm.cmd"
   )
-  echo.
 )
 
-echo [INFO] Iniciando servidor IntegrateSystem na porta 5000...
-echo [INFO] A janela do servidor permanecera aberta para mostrar erros reais.
+rem 4) Tenta obter NVM_HOME e descobrir a versao ativa sem depender do PATH.
+if not defined NODE_CMD if defined NVM_HOME if exist "%NVM_HOME%\nvm.exe" (
+  for /f "delims=" %%V in ('"%NVM_HOME%\nvm.exe" current 2^>nul') do set "NVM_CURRENT=%%V"
+  if defined NVM_CURRENT if not "!NVM_CURRENT!"=="none" if exist "%NVM_HOME%\v!NVM_CURRENT!\node.exe" (
+    set "NODE_CMD=%NVM_HOME%\v!NVM_CURRENT!\node.exe"
+    if exist "%NVM_HOME%\v!NVM_CURRENT!\npm.cmd" set "NPM_CMD=%NVM_HOME%\v!NVM_CURRENT!\npm.cmd"
+  )
+)
+
+if defined NODE_CMD if not defined NPM_CMD call :find_npm_near_node
+exit /b 0
+
+:find_npm_near_node
+if not defined NODE_CMD exit /b 1
+for %%I in ("%NODE_CMD%") do set "NODE_DIR=%%~dpI"
+if exist "!NODE_DIR!npm.cmd" set "NPM_CMD=!NODE_DIR!npm.cmd"
+if exist "!NODE_DIR!node_modules\npm\bin\npm-cli.js" if not defined NPM_CMD set "NPM_CMD=!NODE_DIR!npm.cmd"
+exit /b 0
+
+:show_versions
+echo [INFO] Node detectado em:
+echo        %NODE_CMD%
+"%NODE_CMD%" --version
+if errorlevel 1 (
+  echo [ERRO] Node.js foi localizado, mas nao pode ser executado.
+  pause
+  exit /b 1
+)
+echo [INFO] npm detectado em:
+echo        %NPM_CMD%
+"%NPM_CMD%" --version
+if errorlevel 1 (
+  echo [ERRO] npm foi localizado, mas nao pode ser executado.
+  pause
+  exit /b 1
+)
 echo.
+exit /b 0
 
-start "IntegrateSystem - Server" cmd /k "cd /d "%~dp0" && call "%NPM_CMD%" run dev"
+:check_node_major
+for /f "tokens=1 delims=." %%A in ('"%NODE_CMD%" --version') do set "NODE_MAJOR=%%A"
+set "NODE_MAJOR=!NODE_MAJOR:v=!"
+if not "!NODE_MAJOR!"=="20" (
+  echo [AVISO] O projeto declara Node.js 20.x.
+  echo [AVISO] Versao ativa detectada: !NODE_MAJOR!
+  echo [AVISO] O launcher continuara, mas Node 20 LTS e recomendado.
+  echo.
+)
+exit /b 0
 
+:check_dependencies
+if exist "node_modules" exit /b 0
+
+echo [INFO] node_modules nao existe. Instalando dependencias...
+echo [INFO] Isso pode demorar na primeira execucao.
+echo.
+call "%NPM_CMD%" install
 if errorlevel 1 (
   echo.
-  echo [ERRO] Nao foi possivel abrir o processo do servidor.
+  echo [ERRO] Falha ao instalar as dependencias.
+  echo [ERRO] O processo foi interrompido para preservar o diagnostico.
   echo.
   pause
   exit /b 1
 )
 
-timeout /t 2 /nobreak >nul
-
-echo [OK] Processo de inicializacao enviado.
-echo [INFO] Aplicacao esperada em: http://localhost:5000
-
 echo.
-echo Este launcher nao depende de npm.ps1 nem do comando where.
+echo [OK] Dependencias instaladas.
+echo.
+exit /b 0
+
+:start_server
+echo [INFO] Iniciando IntegrateSystem...
+echo [INFO] Servidor esperado em http://localhost:5000
+echo [INFO] A janela do servidor permanecera aberta para mostrar erros reais.
+echo.
+
+start "IntegrateSystem - Server" cmd /k "cd /d ""%APP_DIR%"" && call ""%NPM_CMD%"" run dev"
+if errorlevel 1 (
+  echo [ERRO] O Windows nao conseguiu criar a janela do servidor.
+  pause
+  exit /b 1
+)
+
+echo [OK] Processo do servidor iniciado.
 echo.
 pause
 exit /b 0
