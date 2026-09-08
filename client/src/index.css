@@ -1,0 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mask-fade-right {
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
+  }
+
+  /* Slider Styles */
+  .relative.flex.w-full.touch-none.select-none.items-center {
+    @apply py-4;
+  }
+  [role="slider"] {
+    @apply border-primary bg-black ring-offset-black focus-visible:ring-primary;
+  }
+}
+
+@keyframes beam {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--tw-rotate)) translateX(0) scaleX(0.5);
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--tw-rotate)) translateX(40px) scaleX(1.5);
+  }
+}
+
+:root {
+  /* HSL Values - Tech Neon Dark Theme */
+  --background: 220 25% 3%;        /* #05070a */
+  --foreground: 210 20% 98%;          /* Near white */
+  
+  --primary: 190 100% 50%;         /* Cyber Blue Neon #00e5ff */
+  --primary-foreground: 210 20% 98%;
+  
+  --secondary: 190 100% 50%;        /* Electric Blue Neon instead of purple */
+  --secondary-foreground: 210 20% 98%;
+  
+  --muted: 220 15% 10%;
+  --muted-foreground: 210 10% 70%;
+  
+  --accent: 190 100% 50%;          
+  --accent-foreground: 210 20% 98%;
+  
+  --destructive: 0 100% 50%;
+  --destructive-foreground: 210 20% 98%;
+  
+  --border: 190 100% 50% / 0.2;     /* Neon borders by default */
+  --input: 220 20% 10%;
+  --ring: 190 100% 50%;
+  
+  --card: 220 25% 5%;
+  --card-foreground: 210 20% 100%;
+  --card-border: 190 100% 50% / 0.1;
+
+  --radius: 0.75rem;
+  
+  /* Fonts */
+  --font-display: 'Montserrat', sans-serif;
+  --font-body: 'Inter', sans-serif;
+}
+
+@layer base {
+  /* Global Background and Layering */
+  html, body {
+    background-color: #05070a !important;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  body {
+    @apply text-foreground antialiased selection:bg-primary/30 selection:text-primary relative;
+    font-family: var(--font-body);
+    background: transparent !important;
+  }
+
+  /* Tech Neon Background Layer */
+  body::before {
+    content: '';
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: -9999 !important;
+    /* Promote to own GPU compositor layer — never repainted on scroll */
+    transform: translateZ(0) !important;
+    will-change: opacity !important;
+    background-color: #05070a !important;
+    background-image: 
+      url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.05'%3E%3Cpath d='M10 10l2 2l-2 2l-2-2zM40 20h4v4h-4zM70 10l3 3l-3 3l-3-3zM20 50c0 2 1 3 3 3s3-1 3-3s-1-3-3-3s-3 1-3 3zM80 40h6v2h-6zM50 70l4-4l4 4l-4 4zM15 85h10v2H15zM85 85h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
+      linear-gradient(rgba(0, 229, 255, 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 229, 255, 0.2) 1px, transparent 1px),
+      url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.15'%3E%3Cpath d='M20 20l4 4l-4 4l-4-4z'/%3E%3Ccircle cx='100' cy='90' r='2'/%3E%3Cpath d='M90 50l4-4l4 4l-4 4z'/%3E%3Crect x='40' y='60' width='6' height='6' rx='1' /%3E%3C/g%3E%3C/svg%3E"),
+      radial-gradient(at 0% 0%, rgba(0, 229, 255, var(--glow-opacity, 0.35)) 0, transparent 70%),
+      radial-gradient(at 100% 100%, rgba(147, 51, 234, var(--glow-opacity, 0.35)) 0, transparent 70%);
+    /* scroll (not fixed) — background-attachment: fixed prevents GPU compositing */
+    background-size: 200px 200px, 40px 40px, 40px 40px, 100px 100px, 100% 100%, 100% 100% !important;
+    background-attachment: scroll !important;
+    background-position: 0 0, center, center, center, center, center !important;
+    background-repeat: repeat !important;
+    pointer-events: none !important;
+    display: block !important;
+    /* Only animate opacity — avoids background-position repaint on every frame */
+    animation: glow-pulse 4s ease-in-out infinite;
+  }
+
+  @keyframes glow-pulse {
+    0%, 100% { --glow-opacity: 0.3; }
+    50% { --glow-opacity: 0.55; }
+  }
+
+  /* Mobile: same rules, slightly higher contrast */
+  @media (max-width: 767px) {
+    body::before {
+      background-image: 
+        url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.1'%3E%3Cpath d='M10 10l2 2l-2 2l-2-2zM40 20h4v4h-4zM70 10l3 3l-3 3l-3-3zM20 50c0 2 1 3 3 3s3-1 3-3s-1-3-3-3s-3 1-3 3zM80 40h6v2h-6zM50 70l4-4l4 4l-4 4zM15 85h10v2H15zM85 85h5v5h-5z'/%3E%3C/g%3E%3C/svg%3E"),
+        linear-gradient(rgba(0, 229, 255, 0.3) 1.5px, transparent 1.5px),
+        linear-gradient(90deg, rgba(0, 229, 255, 0.3) 1.5px, transparent 1.5px),
+        url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.25'%3E%3Cpath d='M20 20l4 4l-4 4l-4-4z'/%3E%3Ccircle cx='100' cy='90' r='2'/%3E%3Cpath d='M90 50l4-4l4 4l-4 4z'/%3E%3Crect x='40' y='60' width='6' height='6' rx='1' /%3E%3C/g%3E%3C/svg%3E"),
+        radial-gradient(at 0% 0%, rgba(0, 229, 255, var(--glow-opacity, 0.6)) 0, transparent 100%),
+        radial-gradient(at 100% 100%, rgba(147, 51, 234, var(--glow-opacity, 0.6)) 0, transparent 100%);
+      background-size: 150px 150px, 50px 50px, 50px 50px, 100px 100px, 100% 100%, 100% 100% !important;
+      background-attachment: scroll !important;
+      background-position: 0 0, center, center, center, center, center !important;
+      animation: glow-pulse 4s ease-in-out infinite;
+    }
+  }
+
+  @property --glow-opacity {
+    syntax: '<number>';
+    inherits: false;
+    initial-value: 0.3;
+  }
+
+  /* Force transparency on main containers */
+  #root, .min-h-screen, [data-sidebar-provider], [data-sidebar-wrapper], [data-sidebar-content], main {
+    background: transparent !important;
+  }
+
+  .bg-floating-icons {
+    background-image: url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2300e5ff' fill-opacity='0.08'%3E%3Cpath d='M20 20l4 4l-4 4l-4-4z'/%3E%3Cpath d='M40 60h8v8h-8z'/%3E%3Cpath d='M80 30l6 6l-6 6l-6-6z'/%3E%3Ccircle cx='100' cy='90' r='3'/%3E%3Cpath d='M30 90h6v2h-6zM32 88h2v6h-2z'/%3E%3Cpath d='M90 50l4-4l4 4l-4 4z'/%3E%3Cpath d='M60 10v6M57 13h6' stroke='%2300e5ff' stroke-width='1'/%3E%3C/g%3E%3C/svg%3E") !important;
+    background-attachment: scroll !important;
+    background-size: 120px 120px !important;
+  }
+
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+
+  .neon-text-blue {
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.5), 0 0 20px rgba(0, 229, 255, 0.3);
+  }
+
+  .neon-text-purple {
+    text-shadow: 0 0 10px rgba(147, 51, 234, 0.5), 0 0 20px rgba(147, 51, 234, 0.3);
+  }
+
+  .neon-border-blue {
+    @apply border-primary/40;
+    box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
+  }
+
+  /* Global Button Glow — transition only the properties that change (not 'all') */
+  button:not(.ghost):not(.outline), .btn-neon {
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  
+  button:not(.ghost):not(.outline):hover, .btn-neon:hover {
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
+    transform: translateY(-1px);
+  }
+}
+
+@layer utilities {
+}
+
+/* ── Light mode stock: increase all tiny text ─────────────────────────────── */
+.light-stock [class*="text-[8px]"]  { font-size: 11px !important; }
+.light-stock [class*="text-[9px]"]  { font-size: 12px !important; }
+.light-stock [class*="text-[10px]"] { font-size: 13px !important; }
+.light-stock [class*="text-[11px]"] { font-size: 13px !important; }
+.light-stock .text-xs               { font-size: 13px !important; }
+.light-stock [class*="tracking-widest"] { letter-spacing: 0.08em !important; }
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full border-2 border-transparent bg-clip-padding hover:bg-white/20;
+}
+
+/* ── Tour spotlight pulse animation ─────────────────────────────────────── */
+@keyframes tour-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 4px rgba(0,229,255,0.15), 0 0 24px rgba(0,229,255,0.4), inset 0 0 20px rgba(0,229,255,0.05);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0,229,255,0.25), 0 0 40px rgba(0,229,255,0.6), inset 0 0 30px rgba(0,229,255,0.08);
+  }
+}
+.tour-spotlight-border {
+  animation: tour-pulse 2s ease-in-out infinite;
+}

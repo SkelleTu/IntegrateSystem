@@ -1,0 +1,1 @@
+Para gerar o executavel: 1. Baixe a pasta Aura System (Windows Version). 2. Rode npm install. 3. Rode npm run package. O executavel portatil estara na pasta dist.

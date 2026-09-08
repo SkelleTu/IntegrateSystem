@@ -1,0 +1,1813 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import { DatabaseStorage, storage } from "./storage";
+import { api } from "../shared/routes";
+import { z } from "zod";
+import { 
+  insertCashRegisterSchema, 
+  insertSaleSchema, 
+  insertSaleItemSchema, 
+  insertPaymentSchema, 
+  insertTransactionSchema, 
+  insertTimeClockSchema,
+  insertInventorySchema
+} from "../shared/schema";
+import session from "express-session";
+import createMemoryStore from "memorystore";
+import SQLiteStore from "better-sqlite3-session-store";
+import sqlite from "better-sqlite3";
+import passport from "passport";
+import { WebSocketServer, WebSocket } from "ws";
+
+const SessionStore = SQLiteStore(session);
+const dbSession = new sqlite(process.env.NODE_ENV === "production" ? "/tmp/sessions.db" : "sessions.db");
+import { Strategy as LocalStrategy } from "passport-local";
+import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { promisify } from "util";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: "attached_assets/uploads/",
+    filename: (req: any, file: any, cb: any) => {
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+      cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+    },
+  }),
+});
+
+const scryptAsync = promisify(scrypt);
+
+async function hashPassword(password: string) {
+  const salt = randomBytes(16).toString("hex");
+  const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+  return `${buf.toString("hex")}.${salt}`;
+}
+
+async function comparePassword(stored: string, supplied: string) {
+  const [hashed, salt] = stored.split(".");
+  const hashedBuf = Buffer.from(hashed, "hex");
+  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+  return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
+import { db } from "./db";
+import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema";
+
+export async function registerRoutes(
+  httpServer: Server,
+  app: Express
+): Promise<Server> {
+  // WebSocket for Label System
+  const wss = new WebSocketServer({ noServer: true });
+  let windowsClient: WebSocket | null = null;
+
+  httpServer.on('upgrade', (request, socket, head) => {
+    const pathname = request.url;
+
+    if (pathname === '/ws/labels') {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    }
+  });
+
+  wss.on('connection', (ws, req) => {
+    console.log('WS Connection established for labels');
+    
+    // Enviar mensagem de boas-vindas para confirmar conexão
+    ws.send(JSON.stringify({ type: 'SERVER_HELLO', message: 'Conectado ao Aura System' }));
+
+    ws.on('message', (msg) => {
+      try {
+        const data = JSON.parse(msg.toString());
+        console.log('WS Message received:', data);
+        if (data.type === 'WINDOWS_HELLO') {
+          windowsClient = ws;
+          console.log('Windows Label App connected');
+          ws.send(JSON.stringify({ type: 'HELLO_ACK', message: 'Registrado com sucesso' }));
+        }
+      } catch (e) {
+        console.error('WS Message error:', e);
+      }
+    });
+
+    ws.on('close', () => {
+      if (ws === windowsClient) {
+        windowsClient = null;
+        console.log('Windows Label App disconnected');
+      }
+    });
+  });
+
+  // Label Printing Route
+  app.post("/api/labels/print", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
+      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+    }
+
+    windowsClient.send(JSON.stringify({
+      type: "PRINT_LABEL",
+      payload: req.body
+    }));
+
+    res.json({ status: "ENVIADO" });
+  });
+
+  app.get("/api/labels/status", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    res.json({
+      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
+    });
+  });
+
+  // Session & Auth Setup
+  app.use(
+    session({
+      store: new SessionStore({
+        client: dbSession,
+        expired: {
+          clear: true,
+          intervalMs: 900000 // 15 minutes
+        }
+      }),
+      secret: process.env.SESSION_SECRET || "barber_shop_secret",
+      resave: false,
+      saveUninitialized: false,
+      cookie: { 
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+      },
+    })
+  );
+
+  app.use(passport.initialize());
+  app.use(passport.session());
+
+  passport.use(
+    new LocalStrategy(async (username, password, done) => {
+      try {
+        const user = await storage.getUserByUsername(username);
+        if (!user) return done(null, false, { message: "Incorrect username." });
+        
+        const isValid = await comparePassword(user.password, password);
+        if (!isValid) return done(null, false, { message: "Incorrect password." });
+        
+        return done(null, user);
+      } catch (err) {
+        return done(err);
+      }
+    })
+  );
+
+  passport.serializeUser((user: any, done) => done(null, user.id));
+  passport.deserializeUser(async (id: number, done) => {
+    try {
+      const user = await storage.getUser(id);
+      done(null, user);
+    } catch (err) {
+      done(err);
+    }
+  });
+
+  app.get("/api/db/status", (req, res) => {
+    // Check if Turso is configured
+    const isTurso = !!process.env.TURSO_DATABASE_URL;
+    
+    res.json({
+      status: "online",
+      message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
+      latency: 15,
+      lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+      timestamp: Date.now()
+    });
+  });
+
+  // Inventory & Menu Search Routes
+  app.get("/api/inventory/search", isAuthenticated, async (req, res) => {
+    const { barcode, codigoBalanca } = req.query;
+    if (barcode) {
+      const item = await storage.getInventoryItemByBarcode(barcode as string);
+      return res.json(item || null);
+    }
+    if (codigoBalanca) {
+      const item = await storage.getInventoryItemByCodigoBalanca(codigoBalanca as string);
+      return res.json(item || null);
+    }
+    res.status(400).json({ message: "Barcode or codigoBalanca required" });
+  });
+
+  app.get("/api/menu/search", isAuthenticated, async (req, res) => {
+    const { codigoBalanca } = req.query;
+    if (codigoBalanca) {
+      const item = await storage.getMenuItemByCodigoBalanca(codigoBalanca as string);
+      return res.json(item || null);
+    }
+    res.status(400).json({ message: "codigoBalanca required" });
+  });
+
+  // Auth Routes
+  app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
+    const user = req.user as any;
+    await storage.logUserSession({
+      userId: user.id,
+      type: "login",
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent")
+    });
+    res.json(req.user);
+  });
+
+  app.post(api.auth.logout.path, async (req, res) => {
+    const user = req.user as any;
+    if (user) {
+      await storage.logUserSession({
+        userId: user.id,
+        type: "logout",
+        ipAddress: req.ip,
+        userAgent: req.get("user-agent")
+      });
+    }
+    req.logout((err) => {
+      if (err) return res.status(500).json({ message: "Logout failed" });
+      res.json({ message: "Logout successful" });
+    });
+  });
+
+  app.get(api.auth.me.path, (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    res.json(req.user);
+  });
+
+  app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    const data = await storage.getAdminMonitoringData();
+    res.json(data);
+  });
+
+  app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    await storage.deleteUser(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
+    
+    try {
+      const { username, password } = req.body;
+      const existing = await storage.getUserByUsername(username);
+      if (existing) return res.status(400).json({ message: "Usuário já existe" });
+      
+      const hashed = await hashPassword(password);
+      const newUser = await storage.createUser({
+        username,
+        password: hashed,
+        role: "barber"
+      });
+      res.status(201).json(newUser);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
+    }
+  });
+
+  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
+  app.get("/api/my-enterprises", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const list = await storage.getEnterprisesByOwner(user.id);
+    res.json(list);
+  });
+
+  app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    try {
+      const owned = await storage.getEnterprisesByOwner(user.id);
+      if (owned.length >= 5) {
+        return res.status(400).json({ message: "Limite de 5 estabelecimentos por conta atingido." });
+      }
+
+      const { name, businessType, taxId, phone, address, city, state } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Nome do estabelecimento é obrigatório." });
+
+      const baseSlug = name.trim().toLowerCase()
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+      
+      // Garantir slug único
+      let slug = baseSlug;
+      let attempt = 1;
+      while (await storage.getEnterpriseBySlug(slug)) {
+        slug = `${baseSlug}-${attempt++}`;
+      }
+
+      const enterprise = await storage.createEnterprise({
+        ownerId: user.id,
+        name: name.trim(),
+        businessType: businessType || "barbearia",
+        taxId: taxId || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        slug,
+        status: "active",
+      });
+
+      // Ativar este estabelecimento para o usuário
+      await storage.updateUser(user.id, { enterpriseId: enterprise.id });
+
+      res.status(201).json(enterprise);
+    } catch (err) {
+      console.error("Erro ao criar estabelecimento:", err);
+      res.status(500).json({ message: "Erro ao criar estabelecimento." });
+    }
+  });
+
+  app.put("/api/my-enterprises/:id/select", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const enterpriseId = Number(req.params.id);
+    const owned = await storage.getEnterprisesByOwner(user.id);
+    if (!owned.find(e => e.id === enterpriseId)) {
+      return res.status(403).json({ message: "Este estabelecimento não pertence a você." });
+    }
+    await storage.updateUser(user.id, { enterpriseId });
+    res.json({ ok: true });
+  });
+
+  // Enterprise Routes
+  app.get("/api/admin/enterprises", async (req, res) => {
+    const list = await storage.getEnterprises();
+    res.json(list);
+  });
+
+  app.post("/api/admin/enterprises", async (req, res) => {
+    try {
+      const { name, slug, username, password } = req.body;
+      
+      console.log("Recebendo dados para registro de instituição:", { name, slug, username, hasPassword: !!password });
+
+      if (!password) {
+        return res.status(400).json({ message: "A senha é obrigatória." });
+      }
+      
+      // Validação básica do slug se não for enviado
+      const finalSlug = slug || name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+      
+      const existing = await storage.getEnterpriseBySlug(finalSlug);
+      if (existing) {
+        return res.status(400).json({ message: "Uma instituição com este nome ou slug já existe." });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ message: "Este nome de usuário já está em uso." });
+      }
+
+      const hashedPassword = await hashPassword(password);
+      
+      const enterpriseData = { ...req.body };
+      delete enterpriseData.username;
+      delete enterpriseData.password;
+      enterpriseData.slug = finalSlug;
+      enterpriseData.status = "pending";
+
+      const adminData = {
+        username,
+        password: hashedPassword,
+      };
+
+      const enterprise = await (storage as DatabaseStorage).createEnterprise(enterpriseData, adminData);
+      res.status(201).json(enterprise);
+    } catch (err) {
+      console.error("Erro ao criar empresa:", err);
+      res.status(500).json({ message: "Erro ao criar empresa. Verifique se os dados estão corretos." });
+    }
+  });
+
+  app.put("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    const updated = await storage.updateEnterprise(Number(req.params.id), req.body);
+    res.json(updated);
+  });
+
+  app.put("/api/admin/enterprises/:id/status", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    const { status } = req.body;
+    if (!["active", "rejected", "pending"].includes(status)) {
+      return res.status(400).json({ message: "Status inválido" });
+    }
+    const updated = await storage.updateEnterprise(Number(req.params.id), { status });
+    res.json(updated);
+  });
+
+  app.delete("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    await storage.deleteEnterprise(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.get("/api/settings", async (req, res) => {
+    const enterpriseId = req.query.enterpriseId ? Number(req.query.enterpriseId) : undefined;
+    const s = await storage.getSettings(enterpriseId);
+    res.json(s);
+  });
+
+  app.post("/api/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    const s = await storage.updateSettings(req.body);
+    res.json(s);
+  });
+
+  // Rota pública de upload usada durante o cadastro (sem auth, pois o usuário ainda não está logado)
+  app.post("/api/public/upload", upload.single("file"), (req: any, res) => {
+    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+    res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+  });
+
+  // Rota de upload autenticada (para uso interno/admin)
+  app.post("/api/admin/upload", isAuthenticated, upload.single("file"), (req: any, res) => {
+    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+    res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+  });
+
+  function isAuthenticated(req: any, res: any, next: any) {
+    if (req.isAuthenticated()) return next();
+    res.status(401).json({ message: "Unauthorized" });
+  }
+
+  // Fiscal Routes
+  app.get("/api/download/app", (req, res) => {
+    const filePath = path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe");
+    if (!fs.existsSync(filePath)) {
+      console.error("Arquivo não encontrado em:", filePath);
+      return res.status(404).json({ message: "Arquivo de download não encontrado" });
+    }
+    res.download(filePath, "AuraSystem.exe");
+  });
+
+  app.get("/api/windows/stream", isAuthenticated, (req, res) => {
+    // Rota placeholder para o stream do Windows
+    res.send("<html><body style='background:black;color:white;display:flex;align-items:center;justify-content:center;height:100vh;font-family:sans-serif;'>Conectando ao stream do Windows...</body></html>");
+  });
+
+  app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const settings = await storage.getFiscalSettings(user.enterpriseId);
+    if (!settings) {
+      // Pré-preenche com os dados já cadastrados no estabelecimento
+      const enterprise = await storage.getEnterprise(user.enterpriseId);
+      const defaultSettings = {
+        enterpriseId: user.enterpriseId,
+        razaoSocial: enterprise?.name ?? "",
+        nomeFantasia: enterprise?.name ?? "",
+        cnpj: enterprise?.taxId ?? "",
+        inscricaoEstadual: "",
+        logradouro: enterprise?.address ?? "",
+        numero: "",
+        bairro: "",
+        municipio: enterprise?.city ?? "",
+        codigoIbge: "",
+        uf: enterprise?.state ?? "SP",
+        cep: "",
+        regimeTributario: "1",
+        ambiente: "homologacao",
+        simulacaoReal: false
+      };
+      const created = await storage.upsertFiscalSettings(defaultSettings as any);
+      return res.json(created);
+    }
+    // Se já existe mas campos estão vazios, sincroniza com dados do estabelecimento
+    // Verifica cada campo individualmente para não sobrescrever dados que o usuário preencheu manualmente
+    const enterprise = await storage.getEnterprise(user.enterpriseId);
+    if (enterprise) {
+      const needsSync =
+        (!settings.cnpj && enterprise.taxId) ||
+        (!settings.razaoSocial && enterprise.name) ||
+        (!settings.nomeFantasia && enterprise.name) ||
+        (!settings.logradouro && enterprise.address) ||
+        (!settings.municipio && enterprise.city) ||
+        (!settings.uf && enterprise.state);
+
+      if (needsSync) {
+        const updated = await storage.upsertFiscalSettings({
+          ...settings,
+          razaoSocial: settings.razaoSocial || enterprise.name || "",
+          nomeFantasia: settings.nomeFantasia || enterprise.name || "",
+          cnpj: settings.cnpj || enterprise.taxId || "",
+          logradouro: settings.logradouro || enterprise.address || "",
+          municipio: settings.municipio || enterprise.city || "",
+          uf: settings.uf || enterprise.state || "SP",
+        } as any);
+        return res.json(updated);
+      }
+    }
+    res.json(settings);
+  });
+
+  app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    try {
+      const enterpriseId = user.enterpriseId || 1;
+      const currentSettings = await storage.getFiscalSettings(enterpriseId);
+      
+      const dataToParse = { 
+        ...currentSettings,
+        ...req.body, 
+        enterpriseId: enterpriseId
+      };
+      
+      // Ensure specific fields have correct types for Zod
+      if (dataToParse.ultimoNumeroNfce !== undefined) dataToParse.ultimoNumeroNfce = Number(dataToParse.ultimoNumeroNfce);
+      if (dataToParse.serieNfce !== undefined) dataToParse.serieNfce = Number(dataToParse.serieNfce);
+      if (dataToParse.simulacaoReal !== undefined) dataToParse.simulacaoReal = !!dataToParse.simulacaoReal;
+
+      const data = insertFiscalSettingsSchema.parse(dataToParse);
+      const settings = await storage.upsertFiscalSettings(data);
+      res.json(settings);
+    } catch (err) {
+      console.error("Erro ao salvar configurações fiscais:", err);
+      res.status(400).json({ message: "Dados fiscais inválidos" });
+    }
+  });
+
+  app.get("/api/fiscal/logs", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const logs = await storage.getLogsFiscais(user.enterpriseId);
+    res.json(logs);
+  });
+
+  app.post("/api/fiscal/emitir/:saleId", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const saleId = Number(req.params.saleId);
+    
+    try {
+      const sale = await storage.getSale(saleId);
+      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      
+      if (sale.status === "simulation") {
+        const nfceData = await storage.createNfce({
+          saleId,
+          numero: Math.floor(Math.random() * 1000000),
+          serie: 1,
+          chaveAcesso: "SIMULACAO" + Math.random().toString(36).substring(7).toUpperCase(),
+          status: "simulated",
+          valorTotal: sale.totalAmount,
+          dataEmissao: new Date(),
+        });
+
+        // Update sale to reflected simulated status if not already
+        if (sale.fiscalStatus !== "simulated") {
+          await storage.updateSaleFiscal(saleId, {
+            fiscalStatus: "simulated",
+            fiscalKey: nfceData.chaveAcesso,
+            fiscalType: "NFCe"
+          });
+        }
+
+        return res.json({ success: true, key: nfceData.chaveAcesso, nfce: nfceData, simulado: true });
+      }
+
+      if (sale.fiscalStatus === "authorized") {
+        return res.status(400).json({ message: "NFC-e já emitida para esta venda" });
+      }
+
+      const [enrichedItems, salePayments, settings] = await Promise.all([
+        storage.getSaleItemsWithNames(saleId),
+        storage.getPayments(saleId),
+        storage.getFiscalSettings(user.enterpriseId)
+      ]);
+      
+      if (!settings) {
+        return res.status(400).json({ message: "Configurações fiscais não encontradas" });
+      }
+
+      // Add payments to sale object for XML generation
+      const saleWithPayments = { ...sale, payments: salePayments };
+
+      // 1. Validar NCM/CFOP (aviso, não bloqueia — usa fallback no XML)
+      for (const item of enrichedItems) {
+        if (!item.ncm || !item.cfop) {
+          console.warn(`[FISCAL] Item ${item.itemId} (${item.name}) sem NCM/CFOP — usando fallback 00000000/5102`);
+        }
+      }
+
+      const { generateNFCeXML, signXML, transmitToSefaz, generateChaveAcesso, generateQRCode } = await import("./fiscal/nfce");
+      
+      // 2. Gerar número sequencial
+      const nNF = await storage.getNextNfceNumber(user.enterpriseId);
+      
+      // 3. Gerar Chave de Acesso
+      const chave = generateChaveAcesso(settings, nNF);
+
+      // 4. Gerar XML com itens enriquecidos (nome, NCM, CFOP)
+      const xml = generateNFCeXML(saleWithPayments, enrichedItems, settings, nNF, chave);
+      
+      // 5. Assinar XML (real se tiver certificado, simulado se não tiver)
+      const xmlSigned = await signXML(xml, settings);
+      
+      // 6. Transmitir — simulacaoReal força bypass mesmo com certificado
+      let result;
+      if (settings.simulacaoReal) {
+        console.log("[FISCAL] simulacaoReal=true — bypass SEFAZ, protocolo local");
+        result = {
+          success: true,
+          protocol: "SIM" + Math.floor(Math.random() * 1000000000),
+          key: chave,
+          cStat: "100",
+          xMotivo: "Simulação Real Autorizada (configuração ativa)"
+        };
+      } else {
+        result = await transmitToSefaz(xmlSigned, settings);
+      }
+      
+      if (result.success) {
+        const qrCode = generateQRCode(chave, settings);
+        const fiscalStatus = (settings.simulacaoReal || result.simulado) ? "simulated" : "authorized";
+        
+        const nfceData = await storage.createNfce({
+          saleId,
+          numero: nNF,
+          serie: settings.serieNfce,
+          chaveAcesso: chave,
+          xmlEnviado: xml,
+          xmlAutorizado: xmlSigned,
+          protocolo: result.protocol,
+          status: fiscalStatus,
+          valorTotal: sale.totalAmount,
+          dataEmissao: new Date(),
+        });
+
+        await storage.updateSaleFiscal(saleId, {
+          fiscalStatus,
+          fiscalKey: chave,
+          fiscalXml: xmlSigned,
+          fiscalType: "NFCe"
+        });
+
+        // Retorna dados completos para impressão do DANFE
+        const saleData = {
+          ...sale,
+          items: enrichedItems,
+          payments: salePayments,
+          customerName: sale.customerName,
+          customerTaxId: sale.customerTaxId,
+        };
+
+        res.json({ success: true, key: chave, nfce: { ...nfceData, qrCode }, qrCode, saleData });
+      } else {
+        await storage.updateSaleFiscal(saleId, {
+          fiscalStatus: "rejected",
+          fiscalError: result.xMotivo
+        });
+        res.status(400).json({ message: result.xMotivo, cStat: result.cStat });
+      }
+    } catch (err: any) {
+      console.error("Erro na emissão fiscal:", err);
+      await storage.updateSaleFiscal(saleId, {
+        fiscalStatus: "error",
+        fiscalError: err.message
+      });
+      res.status(500).json({ message: err.message || "Erro na emissão fiscal" });
+    }
+  });
+
+  app.get("/api/fiscal/history", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+    const history = await storage.getNfceHistory(user.enterpriseId);
+    res.json(history);
+  });
+
+  // Services Routes
+  app.get(api.services.list.path, async (req, res) => {
+    const services = await storage.getServices();
+    res.json(services);
+  });
+
+  app.post(api.services.create.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.services.create.input.parse(req.body);
+      const service = await storage.createService(input);
+      res.status(201).json(service);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.put(api.services.update.path, isAuthenticated, async (req, res) => {
+    try {
+      const input = api.services.update.input.parse(req.body);
+      const service = await storage.updateService(Number(req.params.id), input);
+      res.json(service);
+    } catch (err) {
+      res.status(500).json({ message: "Update failed" });
+    }
+  });
+
+  app.delete(api.services.delete.path, isAuthenticated, async (req, res) => {
+    await storage.deleteService(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  // Queue Routes
+  app.get(api.queue.state.path, async (req, res) => {
+    const state = await storage.getQueueState();
+    res.json(state);
+  });
+
+  app.post(api.queue.next.path, async (req, res) => {
+    const state = await storage.getQueueState();
+    const newState = await storage.updateQueueState({ servingNumber: state.servingNumber + 1 });
+    res.json(newState);
+  });
+
+  app.post(api.queue.prev.path, async (req, res) => {
+    const state = await storage.getQueueState();
+    const newNum = Math.max(0, state.servingNumber - 1);
+    const newState = await storage.updateQueueState({ servingNumber: newNum });
+    res.json(newState);
+  });
+
+  app.post(api.queue.reset.path, async (req, res) => {
+    const input = api.queue.reset.input.parse(req.body);
+    const newState = await storage.updateQueueState({ servingNumber: input.startFrom, currentNumber: input.startFrom });
+    res.json(newState);
+  });
+
+  app.post(api.queue.set.path, async (req, res) => {
+    const input = api.queue.set.input.parse(req.body);
+    const newState = await storage.updateQueueState({ servingNumber: input.number });
+    res.json(newState);
+  });
+
+  app.post(api.queue.createTicket.path, async (req, res) => {
+    const input = api.queue.createTicket.input.parse(req.body);
+    const state = await storage.getQueueState();
+    
+    // Find next available ticket number that isn't currently active (pending or serving)
+    let nextNum = state.currentNumber + 1;
+    let isUnique = false;
+    while (!isUnique) {
+      const existing = await db.select().from(tickets).where(and(
+        eq(tickets.ticketNumber, nextNum),
+        or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
+      )).limit(1);
+      
+      if (existing.length === 0) {
+        isUnique = true;
+      } else {
+        nextNum++;
+      }
+    }
+
+    await storage.updateQueueState({ currentNumber: nextNum });
+    const ticket = await storage.createTicket({
+      ticketNumber: nextNum,
+      serviceId: input.serviceId,
+      status: "pending"
+    });
+    res.status(201).json(ticket);
+  });
+
+  // Digital Menu Routes
+  app.get("/api/categories", async (req, res) => {
+    const categoriesList = await storage.getCategories();
+    res.json(categoriesList);
+  });
+
+  // Inventory API
+  app.post("/api/inventory", isAuthenticated, async (req, res) => {
+    try {
+      const body = { ...req.body };
+      // Trata a conversão de string de data para objeto Date se necessário
+      if (body.expiryDate && typeof body.expiryDate === 'string') {
+        body.expiryDate = new Date(body.expiryDate);
+      }
+      
+      // Se costPrice ou salePrice vierem como string com vírgula ou ponto decimal, tratamos aqui
+      if (typeof body.costPrice === 'string') {
+        body.costPrice = Math.round(Number(body.costPrice.replace(',', '.')) * 100);
+      }
+      if (typeof body.salePrice === 'string') {
+        body.salePrice = Math.round(Number(body.salePrice.replace(',', '.')) * 100);
+      }
+
+      const item = await storage.upsertInventory(body);
+      res.json(item);
+    } catch (err) {
+      console.error("Erro no upsert de inventário:", err);
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Erro ao atualizar estoque" });
+      }
+    }
+  });
+
+  app.get("/api/inventory", isAuthenticated, async (req, res) => {
+    const items = await storage.getInventory();
+    // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
+    const normalizedItems = items.map(item => ({
+      ...item,
+      imageUrl: item.imageUrl || (item as any).image_url || null
+    }));
+    res.json(normalizedItems);
+  });
+
+  app.get("/api/inventory/barcode/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const item = await storage.getInventoryItemByBarcode(req.params.barcode);
+      if (!item) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(item);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao buscar produto" });
+    }
+  });
+
+  app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteInventoryItem(Number(req.params.id));
+      res.status(204).send();
+    } catch (err) {
+      console.error("Erro ao deletar item do estoque:", err);
+      res.status(500).json({ message: "Erro ao deletar item do estoque" });
+    }
+  });
+
+  app.post("/api/inventory/:id/restock", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
+
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+      }
+
+      const restockData = {
+        quantity: parseInt(quantity),
+        unit: unit || undefined,
+        itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit) : undefined,
+        costPrice: costPrice ? Math.round(Number(String(costPrice).replace(',', '.')) * 100) : undefined,
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined
+      };
+
+      const item = await storage.restockInventory(id, restockData);
+      res.json(item);
+    } catch (err: any) {
+      console.error("Erro na reposição de estoque:", err);
+      res.status(500).json({ message: err.message || "Erro ao fazer reposição de estoque" });
+    }
+  });
+
+  app.get("/api/inventory/:id/restocks", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const restocks = await storage.getInventoryRestocks(id);
+      res.json(restocks);
+    } catch (err: any) {
+      console.error("Erro ao buscar reposições:", err);
+      res.status(500).json({ message: err.message || "Erro ao buscar reposições" });
+    }
+  });
+
+  app.get("/api/inventory-restocks", isAuthenticated, async (req, res) => {
+    try {
+      const restocks = await storage.getAllInventoryRestocks();
+      res.json(restocks);
+    } catch (err: any) {
+      console.error("Erro ao buscar todas as reposições:", err);
+      res.status(500).json({ message: err.message || "Erro ao buscar reposições" });
+    }
+  });
+
+  // ─── Produto → Lotes API ────────────────────────────────────────────────────
+
+  app.get("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const { q } = req.query;
+      const items = q
+        ? await storage.searchProducts(q as string)
+        : await storage.getProducts();
+      res.json(items);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao listar produtos" });
+    }
+  });
+
+  // Produtos+lotes achatados para o caixa — cada lote vira um item vendável
+  app.get("/api/products/cashier-items", isAuthenticated, async (req, res) => {
+    try {
+      const prods = await storage.getProducts();
+      const result: any[] = [];
+      for (const prod of prods) {
+        const batchList = await storage.getProductBatches(prod.id);
+        if (batchList.length === 0) continue;
+        for (const batch of batchList) {
+          if (batch.quantity <= 0) continue;
+          const variantLabel = batch.variantName || batch.batchNumber || null;
+          const name = variantLabel ? `${prod.name} – ${variantLabel}` : prod.name;
+          result.push({
+            id: 500000 + batch.id,          // ID único sem colisão com menu/inventory
+            _source: "product-batch",
+            _productId: prod.id,
+            _batchId: batch.id,
+            name,
+            price: batch.salePrice ?? prod.salePrice ?? 0,
+            barcode: batch.barcode ?? null,
+            sku: batch.sku ?? null,
+            codigoProduto: (prod as any).codigoProduto ?? null,
+            codigoBalanca: prod.codigoBalanca ?? null,
+            imageUrl: prod.imageUrl ?? null,
+            isAvailable: true,
+            unitType: prod.unit === "kg" ? "kg" : "unit",
+            unit: prod.unit,
+            quantity: batch.quantity,
+          });
+        }
+      }
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao montar itens do caixa" });
+    }
+  });
+
+  app.get("/api/products/barcode/:barcode", isAuthenticated, async (req, res) => {
+    try {
+      const product = await storage.findProductByBarcode(req.params.barcode);
+      if (!product) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(product);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // Busca produto/variante por SKU (código interno da variante)
+  app.get("/api/products/sku/:sku", isAuthenticated, async (req, res) => {
+    try {
+      const product = await storage.findProductByVariantSku(req.params.sku);
+      if (!product) return res.status(404).json({ message: "Variante não encontrada pelo SKU informado" });
+      res.json(product);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      const p = await storage.getProduct(Number(req.params.id));
+      if (!p) return res.status(404).json({ message: "Produto não encontrado" });
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products/swap-codigo", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password, displacedProductId, displacedNewCode } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      // Update displaced product's code
+      await storage.updateProduct(Number(displacedProductId), {
+        codigoProduto: displacedNewCode || null,
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao trocar código" });
+    }
+  });
+
+  app.post("/api/products/check-duplicate", isAuthenticated, async (req, res) => {
+    try {
+      const dup = await storage.findDuplicateProduct(req.body);
+      res.json(dup || null);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const { salePrice, minStock, ...rest } = req.body;
+      const data = {
+        ...rest,
+        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        minStock: minStock ? Number(minStock) : 5,
+      };
+      const p = await storage.createProduct(data);
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar produto" });
+    }
+  });
+
+  app.put("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
+      const data = {
+        ...rest,
+        salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
+        minStock: minStock !== undefined ? Number(minStock) : undefined,
+        ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
+      };
+      const p = await storage.updateProduct(Number(req.params.id), data);
+      res.json(p);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar produto" });
+    }
+  });
+
+  app.delete("/api/products", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      await storage.clearAllProducts(user.username);
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao limpar estoque" });
+    }
+  });
+
+  app.get("/api/products/snapshot", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const snapshot = await storage.getLatestStockSnapshot();
+      res.json(snapshot);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao buscar snapshot" });
+    }
+  });
+
+  app.post("/api/products/restore", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      const result = await storage.restoreStockSnapshot();
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao restaurar estoque" });
+    }
+  });
+
+  app.post("/api/products/zero-quantities", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito a administradores" });
+      const { password } = req.body;
+      if (!password) return res.status(400).json({ message: "Senha obrigatória" });
+      const dbUser = await storage.getUserByUsername(user.username);
+      if (!dbUser) return res.status(401).json({ message: "Usuário não encontrado" });
+      const valid = await comparePassword(dbUser.password, password);
+      if (!valid) return res.status(401).json({ message: "Senha incorreta" });
+      const count = await storage.zeroAllBatchQuantities(user.username);
+      res.json({ batchesZeroed: count });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao zerar quantidades" });
+    }
+  });
+
+  app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteProduct(Number(req.params.id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao excluir produto" });
+    }
+  });
+
+  // Batches
+  app.get("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+    try {
+      const b = await storage.getProductBatches(Number(req.params.id));
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.post("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const productId = Number(req.params.id);
+      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const b = await storage.createBatch({
+        productId,
+        ...rest,
+        quantity: Number(quantity) || 0,
+        costPrice: costPrice ? Math.round(Number(String(costPrice).replace(",", ".")) * 100) : 0,
+        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        expiryDate: expiryDate ? new Date(expiryDate) : null,
+        manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
+        entryDate: entryDate ? new Date(entryDate) : new Date(),
+        userId: user.id,
+      } as any);
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao criar lote" });
+    }
+  });
+
+  app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const data: any = { ...rest };
+      if (quantity !== undefined) data.quantity = Number(quantity);
+      if (costPrice !== undefined) data.costPrice = Math.round(Number(String(costPrice).replace(",", ".")) * 100);
+      if (salePrice !== undefined) data.salePrice = salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null;
+      if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
+      if (manufactureDate !== undefined) data.manufactureDate = manufactureDate ? new Date(manufactureDate) : null;
+      if (entryDate !== undefined) data.entryDate = new Date(entryDate);
+      const b = await storage.updateBatch(Number(req.params.id), data);
+      res.json(b);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao atualizar lote" });
+    }
+  });
+
+  app.delete("/api/batches/:id", isAuthenticated, async (req, res) => {
+    try {
+      await storage.deleteBatch(Number(req.params.id));
+      res.status(204).send();
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || "Erro ao excluir lote" });
+    }
+  });
+
+  app.post("/api/products/:id/deduct", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { quantity, reason } = req.body;
+      await storage.deductBatchesFefo(Number(req.params.id), Number(quantity), user.id, reason || "Baixa manual");
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.get("/api/products/:id/logs", isAuthenticated, async (req, res) => {
+    try {
+      const logs = await storage.getBatchLogs(Number(req.params.id));
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ─── Fim Produto → Lotes API ────────────────────────────────────────────────
+
+  app.get("/api/menu-items", async (req, res) => {
+    const items = (await storage.getMenuItems()).map(item => ({
+      ...item,
+      tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []),
+      unitType: (item as any).unitType || "unit"
+    }));
+    res.json(items);
+  });
+
+  app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const { rotation, imageScale } = req.body;
+      const updated = await storage.updateMenuItem(id, { rotation, imageScale });
+      res.json(updated);
+    } catch (err) {
+      console.error("Erro ao ajustar produto:", err);
+      res.status(500).json({ message: "Erro ao salvar ajustes do produto" });
+    }
+  });
+
+  // Cashier API
+  app.get("/api/cash-register/open", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
+    const register = await storage.getOpenCashRegister(user.id);
+    if (!register) return res.status(404).json({ message: "No open register" });
+    res.json(register);
+  });
+
+  app.post("/api/cash-register/open", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
+    const existing = await storage.getOpenCashRegister(user.id);
+    if (existing) return res.status(400).json({ message: "Register already open" });
+    
+    const data = insertCashRegisterSchema.parse({
+      ...req.body,
+      userId: user.id,
+      status: "open",
+      openedAt: new Date()
+    });
+    const register = await storage.openCashRegister(data);
+    res.json(register);
+  });
+
+  app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.role !== "admin" && user.username !== "SkelleTu") {
+      return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    }
+    const { id, amount } = req.body;
+    const updated = await storage.updateCashRegisterOpeningAmount(id, amount);
+    res.json(updated);
+  });
+
+  app.post("/api/cash-register/close", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
+    const register = await storage.getOpenCashRegister(user.id);
+    if (!register) return res.status(404).json({ message: "No open register" });
+    
+    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
+    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
+    const updated = await storage.closeCashRegister(register.id, closingAmount);
+    res.json(updated);
+  });
+
+  app.post("/api/sales", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    const user = req.user as any;
+    const register = await storage.getOpenCashRegister(user.id);
+    if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
+
+    const { sale, items, payments, ticketId } = req.body;
+    
+    const parsedSale = insertSaleSchema.parse({ 
+      ...sale, 
+      cashRegisterId: register.id, 
+      userId: user.id,
+      fiscalStatus: sale.customerTaxId ? "pending" : "none",
+      createdAt: new Date()
+    });
+    const parsedItems = items.map((item: any) => insertSaleItemSchema.parse(item));
+    const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse(p));
+
+    const newSale = await storage.createSale(
+      parsedSale,
+      parsedItems,
+      parsedPayments
+    );
+
+    if (ticketId) {
+      // Mark ticket as completed when sale is finalized
+      await db.update(tickets).set({ status: "completed" }).where(eq(tickets.id, ticketId));
+    }
+
+    // Notificação Webhook Simples (Ex: para o dono receber via celular)
+    const WEBHOOK_URL = process.env.NOTIFICATION_WEBHOOK_URL;
+    if (WEBHOOK_URL) {
+      fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `💰 Nova Venda: R$ ${(newSale.totalAmount / 100).toFixed(2)}`,
+          saleId: newSale.id,
+          methods: payments.map((p: any) => p.method).join(", ")
+        })
+      }).catch(err => console.error("Erro ao enviar notificação:", err));
+    }
+
+    res.json(newSale);
+  });
+
+  app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
+    try {
+      const { start, end } = req.query;
+      const filters: any = {};
+      if (start) filters.startDate = new Date(start as string);
+      if (end) filters.endDate = new Date(end as string);
+
+      const registers = await storage.getCashRegisters(filters);
+      
+      // For each register, fetch its sales with items
+      const enrichedRegisters = await Promise.all(registers.map(async (reg) => {
+        const regSales = await storage.getSalesByRegisterId(reg.id);
+        const enrichedSales = await Promise.all(regSales.map(async (sale) => {
+          const items = await storage.getSaleItems(sale.id);
+          const payments = await storage.getPayments(sale.id);
+          return { ...sale, items, payments };
+        }));
+        return { ...reg, sales: enrichedSales };
+      }));
+
+      res.json(enrichedRegisters);
+    } catch (err) {
+      console.error("Error fetching register history:", err);
+      res.status(500).json({ message: "Erro ao buscar histórico de caixas" });
+    }
+  });
+
+  app.get("/api/sales", isAuthenticated, async (req, res) => {
+    const { start, end } = req.query;
+    
+    let startDate: Date | undefined;
+    let endDate: Date | undefined;
+
+    const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
+
+    if (start && start !== "undefined" && start !== "") {
+      const date = new Date(start as string);
+      if (isValidDate(date)) startDate = date;
+    }
+
+    if (end && end !== "undefined" && end !== "") {
+      const date = new Date(end as string);
+      if (isValidDate(date)) endDate = date;
+    }
+
+    const filters = { startDate, endDate };
+    const salesList = await storage.getSales(filters);
+    res.json(salesList);
+  });
+
+  app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) {
+        return res.status(400).json({ message: "ID de venda inválido" });
+      }
+
+      const cancelledSale = await storage.cancelSale(id);
+      res.json(cancelledSale);
+    } catch (err: any) {
+      console.error(`Erro ao cancelar venda #${req.params.id}:`, err);
+      const message = err?.message || "Erro ao cancelar venda";
+      const status = message === "Venda não encontrada" ? 404 : 500;
+      res.status(status).json({ message });
+    }
+  });
+
+  app.post("/api/sales/:id/emit-fiscal", isAuthenticated, async (req, res) => {
+    try {
+      const id = Number(req.params.id);
+      const salesList = await storage.getSales({});
+      const sale = salesList.find(s => s.id === id);
+      
+      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      if (!sale.customerTaxId) return res.status(400).json({ message: "CPF necessário para emissão" });
+
+      // Simulação de emissão (Estrutura completa NF-e / NFC-e)
+      const isNFCe = sale.fiscalType === "NFCe";
+      const mod = isNFCe ? "65" : "55";
+      const simulatedKey = `35240100000000000191${mod}001${String(sale.id).padStart(9, '0')}123456789`;
+      
+      const simulatedXml = `<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe${simulatedKey}" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <natOp>Venda de Mercadoria</natOp>
+        <mod>${mod}</mod>
+        <serie>1</serie>
+        <nNF>${sale.id}</nNF>
+        <dhEmi>${new Date().toISOString()}</dhEmi>
+        <tpImp>${isNFCe ? '4' : '1'}</tpImp>
+      </ide>
+      <emit>
+        <CNPJ>00000000000191</CNPJ>
+        <xNome>Barbearia &amp; Padaria SkelleTu</xNome>
+        <enderEmit>
+          <xLgr>Rua Exemplo</xLgr><nro>123</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>SAO PAULO</xMun><UF>SP</UF>
+        </enderEmit>
+        <CRT>1</CRT>
+      </emit>
+      <dest>
+        <CPF>${sale.customerTaxId}</CPF>
+        <xNome>${sale.customerName || 'Consumidor Final'}</xNome>
+        ${!isNFCe ? `<enderDest><xLgr>${sale.customerAddress || ''}</xLgr><nro>SN</nro><xBairro>Bairro</xBairro><cMun>3550308</cMun><xMun>${sale.customerCity || ''}</xMun><UF>${sale.customerState || ''}</UF></enderDest>` : ''}
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>Serviço/Produto Geral</xProd>
+          <NCM>00000000</NCM>
+          <CFOP>${isNFCe ? '5102' : '5101'}</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>${(sale.totalAmount/100).toFixed(2)}</vUnCom>
+          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd>
+        </prod>
+        <imposto>
+          <vTotTrib>${(sale.totalAmount * 0.1345 / 100).toFixed(2)}</vTotTrib>
+          <ICMS><ICMS00><orig>0</orig><CST>00</CST><modBC>3</modBC><vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><pICMS>18.00</pICMS><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS></ICMS00></ICMS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS>
+          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd><vNF>${(sale.totalAmount/100).toFixed(2)}</vNF>
+        </ICMSTot>
+      </total>
+      <transp><modFrete>9</modFrete></transp>
+      <pag>
+        <detPag><tPag>01</tPag><vPag>${(sale.totalAmount/100).toFixed(2)}</vPag></detPag>
+      </pag>
+    </infNFe>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>...</Signature>
+  </NFe>
+</nfeProc>`;
+      
+      const updatedSale = await storage.updateSaleFiscal(sale.id, {
+        fiscalStatus: "issued",
+        fiscalKey: simulatedKey,
+        fiscalXml: simulatedXml
+      });
+
+      res.json({ 
+        message: "Simulação de emissão concluída", 
+        key: simulatedKey,
+        status: "issued",
+        sale: updatedSale
+      });
+    } catch (err) {
+      res.status(500).json({ message: "Erro na simulação fiscal" });
+    }
+  });
+
+  app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+      
+      const id = Number(req.params.id);
+      const { rotation, imageScale } = req.body;
+      
+      // Se for um item do inventário (ID > 10000), precisamos atualizar no inventário
+      if (id > 10000) {
+        const inventoryId = id - 10000;
+        const updated = await storage.updateInventoryItem(inventoryId, { 
+          rotation: Number(rotation), 
+          imageScale: Number(imageScale) 
+        });
+        return res.json(updated);
+      }
+      
+      const updated = await storage.updateMenuItem(id, { 
+        rotation: Number(rotation), 
+        imageScale: Number(imageScale) 
+      });
+      
+      res.json(updated);
+    } catch (err) {
+      console.error("Erro ao ajustar item do menu:", err);
+      res.status(500).json({ message: "Erro ao salvar ajustes" });
+    }
+  });
+
+  app.get("/api/transactions", isAuthenticated, async (req, res) => {
+    try {
+      const { start, end, businessType } = req.query;
+      console.log('API Request - GET /api/transactions:', { start, end, businessType });
+      
+      let startDate: Date | undefined;
+      let endDate: Date | undefined;
+
+      const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
+
+      if (start && start !== "undefined" && start !== "") {
+        const date = new Date(start as string);
+        if (isValidDate(date)) startDate = date;
+      }
+
+      if (end && end !== "undefined" && end !== "") {
+        const date = new Date(end as string);
+        if (isValidDate(date)) endDate = date;
+      }
+
+      const filters = {
+        startDate,
+        endDate,
+        businessType: businessType as string,
+      };
+      const list = await storage.getTransactions(filters);
+      console.log('Storage returned transactions count:', list.length);
+      res.json(list);
+    } catch (err) {
+      console.error('Error in GET /api/transactions:', err);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+    try {
+      const input = insertTransactionSchema.parse(req.body);
+      const transaction = await storage.createTransaction(input);
+      res.status(201).json(transaction);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        res.status(400).json({ message: err.errors[0].message });
+      } else {
+        res.status(500).json({ message: "Internal server error" });
+      }
+    }
+  });
+
+  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteTransaction(id);
+      res.status(200).json({ message: "Transaction deleted" });
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Inventory API
+  app.get("/api/inventory", isAuthenticated, async (req, res) => {
+    const items = await storage.getInventory();
+    // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
+    const normalizedItems = items.map(item => ({
+      ...item,
+      imageUrl: item.imageUrl || (item as any).image_url || null
+    }));
+    res.json(normalizedItems);
+  });
+
+  app.post("/api/inventory", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+      
+      const { id, ...data } = req.body;
+      
+      // Map frontend fields to database fields if necessary
+      const inventoryData = {
+        ...data,
+        id: (id !== undefined && id !== null && id !== "") ? Number(id) : undefined,
+        rotation: data.rotation || 0,
+        imageScale: data.imageScale || 100,
+        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
+      };
+
+      const item = await storage.upsertInventory(inventoryData);
+      
+      await storage.createInventoryLog({
+        inventoryId: item.id,
+        type: "in",
+        quantity: Number(data.quantity) || 0,
+        reason: id ? "Update" : "Initial Stock",
+        userId: user.id
+      });
+      
+      res.json(item);
+    } catch (err) {
+      console.error("Error updating inventory:", err);
+      res.status(500).json({ message: "Erro ao atualizar estoque" });
+    }
+  });
+
+  app.post("/api/inventory/log", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const log = await storage.createInventoryLog({ ...req.body, userId: user.id });
+    const inv = await storage.getInventoryItem(log.inventoryId);
+    if (inv) {
+      const newQty = log.type === "in" ? inv.quantity + log.quantity : inv.quantity - log.quantity;
+      await storage.updateInventory(inv.id, newQty);
+    }
+    res.json(log);
+  });
+  app.post("/api/tickets/:id/items", async (req, res) => {
+    try {
+      const { items } = req.body;
+      const ticket = await storage.updateTicketItems(Number(req.params.id), items);
+      res.json(ticket);
+    } catch (err) {
+      res.status(500).json({ message: "Erro ao atualizar comanda" });
+    }
+  });
+
+  // Time Clock Routes
+  app.get("/api/time-clock/history", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const history = await storage.getTimeClockHistory(user.id);
+    res.json(history);
+  });
+
+  app.get("/api/admin/time-clock/history/:userId", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao administrador" });
+    const history = await storage.getTimeClockHistory(Number(req.params.userId));
+    res.json(history);
+  });
+
+  app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const latest = await storage.getLatestTimeClock(user.id);
+    res.json({ latest });
+  });
+
+  app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const { type, fingerprintId } = req.body;
+    
+    if (!user.fingerprintId) {
+      return res.status(400).json({ message: "Você precisa cadastrar sua digital primeiro!" });
+    }
+
+    if (fingerprintId !== user.fingerprintId) {
+      return res.status(400).json({ message: "Digital não reconhecida." });
+    }
+    
+    const clock = await storage.createTimeClock({
+      userId: user.id,
+      type, // "in", "break_start", "break_end", "out"
+      timestamp: new Date(),
+      fingerprintId
+    });
+    res.json(clock);
+  });
+
+  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const { fingerprintId } = req.body;
+    if (!fingerprintId) return res.status(400).json({ message: "ID da digital é obrigatório" });
+    
+    await db.update(users).set({ fingerprintId }).where(eq(users.id, user.id));
+    res.json({ message: "Digital vinculada com sucesso" });
+  });
+
+  app.get("/api/tickets/:number", async (req, res) => {
+    const ticket = await storage.getTicketByNumber(Number(req.params.number));
+    if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
+    res.json(ticket);
+  });
+  // Seed only the admin user if it doesn't exist — no demo data
+  const adminUser = await storage.getUserByUsername("SkelleTu");
+  if (!adminUser) {
+    const hashed = await hashPassword("Victor.!.1999");
+    await storage.createUser({
+      username: "SkelleTu",
+      password: hashed,
+      role: "admin"
+    });
+    console.log("Admin user seeded");
+  }
+
+  // ─── BACKUP / SAVE / LOAD ROUTES ────────────────────────────────────────────
+  const {
+    exportAllDataSync,
+    saveBackupToFile,
+    listBackups,
+    importDataFromSnapshot,
+    restoreFromFile,
+    getAutoBackupInfo,
+  } = await import("./backup.js");
+
+  // GET /api/backup/status — info do auto-backup e bancos ativos
+  const { isRemoteEnabled } = await import("./db.js");
+  app.get("/api/backup/status", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    res.json({
+      autoBackup: getAutoBackupInfo(),
+      databases: {
+        local: true,
+        remote: isRemoteEnabled,
+        count: isRemoteEnabled ? 2 : 1,
+      },
+    });
+  });
+
+  // GET /api/backup/export — baixa snapshot JSON completo
+  app.get("/api/backup/export", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const snapshot = exportAllDataSync();
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader(
+        "Content-Disposition",
+        `attachment; filename="aura-backup-${timestamp}.json"`
+      );
+      res.send(JSON.stringify(snapshot, null, 2));
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao exportar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/save — salva snapshot nomeado em arquivo
+  app.post("/api/backup/save", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const { name } = req.body;
+      const filepath = saveBackupToFile(name || undefined);
+      const filename = filepath.split("/").pop()!;
+      res.json({ ok: true, filename, message: `Backup '${filename}' salvo com sucesso` });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao salvar backup: ${e.message}` });
+    }
+  });
+
+  // GET /api/backup/list — lista backups salvos
+  app.get("/api/backup/list", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      res.json(listBackups());
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao listar backups: ${e.message}` });
+    }
+  });
+
+  // GET /api/backup/download/:filename — baixa arquivo de backup específico
+  app.get("/api/backup/download/:filename", (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    const { filename } = req.params;
+    // segurança: só permite nomes simples sem paths
+    if (filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ message: "Nome inválido" });
+    }
+    const filepath = path.join(process.cwd(), "attached_assets", "backups", filename);
+    if (!fs.existsSync(filepath)) return res.status(404).json({ message: "Arquivo não encontrado" });
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.sendFile(path.resolve(filepath));
+  });
+
+  // POST /api/backup/import — restaura a partir de JSON enviado no body
+  app.post("/api/backup/import", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const snapshot = req.body;
+      if (!snapshot || typeof snapshot !== "object") {
+        return res.status(400).json({ message: "JSON de backup inválido" });
+      }
+      const result = await importDataFromSnapshot(snapshot);
+      res.json({ ok: true, ...result });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/restore/:filename — restaura a partir de arquivo salvo
+  app.post("/api/backup/restore/:filename", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    const { filename } = req.params;
+    if (filename.includes("..") || filename.includes("/")) {
+      return res.status(400).json({ message: "Nome inválido" });
+    }
+    try {
+      const result = await restoreFromFile(filename);
+      res.json({ ok: true, ...result, message: "Dados restaurados com sucesso" });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar: ${e.message}` });
+    }
+  });
+
+  // POST /api/backup/restore-auto — restaura a partir do auto-backup
+  app.post("/api/backup/restore-auto", async (req: any, res: any) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    try {
+      const result = await restoreFromFile("auto-backup");
+      res.json({ ok: true, ...result, message: "Auto-backup restaurado com sucesso" });
+    } catch (e: any) {
+      res.status(500).json({ message: `Erro ao restaurar auto-backup: ${e.message}` });
+    }
+  });
+
+  return httpServer;
+}

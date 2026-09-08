@@ -1,0 +1,143 @@
+
+ERRO PRINCIPAL IDENTIFICADO
+--------------------------------------------
+Error: Could not find the build directory:
+/var/task/dist/public
+
+Isso NÃO é erro de banco.
+NÃO é erro de variável.
+NÃO é erro de Preview.
+
+É erro estrutural de arquivos estáticos.
+
+O Express está tentando servir:
+dist/public
+
+Mas o Vite gera:
+dist/
+
+Logo, a pasta não existe na Vercel → erro 500.
+
+--------------------------------------------
+CORREÇÃO 1 — Ajustar caminho dos estáticos
+--------------------------------------------
+
+Abrir:
+server/static.ts
+
+Encontrar algo como:
+
+const buildPath = path.join(process.cwd(), "dist/public");
+
+Trocar para:
+
+const buildPath = path.join(process.cwd(), "dist");
+
+OU
+
+Se você estiver usando Framework Preset: Vite
+e Output Directory: dist
+
+Você pode remover completamente o serveStatic do Express,
+porque a Vercel já serve os arquivos do dist automaticamente.
+
+--------------------------------------------
+CORREÇÃO 2 — Evitar reinicialização do Express (Memory Leak)
+--------------------------------------------
+
+Erro detectado:
+MaxListenersExceededWarning
+
+Isso significa que seu app Express está sendo criado
+a cada requisição.
+
+Abrir:
+api/index.ts
+
+Se estiver assim:
+
+export default async function handler(req, res) {
+  const app = await initApp();
+  return app(req, res);
+}
+
+Isso está errado para serverless.
+
+Trocar para padrão singleton:
+
+let appInstance;
+
+export default async function handler(req, res) {
+  if (!appInstance) {
+    appInstance = await initApp();
+  }
+  return appInstance(req, res);
+}
+
+Assim o Express é criado apenas uma vez por container.
+
+--------------------------------------------
+CORREÇÃO 3 — NÃO usar app.listen() na Vercel
+--------------------------------------------
+
+Se existir:
+
+app.listen(3000);
+
+Trocar para:
+
+if (process.env.NODE_ENV !== "production") {
+  app.listen(3000);
+}
+
+Na Vercel quem controla o servidor é o runtime serverless.
+
+--------------------------------------------
+CORREÇÃO 4 — Confirmar script de build
+--------------------------------------------
+
+No package.json deve existir:
+
+"vercel-build": "vite build && tsc"
+
+Isso garante:
+
+1) Frontend gera dist
+2) Backend compila
+3) Nada é iniciado durante build
+
+--------------------------------------------
+CORREÇÃO 5 — Estrutura ideal do vercel.json
+--------------------------------------------
+
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.ts" }
+  ]
+}
+
+Não redirecionar tudo para Express.
+Deixe a Vercel servir os arquivos estáticos do dist.
+
+--------------------------------------------
+RESUMO FINAL
+
+O erro 500 acontece porque:
+
+✔ Express procura dist/public
+✔ Essa pasta não existe
+✔ Vercel já serve dist automaticamente
+✔ Express está sendo reiniciado a cada request
+
+Após corrigir:
+
+✔ Ajustar ou remover serveStatic
+✔ Implementar singleton no api/index.ts
+✔ Garantir vite build gera dist
+✔ Não usar app.listen em produção
+
+O 500 desaparece.
+
+Se quiser, posso te mandar a arquitetura final limpa
+para Fullstack Vite + Express + Drizzle 100% otimizada
+para Vercel.

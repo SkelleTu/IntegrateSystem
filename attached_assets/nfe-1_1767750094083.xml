@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe>
+    <infNFe Id="NFe3524010000000000019165001000000001123456789" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <natOp>Venda de Mercadoria</natOp>
+        <mod>65</mod>
+        <serie>1</serie>
+        <nNF>1</nNF>
+        <dhEmi>2026-01-07T01:38:22.176Z</dhEmi>
+        <tpImp>4</tpImp>
+      </ide>
+      <emit>
+        <CNPJ>00000000000191</CNPJ>
+        <xNome>Barbearia &amp; Padaria SkelleTu</xNome>
+        <enderEmit>
+          <xLgr>Rua Exemplo</xLgr><nro>123</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>SAO PAULO</xMun><UF>SP</UF>
+        </enderEmit>
+        <CRT>1</CRT>
+      </emit>
+      <dest>
+        <CPF>46504889821</CPF>
+        <xNome>Consumidor Final</xNome>
+        
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>001</cProd>
+          <xProd>Serviço/Produto Geral</xProd>
+          <NCM>00000000</NCM>
+          <CFOP>5102</CFOP>
+          <uCom>UN</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>14.00</vUnCom>
+          <vProd>14.00</vProd>
+        </prod>
+        <imposto>
+          <vTotTrib>1.88</vTotTrib>
+          <ICMS><ICMS00><orig>0</orig><CST>00</CST><modBC>3</modBC><vBC>14.00</vBC><pICMS>18.00</pICMS><vICMS>2.52</vICMS></ICMS00></ICMS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vBC>14.00</vBC><vICMS>2.52</vICMS>
+          <vProd>14.00</vProd><vNF>14.00</vNF>
+        </ICMSTot>
+      </total>
+      <transp><modFrete>9</modFrete></transp>
+      <pag>
+        <detPag><tPag>01</tPag><vPag>14.00</vPag></detPag>
+      </pag>
+    </infNFe>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>...</Signature>
+  </NFe>
+</nfeProc>
