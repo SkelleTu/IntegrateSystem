@@ -2,3 +2,11 @@ node_modules/
 dist/
 .env
 .DS_Store
+
+# AuraPrinter legacy artifacts
+attached_assets/dist_windows/
+client/public/attached_assets/dist_windows/
+client/public/downloads/AuraPrinter.exe
+client/public/downloads/AuraSystem.exe
+attached_assets/windows_app/
+attached_assets/windows_app_source/
