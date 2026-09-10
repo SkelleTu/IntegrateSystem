@@ -57,6 +57,7 @@ import SetupEnterprise from "./pages/SetupEnterprise";
 import { TourProvider } from "@/components/tour/TourContext";
 import { TourEngine } from "@/components/tour/TourEngine";
 import CashRegisterOptions from "@/components/CashRegisterOptions";
+import CashRegisterOpeningFallback from "@/components/CashRegisterOpeningFallback";
 
 function Router() {
   const { data: user, isLoading } = useUser();
@@ -162,9 +163,7 @@ function LandingNavigation() {
       </div>
       <div className="hidden lg:flex items-center gap-6 xl:gap-8">
         {navLinks.map((link) => (
-          <a key={link.href} href={link.href} className="text-zinc-400 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors whitespace-nowrap">
-            {link.label}
-          </a>
+          <a key={link.href} href={link.href} className="text-zinc-400 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors whitespace-nowrap">{link.label}</a>
         ))}
       </div>
       <div className="flex items-center gap-3 shrink-0">
@@ -214,7 +213,12 @@ function AppContent() {
           <LandingNavigation />
           {user && !isLandingPage && location !== "/setup" && <Navbar />}
           <Router />
-          {user && location === "/caixa" && <CashRegisterOptions />}
+          {user && location === "/caixa" && (
+            <>
+              <CashRegisterOptions />
+              <CashRegisterOpeningFallback />
+            </>
+          )}
         </main>
       </div>
       <Toaster />
