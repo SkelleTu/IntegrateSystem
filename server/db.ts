@@ -67,19 +67,29 @@ export async function multiWrite<T>(
   operation: (database: typeof db) => Promise<T>
 ): Promise<T> {
   const dbs = getAllDatabases();
-  const primary = dbs[0];
 
-  const result = await operation(primary);
+  // Executa a mesma operação nos dois bancos em paralelo.
+  // Nenhum banco é tratado como "primário" para fins de escrita.
+  const results = await Promise.allSettled(dbs.map((database) => operation(database)));
 
-  if (dbs.length > 1) {
-    await Promise.allSettled(
-      dbs.slice(1).map((mirrorDb) =>
-        operation(mirrorDb).catch((e) => console.error("Mirror write failed:", e))
-      )
-    );
+  const failures = results
+    .map((result, index) => ({ result, index }))
+    .filter((entry): entry is { result: PromiseRejectedResult; index: number } => entry.result.status === "rejected");
+
+  if (failures.length > 0) {
+    const details = failures
+      .map(({ result, index }) => {
+        const target = dbs[index] === dbRemote ? "Turso" : "SQLite local";
+        const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+        return `${target}: ${reason}`;
+      })
+      .join(" | ");
+
+    throw new Error(`Falha na gravação simultânea do banco de dados. ${details}`);
   }
 
-  return result;
+  // Mantém a compatibilidade atual: devolve o resultado do primeiro banco.
+  return (results[0] as PromiseFulfilledResult<T>).value;
 }
 
 // ─── 6. Setup / auto-migração das tabelas ────────────────────────────────────
