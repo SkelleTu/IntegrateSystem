@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('aura', {
   toggleMaximize: () => ipcRenderer.send('toggle-maximize'),
   onMaximized: (cb) => ipcRenderer.on('window-maximized', (_e, v) => cb(v)),
   onUnmaximized: (cb) => ipcRenderer.on('window-unmaximized', () => cb()),
+  saveTextFile: (payload) => ipcRenderer.invoke('aura-save-text-file', payload),
 });
