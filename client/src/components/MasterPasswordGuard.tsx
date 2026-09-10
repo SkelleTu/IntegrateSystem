@@ -11,9 +11,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ShieldAlert, Lock } from "lucide-react";
+import { ShieldAlert, Lock, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
 
 interface MasterPasswordGuardProps {
   open: boolean;
@@ -24,27 +23,49 @@ interface MasterPasswordGuardProps {
 
 export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Acesso Restrito" }: MasterPasswordGuardProps) {
   const [password, setPassword] = useState("");
+  const [isVerifying, setIsVerifying] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
 
-  const handleConfirm = () => {
-    // If user is already master, we don't even show the dialog usually, 
-    // but as a fallback/guard:
-    if (user?.username === "SkelleTu" || password === "Victor.!.1999") {
+  const handleConfirm = async () => {
+    if (!password || isVerifying) return;
+
+    setIsVerifying(true);
+    try {
+      const res = await fetch("/api/auth/verify-admin-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast({
+          title: "Senha Incorreta",
+          description: data.message || "A senha administrativa informada é inválida.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       onSuccess();
       onOpenChange(false);
       setPassword("");
-    } else {
+    } catch (error: any) {
       toast({
-        title: "Senha Incorreta",
-        description: "A senha master informada é inválida.",
+        title: "Falha na autorização",
+        description: error?.message || "Não foi possível validar a senha administrativa.",
         variant: "destructive",
       });
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog open={open} onOpenChange={(value) => {
+      if (!value) setPassword("");
+      onOpenChange(value);
+    }}>
       <AlertDialogContent className="bg-zinc-950 border-white/10 text-white">
         <AlertDialogHeader>
           <div className="flex items-center gap-2 mb-2">
@@ -54,7 +75,7 @@ export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Ac
             </AlertDialogTitle>
           </div>
           <AlertDialogDescription className="text-zinc-400">
-            Esta área é restrita. Por favor, insira a senha da conta mestre para continuar.
+            Esta operação exige a senha administrativa do estabelecimento, a mesma utilizada no acesso à plataforma.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
@@ -62,32 +83,38 @@ export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Ac
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase text-zinc-500 tracking-widest flex items-center gap-2">
               <Lock className="w-3 h-3" />
-              Senha Master
+              Senha Administrativa
             </Label>
             <Input
               type="password"
-              placeholder="Digite a senha Victor.!.1999"
+              placeholder="Digite sua senha"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+              onKeyDown={(e) => e.key === "Enter" && void handleConfirm()}
               className="bg-black border-white/5 focus:border-primary/50 text-white h-12"
               autoFocus
+              disabled={isVerifying}
             />
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel 
+          <AlertDialogCancel
             onClick={() => setPassword("")}
+            disabled={isVerifying}
             className="bg-transparent border-white/10 text-white hover:bg-white/5"
           >
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
-            onClick={handleConfirm}
-            className="bg-primary text-black font-black uppercase italic tracking-tighter"
+            onClick={(e) => {
+              e.preventDefault();
+              void handleConfirm();
+            }}
+            disabled={!password || isVerifying}
+            className="bg-primary text-black font-black uppercase italic tracking-tighter disabled:opacity-50"
           >
-            Autorizar Acesso
+            {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : "Autorizar Acesso"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
