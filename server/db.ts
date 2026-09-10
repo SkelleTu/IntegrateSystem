@@ -165,7 +165,6 @@ export async function multiWrite<T>(
     throw new Error(`Falha na gravação simultânea do banco de dados. ${details}`);
   }
 
-  // Mantém a compatibilidade atual: devolve o resultado do primeiro banco.
   return (results[0] as PromiseFulfilledResult<T>).value;
 }
 
@@ -358,7 +357,7 @@ const TABLE_DEFINITIONS = [
     unit TEXT NOT NULL,
     items_per_unit INTEGER NOT NULL DEFAULT 1,
     cost_price INTEGER NOT NULL DEFAULT 0,
-    expiry_date INTEGER NOT NULL,
+    expiry_date INTEGER,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS fiscal_settings (
