@@ -59,15 +59,16 @@ function getSqlStatements(database: any): { statements: string[]; tableRows: Rec
   const tables = getUserTables(database);
 
   for (const table of tables) {
+    const safeTable = table.replace(/"/g, '""');
     const schemaRow = database
       .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
       .get(table) as { sql?: string } | undefined;
     if (schemaRow?.sql) statements.push(`${schemaRow.sql};`);
 
     const columns = database
-      .prepare(`PRAGMA table_info("${table.replace(/"/g, '""')}")`)
+      .prepare(`PRAGMA table_info("${safeTable}")`)
       .all() as Array<{ name: string }>;
-    const rows = database.prepare(`SELECT * FROM "${table.replace(/"/g, '""')}"`).all() as Array<Record<string, unknown>>;
+    const rows = database.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
     tableRows[table] = rows.length;
 
     const quotedColumns = columns.map((column) => `"${column.name.replace(/"/g, '""')}"`).join(", ");
@@ -75,11 +76,10 @@ function getSqlStatements(database: any): { statements: string[]; tableRows: Rec
 
     for (const row of rows) {
       const values = columns.map((column) => sqlLiteral(row[column.name])).join(", ");
-      statements.push(`INSERT INTO "${table.replace(/"/g, '""')}" (${quotedColumns}) VALUES (${values});`);
+      statements.push(`INSERT INTO "${safeTable}" (${quotedColumns}) VALUES (${values});`);
     }
   }
 
-  // Indexes/triggers that belong to user tables are restored after data.
   const auxiliary = database
     .prepare("SELECT type, name, sql FROM sqlite_master WHERE type IN ('index','trigger') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type, name")
     .all() as Array<{ type: string; name: string; sql: string }>;
@@ -105,7 +105,6 @@ function buildSqlDump(database: any): { sql: string; tableRows: Record<string, n
 }
 
 function persistLocalSqlite() {
-  if (process.env.VERCEL) return;
   fs.writeFileSync(SQLITE_FILE, localSqlite.export());
 }
 
@@ -114,7 +113,10 @@ async function databaseFromSql(sqlText: string) {
   const database = new SQL.Database();
   database.run(sqlText);
   const tables = getUserTables(database);
-  if (!tables.length) throw new Error("O SQL não criou nenhuma tabela de dados.");
+  if (!tables.length) {
+    database.close();
+    throw new Error("O SQL não criou nenhuma tabela de dados.");
+  }
   return database;
 }
 
@@ -141,9 +143,7 @@ function compareDatabases(current: any, incoming: any) {
     const safeTable = table.replace(/"/g, '""');
     const oldColumns = current.prepare(`PRAGMA table_info("${safeTable}")`).all() as Array<{ name: string; pk: number }>;
     const newColumns = incoming.prepare(`PRAGMA table_info("${safeTable}")`).all() as Array<{ name: string; pk: number }>;
-    const oldSchema = JSON.stringify(oldColumns);
-    const newSchema = JSON.stringify(newColumns);
-    if (oldSchema !== newSchema) tablesChanged.push(table);
+    if (JSON.stringify(oldColumns) !== JSON.stringify(newColumns)) tablesChanged.push(table);
 
     const oldRows = current.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
     const newRows = incoming.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
@@ -161,8 +161,14 @@ function compareDatabases(current: any, incoming: any) {
     } else {
       const oldCounts = new Map<string, number>();
       const newCounts = new Map<string, number>();
-      oldRows.forEach((row) => oldCounts.set(commonColumns.map((column) => canonical(row[column])).join("|"), (oldCounts.get(commonColumns.map((column) => canonical(row[column])).join("|")) || 0) + 1));
-      newRows.forEach((row) => newCounts.set(commonColumns.map((column) => canonical(row[column])).join("|"), (newCounts.get(commonColumns.map((column) => canonical(row[column])).join("|")) || 0) + 1));
+      for (const row of oldRows) {
+        const key = commonColumns.map((column) => canonical(row[column])).join("|");
+        oldCounts.set(key, (oldCounts.get(key) || 0) + 1);
+      }
+      for (const row of newRows) {
+        const key = commonColumns.map((column) => canonical(row[column])).join("|");
+        newCounts.set(key, (newCounts.get(key) || 0) + 1);
+      }
       for (const [key, count] of oldCounts) rowsRemoved += Math.max(0, count - (newCounts.get(key) || 0));
       for (const [key, count] of newCounts) rowsAdded += Math.max(0, count - (oldCounts.get(key) || 0));
     }
@@ -179,9 +185,7 @@ async function syncRemoteFromLocal(sql: string) {
   const remoteTablesResult = await client.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
   const remoteTables = (remoteTablesResult.rows ?? []).map((row: any) => (Array.isArray(row) ? row[0] : row.name)).filter(Boolean) as string[];
   await client.execute("PRAGMA foreign_keys=OFF");
-  for (const table of remoteTables) {
-    await client.execute(`DROP TABLE IF EXISTS "${String(table).replace(/"/g, '""')}"`);
-  }
+  for (const table of remoteTables) await client.execute(`DROP TABLE IF EXISTS "${String(table).replace(/"/g, '""')}"`);
 
   const statements = sql
     .split(/\n(?=(?:CREATE|INSERT|PRAGMA|BEGIN|COMMIT)\b)/i)
@@ -195,6 +199,31 @@ async function syncRemoteFromLocal(sql: string) {
   await client.execute("PRAGMA foreign_keys=ON");
 }
 
+async function mirrorLegacySnapshot(snapshot: Record<string, any[]>) {
+  if (!dbRemote) return;
+  const client = (dbRemote as any).$client ?? (dbRemote as any).client;
+  if (!client || typeof client.execute !== "function") return;
+
+  for (const table of LEGACY_TABLES) {
+    const rows = snapshot[table];
+    if (!rows?.length) continue;
+    try {
+      const pragmaResult = await client.execute(`PRAGMA table_info("${table.replace(/"/g, '""')}")`);
+      const columns = (pragmaResult.rows ?? []).map((row: any) => (typeof row === "object" && !Array.isArray(row) ? row.name : row[1])).filter(Boolean) as string[];
+      if (!columns.length) continue;
+      const placeholders = columns.map(() => "?").join(", ");
+      for (const row of rows) {
+        await client.execute({
+          sql: `INSERT OR REPLACE INTO "${table}" (${columns.map((c) => `"${c.replace(/"/g, '""')}"`).join(", ")}) VALUES (${placeholders})`,
+          args: columns.map((column) => row[column] ?? null),
+        });
+      }
+    } catch (error) {
+      console.warn(`[BACKUP] Falha ao espelhar '${table}' no Turso:`, error);
+    }
+  }
+}
+
 async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
   const incoming = await databaseFromSql(sqlText);
   const comparison = compareDatabases(localSqlite, incoming);
@@ -205,10 +234,10 @@ async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
   fs.writeFileSync(path.join(BACKUP_DIR, `before-${safeFilename(sourceLabel)}-${timestamp}.sql`), before.sql, "utf-8");
 
   const incomingDump = buildSqlDump(incoming).sql;
-  for (const table of getUserTables(localSqlite)) {
+  localSqlite.exec("PRAGMA foreign_keys=OFF;");
+  for (const table of getUserTables(localSqlite).reverse()) {
     localSqlite.prepare(`DROP TABLE IF EXISTS "${table.replace(/"/g, '""')}"`).run();
   }
-  localSqlite.exec("PRAGMA foreign_keys=OFF;");
   localSqlite.run(incomingDump);
   localSqlite.exec("PRAGMA foreign_keys=ON;");
   persistLocalSqlite();
@@ -222,10 +251,10 @@ async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
 
   fs.writeFileSync(path.join(BACKUP_DIR, `imported-${safeFilename(sourceLabel)}-${timestamp}.sql`), incomingDump, "utf-8");
   incoming.close();
-  return { tablesRestored: getUserTables(localSqlite).length, rowsRestored: Object.values(buildSqlDump(localSqlite).tableRows).reduce((sum, value) => sum + value, 0), errors: [], comparison, warning };
+  const restored = buildSqlDump(localSqlite);
+  return { tablesRestored: Object.keys(restored.tableRows).length, rowsRestored: Object.values(restored.tableRows).reduce((sum, value) => sum + value, 0), errors: [], comparison, warning };
 }
 
-// ─── Exportar todos os dados em JSON (compatibilidade legada) ────────────────
 export function exportAllDataSync(): Record<string, any[]> {
   const snapshot: Record<string, any[]> = {
     _meta: { version: "2.0", exportedAt: new Date().toISOString(), exportedBy: "Aura System Backup" } as any,
@@ -288,7 +317,7 @@ export function listBackups(): Array<{ filename: string; name: string; createdAt
   return files.map((filename) => {
     const filepath = path.join(BACKUP_DIR, filename);
     const stat = fs.statSync(filepath);
-    const format = filename.endsWith(".sql") ? "sql" : "json" as "json" | "sql";
+    const format: "json" | "sql" = filename.endsWith(".sql") ? "sql" : "json";
     let createdAt = stat.mtime.toISOString();
     let totalRows = 0;
     let name = filename.replace(/_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.(?:json|sql)$/, "");
@@ -341,6 +370,7 @@ export async function importDataFromSnapshot(snapshot: Record<string, any[]> & {
   }
 
   persistLocalSqlite();
+  await mirrorLegacySnapshot(snapshot);
   return { tablesRestored, rowsRestored, errors };
 }
 
@@ -349,9 +379,7 @@ export async function restoreFromFile(filename: string) {
   if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) throw new Error("Nome de arquivo inválido");
   if (!fs.existsSync(filepath)) throw new Error(`Arquivo não encontrado: ${filename}`);
 
-  if (filepath.endsWith(".sql")) {
-    return restoreSqlDump(fs.readFileSync(filepath, "utf-8"), filename.replace(/\.sql$/i, "restore"));
-  }
+  if (filepath.endsWith(".sql")) return restoreSqlDump(fs.readFileSync(filepath, "utf-8"), filename.replace(/\.sql$/i, "restore"));
   const snapshot = JSON.parse(fs.readFileSync(filepath, "utf-8"));
   return importDataFromSnapshot(snapshot);
 }
