@@ -1,21 +1,42 @@
-import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
-import { drizzle as drizzleLibsql } from "drizzle-orm/libsql";
-import Database from "better-sqlite3";
-import { createClient } from "@libsql/client";
+import { drizzle } from "drizzle-orm/sql-js";
+import initSqlJs from "sql.js";
 import * as schema from "../shared/schema";
 import path from "path";
+import fs from "fs";
 import { sql } from "drizzle-orm";
 
-// ─── 1. SQLite Local — SEMPRE ligado, nunca desligado ────────────────────────
+// ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
 const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
-export const localSqlite = new Database(sqliteFile);
-export const dbLocal = drizzleSqlite(localSqlite, { schema });
+
+// Initialize sql.js database
+let sqlJsDb: any;
+if (fs.existsSync(sqliteFile)) {
+  const filebuffer = fs.readFileSync(sqliteFile);
+  const SQL = await initSqlJs();
+  sqlJsDb = new SQL.Database(filebuffer);
+} else {
+  const SQL = await initSqlJs();
+  sqlJsDb = new SQL.Database();
+}
+
+// Auto-save to file
+const originalExec = sqlJsDb.exec.bind(sqlJsDb);
+sqlJsDb.exec = function(...args: any[]) {
+  const result = originalExec(...args);
+  fs.writeFileSync(sqliteFile, sqlJsDb.export());
+  return result;
+};
+
+export const localSqlite = sqlJsDb;
+export const dbLocal = drizzle(localSqlite, { schema });
 
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
-export let dbRemote: ReturnType<typeof drizzleLibsql> | null = null;
+export let dbRemote: ReturnType<typeof drizzle> | null = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
+    const { createClient } = await import("@libsql/client");
+    const { drizzle: drizzleLibsql } = await import("drizzle-orm/libsql");
     const client = createClient({
       url: process.env.TURSO_DATABASE_URL,
       authToken: process.env.TURSO_AUTH_TOKEN,
@@ -33,36 +54,26 @@ export const isRemoteEnabled = !!dbRemote;
 export const db = dbRemote ?? dbLocal;
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
-// Sempre inclui o local. O remoto entra se configurado.
-// Nunca remove o local — é o âncora de segurança permanente.
 export function getAllDatabases(): Array<typeof db> {
   if (dbRemote) {
-    return [dbRemote, dbLocal]; // remoto primeiro (fonte de verdade), local como espelho
+    return [dbRemote, dbLocal];
   }
   return [dbLocal];
 }
 
 // ─── 5. multiWrite — escreve em TODOS os bancos simultaneamente ──────────────
-// Usa o banco primário para obter o resultado canônico (com ID gerado).
-// Espelha nos demais com Promise.allSettled — falha num banco não bloqueia os outros.
 export async function multiWrite<T>(
   operation: (database: typeof db) => Promise<T>
 ): Promise<T> {
   const dbs = getAllDatabases();
   const primary = dbs[0];
 
-  // Escreve no primário e captura resultado (ex: ID gerado)
   const result = await operation(primary);
 
-  // Espelha em paralelo nos demais (best-effort)
   if (dbs.length > 1) {
     await Promise.allSettled(
       dbs.slice(1).map((mirrorDb) =>
-        operation(mirrorDb).catch((e: any) => {
-          console.warn(
-            `[MULTI-DB] ⚠️  Espelhamento falhou (banco secundário): ${e?.message ?? e}`
-          );
-        })
+        operation(mirrorDb).catch((e) => console.error("Mirror write failed:", e))
       )
     );
   }

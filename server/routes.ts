@@ -14,13 +14,10 @@ import {
 } from "../shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
-import SQLiteStore from "better-sqlite3-session-store";
-import sqlite from "better-sqlite3";
-import passport from "passport";
-import { WebSocketServer, WebSocket } from "ws";
 
-const SessionStore = SQLiteStore(session);
-const dbSession = new sqlite(process.env.NODE_ENV === "production" ? "/tmp/sessions.db" : "sessions.db");
+const MemoryStore = createMemoryStore(session);
+import { WebSocketServer, WebSocket } from "ws";
+import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
@@ -138,13 +135,7 @@ export async function registerRoutes(
   // Session & Auth Setup
   app.use(
     session({
-      store: new SessionStore({
-        client: dbSession,
-        expired: {
-          clear: true,
-          intervalMs: 900000 // 15 minutes
-        }
-      }),
+      store: new MemoryStore({ checkPeriod: 86400000 }),
       secret: process.env.SESSION_SECRET || "barber_shop_secret",
       resave: false,
       saveUninitialized: false,
