@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,7 @@ import {
   AlertTriangle,
   ArrowDownToLine,
   ArrowUpFromLine,
-  CheckCircle2,
-  CircleDollarSign,
   Clock3,
-  Loader2,
   LockKeyhole,
   RefreshCw,
   Settings2,
@@ -86,8 +83,20 @@ export default function CashRegisterOptions() {
     staleTime: 5000,
   });
 
+  const { data: reviewSummary } = useQuery<CashRegisterSummary>({
+    queryKey: ["/api/cash-control/register", reviewRegisterId],
+    queryFn: async () => {
+      const res = await fetch(`/api/cash-control/register/${reviewRegisterId}`);
+      if (!res.ok) throw new Error("Não foi possível consultar o fechamento automático.");
+      return res.json();
+    },
+    enabled: operation === "review" && !!reviewRegisterId,
+    staleTime: 5000,
+  });
+
   const registerOpen = !!status?.register && status.register.status === "open" && !status.register.closedAt;
   const pendingReviews = status?.pendingReviews || [];
+  const activeSummary = operation === "review" ? reviewSummary : status?.summary;
 
   const syncAnchor = useCallback(() => {
     const headings = Array.from(document.querySelectorAll("h3"));
@@ -199,10 +208,7 @@ export default function CashRegisterOptions() {
 
   return (
     <>
-      <div
-        className="fixed z-[90]"
-        style={{ left: anchor.left, top: anchor.top }}
-      >
+      <div className="fixed z-[90]" style={{ left: anchor.left, top: anchor.top }}>
         <div className="relative">
           {menuOpen && (
             <div className="absolute right-0 top-11 w-[290px] max-w-[calc(100vw-16px)] rounded-2xl border border-white/10 bg-zinc-950/98 backdrop-blur-xl shadow-2xl p-2 space-y-1">
@@ -219,30 +225,10 @@ export default function CashRegisterOptions() {
                 </div>
               </div>
 
-              <OptionButton
-                icon={<UnlockKeyhole className="w-4 h-4" />}
-                label="Abertura do Caixa"
-                disabled={registerOpen}
-                onClick={() => { setOperation("open"); setMenuOpen(false); }}
-              />
-              <OptionButton
-                icon={<LockKeyhole className="w-4 h-4" />}
-                label="Fechamento do caixa"
-                disabled={!registerOpen}
-                onClick={() => { setOperation("close"); setMenuOpen(false); }}
-              />
-              <OptionButton
-                icon={<ArrowDownToLine className="w-4 h-4" />}
-                label="Sangria"
-                disabled={!registerOpen}
-                onClick={() => { setOperation("withdrawal"); setMenuOpen(false); }}
-              />
-              <OptionButton
-                icon={<ArrowUpFromLine className="w-4 h-4" />}
-                label="Suprimento"
-                disabled={!registerOpen}
-                onClick={() => { setOperation("replenishment"); setMenuOpen(false); }}
-              />
+              <OptionButton icon={<UnlockKeyhole className="w-4 h-4" />} label="Abertura do Caixa" disabled={registerOpen} onClick={() => { setOperation("open"); setMenuOpen(false); }} />
+              <OptionButton icon={<LockKeyhole className="w-4 h-4" />} label="Fechamento do caixa" disabled={!registerOpen} onClick={() => { setOperation("close"); setMenuOpen(false); }} />
+              <OptionButton icon={<ArrowDownToLine className="w-4 h-4" />} label="Sangria" disabled={!registerOpen} onClick={() => { setOperation("withdrawal"); setMenuOpen(false); }} />
+              <OptionButton icon={<ArrowUpFromLine className="w-4 h-4" />} label="Suprimento" disabled={!registerOpen} onClick={() => { setOperation("replenishment"); setMenuOpen(false); }} />
 
               {pendingReviews.length > 0 && (
                 <div className="pt-1 mt-1 border-t border-white/5">
@@ -299,15 +285,16 @@ export default function CashRegisterOptions() {
             </DialogDescription>
           </DialogHeader>
 
-          {operation === "close" && status?.summary && (
+          {(operation === "close" || operation === "review") && activeSummary && (
             <div className="grid grid-cols-2 gap-2 mt-2">
-              <SummaryTile label="Abertura" value={money(status.summary.openingAmount)} />
-              <SummaryTile label="Vendas em dinheiro" value={money(status.summary.cashSales)} />
-              <SummaryTile label="Suprimentos" value={money(status.summary.replenishments)} />
-              <SummaryTile label="Sangrias" value={money(status.summary.withdrawals)} />
+              <SummaryTile label="Abertura" value={money(activeSummary.openingAmount)} />
+              <SummaryTile label="Vendas em dinheiro" value={money(activeSummary.cashSales)} />
+              <SummaryTile label="Suprimentos" value={money(activeSummary.replenishments)} />
+              <SummaryTile label="Sangrias" value={money(activeSummary.withdrawals)} />
+              <SummaryTile label="Ajustes" value={money(activeSummary.adjustments)} />
               <div className="col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
                 <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">Saldo esperado</span>
-                <span className="text-primary text-xl font-black italic">{money(status.summary.expectedAmount)}</span>
+                <span className="text-primary text-xl font-black italic">{money(activeSummary.expectedAmount)}</span>
               </div>
             </div>
           )}
@@ -326,7 +313,7 @@ export default function CashRegisterOptions() {
             <div className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label className="text-white/40 text-[9px] font-black uppercase tracking-widest">
-                  {operation === "open" ? "Valor inicial / troco" : "Valor"}
+                  {operation === "open" ? "Valor inicial / troco" : operation === "withdrawal" ? "Valor da sangria" : operation === "replenishment" ? "Valor do suprimento" : "Valor físico conferido"}
                 </Label>
                 <Input
                   value={amount}
@@ -363,7 +350,7 @@ export default function CashRegisterOptions() {
                     className="h-12 bg-black border-white/10 text-white rounded-xl"
                     onKeyDown={(e) => e.key === "Enter" && void runOperation()}
                   />
-                  <p className="text-[8px] text-white/25 uppercase tracking-widest">A senha não é salva pelo Caixa.</p>
+                  <p className="text-[8px] text-white/25 uppercase tracking-widest">A senha nunca é armazenada pelo Caixa.</p>
                 </div>
               )}
             </div>
@@ -373,11 +360,7 @@ export default function CashRegisterOptions() {
             <Button variant="outline" onClick={closeDialog} className="border-white/10 text-white bg-transparent hover:bg-white/5">Cancelar</Button>
             <Button
               onClick={() => void runOperation()}
-              disabled={
-                !amount ||
-                (dialogNeedsPassword && !password) ||
-                ((operation === "withdrawal" || operation === "replenishment") && !reason.trim())
-              }
+              disabled={!amount || (dialogNeedsPassword && !password) || ((operation === "withdrawal" || operation === "replenishment") && !reason.trim())}
               className="bg-primary text-black font-black uppercase italic disabled:opacity-40"
             >
               {operation === "review" ? "Concluir Revisão" : operation === "close" ? "Confirmar Fechamento" : "Confirmar Operação"}
@@ -389,7 +372,7 @@ export default function CashRegisterOptions() {
   );
 }
 
-function OptionButton({ icon, label, disabled, onClick }: { icon: React.ReactNode; label: string; disabled?: boolean; onClick: () => void }) {
+function OptionButton({ icon, label, disabled, onClick }: { icon: ReactNode; label: string; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
