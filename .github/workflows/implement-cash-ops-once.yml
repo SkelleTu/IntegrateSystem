@@ -1,0 +1,469 @@
+name: Implement forensic cash operations once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/implement-cash-ops-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Apply implementation
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          root = Path('.')
+
+          def replace_once(path, old, new):
+              p = root / path
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected 1 match, got {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          # shared/schema.ts
+          replace_once('shared/schema.ts', 'export const sales = pgTable("sales", {', '''export const cashRegisterMovements = pgTable("cash_register_movements", {
+            id: integer("id").primaryKey({ autoIncrement: true }),
+            cashRegisterId: integer("cash_register_id").notNull(),
+            userId: integer("user_id").notNull(),
+            type: text("type").notNull(), // opening, replenishment, withdrawal, adjustment, closing
+            amount: integer("amount").notNull(), // cents; adjustment may be negative
+            reason: text("reason"),
+            createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+          });
+
+          export const sales = pgTable("sales", {''')
+          replace_once('shared/schema.ts', 'export const insertSaleSchema = createInsertSchema(sales);', '''export const insertCashRegisterMovementSchema = createInsertSchema(cashRegisterMovements, {
+            amount: z.number(),
+          });
+          export const insertSaleSchema = createInsertSchema(sales);''')
+          replace_once('shared/schema.ts', 'export type CashRegister = typeof cashRegisters.$inferSelect;', '''export type CashRegister = typeof cashRegisters.$inferSelect;
+          export type CashRegisterMovement = typeof cashRegisterMovements.$inferSelect;''')
+          replace_once('shared/schema.ts', 'export type InsertCashRegister = z.infer<typeof insertCashRegisterSchema>;', '''export type InsertCashRegister = z.infer<typeof insertCashRegisterSchema>;
+          export type InsertCashRegisterMovement = z.infer<typeof insertCashRegisterMovementSchema>;''')
+
+          # server/db.ts: local and remote creation
+          replace_once('server/db.ts', '  `CREATE TABLE IF NOT EXISTS sales (', '''  `CREATE TABLE IF NOT EXISTS cash_register_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cash_register_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT,
+            created_at INTEGER NOT NULL
+          )`,
+          `CREATE TABLE IF NOT EXISTS sales (''')
+          replace_once('server/db.ts', '      `CREATE TABLE IF NOT EXISTS batches (', '''      `CREATE TABLE IF NOT EXISTS cash_register_movements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cash_register_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            amount INTEGER NOT NULL,
+            reason TEXT,
+            created_at INTEGER NOT NULL
+          )`,
+      `CREATE TABLE IF NOT EXISTS batches (''')
+
+          # server/storage.ts
+          replace_once('server/storage.ts', '  cashRegisters, sales, saleItems, payments, transactions,', '  cashRegisters, cashRegisterMovements, sales, saleItems, payments, transactions,')
+          replace_once('server/storage.ts', '''      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
+        await database.insert(transactions).values({''', '''      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: newRegister.id,
+        userId: newRegister.userId,
+        type: "opening",
+        amount: newRegister.openingAmount || 0,
+        reason: "Abertura de Caixa",
+        createdAt: new Date(),
+      } as any);
+
+      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
+        await database.insert(transactions).values({''')
+          old_close = '''  async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
+    this.logAction(`Fechamento de caixa ID:${id}`);
+    return await dualWrite(async (database) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
+      if (!register) throw new Error("Caixa não encontrado");
+
+      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const completedSales = salesList.filter((s: any) => s.status === "completed");
+      const cashPayments = await Promise.all(
+        completedSales.map(async (sale: any) => {
+          const salePayments = await database
+            .select()
+            .from(payments)
+            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+        })
+      );
+      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
+      const expectedAmount = (register.openingAmount || 0) + totalCashSales;
+      const difference = closingAmount - expectedAmount;
+
+      const [updated] = await database.update(cashRegisters)
+        .set({ 
+          closingAmount, 
+          difference,
+          closedAt: new Date(),
+          status: "closed"
+        })
+        .where(eq(cashRegisters.id, id))
+        .returning();
+
+      await database.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "caixa",
+        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
+        amount: closingAmount,
+        createdAt: new Date()
+      } as any);
+
+      return updated;
+    });
+  }'''
+          new_close = '''  async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
+    this.logAction(`Fechamento de caixa ID:${id}`);
+    return await dualWrite(async (database) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
+      if (!register) throw new Error("Caixa não encontrado");
+      if (register.status === "closed" || register.closedAt) throw new Error("Caixa já está fechado");
+
+      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const completedSales = salesList.filter((s: any) => s.status === "completed");
+      const cashPayments = await Promise.all(
+        completedSales.map(async (sale: any) => {
+          const salePayments = await database
+            .select()
+            .from(payments)
+            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+        })
+      );
+      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
+      const movements = await database.select()
+        .from(cashRegisterMovements)
+        .where(eq(cashRegisterMovements.cashRegisterId, id));
+      const replenishments = movements.filter((m: any) => m.type === "replenishment")
+        .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+      const withdrawals = movements.filter((m: any) => m.type === "withdrawal")
+        .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+      const adjustments = movements.filter((m: any) => m.type === "adjustment")
+        .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+      const expectedAmount = (register.openingAmount || 0) + totalCashSales + replenishments - withdrawals + adjustments;
+      const difference = closingAmount - expectedAmount;
+
+      const [updated] = await database.update(cashRegisters)
+        .set({
+          closingAmount,
+          difference,
+          closedAt: new Date(),
+          status: "closed"
+        })
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.status, "open")))
+        .returning();
+
+      if (!updated) throw new Error("Não foi possível fechar o caixa. Ele pode ter sido fechado por outra operação.");
+
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: id,
+        userId: register.userId,
+        type: "closing",
+        amount: closingAmount,
+        reason: "Fechamento de Caixa",
+        createdAt: new Date(),
+      } as any);
+
+      await database.insert(transactions).values({
+        businessType: "padaria",
+        type: "income",
+        category: "caixa",
+        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
+        amount: closingAmount,
+        createdAt: new Date()
+      } as any);
+
+      return updated;
+    });
+  }'''
+          replace_once('server/storage.ts', old_close, new_close)
+
+          # server/routes.ts
+          replace_once('server/routes.ts', 'import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema";', 'import { tickets, users, fiscalSettings, cashRegisterMovements, insertFiscalSettingsSchema, insertCashRegisterMovementSchema } from "../shared/schema";')
+          anchor = '''  // Cashier API
+  app.get("/api/cash-register/open", async (req, res) => {'''
+          replacement = '''  // Cashier API — ledger financeiro do dinheiro físico
+  async function calculateCashRegisterSummary(registerId: number) {
+    const register = await db.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+    const currentRegister: any = register[0];
+    if (!currentRegister) throw new Error("Caixa não encontrado");
+
+    const salesList = await storage.getSalesByRegisterId(registerId);
+    const completedSales = salesList.filter((sale: any) => sale.status === "completed");
+    let cashSales = 0;
+    for (const sale of completedSales) {
+      const salePayments = await storage.getPayments(sale.id);
+      cashSales += salePayments.filter((payment: any) => payment.method === "cash")
+        .reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+    }
+
+    const movements = await db.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, registerId))
+      .orderBy(desc(cashRegisterMovements.createdAt));
+    const replenishments = movements.filter((m: any) => m.type === "replenishment")
+      .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const withdrawals = movements.filter((m: any) => m.type === "withdrawal")
+      .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const adjustments = movements.filter((m: any) => m.type === "adjustment")
+      .reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const expectedAmount = (currentRegister.openingAmount || 0) + cashSales + replenishments - withdrawals + adjustments;
+
+    return {
+      register: currentRegister,
+      openingAmount: currentRegister.openingAmount || 0,
+      cashSales,
+      replenishments,
+      withdrawals,
+      adjustments,
+      expectedAmount,
+      movements,
+    };
+  }
+
+  app.get("/api/cash-register/summary", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(404).json({ message: "No open register" });
+      res.json(await calculateCashRegisterSummary(register.id));
+    } catch (err: any) {
+      console.error("Erro ao calcular saldo do caixa:", err);
+      res.status(500).json({ message: err.message || "Erro ao calcular saldo do caixa" });
+    }
+  });
+
+  app.post("/api/cash-register/movement", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(400).json({ message: "Abra o caixa antes de registrar movimentações" });
+      const type = String(req.body.type || "");
+      if (!["replenishment", "withdrawal"].includes(type)) {
+        return res.status(400).json({ message: "Tipo de movimentação inválido" });
+      }
+      const amount = Math.round(Number(String(req.body.amount ?? "").replace(",", ".")) * 100);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return res.status(400).json({ message: "O valor deve ser maior que zero" });
+      }
+      const reason = String(req.body.reason || "").trim();
+      if (!reason) return res.status(400).json({ message: "Informe o motivo da movimentação" });
+      if (type === "withdrawal") {
+        const summary = await calculateCashRegisterSummary(register.id);
+        if (amount > summary.expectedAmount) {
+          return res.status(400).json({ message: `Sangria superior ao dinheiro disponível. Disponível: R$ ${(summary.expectedAmount / 100).toFixed(2)}` });
+        }
+      }
+      const parsed = insertCashRegisterMovementSchema.parse({
+        cashRegisterId: register.id,
+        userId: user.id,
+        type,
+        amount,
+        reason,
+        createdAt: new Date(),
+      });
+      const [movement] = await db.insert(cashRegisterMovements).values(parsed as any).returning();
+      res.status(201).json(movement);
+    } catch (err: any) {
+      console.error("Erro ao registrar movimentação do caixa:", err);
+      res.status(400).json({ message: err.message || "Erro ao registrar movimentação do caixa" });
+    }
+  });
+
+  app.get("/api/cash-register/open", async (req, res) => {'''
+          replace_once('server/routes.ts', anchor, replacement)
+          replace_once('server/routes.ts', '''    const data = insertCashRegisterSchema.parse({
+      ...req.body,
+      userId: user.id,
+      status: "open",
+      openedAt: new Date()
+    });''', '''    const openingAmount = Number(String(req.body.openingAmount ?? 0).replace(",", "."));
+    if (!Number.isFinite(openingAmount) || openingAmount < 0) {
+      return res.status(400).json({ message: "Valor de abertura inválido" });
+    }
+
+    const data = insertCashRegisterSchema.parse({
+      ...req.body,
+      openingAmount,
+      userId: user.id,
+      status: "open",
+      openedAt: new Date()
+    });''')
+          replace_once('server/routes.ts', '''    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
+    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
+    const updated = await storage.closeCashRegister(register.id, closingAmount);''', '''    const closingAmountReais = Number(String(req.body.closingAmount ?? "").replace(",", "."));
+    if (!Number.isFinite(closingAmountReais) || closingAmountReais < 0) {
+      return res.status(400).json({ message: "Valor de fechamento inválido" });
+    }
+    const closingAmount = Math.round(closingAmountReais * 100);
+    const updated = await storage.closeCashRegister(register.id, closingAmount);''')
+
+          # client/src/components/CashRegisterOptions.tsx
+          component = '''import { useState } from "react";
+          import { useLocation } from "wouter";
+          import { useMutation, useQuery } from "@tanstack/react-query";
+          import type { CashRegister } from "@shared/schema";
+          import { apiRequest, queryClient } from "@/lib/queryClient";
+          import { Button } from "@/components/ui/button";
+          import { Input } from "@/components/ui/input";
+          import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+          import { useToast } from "@/hooks/use-toast";
+          import { BanknoteArrowDown, BanknoteArrowUp, ClipboardCheck, LockKeyhole, Settings2, WalletCards } from "lucide-react";
+
+          type Action = "opening" | "closing" | "withdrawal" | "replenishment" | null;
+
+          export default function CashRegisterOptions({ register }: { register: CashRegister | null }) {
+            const [, setLocation] = useLocation();
+            const { toast } = useToast();
+            const [open, setOpen] = useState(false);
+            const [action, setAction] = useState<Action>(null);
+            const [amount, setAmount] = useState("");
+            const [reason, setReason] = useState("");
+            const { data: summary } = useQuery<any>({
+              queryKey: ["/api/cash-register/summary"],
+              enabled: open && !!register,
+              staleTime: 1000,
+              refetchOnWindowFocus: false,
+            });
+
+            const movementMutation = useMutation({
+              mutationFn: async ({ type, amount, reason }: { type: "withdrawal" | "replenishment"; amount: string; reason: string }) => {
+                const res = await apiRequest("POST", "/api/cash-register/movement", { type, amount, reason });
+                return res.json();
+              },
+              onSuccess: () => {
+                queryClient.invalidateQueries({ queryKey: ["/api/cash-register/summary"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] });
+                setAmount("");
+                setReason("");
+                setAction(null);
+                toast({ title: action === "withdrawal" ? "Sangria registrada" : "Reposição registrada" });
+              },
+              onError: (error: any) => toast({ title: "Movimentação não registrada", description: error?.message || "Verifique os dados e tente novamente", variant: "destructive" }),
+            });
+
+            const openAction = (next: Action) => { setAction(next); setAmount(""); setReason(""); };
+            const submitMovement = () => {
+              if (action !== "withdrawal" && action !== "replenishment") return;
+              const value = Number(amount.replace(",", "."));
+              if (!Number.isFinite(value) || value <= 0) return toast({ title: "Valor inválido", variant: "destructive" });
+              if (!reason.trim()) return toast({ title: "Motivo obrigatório", variant: "destructive" });
+              movementMutation.mutate({ type: action, amount: amount.replace(",", "."), reason: reason.trim() });
+            };
+            const closeAll = () => { setAction(null); setAmount(""); setReason(""); };
+
+            return <>
+              <Button type="button" variant="outline" onClick={() => setOpen(true)} className="h-8 px-2.5 rounded-lg border-primary/20 bg-primary/5 text-primary hover:bg-primary/10 gap-1.5 shrink-0 text-[8px] font-black uppercase tracking-widest" title="Opções do Caixa">
+                <Settings2 className="w-3.5 h-3.5" /><span>Opções do Caixa</span>
+              </Button>
+              <Dialog open={open} onOpenChange={(value) => { setOpen(value); if (!value) closeAll(); }}>
+                <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-2xl max-h-[90vh] overflow-y-auto bg-zinc-950 border-white/10 text-white rounded-2xl p-4 sm:p-6">
+                  <DialogHeader><DialogTitle className="flex items-center gap-2 text-base sm:text-xl font-black uppercase italic tracking-tight"><WalletCards className="w-5 h-5 text-primary" />Opções do Caixa</DialogTitle></DialogHeader>
+                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <Button onClick={() => openAction("opening")} variant="outline" className="h-20 sm:h-24 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-primary/10 hover:border-primary/30"><ClipboardCheck className="w-5 h-5 text-primary" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wide">Abertura de Caixa</span></Button>
+                    <Button onClick={() => openAction("closing")} variant="outline" className="h-20 sm:h-24 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-red-500/10 hover:border-red-500/30"><LockKeyhole className="w-5 h-5 text-red-400" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wide">Fechamento de Caixa</span></Button>
+                    <Button onClick={() => openAction("withdrawal")} variant="outline" className="h-20 sm:h-24 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-orange-500/10 hover:border-orange-500/30"><BanknoteArrowDown className="w-5 h-5 text-orange-400" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wide">Sangria</span></Button>
+                    <Button onClick={() => openAction("replenishment")} variant="outline" className="h-20 sm:h-24 flex flex-col gap-2 border-white/10 bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/30"><BanknoteArrowUp className="w-5 h-5 text-blue-400" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wide">Reposição</span></Button>
+                  </div>
+                  {summary && <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded-xl border border-white/10 bg-black/30 p-3"><div><p className="text-[8px] text-white/30 uppercase font-black">Abertura</p><p className="text-sm font-black">R$ {(summary.openingAmount/100).toFixed(2)}</p></div><div><p className="text-[8px] text-white/30 uppercase font-black">Vendas Din.</p><p className="text-sm font-black">R$ {(summary.cashSales/100).toFixed(2)}</p></div><div><p className="text-[8px] text-white/30 uppercase font-black">Sangrias</p><p className="text-sm font-black">R$ {(summary.withdrawals/100).toFixed(2)}</p></div><div><p className="text-[8px] text-white/30 uppercase font-black">Disponível</p><p className="text-sm font-black text-primary">R$ {(summary.expectedAmount/100).toFixed(2)}</p></div></div>}
+                  {action === "opening" && <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2"><p className="text-[10px] font-black uppercase tracking-widest text-primary">Abertura de Caixa</p><p className="text-sm text-white/70">Este caixa já está aberto. Uma segunda abertura é bloqueada para impedir dois turnos simultâneos para o mesmo operador.</p>{register && <p className="text-lg font-black">Saldo inicial: R$ {((register.openingAmount || 0)/100).toFixed(2)}</p>}<p className="text-[9px] text-white/30 uppercase font-bold">A nova abertura deve ser feita somente após o fechamento do turno atual.</p></div>}
+                  {action === "closing" && <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 space-y-3"><p className="text-[10px] font-black uppercase tracking-widest text-red-300">Fechamento de Caixa</p><p className="text-sm text-white/70">O fechamento usa o saldo esperado calculado pelo servidor, incluindo vendas em dinheiro, reposições, sangrias e ajustes auditados.</p><Button className="w-full h-11 bg-red-600 hover:bg-red-500 font-black uppercase" onClick={() => { setOpen(false); setLocation("/caixa/fechamento"); }}>Ir para fechamento</Button></div>}
+                  {(action === "withdrawal" || action === "replenishment") && <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3"><p className="text-[10px] font-black uppercase tracking-widest text-white/50">{action === "withdrawal" ? "Sangria" : "Reposição"}</p><Input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" placeholder="0,00" className="h-12 bg-black border-white/10 text-xl font-black text-white" autoFocus /><Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={action === "withdrawal" ? "Motivo da sangria" : "Motivo da reposição"} className="h-11 bg-black border-white/10 text-white" maxLength={200} /><DialogFooter className="grid grid-cols-2 gap-2"><Button variant="ghost" onClick={closeAll} className="h-11">Cancelar</Button><Button onClick={submitMovement} disabled={movementMutation.isPending} className="h-11 bg-primary text-black hover:bg-white font-black uppercase">{movementMutation.isPending ? "Registrando..." : "Confirmar"}</Button></DialogFooter></div>}
+                  {!action && summary?.movements?.length > 0 && <div className="space-y-2"><p className="text-[9px] font-black uppercase tracking-widest text-white/30">Últimas movimentações</p><div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">{summary.movements.slice(0,10).map((movement:any)=><div key={movement.id} className="flex items-center justify-between gap-2 rounded-lg border border-white/5 bg-white/5 px-3 py-2"><div className="min-w-0"><p className="text-[9px] font-black uppercase truncate">{movement.type}</p><p className="text-[8px] text-white/30 truncate">{movement.reason || "Sem motivo"}</p></div><span className="text-[10px] font-black">R$ {(movement.amount/100).toFixed(2)}</span></div>)}</div></div>}
+                </DialogContent>
+              </Dialog>
+            </>;
+          }
+          '''
+          (root / 'client/src/components/CashRegisterOptions.tsx').write_text(component)
+
+          # Cashier.tsx
+          replace_once('client/src/pages/Cashier.tsx', 'import { Label } from "@/components/ui/label";', 'import { Label } from "@/components/ui/label";\nimport CashRegisterOptions from "@/components/CashRegisterOptions";')
+          replace_once('client/src/pages/Cashier.tsx', '''                      <div className="flex items-center gap-2 mb-4">
+                        <ShoppingCart className="w-4 h-4 text-primary" />
+                        <h3 className="text-white font-black uppercase italic text-xs tracking-tighter">Itens no <span className="text-primary">Carrinho</span></h3>
+                      </div>''', '''                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ShoppingCart className="w-4 h-4 text-primary shrink-0" />
+                          <h3 className="text-white font-black uppercase italic text-xs tracking-tighter truncate">Itens no <span className="text-primary">Carrinho</span></h3>
+                        </div>
+                        <CashRegisterOptions register={register} />
+                      </div>''')
+
+          # CashierClose.tsx uses same server source of truth.
+          replace_once('client/src/pages/CashierClose.tsx', '''  const { data: registers = [] } = useQuery<(CashRegister & { sales?: (Sale & { payments?: { method: string; amount: number }[] })[] })[]>({
+    queryKey: ["/api/cash-registers/history"],
+    queryFn: async () => {
+      const res = await fetch("/api/cash-registers/history");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!register,
+  });
+
+  // O caixa físico recebe apenas pagamentos em dinheiro. Cartão e Pix
+  // permanecem na venda, mas não entram no valor esperado da gaveta.
+  const totalCashSales = useMemo(() => {
+    const registerSales = registers.find((item) => item.id === register?.id)?.sales ?? [];
+    return registerSales
+      .filter((sale) => sale.status === "completed")
+      .reduce((sum, sale) => sum + (sale.payments ?? [])
+        .filter((payment) => payment.method === "cash")
+        .reduce((paymentSum, payment) => paymentSum + Number(payment.amount || 0), 0), 0);
+  }, [registers, register?.id]);
+  
+  const expectedTotal = (register?.openingAmount || 0) + totalCashSales;''', '''  const { data: cashSummary } = useQuery<any>({
+    queryKey: ["/api/cash-register/summary"],
+    enabled: !!register,
+    staleTime: 1000,
+    refetchOnWindowFocus: false,
+  });
+
+  const totalCashSales = cashSummary?.cashSales ?? 0;
+  const expectedTotal = cashSummary?.expectedAmount ?? ((register?.openingAmount || 0) + totalCashSales);''')
+          replace_once('client/src/pages/CashierClose.tsx', 'import type { CashRegister, Sale } from "@shared/schema";', 'import type { CashRegister } from "@shared/schema";')
+
+          print('cash operations implementation applied')
+          PY
+
+      - name: Install and typecheck
+        run: |
+          npm ci
+          npx tsc --noEmit
+
+      - name: Commit implementation and remove temporary workflows
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/implement-cash-ops-once.yml
+          if [ -f .github/workflows/implement-cash-ops.yml ]; then git rm .github/workflows/implement-cash-ops.yml; fi
+          git add shared/schema.ts server/db.ts server/storage.ts server/routes.ts client/src/pages/Cashier.tsx client/src/pages/CashierClose.tsx client/src/components/CashRegisterOptions.tsx
+          git commit -m "feat: add forensic cash register operations"
+          git push origin main
