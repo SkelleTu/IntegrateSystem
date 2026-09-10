@@ -51,8 +51,88 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
 
 export const isRemoteEnabled = !!dbRemote;
 
-// ─── 3. db principal — Turso se disponível, senão SQLite local ───────────────
-export const db = dbRemote ?? dbLocal;
+// ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
+// Além do multiWrite(), este proxy cobre escritas legadas que ainda usam
+// diretamente db.insert(), db.update() ou db.delete(). Assim o código antigo
+// continua funcionando sem precisar de uma reescrita estrutural do projeto.
+const primaryDatabase = dbRemote ?? dbLocal;
+const mirrorDatabase = dbRemote ? dbLocal : null;
+
+function isPromiseLike(value: any): boolean {
+  return !!value && typeof value.then === "function";
+}
+
+function isQueryBuilder(value: any): boolean {
+  return isPromiseLike(value) &&
+    ["values", "set", "where", "returning", "execute", "run"].some(
+      (method) => typeof value[method] === "function"
+    );
+}
+
+function createMirroredQuery(primaryQuery: any, mirrorQuery: any): any {
+  return new Proxy(primaryQuery, {
+    get(target, property, receiver) {
+      if (property === "then") {
+        return (onFulfilled?: any, onRejected?: any) =>
+          Promise.all([primaryQuery, mirrorQuery])
+            .then(([result]) => result)
+            .then(onFulfilled, onRejected);
+      }
+
+      if (property === "catch") {
+        return (onRejected?: any) =>
+          Promise.all([primaryQuery, mirrorQuery])
+            .then(([result]) => result)
+            .catch(onRejected);
+      }
+
+      if (property === "finally") {
+        return (onFinally?: any) =>
+          Promise.all([primaryQuery, mirrorQuery])
+            .then(([result]) => result)
+            .finally(onFinally);
+      }
+
+      const primaryMember = Reflect.get(target, property, receiver);
+      if (typeof primaryMember !== "function") return primaryMember;
+
+      const mirrorMember = mirrorQuery ? mirrorQuery[property] : undefined;
+      if (typeof mirrorMember !== "function") {
+        return primaryMember.bind(target);
+      }
+
+      return (...args: any[]) => {
+        const primaryResult = primaryMember.apply(target, args);
+        const mirrorResult = mirrorMember.apply(mirrorQuery, args);
+
+        if (isQueryBuilder(primaryResult) && isQueryBuilder(mirrorResult)) {
+          return createMirroredQuery(primaryResult, mirrorResult);
+        }
+
+        if (isPromiseLike(primaryResult) && isPromiseLike(mirrorResult)) {
+          return Promise.all([primaryResult, mirrorResult]).then(([result]) => result);
+        }
+
+        return primaryResult;
+      };
+    },
+  });
+}
+
+export const db = (mirrorDatabase
+  ? new Proxy(primaryDatabase as any, {
+      get(target, property, receiver) {
+        if (property === "insert" || property === "update" || property === "delete") {
+          return (...args: any[]) => {
+            const primaryQuery = target[property].apply(target, args);
+            const mirrorQuery = (mirrorDatabase as any)[property].apply(mirrorDatabase, args);
+            return createMirroredQuery(primaryQuery, mirrorQuery);
+          };
+        }
+        return Reflect.get(target, property, receiver);
+      },
+    })
+  : primaryDatabase) as typeof dbLocal;
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
