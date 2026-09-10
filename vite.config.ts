@@ -29,7 +29,7 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5005,
+    port: 5010,
     strictPort: true,
     open: false,
     hmr: false,

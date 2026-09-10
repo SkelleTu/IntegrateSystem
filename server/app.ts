@@ -37,7 +37,7 @@ app.use(
 
 app.use(express.urlencoded({ extended: false }));
 
-// Configuração para Replit e Proxies
+// Configuração de proxy e caminhos públicos
 app.set('trust proxy', 1);
 
 app.use((req, res, next) => {

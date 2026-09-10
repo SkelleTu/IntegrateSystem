@@ -514,7 +514,7 @@ export default function Backup() {
           <p>• Cada write na plataforma é salvo simultaneamente em <strong className="text-zinc-300">todos os bancos ativos</strong> ({dbCount} banco{dbCount > 1 ? "s" : ""})</p>
           <p>• Um auto-backup JSON é gerado automaticamente a cada modificação importante (debounce 5s)</p>
           <p>• Os saves ficam em <code className="text-zinc-400">attached_assets/backups/</code> — commitados no GitHub e nunca perdidos</p>
-          <p>• Para migrar de conta no Replit: faça um <strong className="text-zinc-300">SAVE</strong> antes, clone o repositório no novo Replit, e dê <strong className="text-zinc-300">LOAD</strong></p>
+          <p>• Para migrar de conta: faça um <strong className="text-zinc-300">SAVE</strong> antes, clone o repositório na nova conta, e dê <strong className="text-zinc-300">LOAD</strong></p>
           <p>• O sistema suporta até 3 bancos simultâneos: SQLite local, Turso (nuvem) + futuros</p>
         </div>
       </div>

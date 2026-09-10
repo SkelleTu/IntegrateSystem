@@ -37,7 +37,7 @@ export default function WindowsAppRunner() {
         <InfoIcon className="h-4 w-4 text-primary" />
         <AlertTitle className="text-primary font-bold">Acesso Direto à Plataforma</AlertTitle>
         <AlertDescription className="text-zinc-400">
-          Você pode operar a versão Windows diretamente abaixo. Caso a visualização integrada falhe, utilize o botão "Abrir em Nova Janela" para forçar a renderização nativa do ambiente Replit.
+          Você pode operar a versão Windows diretamente abaixo. Caso a visualização integrada falhe, utilize o botão "Abrir em Nova Janela" para forçar a renderização nativa do app.
         </AlertDescription>
       </Alert>
 
