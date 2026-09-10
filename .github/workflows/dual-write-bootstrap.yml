@@ -1,0 +1,132 @@
+name: One-shot dual-write hardening
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: contains(github.event.head_commit.message, '[dual-write-bootstrap]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Patch db.ts safely
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const file = 'server/db.ts';
+          const text = fs.readFileSync(file, 'utf8');
+          const marker = 'export const db = dbRemote ?? dbLocal;';
+          if ((text.match(/export const db = dbRemote \\?\\? dbLocal;/g) || []).length !== 1) {
+            throw new Error('Marcador esperado de db.ts não encontrado exatamente uma vez. Nenhuma alteração será aplicada.');
+          }
+
+          const replacement = [
+            '// ─── 3. db principal — Turso se disponível, com espelhamento automático ─────',
+            'const primaryDatabase = dbRemote ?? dbLocal;',
+            'const mirrorDatabase = dbRemote ? dbLocal : null;',
+            '',
+            'function isPromiseLike(value: any): boolean {',
+            '  return !!value && typeof value.then === "function";',
+            '}',
+            '',
+            'function isQueryBuilder(value: any): boolean {',
+            '  return isPromiseLike(value) && ["values", "set", "where", "returning", "execute", "run"].some(',
+            '    (method) => typeof value[method] === "function"',
+            '  );',
+            '}',
+            '',
+            'function createMirroredQuery(primaryQuery: any, mirrorQuery: any): any {',
+            '  return new Proxy(primaryQuery, {',
+            '    get(target, property, receiver) {',
+            '      if (property === "then") {',
+            '        return (onFulfilled?: any, onRejected?: any) =>',
+            '          Promise.all([primaryQuery, mirrorQuery])',
+            '            .then(([result]) => result)',
+            '            .then(onFulfilled, onRejected);',
+            '      }',
+            '      if (property === "catch") {',
+            '        return (onRejected?: any) =>',
+            '          Promise.all([primaryQuery, mirrorQuery])',
+            '            .then(([result]) => result)',
+            '            .catch(onRejected);',
+            '      }',
+            '      if (property === "finally") {',
+            '        return (onFinally?: any) =>',
+            '          Promise.all([primaryQuery, mirrorQuery])',
+            '            .then(([result]) => result)',
+            '            .finally(onFinally);',
+            '      }',
+            '',
+            '      const primaryMember = Reflect.get(target, property, receiver);',
+            '      if (typeof primaryMember !== "function") return primaryMember;',
+            '',
+            '      const mirrorMember = mirrorQuery ? mirrorQuery[property] : undefined;',
+            '      if (typeof mirrorMember !== "function") {',
+            '        return primaryMember.bind(target);',
+            '      }',
+            '',
+            '      return (...args: any[]) => {',
+            '        const primaryResult = primaryMember.apply(target, args);',
+            '        const mirrorResult = mirrorMember.apply(mirrorQuery, args);',
+            '',
+            '        if (isQueryBuilder(primaryResult) && isQueryBuilder(mirrorResult)) {',
+            '          return createMirroredQuery(primaryResult, mirrorResult);',
+            '        }',
+            '',
+            '        if (isPromiseLike(primaryResult) && isPromiseLike(mirrorResult)) {',
+            '          return Promise.all([primaryResult, mirrorResult]).then(([result]) => result);',
+            '        }',
+            '',
+            '        return primaryResult;',
+            '      };',
+            '    },',
+            '  });',
+            '}',
+            '',
+            'export const db = (mirrorDatabase',
+            '  ? new Proxy(primaryDatabase as any, {',
+            '      get(target, property, receiver) {',
+            '        if (property === "insert" || property === "update" || property === "delete") {',
+            '          return (...args: any[]) => {',
+            '            const primaryQuery = target[property].apply(target, args);',
+            '            const mirrorQuery = (mirrorDatabase as any)[property].apply(mirrorDatabase, args);',
+            '            return createMirroredQuery(primaryQuery, mirrorQuery);',
+            '          };',
+            '        }',
+            '        return Reflect.get(target, property, receiver);',
+            '      },',
+            '    })',
+            '  : primaryDatabase) as typeof dbLocal;',
+          ].join('\\n');
+
+          fs.writeFileSync(file, text.replace(marker, replacement), 'utf8');
+          NODE
+
+      - name: Install and typecheck
+        run: npm ci && npx tsc --noEmit
+
+      - name: Commit tested change and remove bootstrap
+        shell: bash
+        run: |
+          rm .github/workflows/dual-write-bootstrap.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server/db.ts .github/workflows/dual-write-bootstrap.yml
+          git diff --cached --quiet && { echo "Nenhuma alteração preparada."; exit 1; }
+          git commit -m "fix: mirror direct database writes to Turso and SQLite"
+          git push origin main
