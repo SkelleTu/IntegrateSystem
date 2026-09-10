@@ -1,1 +1,1 @@
-/* intentionally unchanged in this commit; use repository rollback */
+/* rollback marker */
