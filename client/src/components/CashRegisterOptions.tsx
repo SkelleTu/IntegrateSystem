@@ -4,393 +4,89 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertTriangle,
-  ArrowDownToLine,
-  ArrowUpFromLine,
-  Clock3,
-  LockKeyhole,
-  RefreshCw,
-  Settings2,
-  ShieldCheck,
-  UnlockKeyhole,
-} from "lucide-react";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, CalendarClock, Clock3, LockKeyhole, Printer, RefreshCw, Settings2, ShieldCheck, UnlockKeyhole } from "lucide-react";
 
-interface CashRegisterMovement {
-  id: number;
-  cashRegisterId: number;
-  userId: number;
-  type: "opening" | "replenishment" | "withdrawal" | "adjustment" | "closing";
-  amount: number;
-  reason?: string | null;
-  createdAt: string;
+type Movement = { id:number; cashRegisterId:number; userId:number; type:string; amount:number; reason?:string|null; createdAt:string|Date };
+type Summary = { register:any; openingAmount:number; cashSales:number; cardSales:number; pixSales:number; otherSales:number; replenishments:number; withdrawals:number; adjustments:number; expectedAmount:number; movements:Movement[]; detailedSales:any[]; toleranceCents?:number; review?:any|null; operator?:any|null };
+type Status = { register:any|null; summary:Summary|null; pendingReviews:any[] };
+type Operation = "open"|"close"|"withdrawal"|"replenishment"|"review"|"config"|null;
+
+const money = (c:number|null|undefined) => `R$ ${((Number(c||0))/100).toFixed(2).replace(".",",")}`;
+const fmtDate = (d:any) => { const x=new Date(d); return Number.isNaN(x.getTime()) ? "Data indisponível" : x.toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"medium" }); };
+const classify = (diff:number,tol:number) => diff===0 ? "CAIXA CONFERIDO" : Math.abs(diff)<=tol ? "DENTRO DA TOLERÂNCIA" : diff>0 ? "SOBRA DE CAIXA" : "FALTA DE CAIXA";
+
+export default function CashRegisterOptions(){
+  const {toast}=useToast(); const qc=useQueryClient();
+  const [menuOpen,setMenuOpen]=useState(false); const [operation,setOperation]=useState<Operation>(null);
+  const [amount,setAmount]=useState(""); const [reason,setReason]=useState(""); const [password,setPassword]=useState(""); const [observation,setObservation]=useState("");
+  const [reviewRegisterId,setReviewRegisterId]=useState<number|null>(null); const [tolerance,setTolerance]=useState(""); const [configPassword,setConfigPassword]=useState("");
+  const [anchor,setAnchor]=useState({left:0,top:0,visible:false}); const anchorRef=useRef<HTMLButtonElement|null>(null);
+
+  const {data:status,isFetching}=useQuery<Status>({queryKey:["/api/cash-control/status"],queryFn:async()=>{const r=await fetch("/api/cash-control/status");if(!r.ok)throw new Error("Não foi possível consultar o Caixa.");return r.json();},refetchInterval:15000,staleTime:5000});
+  const targetId=operation==="review"||operation==="close" ? (operation==="review"?reviewRegisterId:status?.register?.id) : null;
+  const {data:detail}=useQuery<Summary>({queryKey:["/api/cash-audit/review",targetId],queryFn:async()=>{const r=await fetch(`/api/cash-audit/review/${targetId}`);if(!r.ok)throw new Error("Não foi possível carregar o fechamento.");return r.json();},enabled:!!targetId&&!!operation&&["review","close"].includes(operation),staleTime:3000});
+  const {data:config}=useQuery<{toleranceCents:number}>({queryKey:["/api/cash-audit/config"],queryFn:async()=>{const r=await fetch("/api/cash-audit/config");if(!r.ok)throw new Error("Não foi possível carregar a tolerância.");return r.json();},staleTime:10000});
+
+  const registerOpen=!!status?.register&&status.register.status==="open"&&!status.register.closedAt;
+  const pendingReviews=status?.pendingReviews||[]; const summary=detail||status?.summary||null;
+  const currentTolerance=detail?.toleranceCents??config?.toleranceCents??0;
+  const numericAmount=Number(amount.replace(",",".")); const physicalCents=Number.isFinite(numericAmount)?Math.round(numericAmount*100):null;
+  const previewDiff=summary&&physicalCents!==null?physicalCents-summary.expectedAmount:null;
+  const previewClass=previewDiff===null?null:classify(previewDiff,currentTolerance);
+
+  const syncAnchor=useCallback(()=>{const hs=Array.from(document.querySelectorAll("h3"));const h=hs.find(n=>n.textContent?.toLowerCase().includes("itens no carrinho"));const t=h?.parentElement||document.querySelector("[data-cashier-cart]");if(!t){setAnchor(p=>({...p,visible:false}));return;}const r=t.getBoundingClientRect();setAnchor({left:Math.max(8,r.right-154),top:Math.max(72,r.top-6),visible:true});},[]);
+  useEffect(()=>{const tm=window.setTimeout(syncAnchor,80);const mo=new MutationObserver(syncAnchor);mo.observe(document.body,{childList:true,subtree:true});window.addEventListener("resize",syncAnchor);window.addEventListener("scroll",syncAnchor,true);return()=>{clearTimeout(tm);mo.disconnect();window.removeEventListener("resize",syncAnchor);window.removeEventListener("scroll",syncAnchor,true);};},[syncAnchor]);
+
+  const reset=()=>{setAmount("");setReason("");setPassword("");setObservation("");setReviewRegisterId(null);setConfigPassword("");};
+  const closeDialog=()=>{setOperation(null);reset();};
+  const run=async()=>{try{
+    if(operation==="config"){const v=Number(tolerance.replace(",","."));if(!Number.isFinite(v)||v<0||!configPassword)throw new Error("Informe uma tolerância válida e a senha administrativa.");const r=await apiRequest("POST","/api/cash-audit/config",{tolerance:v,password:configPassword});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"Não foi possível salvar a tolerância.");await qc.invalidateQueries({queryKey:["/api/cash-audit/config"]});toast({title:"Tolerância administrativa atualizada"});closeDialog();return;}
+    if(operation==="withdrawal"||operation==="replenishment"){const v=Number(amount.replace(",","."));if(!Number.isFinite(v)||v<=0||!reason.trim())throw new Error("Informe valor e motivo.");const r=await apiRequest("POST",operation==="withdrawal"?"/api/cash-control/withdrawal":"/api/cash-control/replenishment",{amount:v,reason:reason.trim()});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"Operação não concluída.");toast({title:operation==="withdrawal"?"Sangria registrada":"Suprimento registrado"});await qc.invalidateQueries({queryKey:["/api/cash-control/status"]});closeDialog();return;}
+    const v=Number(amount.replace(",","."));if(!Number.isFinite(v)||v<0||!password)throw new Error("Informe o valor físico e a senha administrativa.");
+    const endpoint=operation==="review"?"/api/cash-audit/review":"/api/cash-audit/close";const r=await apiRequest("POST",endpoint,{registerId:targetId,closingAmount:v,password,observation:observation.trim()||null});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.message||"Não foi possível concluir o fechamento.");toast({title:operation==="review"?"Revisão administrativa concluída":"Caixa fechado com sucesso"});await qc.invalidateQueries({queryKey:["/api/cash-control/status"]});await qc.invalidateQueries({queryKey:["/api/cash-audit/config"]});closeDialog();
+  }catch(e:any){toast({title:"Não foi possível concluir",description:e.message||"Erro inesperado.",variant:"destructive"});}};
+
+  const printSummary=()=>{if(!summary)return;const lines=(summary.movements||[]).slice().reverse().map(m=>`<tr><td>${fmtDate(m.createdAt)}</td><td>${String(m.type).toUpperCase()}</td><td>${money(m.amount)}</td><td>${(m.reason||"").replace(/</g,"&lt;")}</td></tr>`).join("");const sales=(summary.detailedSales||[]).map((x:any)=>`<tr><td>#${x.sale.id}</td><td>${fmtDate(x.sale.createdAt)}</td><td>${money(x.sale.totalAmount)}</td><td>${(x.payments||[]).map((p:any)=>`${p.method}: ${money(p.amount)}`).join(" | ")}</td></tr>`).join("");const diff=physicalCents===null?null:physicalCents-summary.expectedAmount;const w=window.open("","_blank","width=1000,height=800");if(!w)return;w.document.write(`<!doctype html><html><head><title>Fechamento Caixa #${summary.register.id}</title><style>body{font-family:Arial,sans-serif;margin:32px;color:#111}h1{margin-bottom:4px}small{color:#666}.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.card{border:1px solid #ddd;border-radius:8px;padding:12px}table{width:100%;border-collapse:collapse;margin-top:14px}th,td{border:1px solid #ddd;padding:7px;text-align:left;font-size:12px}@media print{button{display:none}}</style></head><body><h1>Fechamento de Caixa #${summary.register.id}</h1><small>Gerado em ${fmtDate(new Date())}</small><p><b>Operador:</b> ${summary.operator?.username||summary.register.userId} &nbsp; <b>Abertura:</b> ${fmtDate(summary.register.openedAt)} &nbsp; <b>Fechamento:</b> ${fmtDate(summary.register.closedAt)}</p><div class="grid"><div class="card">Abertura: <b>${money(summary.openingAmount)}</b></div><div class="card">Vendas dinheiro: <b>${money(summary.cashSales)}</b></div><div class="card">Cartão: <b>${money(summary.cardSales)}</b></div><div class="card">Pix: <b>${money(summary.pixSales)}</b></div><div class="card">Suprimentos: <b>${money(summary.replenishments)}</b></div><div class="card">Sangrias: <b>${money(summary.withdrawals)}</b></div><div class="card">Ajustes: <b>${money(summary.adjustments)}</b></div><div class="card">Saldo esperado: <b>${money(summary.expectedAmount)}</b></div><div class="card">Valor físico: <b>${physicalCents===null?"Não informado":money(physicalCents)}</b></div><div class="card">Diferença real: <b>${diff===null?"Não informado":money(diff)}</b></div><div class="card">Tolerância: <b>${money(currentTolerance)}</b></div><div class="card">Classificação: <b>${diff===null?"PENDENTE":classify(diff,currentTolerance)}</b></div></div><h2>Vendas</h2><table><tr><th>Venda</th><th>Data</th><th>Total</th><th>Pagamentos</th></tr>${sales}</table><h2>Movimentações</h2><table><tr><th>Data</th><th>Tipo</th><th>Valor</th><th>Motivo</th></tr>${lines}</table><h2>Observação administrativa</h2><p>${(observation||summary.review?.observation||"").replace(/</g,"&lt;")||"Nenhuma."}</p><script>window.print()</script></body></html>`);w.document.close();};
+
+  if(!anchor.visible)return null;
+  return <>
+    <div className="fixed z-[90]" style={{left:anchor.left,top:anchor.top}}><div className="relative">
+      {menuOpen&&<div className="absolute right-0 top-11 w-[310px] max-w-[calc(100vw-16px)] rounded-2xl border border-white/10 bg-zinc-950/98 backdrop-blur-xl shadow-2xl p-2 space-y-1">
+        <div className="px-3 py-2 border-b border-white/5 mb-1"><div className="flex items-center justify-between"><span className="text-white font-black uppercase italic text-[10px] tracking-widest">Opções do Caixa</span><button className="text-white/30 hover:text-primary" onClick={()=>qc.invalidateQueries({queryKey:["/api/cash-control/status"]})}><RefreshCw className={`w-3.5 h-3.5 ${isFetching?"animate-spin":""}`}/></button></div><div className="mt-2 flex justify-between text-[9px] font-black uppercase tracking-widest"><span className={registerOpen?"text-emerald-400":"text-white/40"}>{registerOpen?"Caixa Aberto":"Caixa Fechado"}</span>{status?.summary&&<span className="text-primary">{money(status.summary.expectedAmount)}</span>}</div></div>
+        <OptionButton icon={<UnlockKeyhole className="w-4 h-4"/>} label="Abertura do Caixa" disabled={registerOpen} onClick={()=>{setOperation("open");setMenuOpen(false);}}/>
+        <OptionButton icon={<LockKeyhole className="w-4 h-4"/>} label="Fechamento do Caixa" disabled={!registerOpen} onClick={()=>{setOperation("close");setMenuOpen(false);}}/>
+        <OptionButton icon={<ArrowDownToLine className="w-4 h-4"/>} label="Sangria" disabled={!registerOpen} onClick={()=>{setOperation("withdrawal");setMenuOpen(false);}}/>
+        <OptionButton icon={<ArrowUpFromLine className="w-4 h-4"/>} label="Suprimento" disabled={!registerOpen} onClick={()=>{setOperation("replenishment");setMenuOpen(false);}}/>
+        <div className="mt-1 pt-1 border-t border-white/5"><OptionButton icon={<Settings2 className="w-4 h-4"/>} label="Configuração administrativa" onClick={()=>{setTolerance((currentTolerance/100).toFixed(2).replace(".",","));setOperation("config");setMenuOpen(false);}}/></div>
+        {pendingReviews.length>0&&<div className="pt-1 mt-1 border-t border-white/5"><button className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left bg-amber-500/10 border border-amber-500/20" onClick={()=>{setReviewRegisterId(pendingReviews[0].id);setOperation("review");setMenuOpen(false);}}><AlertTriangle className="w-4 h-4 text-amber-400"/><span><span className="block text-amber-300 font-black uppercase italic text-[9px] tracking-widest">Revisões pendentes</span><span className="block text-white/40 text-[8px] uppercase mt-0.5">{pendingReviews.length} fechamento(s) automático(s)</span></span></button></div>}
+      </div>}
+      <Button ref={anchorRef} type="button" variant="outline" aria-label="Opções do Caixa" onClick={()=>setMenuOpen(v=>!v)} className="h-9 px-2.5 rounded-xl bg-zinc-950/95 border-white/10 text-white hover:text-primary hover:border-primary/40 shadow-xl backdrop-blur-md gap-1.5"><Settings2 className="w-4 h-4"/><span className="hidden sm:inline text-[9px] font-black uppercase italic tracking-widest">Opções do Caixa</span></Button>
+    </div></div>
+
+    <Dialog open={!!operation} onOpenChange={o=>!o&&closeDialog()}><DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-2xl max-h-[92vh] overflow-y-auto">
+      <DialogHeader><DialogTitle className="uppercase italic tracking-tighter text-2xl font-black flex items-center gap-2">{operation==="review"?<AlertTriangle className="w-5 h-5 text-amber-400"/>:operation==="config"?<Settings2 className="w-5 h-5 text-primary"/>:<LockKeyhole className="w-5 h-5 text-primary"/>}{operation==="review"?"Revisão do Fechamento Automático":operation==="config"?"Configuração Administrativa":"Fechamento do Caixa"}</DialogTitle><DialogDescription className="text-zinc-400">{operation==="review"?`Este Caixa foi encerrado automaticamente em ${summary?.register?.closedAt?fmtDate(summary.register.closedAt):"data não disponível"} e aguarda revisão administrativa.`:operation==="config"?"Defina o limite administrativo de tolerância das diferenças do Caixa.":"O servidor recalcula todos os valores antes de confirmar o fechamento."}</DialogDescription></DialogHeader>
+
+      {operation==="config"?<div className="space-y-5 py-3"><div className="rounded-xl border border-primary/20 bg-primary/5 p-4"><div className="text-[9px] uppercase tracking-widest font-black text-white/40">Tolerância vigente</div><div className="text-2xl font-black italic text-primary">{money(currentTolerance)}</div></div><div><Label className="text-white/50 text-[9px] uppercase tracking-widest font-black">Nova tolerância (R$)</Label><Input value={tolerance} onChange={e=>setTolerance(e.target.value)} placeholder="0,00" inputMode="decimal" className="mt-2 h-14 bg-black border-white/10 text-2xl text-primary font-black text-center rounded-xl"/></div><div><Label className="text-white/50 text-[9px] uppercase tracking-widest font-black"><ShieldCheck className="inline w-3.5 h-3.5 mr-1 text-primary"/>Senha administrativa</Label><Input type="password" value={configPassword} onChange={e=>setConfigPassword(e.target.value)} className="mt-2 h-12 bg-black border-white/10 rounded-xl"/></div><p className="text-[9px] text-white/30 uppercase tracking-widest">A tolerância somente classifica a divergência. A diferença real continua registrada no Financeiro.</p></div>:
+      <>
+        {summary&&<>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2"><SummaryTile label="Abertura" value={money(summary.openingAmount)}/><SummaryTile label="Dinheiro" value={money(summary.cashSales)}/><SummaryTile label="Cartão" value={money(summary.cardSales)}/><SummaryTile label="Pix" value={money(summary.pixSales)}/><SummaryTile label="Suprimentos" value={money(summary.replenishments)}/><SummaryTile label="Sangrias" value={money(summary.withdrawals)}/><SummaryTile label="Ajustes" value={money(summary.adjustments)}/><SummaryTile label="Tolerância" value={money(currentTolerance)}/></div>
+          <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between"><span className="text-white/50 text-[9px] font-black uppercase tracking-widest">Saldo esperado</span><span className="text-primary text-2xl font-black italic">{money(summary.expectedAmount)}</span></div>
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/5 p-4 text-xs"><div className="grid grid-cols-2 gap-2"><span>Operador: <b>{summary.operator?.username||summary.register.userId}</b></span><span>Caixa/Sessão: <b>#{summary.register.id}</b></span><span>Abertura: <b>{fmtDate(summary.register.openedAt)}</b></span><span>Fechamento: <b>{fmtDate(summary.register.closedAt)}</b></span></div></div>
+          <div className="mt-4 flex items-center justify-between"><div className="flex items-center gap-2 text-[9px] uppercase font-black tracking-widest text-white/40"><CalendarClock className="w-4 h-4 text-primary"/> Conferência física</div><Button variant="outline" size="sm" onClick={printSummary} className="border-white/10 text-white"><Printer className="w-4 h-4 mr-1"/>Imprimir</Button></div>
+          <Input value={amount} onChange={e=>setAmount(e.target.value)} placeholder="0,00" inputMode="decimal" className="mt-2 h-14 bg-black border-white/10 text-2xl font-black text-primary text-center rounded-xl"/>
+          {previewDiff!==null&&<div className="mt-2 rounded-xl border border-white/10 p-4"><div className="flex justify-between text-[10px] uppercase tracking-widest font-black"><span>Diferença real</span><span className={previewDiff===0?"text-emerald-400":previewDiff>0?"text-primary":"text-red-400"}>{money(previewDiff)}</span></div><div className="mt-2 flex justify-between text-[10px] uppercase tracking-widest font-black"><span>Classificação</span><span>{previewClass}</span></div></div>}
+          <div className="mt-4"><Label className="text-white/50 text-[9px] uppercase tracking-widest font-black">Observação administrativa (opcional)</Label><Textarea value={observation} onChange={e=>setObservation(e.target.value)} placeholder="Registre aqui qualquer ocorrência que precise ser verificada no próximo expediente." className="mt-2 bg-black border-white/10 rounded-xl min-h-[90px]"/></div>
+          {summary.detailedSales?.length>0&&<div className="mt-4"><div className="text-[9px] uppercase tracking-widest font-black text-white/40 mb-2">Vendas concluídas ({summary.detailedSales.length})</div><div className="space-y-1">{summary.detailedSales.map((x:any)=><div key={x.sale.id} className="rounded-lg border border-white/5 p-3 text-[10px] flex justify-between"><span>Venda #{x.sale.id} · {fmtDate(x.sale.createdAt)}</span><b>{money(x.sale.totalAmount)}</b></div>)}</div></div>}
+          {summary.movements?.length>0&&<div className="mt-4"><div className="text-[9px] uppercase tracking-widest font-black text-white/40 mb-2">Histórico de movimentações</div><div className="space-y-1 max-h-48 overflow-y-auto">{summary.movements.slice().reverse().map((m:any)=><div key={m.id} className="rounded-lg border border-white/5 p-3 text-[9px] grid grid-cols-[90px_90px_1fr] gap-2"><span>{new Date(m.createdAt).toLocaleTimeString("pt-BR")}</span><b>{String(m.type).toUpperCase()}</b><span>{money(m.amount)} · {m.reason||"Sem observação"}</span></div>)}</div></div>}
+          {summary.review?.observation&&<div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs"><b className="text-amber-300">Observação registrada anteriormente:</b><p className="mt-1 text-white/60">{summary.review.observation}</p></div>}
+        </>}
+      </>}
+      <DialogFooter className="gap-2"><Button variant="outline" onClick={closeDialog} className="border-white/10 text-white bg-transparent">Cancelar</Button><Button onClick={()=>void run()} disabled={operation==="config"?!tolerance||!configPassword:(!amount||!password)} className="bg-primary text-black font-black uppercase italic">{operation==="review"?"Concluir Revisão":operation==="config"?"Salvar Tolerância":"Confirmar Fechamento"}</Button></DialogFooter>
+    </DialogContent></Dialog>
+  </>;
 }
-
-interface CashRegisterSummary {
-  register: {
-    id: number;
-    userId: number;
-    openedAt: string | Date;
-    closedAt?: string | Date | null;
-    openingAmount: number;
-    closingAmount?: number | null;
-    difference?: number | null;
-    status: string;
-  };
-  openingAmount: number;
-  cashSales: number;
-  replenishments: number;
-  withdrawals: number;
-  adjustments: number;
-  expectedAmount: number;
-  movements: CashRegisterMovement[];
-}
-
-interface CashControlStatus {
-  register: CashRegisterSummary["register"] | null;
-  summary: CashRegisterSummary | null;
-  pendingReviews: CashRegisterSummary["register"][];
-}
-
-type Operation = "open" | "close" | "withdrawal" | "replenishment" | "review" | null;
-
-function money(cents: number | null | undefined) {
-  return `R$ ${((Number(cents || 0)) / 100).toFixed(2).replace(".", ",")}`;
-}
-
-export default function CashRegisterOptions() {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [operation, setOperation] = useState<Operation>(null);
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-  const [password, setPassword] = useState("");
-  const [reviewRegisterId, setReviewRegisterId] = useState<number | null>(null);
-  const [anchor, setAnchor] = useState({ left: 0, top: 0, visible: false });
-  const anchorRef = useRef<HTMLButtonElement | null>(null);
-
-  const { data: status, isFetching } = useQuery<CashControlStatus>({
-    queryKey: ["/api/cash-control/status"],
-    queryFn: async () => {
-      const res = await fetch("/api/cash-control/status");
-      if (!res.ok) throw new Error("Não foi possível consultar o Caixa.");
-      return res.json();
-    },
-    refetchInterval: 15000,
-    staleTime: 5000,
-  });
-
-  const { data: reviewSummary } = useQuery<CashRegisterSummary>({
-    queryKey: ["/api/cash-control/register", reviewRegisterId],
-    queryFn: async () => {
-      const res = await fetch(`/api/cash-control/register/${reviewRegisterId}`);
-      if (!res.ok) throw new Error("Não foi possível consultar o fechamento automático.");
-      return res.json();
-    },
-    enabled: operation === "review" && !!reviewRegisterId,
-    staleTime: 5000,
-  });
-
-  const registerOpen = !!status?.register && status.register.status === "open" && !status.register.closedAt;
-  const pendingReviews = status?.pendingReviews || [];
-  const activeSummary = operation === "review" ? reviewSummary : status?.summary;
-
-  const syncAnchor = useCallback(() => {
-    const headings = Array.from(document.querySelectorAll("h3"));
-    const heading = headings.find((node) => node.textContent?.toLowerCase().includes("itens no carrinho"));
-    const target = heading?.parentElement || document.querySelector("[data-cashier-cart]");
-    if (!target) {
-      setAnchor((prev) => ({ ...prev, visible: false }));
-      return;
-    }
-    const rect = target.getBoundingClientRect();
-    const buttonWidth = 150;
-    setAnchor({
-      left: Math.max(8, rect.right - buttonWidth - 4),
-      top: Math.max(72, rect.top - 6),
-      visible: true,
-    });
-  }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(syncAnchor, 80);
-    const observer = new MutationObserver(syncAnchor);
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.addEventListener("resize", syncAnchor);
-    window.addEventListener("scroll", syncAnchor, true);
-    return () => {
-      window.clearTimeout(timer);
-      observer.disconnect();
-      window.removeEventListener("resize", syncAnchor);
-      window.removeEventListener("scroll", syncAnchor, true);
-    };
-  }, [syncAnchor]);
-
-  const resetForm = () => {
-    setAmount("");
-    setReason("");
-    setPassword("");
-    setReviewRegisterId(null);
-  };
-
-  const closeDialog = () => {
-    setOperation(null);
-    resetForm();
-  };
-
-  const runOperation = async () => {
-    try {
-      const numericAmount = Number(amount.replace(",", "."));
-      if (["open", "close", "review", "withdrawal", "replenishment"].includes(operation || "")) {
-        if (!Number.isFinite(numericAmount) || numericAmount < 0 || (operation !== "open" && numericAmount <= 0)) {
-          toast({ title: "Valor inválido", description: "Informe um valor financeiro válido.", variant: "destructive" });
-          return;
-        }
-      }
-
-      let response: Response;
-      if (operation === "open") {
-        response = await apiRequest("POST", "/api/cash-control/open", { openingAmount: numericAmount, password });
-      } else if (operation === "close") {
-        response = await apiRequest("POST", "/api/cash-control/close", { closingAmount: numericAmount, password });
-      } else if (operation === "withdrawal") {
-        response = await apiRequest("POST", "/api/cash-control/withdrawal", { amount: numericAmount, reason });
-      } else if (operation === "replenishment") {
-        response = await apiRequest("POST", "/api/cash-control/replenishment", { amount: numericAmount, reason });
-      } else if (operation === "review") {
-        response = await apiRequest("POST", "/api/cash-control/review", {
-          registerId: reviewRegisterId,
-          closingAmount: numericAmount,
-          password,
-        });
-      } else {
-        return;
-      }
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "A operação não pôde ser concluída.");
-
-      await queryClient.invalidateQueries({ queryKey: ["/api/cash-control/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-
-      const titles: Record<string, string> = {
-        open: "Caixa aberto com sucesso",
-        close: "Caixa fechado com sucesso",
-        withdrawal: "Sangria registrada",
-        replenishment: "Suprimento registrado",
-        review: "Fechamento automático revisado",
-      };
-      toast({ title: titles[operation || ""] || "Operação concluída" });
-      closeDialog();
-    } catch (error: any) {
-      toast({
-        title: "Não foi possível concluir",
-        description: error?.message || "Erro inesperado na operação do Caixa.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const dialogTitle = useMemo(() => ({
-    open: "Abertura do Caixa",
-    close: "Fechamento do Caixa",
-    withdrawal: "Sangria",
-    replenishment: "Suprimento",
-    review: "Revisão do Fechamento Automático",
-  } as Record<string, string>)[operation || ""] || "Opções do Caixa", [operation]);
-
-  const dialogNeedsPassword = operation === "open" || operation === "close" || operation === "review";
-
-  if (!anchor.visible) return null;
-
-  return (
-    <>
-      <div className="fixed z-[90]" style={{ left: anchor.left, top: anchor.top }}>
-        <div className="relative">
-          {menuOpen && (
-            <div className="absolute right-0 top-11 w-[290px] max-w-[calc(100vw-16px)] rounded-2xl border border-white/10 bg-zinc-950/98 backdrop-blur-xl shadow-2xl p-2 space-y-1">
-              <div className="px-3 py-2 border-b border-white/5 mb-1">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-white font-black uppercase italic text-[10px] tracking-widest">Opções do Caixa</span>
-                  <button onClick={() => queryClient.invalidateQueries({ queryKey: ["/api/cash-control/status"] })} className="text-white/30 hover:text-primary">
-                    <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-[9px] font-black uppercase tracking-widest">
-                  <span className={registerOpen ? "text-emerald-400" : "text-white/40"}>{registerOpen ? "Caixa Aberto" : "Caixa Fechado"}</span>
-                  {status?.summary && <span className="text-primary">{money(status.summary.expectedAmount)}</span>}
-                </div>
-              </div>
-
-              <OptionButton icon={<UnlockKeyhole className="w-4 h-4" />} label="Abertura do Caixa" disabled={registerOpen} onClick={() => { setOperation("open"); setMenuOpen(false); }} />
-              <OptionButton icon={<LockKeyhole className="w-4 h-4" />} label="Fechamento do caixa" disabled={!registerOpen} onClick={() => { setOperation("close"); setMenuOpen(false); }} />
-              <OptionButton icon={<ArrowDownToLine className="w-4 h-4" />} label="Sangria" disabled={!registerOpen} onClick={() => { setOperation("withdrawal"); setMenuOpen(false); }} />
-              <OptionButton icon={<ArrowUpFromLine className="w-4 h-4" />} label="Suprimento" disabled={!registerOpen} onClick={() => { setOperation("replenishment"); setMenuOpen(false); }} />
-
-              {pendingReviews.length > 0 && (
-                <div className="pt-1 mt-1 border-t border-white/5">
-                  <button
-                    className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15 transition-colors"
-                    onClick={() => {
-                      setReviewRegisterId(pendingReviews[0].id);
-                      setOperation("review");
-                      setMenuOpen(false);
-                    }}
-                  >
-                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-amber-300 font-black uppercase italic text-[9px] tracking-widest">Revisões pendentes</span>
-                      <span className="block text-white/40 text-[8px] uppercase mt-0.5">{pendingReviews.length} fechamento(s) automático(s)</span>
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          <Button
-            ref={anchorRef}
-            type="button"
-            variant="outline"
-            aria-label="Opções do Caixa"
-            onClick={() => setMenuOpen((value) => !value)}
-            className="h-9 px-2.5 rounded-xl bg-zinc-950/95 border-white/10 text-white hover:text-primary hover:border-primary/40 shadow-xl backdrop-blur-md gap-1.5"
-          >
-            <Settings2 className="w-4 h-4" />
-            <span className="hidden sm:inline text-[9px] font-black uppercase italic tracking-widest">Opções do Caixa</span>
-          </Button>
-        </div>
-      </div>
-
-      <Dialog open={!!operation} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-lg max-h-[92vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="uppercase italic tracking-tighter text-2xl font-black flex items-center gap-2">
-              {operation === "open" && <UnlockKeyhole className="w-5 h-5 text-primary" />}
-              {operation === "close" && <LockKeyhole className="w-5 h-5 text-primary" />}
-              {operation === "withdrawal" && <ArrowDownToLine className="w-5 h-5 text-primary" />}
-              {operation === "replenishment" && <ArrowUpFromLine className="w-5 h-5 text-primary" />}
-              {operation === "review" && <AlertTriangle className="w-5 h-5 text-amber-400" />}
-              {dialogTitle}
-            </DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              {operation === "open" && "Abra uma nova sessão de Caixa usando a mesma senha administrativa do estabelecimento."}
-              {operation === "close" && "Conferência final da sessão atual. O servidor recalcula o saldo esperado antes de confirmar."}
-              {operation === "withdrawal" && "Retire dinheiro do Caixa com registro auditável e reflexo imediato no Financeiro."}
-              {operation === "replenishment" && "Adicione dinheiro ao Caixa com registro auditável e reflexo imediato no Financeiro."}
-              {operation === "review" && "Este Caixa foi encerrado automaticamente às 00:00 e precisa da conferência dos donos."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {(operation === "close" || operation === "review") && activeSummary && (
-            <div className="grid grid-cols-2 gap-2 mt-2">
-              <SummaryTile label="Abertura" value={money(activeSummary.openingAmount)} />
-              <SummaryTile label="Vendas em dinheiro" value={money(activeSummary.cashSales)} />
-              <SummaryTile label="Suprimentos" value={money(activeSummary.replenishments)} />
-              <SummaryTile label="Sangrias" value={money(activeSummary.withdrawals)} />
-              <SummaryTile label="Ajustes" value={money(activeSummary.adjustments)} />
-              <div className="col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
-                <span className="text-white/50 text-[9px] font-black uppercase tracking-widest">Saldo esperado</span>
-                <span className="text-primary text-xl font-black italic">{money(activeSummary.expectedAmount)}</span>
-              </div>
-            </div>
-          )}
-
-          {operation === "review" && reviewRegisterId && (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2">
-              <div className="flex items-center gap-2 text-amber-300">
-                <Clock3 className="w-4 h-4" />
-                <span className="text-[9px] font-black uppercase tracking-widest">Sessão #{reviewRegisterId}</span>
-              </div>
-              <p className="text-xs text-white/50 leading-relaxed">O fechamento ocorreu automaticamente. Informe o valor físico contado agora para concluir a revisão.</p>
-            </div>
-          )}
-
-          {(operation === "open" || operation === "close" || operation === "review" || operation === "withdrawal" || operation === "replenishment") && (
-            <div className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label className="text-white/40 text-[9px] font-black uppercase tracking-widest">
-                  {operation === "open" ? "Valor inicial / troco" : operation === "withdrawal" ? "Valor da sangria" : operation === "replenishment" ? "Valor do suprimento" : "Valor físico conferido"}
-                </Label>
-                <Input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  placeholder="0,00"
-                  inputMode="decimal"
-                  className="h-14 bg-black border-white/10 text-2xl font-black text-primary text-center rounded-xl"
-                  autoFocus
-                />
-              </div>
-
-              {(operation === "withdrawal" || operation === "replenishment") && (
-                <div className="space-y-2">
-                  <Label className="text-white/40 text-[9px] font-black uppercase tracking-widest">Motivo / observação</Label>
-                  <Input
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    placeholder={operation === "withdrawal" ? "Ex.: retirada para banco" : "Ex.: reforço de troco"}
-                    className="h-12 bg-black border-white/10 text-white rounded-xl"
-                  />
-                </div>
-              )}
-
-              {dialogNeedsPassword && (
-                <div className="space-y-2">
-                  <Label className="text-white/40 text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
-                    <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Senha administrativa
-                  </Label>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="A mesma senha usada para entrar na plataforma"
-                    className="h-12 bg-black border-white/10 text-white rounded-xl"
-                    onKeyDown={(e) => e.key === "Enter" && void runOperation()}
-                  />
-                  <p className="text-[8px] text-white/25 uppercase tracking-widest">A senha nunca é armazenada pelo Caixa.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <DialogFooter className="gap-2 sm:gap-2">
-            <Button variant="outline" onClick={closeDialog} className="border-white/10 text-white bg-transparent hover:bg-white/5">Cancelar</Button>
-            <Button
-              onClick={() => void runOperation()}
-              disabled={!amount || (dialogNeedsPassword && !password) || ((operation === "withdrawal" || operation === "replenishment") && !reason.trim())}
-              className="bg-primary text-black font-black uppercase italic disabled:opacity-40"
-            >
-              {operation === "review" ? "Concluir Revisão" : operation === "close" ? "Confirmar Fechamento" : "Confirmar Operação"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-function OptionButton({ icon, label, disabled, onClick }: { icon: ReactNode; label: string; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left text-white/80 hover:text-primary hover:bg-white/5 disabled:opacity-25 disabled:pointer-events-none transition-colors"
-    >
-      <span className="text-primary">{icon}</span>
-      <span className="text-[9px] font-black uppercase italic tracking-widest">{label}</span>
-    </button>
-  );
-}
-
-function SummaryTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/5 bg-white/5 p-3">
-      <div className="text-[8px] font-black uppercase tracking-widest text-white/30">{label}</div>
-      <div className="mt-1 text-sm font-black italic text-white">{value}</div>
-    </div>
-  );
-}
+function OptionButton({icon,label,disabled,onClick}:{icon:ReactNode;label:string;disabled?:boolean;onClick:()=>void}){return <button type="button" disabled={disabled} onClick={onClick} className="w-full flex items-center gap-3 rounded-xl px-3 py-3 text-left text-white/80 hover:text-primary hover:bg-white/5 disabled:opacity-25 disabled:pointer-events-none transition-colors"><span className="text-primary">{icon}</span><span className="text-[9px] font-black uppercase italic tracking-widest">{label}</span></button>}
+function SummaryTile({label,value}:{label:string;value:string}){return <div className="rounded-xl border border-white/5 bg-white/5 p-3"><div className="text-[8px] font-black uppercase tracking-widest text-white/30">{label}</div><div className="mt-1 text-sm font-black italic text-white">{value}</div></div>}
