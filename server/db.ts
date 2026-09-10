@@ -52,9 +52,6 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
 export const isRemoteEnabled = !!dbRemote;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
-// Além do multiWrite(), este proxy cobre escritas legadas que ainda usam
-// diretamente db.insert(), db.update() ou db.delete(). Assim o código antigo
-// continua funcionando sem precisar de uma reescrita estrutural do projeto.
 const primaryDatabase = dbRemote ?? dbLocal;
 const mirrorDatabase = dbRemote ? dbLocal : null;
 
@@ -361,7 +358,7 @@ const TABLE_DEFINITIONS = [
     unit TEXT NOT NULL,
     items_per_unit INTEGER NOT NULL DEFAULT 1,
     cost_price INTEGER NOT NULL DEFAULT 0,
-    expiry_date INTEGER,
+    expiry_date INTEGER NOT NULL,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS fiscal_settings (
