@@ -56,6 +56,7 @@ import Backup from "./pages/Backup";
 import SetupEnterprise from "./pages/SetupEnterprise";
 import { TourProvider } from "@/components/tour/TourContext";
 import { TourEngine } from "@/components/tour/TourEngine";
+import CashRegisterOptions from "@/components/CashRegisterOptions";
 
 function Router() {
   const { data: user, isLoading } = useUser();
@@ -213,6 +214,7 @@ function AppContent() {
           <LandingNavigation />
           {user && !isLandingPage && location !== "/setup" && <Navbar />}
           <Router />
+          {user && location === "/caixa" && <CashRegisterOptions />}
         </main>
       </div>
       <Toaster />
