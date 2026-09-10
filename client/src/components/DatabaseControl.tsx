@@ -112,11 +112,21 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
       const response = await apiRequest("POST", "/api/backup/save", { name: `__SQL__aura-database-${stamp}` });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Falha ao gerar o banco SQL.");
-      const downloadResponse = await fetch(`/api/backup/download/${encodeURIComponent(data.filename)}`);
-      if (!downloadResponse.ok) throw new Error("Não foi possível recuperar o SQL gerado.");
+
+      // O servidor pode retornar um caminho absoluto com barras do Windows (\\).
+      // Para o endpoint de download, precisamos enviar somente o nome do arquivo.
+      const generatedFilename = String(data?.filename || "");
+      const filename = generatedFilename.split(/[\\/]/).pop() || generatedFilename;
+      if (!filename) throw new Error("O servidor não retornou o nome do SQL gerado.");
+
+      const downloadResponse = await fetch(`/api/backup/download/${encodeURIComponent(filename)}`);
+      if (!downloadResponse.ok) {
+        const errorBody = await downloadResponse.text().catch(() => "");
+        throw new Error(errorBody || "Não foi possível recuperar o SQL gerado.");
+      }
       const sql = await downloadResponse.text();
-      await downloadTextToLocalMachine(data.filename, sql);
-      setMessage(`Banco SQL salvo: ${data.filename}`);
+      await downloadTextToLocalMachine(filename, sql);
+      setMessage(`Banco SQL salvo: ${filename}`);
       await loadHistory();
     } catch (error: any) {
       setMessage(error?.message || "Falha ao salvar o banco SQL.");
