@@ -45,10 +45,28 @@ function sqlLiteral(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+function queryAll(database: any, sqlText: string, params?: any): any[] {
+  const statement = database.prepare(sqlText);
+  try {
+    if (params !== undefined) statement.bind(params);
+    const rows: any[] = [];
+    while (statement.step()) rows.push(statement.getAsObject());
+    return rows;
+  } finally {
+    statement.free();
+  }
+}
+
+function queryGet(database: any, sqlText: string, params?: any): any | undefined {
+  const rows = queryAll(database, sqlText, params);
+  return rows[0];
+}
+
 function getUserTables(database: any): string[] {
-  return (database
-    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-    .all() as Array<{ name: string }>)
+  return (queryAll(
+    database,
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  ) as Array<{ name: string }>)
     .map((row) => row.name)
     .filter(Boolean);
 }
@@ -60,15 +78,21 @@ function getSqlStatements(database: any): { statements: string[]; tableRows: Rec
 
   for (const table of tables) {
     const safeTable = table.replace(/"/g, '""');
-    const schemaRow = database
-      .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?")
-      .get(table) as { sql?: string } | undefined;
+    const schemaRow = queryGet(
+      database,
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+      [table],
+    ) as { sql?: string } | undefined;
     if (schemaRow?.sql) statements.push(`${schemaRow.sql};`);
 
-    const columns = database
-      .prepare(`PRAGMA table_info("${safeTable}")`)
-      .all() as Array<{ name: string }>;
-    const rows = database.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
+    const columns = queryAll(
+      database,
+      `PRAGMA table_info("${safeTable}")`,
+    ) as Array<{ name: string }>;
+    const rows = queryAll(
+      database,
+      `SELECT * FROM "${safeTable}"`,
+    ) as Array<Record<string, unknown>>;
     tableRows[table] = rows.length;
 
     const quotedColumns = columns.map((column) => `"${column.name.replace(/"/g, '""')}"`).join(", ");
@@ -80,9 +104,10 @@ function getSqlStatements(database: any): { statements: string[]; tableRows: Rec
     }
   }
 
-  const auxiliary = database
-    .prepare("SELECT type, name, sql FROM sqlite_master WHERE type IN ('index','trigger') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type, name")
-    .all() as Array<{ type: string; name: string; sql: string }>;
+  const auxiliary = queryAll(
+    database,
+    "SELECT type, name, sql FROM sqlite_master WHERE type IN ('index','trigger') AND sql IS NOT NULL AND name NOT LIKE 'sqlite_%' ORDER BY type, name",
+  ) as Array<{ type: string; name: string; sql: string }>;
   for (const object of auxiliary) statements.push(`${object.sql};`);
 
   statements.push("COMMIT;", "PRAGMA foreign_keys=ON;");
@@ -141,12 +166,24 @@ function compareDatabases(current: any, incoming: any) {
     if (!currentTables.has(table) || !incomingTables.has(table)) continue;
 
     const safeTable = table.replace(/"/g, '""');
-    const oldColumns = current.prepare(`PRAGMA table_info("${safeTable}")`).all() as Array<{ name: string; pk: number }>;
-    const newColumns = incoming.prepare(`PRAGMA table_info("${safeTable}")`).all() as Array<{ name: string; pk: number }>;
+    const oldColumns = queryAll(
+      current,
+      `PRAGMA table_info("${safeTable}")`,
+    ) as Array<{ name: string; pk: number }>;
+    const newColumns = queryAll(
+      incoming,
+      `PRAGMA table_info("${safeTable}")`,
+    ) as Array<{ name: string; pk: number }>;
     if (JSON.stringify(oldColumns) !== JSON.stringify(newColumns)) tablesChanged.push(table);
 
-    const oldRows = current.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
-    const newRows = incoming.prepare(`SELECT * FROM "${safeTable}"`).all() as Array<Record<string, unknown>>;
+    const oldRows = queryAll(
+      current,
+      `SELECT * FROM "${safeTable}"`,
+    ) as Array<Record<string, unknown>>;
+    const newRows = queryAll(
+      incoming,
+      `SELECT * FROM "${safeTable}"`,
+    ) as Array<Record<string, unknown>>;
     const commonColumns = oldColumns.map((column) => column.name).filter((name) => newColumns.some((column) => column.name === name));
     const primaryKey = newColumns.filter((column) => column.pk > 0).sort((a, b) => a.pk - b.pk).map((column) => column.name);
 
@@ -261,7 +298,7 @@ export function exportAllDataSync(): Record<string, any[]> {
   };
   for (const table of LEGACY_TABLES) {
     try {
-      snapshot[table] = localSqlite.prepare(`SELECT * FROM ${table}`).all();
+      snapshot[table] = queryAll(localSqlite, `SELECT * FROM ${table}`);
     } catch (e: any) {
       console.warn(`[BACKUP] Tabela '${table}' pulada: ${e.message}`);
       snapshot[table] = [];
@@ -352,7 +389,7 @@ export async function importDataFromSnapshot(snapshot: Record<string, any[]> & {
     const rows = snapshot[table];
     if (!rows || rows.length === 0) continue;
     try {
-      const cols = localSqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
+      const cols = queryAll(localSqlite, `PRAGMA table_info(${table})`) as Array<{ name: string }>;
       if (!cols.length) {
         errors.push(`Tabela '${table}' não existe no banco local`);
         continue;
