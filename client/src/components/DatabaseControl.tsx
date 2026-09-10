@@ -37,7 +37,11 @@ declare global {
   }
 }
 
-export default function DatabaseControl() {
+interface DatabaseControlProps {
+  embedded?: boolean;
+}
+
+export default function DatabaseControl({ embedded = false }: DatabaseControlProps) {
   const { data: user } = useUser();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -165,21 +169,26 @@ export default function DatabaseControl() {
     }
   };
 
+  const triggerClass = embedded
+    ? "relative inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-cyan-400/30 bg-zinc-950/80 px-2 text-[9px] font-bold uppercase tracking-wider text-white shadow-sm backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-zinc-900"
+    : "fixed right-4 bottom-[5.5rem] sm:right-6 sm:bottom-24 z-[9998] inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-zinc-950/90 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-zinc-900 pointer-events-auto";
+
   return (
     <>
       <button
         type="button"
         aria-label="Banco de Dados"
+        title="Banco de Dados"
         onClick={() => setOpen((value) => !value)}
-        className="fixed right-4 bottom-[5.5rem] sm:right-6 sm:bottom-24 z-[9998] inline-flex items-center gap-2 rounded-full border border-cyan-400/30 bg-zinc-950/90 px-4 py-3 text-xs font-bold uppercase tracking-wider text-white shadow-2xl backdrop-blur-md transition hover:border-cyan-300/60 hover:bg-zinc-900 pointer-events-auto"
+        className={triggerClass}
       >
-        <Database className="h-4 w-4 text-cyan-300" />
-        <span className="hidden sm:inline">Banco de Dados</span>
+        <Database className={embedded ? "h-3.5 w-3.5 text-cyan-300" : "h-4 w-4 text-cyan-300"} />
+        <span className={embedded ? "hidden lg:inline" : "hidden sm:inline"}>Banco de Dados</span>
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[9999] pointer-events-none">
-          <div className="absolute right-3 bottom-3 sm:right-6 sm:bottom-5 w-[min(92vw,480px)] max-h-[calc(100vh-7rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl pointer-events-auto">
+        <div className="fixed inset-0 z-[10001] pointer-events-none">
+          <div className="absolute right-3 bottom-10 sm:right-6 sm:bottom-11 w-[min(92vw,480px)] max-h-[calc(100vh-5rem)] overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 text-white shadow-2xl backdrop-blur-xl pointer-events-auto">
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="flex items-center gap-3">
                 <div className="rounded-lg border border-cyan-400/20 bg-cyan-400/10 p-2"><ShieldCheck className="h-4 w-4 text-cyan-300" /></div>
@@ -188,7 +197,7 @@ export default function DatabaseControl() {
               <Button variant="ghost" size="icon" onClick={() => setOpen(false)} className="text-zinc-400 hover:text-white"><X className="h-4 w-4" /></Button>
             </div>
 
-            <div className="max-h-[calc(100vh-11rem)] overflow-y-auto p-4 space-y-4">
+            <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-4 space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <Button disabled={!canManage || !!busy} onClick={saveSql} className="h-11 bg-cyan-400 text-black hover:bg-cyan-300">
                   {busy === "save" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Salvar Banco SQL
