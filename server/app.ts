@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { registerCashRegisterControl, startCashRegisterControl } from "./cash-register-control";
+import { installLegacyCashGuards } from "./legacy-cash-guard";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -94,6 +95,11 @@ app.use((req, res, next) => {
 export async function initApp() {
   const { setupDatabase } = await import("./db");
   await setupDatabase();
+
+  // Protect legacy cashier routes as they are still registered by routes.ts.
+  // The guard runs at route-registration time, after the session middleware is
+  // installed by registerRoutes, so it can validate the real authenticated admin.
+  installLegacyCashGuards(app);
   await registerRoutes(httpServer, app);
 
   // Cashier control layer: admin-only opening/closing, sangria/suprimento,
