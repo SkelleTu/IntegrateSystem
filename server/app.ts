@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
+import { registerCashRegisterControl, startCashRegisterControl } from "./cash-register-control";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -94,6 +95,14 @@ export async function initApp() {
   const { setupDatabase } = await import("./db");
   await setupDatabase();
   await registerRoutes(httpServer, app);
+
+  // Cashier control layer: admin-only opening/closing, sangria/suprimento,
+  // audit movements, server-side midnight auto-close and pending review.
+  registerCashRegisterControl(app, (req: any, res: any, next: any) => {
+    if (req.isAuthenticated()) return next();
+    res.status(401).json({ message: "Unauthorized" });
+  });
+  await startCashRegisterControl();
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
