@@ -57,8 +57,11 @@
 - [x] Resumo separa dinheiro, cartão, PIX, suprimentos, sangrias e ajustes
 - [x] Detalhamento expansível por caixa
 - [x] Impressão do relatório completo por caixa
+- [x] Pagamentos em cartão distinguem crédito e débito nos registros e relatórios
+- [x] Detalhes da venda incluem dados fiscais disponíveis do item: nome, código, NCM, CFOP, unidade, quantidade, valor unitário e total
 - [ ] Homologar visualmente o relatório completo em produção
 - [ ] Homologar impressão do relatório em produção
+- [ ] Homologar visualização fiscal completa dos itens no detalhe de uma venda real
 - [x] Ponto de restauração desta sessão: `8db1e25bd221dc1368f177750b380eb1fdf0a1cd`
 
 ## Sessão 7 — Fechamento e revisão administrativa
@@ -67,25 +70,33 @@
 - [x] Fechamento/revisão preservam observação administrativa
 - [x] Revisão consegue calcular dinheiro, cartão, PIX, suprimentos, sangrias e ajustes
 - [x] Relatório consegue exibir a linha do tempo completa do caixa
+- [x] Abertura e fechamento administrativos possuem integração com setores financeiros/relatórios
 - [ ] Homologar fechamento normal com diferença zero
 - [ ] Homologar fechamento com diferença positiva
 - [ ] Homologar fechamento com diferença negativa
 - [ ] Homologar revisão pendente até resolução completa
 
-## Sessão 8 — Persistência de dados e continuidade
+## Sessão 8 — Persistência de dados e continuidade global da plataforma
 - [x] Diagnóstico `/api/system/persistence-health` criado
 - [x] Diagnóstico informa se Turso está habilitado
 - [x] Diagnóstico informa quantidade de registros nas tabelas críticas
 - [x] Diagnóstico informa estado do arquivo SQLite local
 - [x] Produção passa a exigir `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`
 - [x] Sem armazenamento remoto configurado, a aplicação falha explicitamente em produção em vez de operar silenciosamente sobre `/tmp`
+- [x] PDV invalida leituras derivadas após vendas, estoque e operações administrativas
+- [x] Operações do Caixa invalidam estado de PDV, Financeiro e Relatórios
 - [ ] Executar `/api/system/persistence-health` em produção
 - [ ] Confirmar `remoteEnabled: true`
 - [ ] Fazer venda e verificar incremento nas tabelas críticas
+- [ ] Alterar estoque/produto/lote e verificar persistência no banco
+- [ ] Alterar configurações e verificar persistência no banco
 - [ ] Reiniciar a aplicação e confirmar que os mesmos dados continuam presentes
 - [ ] Reentrar no PDV e confirmar o mesmo estado do Caixa
-- [ ] Confirmar estoque, vendas, pagamentos, transações e movimentos após reinício
+- [ ] Confirmar estoque, produtos, lotes, vendas, itens, pagamentos, transações e movimentos após reinício
+- [ ] Confirmar configurações fiscais e demais configurações após reinício
+- [ ] Confirmar que nenhum dado novo volta para valores padrão após nova inicialização
 - [ ] Confirmar que nenhum dado novo some ou duplica após nova inicialização
+- [ ] Confirmar continuidade dos estados de todos os módulos que dependem de dados persistidos
 - [ ] Ponto de restauração final desta sessão será criado após a homologação real
 
 ## Sessão 9 — Auditoria final de arquitetura
@@ -96,5 +107,8 @@
 - [ ] Idempotência impede duplicação de operações críticas
 - [ ] Backup inclui todas as tabelas necessárias ao estado operacional
 - [ ] Nenhum componente legado é montado simultaneamente no `App`
+- [ ] Nenhuma funcionalidade da plataforma depende exclusivamente de estado temporário de sessão para dados operacionais
+- [ ] Todo estado operacional persistente possui leitura de retorno do banco após inicialização
+- [ ] Nenhum valor padrão de frontend pode sobrescrever silenciosamente um valor já persistido
 
 > Convenção: `[x]` = implementação confirmada no código ou comportamento funcional já informado/homologado. `[ ]` = ainda requer teste real ou auditoria final.
