@@ -30,33 +30,6 @@ function validMoney(value: unknown, allowZero = false) {
   return Math.round(n * 100);
 }
 
-async function ensureCashRegisterControlTable() {
-  const createSql = `CREATE TABLE IF NOT EXISTS cash_register_movements (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cash_register_id INTEGER NOT NULL,
-    user_id INTEGER NOT NULL,
-    type TEXT NOT NULL,
-    amount INTEGER NOT NULL,
-    reason TEXT,
-    created_at INTEGER NOT NULL
-  )`;
-
-  try {
-    localSqlite.prepare(createSql).run();
-  } catch (err) {
-    console.warn("[CAIXA] Falha ao criar tabela local de movimentos:", err);
-  }
-
-  if (dbRemote) {
-    try {
-      const client = (dbRemote as any).$client ?? (dbRemote as any).client;
-      if (client && typeof client.execute === "function") await client.execute(createSql);
-    } catch (err) {
-      console.warn("[CAIXA] Falha ao criar tabela remota de movimentos:", err);
-    }
-  }
-}
-
 async function calculateSummary(database: any, registerId: number) {
   const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
   if (!register) throw new Error("Caixa não encontrado");
@@ -149,7 +122,6 @@ async function autoCloseExpiredRegisters() {
 }
 
 export async function startCashRegisterControl() {
-  await ensureCashRegisterControlTable();
   await autoCloseExpiredRegisters();
   if (!autoCloseTimer) {
     autoCloseTimer = setInterval(() => {
