@@ -1,8 +1,8 @@
 import { useEffect } from "react";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient } from "@tanstack/react-query";
 
 /**
- * Sincronizador transversal do PDV. A venda/baixa acontece no backend;
+ * Sincronizador transversal do PDV. As operações acontecem no backend;
  * este componente apenas invalida leituras derivadas após respostas de escrita.
  * Não cria estado paralelo nem executa a operação novamente.
  */
@@ -30,6 +30,7 @@ export default function CashierDataPersistenceBridge() {
           queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/cash-control/status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-control/reports/history"] }),
         ]);
       }
 
@@ -38,6 +39,26 @@ export default function CashierDataPersistenceBridge() {
           queryClient.invalidateQueries({ queryKey: ["/api/inventory"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/products/cashier-items"] }),
           queryClient.invalidateQueries({ queryKey: ["/api/menu-items-combined"] }),
+        ]);
+      }
+
+      if (isWrite && normalized.startsWith("/api/cash-control/")) {
+        void Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-control/status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-control/reports/history"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/sales"] }),
+        ]);
+      }
+
+      if (isWrite && normalized.startsWith("/api/cash-audit/")) {
+        void Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-control/status"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-control/reports/history"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] }),
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] }),
         ]);
       }
 
