@@ -241,6 +241,15 @@ const TABLE_DEFINITIONS = [
     difference INTEGER,
     status TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS cash_register_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cash_register_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    reason TEXT,
+    created_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cash_register_id INTEGER,
@@ -605,6 +614,15 @@ export async function setupDatabase() {
         products_json TEXT NOT NULL,
         batches_json TEXT NOT NULL,
         product_count INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS cash_register_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cash_register_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        reason TEXT,
+        created_at INTEGER NOT NULL
       )`,
     ];
 
