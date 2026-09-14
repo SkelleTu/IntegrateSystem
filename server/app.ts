@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { registerCashRegisterControl, startCashRegisterControl } from "./cash-register-control";
 import { registerCashAudit } from "./cash-audit";
 import { registerCashRegisterReports } from "./cash-register-reports";
+import { registerDatabasePersistenceHealth } from "./database-persistence-health";
 import { installLegacyCashGuards } from "./legacy-cash-guard";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -68,6 +69,7 @@ export async function initApp() {
   registerCashRegisterControl(app, auth);
   await registerCashAudit(app, auth);
   registerCashRegisterReports(app, auth);
+  registerDatabasePersistenceHealth(app, auth);
   await startCashRegisterControl();
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
