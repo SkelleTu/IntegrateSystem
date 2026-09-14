@@ -6,6 +6,7 @@ import { registerCashRegisterReports } from "./cash-register-reports";
 import { registerDatabasePersistenceHealth } from "./database-persistence-health";
 import { assertProductionPersistence } from "./database-persistence-guard";
 import { installLegacyCashGuards } from "./legacy-cash-guard";
+import { installLocalSqliteRealtimePersistence } from "./local-sqlite-realtime-persistence";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -61,6 +62,7 @@ app.use((req, res, next) => {
 export async function initApp() {
   const { setupDatabase } = await import("./db");
   await setupDatabase();
+  installLocalSqliteRealtimePersistence();
   assertProductionPersistence();
   installLegacyCashGuards(app);
   await registerRoutes(httpServer, app);
