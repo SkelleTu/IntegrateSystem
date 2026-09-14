@@ -4,6 +4,7 @@ import { registerCashRegisterControl, startCashRegisterControl } from "./cash-re
 import { registerCashAudit } from "./cash-audit";
 import { registerCashRegisterReports } from "./cash-register-reports";
 import { registerDatabasePersistenceHealth } from "./database-persistence-health";
+import { assertProductionPersistence } from "./database-persistence-guard";
 import { installLegacyCashGuards } from "./legacy-cash-guard";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -60,6 +61,7 @@ app.use((req, res, next) => {
 export async function initApp() {
   const { setupDatabase } = await import("./db");
   await setupDatabase();
+  assertProductionPersistence();
   installLegacyCashGuards(app);
   await registerRoutes(httpServer, app);
   const auth = (req: any, res: any, next: any) => {
