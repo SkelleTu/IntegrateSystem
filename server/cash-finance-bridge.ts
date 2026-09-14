@@ -7,21 +7,24 @@ import { db, multiWrite } from "./db.js";
  * estado para o Caixa. O módulo canônico continua sendo cash-control.
  */
 export function installCashFinanceBridge(app: any, isAuthenticated: any) {
-  app.use("/api/cash-control", isAuthenticated, (req: any, res: any, next: any) => {
-    const operation = req.path;
-    if (req.method !== "POST" || (operation !== "/open" && operation !== "/close")) {
-      return next();
-    }
+  const watch = (prefix: string, operations: string[]) => {
+    app.use(prefix, isAuthenticated, (req: any, res: any, next: any) => {
+      const operation = req.path;
+      if (req.method !== "POST" || !operations.includes(operation)) return next();
 
-    res.on("finish", () => {
-      if (res.statusCode < 200 || res.statusCode >= 300) return;
-      void syncCashFinancialRecord(req, operation).catch((error) => {
-        console.error("[CAIXA][FINANCEIRO] Falha ao refletir operação administrativa:", error);
+      res.on("finish", () => {
+        if (res.statusCode < 200 || res.statusCode >= 300) return;
+        void syncCashFinancialRecord(req, operation).catch((error) => {
+          console.error("[CAIXA][FINANCEIRO] Falha ao refletir operação administrativa:", error);
+        });
       });
-    });
 
-    next();
-  });
+      next();
+    });
+  };
+
+  watch("/api/cash-control", ["/open", "/close"]);
+  watch("/api/cash-audit", ["/close", "/review"]);
 }
 
 async function syncCashFinancialRecord(req: any, operation: string) {
@@ -60,11 +63,11 @@ async function syncCashFinancialRecord(req: any, operation: string) {
   const registerId = Number(req.body?.registerId);
   const [register] = await db.select().from(cashRegisters)
     .where(registerId ? eq(cashRegisters.id, registerId) : eq(cashRegisters.userId, user.id))
-    .orderBy(desc(cashRegisters.closedAt))
+    .orderBy(desc(cashRegisters.closedAt), desc(cashRegisters.openedAt))
     .limit(1);
   if (!register?.closedAt) return;
 
-  const observation = String(req.body?.observation || "").trim();
+  const observation = String(req.body?.observation || req.body?.notes || "").trim();
   const description = `Fechamento de Caixa #${register.id}${observation ? ` — ${observation}` : ""}`;
   const [existing] = await db.select().from(transactions)
     .where(and(eq(transactions.category, "caixa"), eq(transactions.description, description)))
