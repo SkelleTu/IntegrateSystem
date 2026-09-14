@@ -23,26 +23,78 @@
 - [x] Após uma venda, invalidação das consultas financeiras
 - [x] Atualização do estado do Caixa após venda
 - [x] Atualização do catálogo/itens do PDV após alterações de estoque
+- [x] O estado do Caixa permanece disponível após sair/reentrar no PDV, conforme homologação funcional atual
 - [x] Ponto de restauração: `40cb34307407b72e5f311bf1dff7e6cdf434951f`
 
 ## Sessão 4 — Vendas e cadeia operacional
-- [x] Venda já utiliza `/api/sales` como operação de backend
+- [x] Venda utiliza `/api/sales` como operação de backend
 - [x] Venda grava itens, pagamentos e lançamento financeiro no servidor
 - [x] Baixa de estoque ocorre no backend durante a venda
 - [x] Cancelamento de venda possui estorno de estoque/financeiro no backend
-- [x] O cliente passa a refletir essas gravações imediatamente por invalidação de cache
+- [x] O cliente passa a refletir essas gravações por invalidação de cache
 - [x] Ponto de restauração: `40cb34307407b72e5f311bf1dff7e6cdf434951f`
 
-## Sessão 5 — Revisão final
-- [ ] Validar abertura após reiniciar/reentrar no PDV
-- [ ] Validar estoque 35 → venda de 3 → 32 após sair e entrar novamente
-- [ ] Validar venda aparecendo em Financeiro
-- [ ] Validar venda aparecendo em Relatórios
-- [ ] Validar fechamento com valor esperado correto
-- [ ] Validar sangria sem permitir saldo negativo
-- [ ] Validar suprimento refletindo no Caixa
-- [ ] Validar revisão automática detalhada e conclusão
-- [ ] Validar ausência de interfaces duplicadas
-- [ ] Ponto de restauração final será criado após a validação integrada
+## Sessão 5 — Validação funcional anterior
+- [x] Abertura após reiniciar/reentrar no PDV
+- [x] Estoque 35 → venda de 3 → 32 após sair e entrar novamente
+- [x] Venda aparecendo em Financeiro, conforme teste funcional informado
+- [x] Venda aparecendo em Relatórios, conforme teste funcional informado
+- [x] Ausência de interfaces duplicadas, conforme estado atual do `App`
+- [ ] Fechamento com valor esperado correto
+- [ ] Sangria sem permitir saldo negativo
+- [ ] Suprimento refletindo no Caixa
+- [ ] Revisão automática detalhada e conclusão
+- [ ] Ponto de restauração final após homologação completa
 
-> Observação: os itens marcados `[x]` representam implementação concluída no código. Os itens da Sessão 5 permanecem pendentes porque dependem de validação real no ambiente executado.
+## Sessão 6 — Relatórios completos de Caixa
+- [x] Endpoint dedicado `/api/cash-control/reports/history`
+- [x] Relatório recebe abertura e fechamento com data e hora
+- [x] Relatório recebe todas as movimentações do caixa
+- [x] Sangrias aparecem com valor, data/hora e observação/motivo
+- [x] Suprimentos aparecem com valor, data/hora e observação/motivo
+- [x] Ajustes aparecem com valor e data/hora
+- [x] Vendas vinculadas ao caixa aparecem com data/hora, itens, pagamentos, status e total
+- [x] Resumo separa dinheiro, cartão, PIX, suprimentos, sangrias e ajustes
+- [x] Detalhamento expansível por caixa
+- [x] Impressão do relatório completo por caixa
+- [ ] Homologar visualmente o relatório completo em produção
+- [ ] Homologar impressão do relatório em produção
+- [x] Ponto de restauração desta sessão: `8db1e25bd221dc1368f177750b380eb1fdf0a1cd`
+
+## Sessão 7 — Fechamento e revisão administrativa
+- [x] Fechamento registra `closedAt` com data/hora no servidor
+- [x] Revisão administrativa registra `reviewedAt`
+- [x] Fechamento/revisão preservam observação administrativa
+- [x] Revisão consegue calcular dinheiro, cartão, PIX, suprimentos, sangrias e ajustes
+- [x] Relatório consegue exibir a linha do tempo completa do caixa
+- [ ] Homologar fechamento normal com diferença zero
+- [ ] Homologar fechamento com diferença positiva
+- [ ] Homologar fechamento com diferença negativa
+- [ ] Homologar revisão pendente até resolução completa
+
+## Sessão 8 — Persistência de dados e continuidade
+- [x] Diagnóstico `/api/system/persistence-health` criado
+- [x] Diagnóstico informa se Turso está habilitado
+- [x] Diagnóstico informa quantidade de registros nas tabelas críticas
+- [x] Diagnóstico informa estado do arquivo SQLite local
+- [x] Produção passa a exigir `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`
+- [x] Sem armazenamento remoto configurado, a aplicação falha explicitamente em produção em vez de operar silenciosamente sobre `/tmp`
+- [ ] Executar `/api/system/persistence-health` em produção
+- [ ] Confirmar `remoteEnabled: true`
+- [ ] Fazer venda e verificar incremento nas tabelas críticas
+- [ ] Reiniciar a aplicação e confirmar que os mesmos dados continuam presentes
+- [ ] Reentrar no PDV e confirmar o mesmo estado do Caixa
+- [ ] Confirmar estoque, vendas, pagamentos, transações e movimentos após reinício
+- [ ] Confirmar que nenhum dado novo some ou duplica após nova inicialização
+- [ ] Ponto de restauração final desta sessão será criado após a homologação real
+
+## Sessão 9 — Auditoria final de arquitetura
+- [ ] Não existe segundo dono real para abertura do Caixa
+- [ ] Não existe segundo dono real para fechamento do Caixa
+- [ ] Rotas legadas permanecem somente como compatibilidade, sem criar estado paralelo
+- [ ] Um único cálculo canônico é usado para fechamento e relatórios
+- [ ] Idempotência impede duplicação de operações críticas
+- [ ] Backup inclui todas as tabelas necessárias ao estado operacional
+- [ ] Nenhum componente legado é montado simultaneamente no `App`
+
+> Convenção: `[x]` = implementação confirmada no código ou comportamento funcional já informado/homologado. `[ ]` = ainda requer teste real ou auditoria final.
