@@ -7,6 +7,7 @@ import { registerDatabasePersistenceHealth } from "./database-persistence-health
 import { assertProductionPersistence } from "./database-persistence-guard";
 import { installLegacyCashGuards } from "./legacy-cash-guard";
 import { installLocalSqliteRealtimePersistence } from "./local-sqlite-realtime-persistence";
+import { installCashFinanceBridge } from "./cash-finance-bridge";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -70,6 +71,7 @@ export async function initApp() {
     if (req.isAuthenticated()) return next();
     res.status(401).json({ message: "Unauthorized" });
   };
+  installCashFinanceBridge(app, auth);
   registerCashRegisterControl(app, auth);
   await registerCashAudit(app, auth);
   registerCashRegisterReports(app, auth);
