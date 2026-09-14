@@ -1,21 +1,10 @@
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { scrypt, timingSafeEqual } from "crypto";
 import { promisify } from "util";
-import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 import { db, dbRemote, localSqlite, multiWrite, getAllDatabases } from "./db.js";
-import { cashRegisters, sales, payments, transactions, users } from "../shared/schema.js";
+import { cashRegisters, cashRegisterMovements, sales, payments, transactions, users } from "../shared/schema.js";
 
 const scryptAsync = promisify(scrypt);
-
-const cashRegisterMovements = sqliteTable("cash_register_movements", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  cashRegisterId: integer("cash_register_id").notNull(),
-  userId: integer("user_id").notNull(),
-  type: text("type").notNull(), // opening, replenishment, withdrawal, adjustment, closing
-  amount: integer("amount").notNull(), // cents; closing stores the physically informed amount
-  reason: text("reason"),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-});
 
 const AUTO_CLOSE_INTERVAL_MS = 30_000;
 let autoCloseTimer: ReturnType<typeof setInterval> | null = null;
