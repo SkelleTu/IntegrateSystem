@@ -70,6 +70,11 @@ export const menuItems = pgTable("menu_items", {
   imageScale: integer("image_scale").default(100).notNull(),
 });
 
+export type CashRegisterStatus = "open" | "closed" | "closed_pending_review";
+export const CASH_REGISTER_STATUSES = ["open", "closed", "closed_pending_review"] as const;
+export type CashRegisterMovementType = "opening" | "replenishment" | "withdrawal" | "adjustment" | "closing";
+export const CASH_REGISTER_MOVEMENT_TYPES = ["opening", "replenishment", "withdrawal", "adjustment", "closing"] as const;
+
 export const cashRegisters = pgTable("cash_register", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
@@ -78,7 +83,17 @@ export const cashRegisters = pgTable("cash_register", {
   openingAmount: integer("opening_amount"), // in cents
   closingAmount: integer("closing_amount"), // in cents
   difference: integer("difference"), // in cents
-  status: text("status").notNull(), // "open", "closed"
+  status: text("status").$type<CashRegisterStatus>().notNull(),
+});
+
+export const cashRegisterMovements = pgTable("cash_register_movements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  cashRegisterId: integer("cash_register_id").notNull(),
+  userId: integer("user_id").notNull(),
+  type: text("type").$type<CashRegisterMovementType>().notNull(),
+  amount: integer("amount").notNull(), // cents
+  reason: text("reason"),
+  createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
 export const sales = pgTable("sales", {
@@ -342,6 +357,10 @@ export const insertCashRegisterSchema = createInsertSchema(cashRegisters, {
   openingAmount: z.number().transform(v => Math.round(v * 100)),
   closingAmount: z.number().transform(v => Math.round(v * 100)).optional(),
 });
+export const insertCashRegisterMovementSchema = createInsertSchema(cashRegisterMovements, {
+  type: z.enum(CASH_REGISTER_MOVEMENT_TYPES),
+  amount: z.number().int().nonnegative(),
+});
 export const insertSaleSchema = createInsertSchema(sales);
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ saleId: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ saleId: true });
@@ -367,6 +386,7 @@ export type QueueState = typeof queueState.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type MenuItem = typeof menuItems.$inferSelect;
 export type CashRegister = typeof cashRegisters.$inferSelect;
+export type CashRegisterMovement = typeof cashRegisterMovements.$inferSelect;
 export type Sale = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
@@ -385,6 +405,7 @@ export type InsertQueueState = z.infer<typeof insertQueueStateSchema>;
 export type InsertCategory = z.infer<typeof insertCategorySchema>;
 export type InsertMenuItem = z.infer<typeof insertMenuItemSchema>;
 export type InsertCashRegister = z.infer<typeof insertCashRegisterSchema>;
+export type InsertCashRegisterMovement = z.infer<typeof insertCashRegisterMovementSchema>;
 export type InsertSale = z.infer<typeof insertSaleSchema>;
 export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
