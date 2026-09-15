@@ -1,13 +1,12 @@
 import fs from "fs";
-import path from "path";
 import { localSqlite } from "./db.js";
+import { ensureRuntimeDataDir, getRuntimeSqliteFile } from "./runtime-data.js";
 
 let installed = false;
 
 function getSqliteFile() {
-  return process.env.VERCEL
-    ? "/tmp/sqlite.db"
-    : path.join(process.cwd(), "sqlite.db");
+  ensureRuntimeDataDir();
+  return getRuntimeSqliteFile();
 }
 
 function persist() {
@@ -21,7 +20,9 @@ function persist() {
 
 /**
  * sql.js não garante persistência em disco ao usar apenas a API Drizzle.
- * Mantemos um espelho físico do banco local após cada operação mutável.
+ * Mantemos o espelho físico do banco local após cada operação mutável.
+ * O arquivo físico fica fora do Git working tree e nunca volta a ser
+ * substituído por um banco versionado durante pull/restart.
  */
 export function installLocalSqliteRealtimePersistence() {
   if (installed) return;
