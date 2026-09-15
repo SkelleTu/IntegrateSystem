@@ -55,10 +55,15 @@ async function start() {
 
   const electronPath = require('electron');
   const mainScript = path.join(__dirname, 'main.js');
+  const electronEnv = { ...process.env, NODE_ENV: 'production' };
+
+  // O Electron deve iniciar como runtime Electron, nunca como Node.js puro.
+  // Essa variável pode ficar herdada do Git Bash ou de uma sessão anterior.
+  delete electronEnv.ELECTRON_RUN_AS_NODE;
 
   const electron = spawn(electronPath, [mainScript], {
     stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'production' },
+    env: electronEnv,
   });
 
   electron.on('close', () => {
