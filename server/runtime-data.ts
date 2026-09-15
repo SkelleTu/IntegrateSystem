@@ -9,18 +9,28 @@ import path from "path";
  * be able to roll the platform back to an old data snapshot after pull/restart.
  */
 export function getRuntimeDataDir(): string {
-  if (process.env.VERCEL) return "/tmp/aura-system";
-
-  if (process.env.AURA_DATA_DIR) {
-    return path.resolve(process.env.AURA_DATA_DIR);
+  let dir: string;
+  if (process.env.VERCEL) {
+    dir = "/tmp/aura-system";
+  } else if (process.env.AURA_DATA_DIR) {
+    dir = path.resolve(process.env.AURA_DATA_DIR);
+  } else {
+    const windowsDataRoot = process.env.LOCALAPPDATA || process.env.APPDATA;
+    dir = windowsDataRoot
+      ? path.join(windowsDataRoot, "AuraSystem", "data")
+      : path.join(os.homedir(), ".aura-system", "data");
   }
 
-  const windowsDataRoot = process.env.LOCALAPPDATA || process.env.APPDATA;
-  if (windowsDataRoot) {
-    return path.join(windowsDataRoot, "AuraSystem", "data");
+  const repositoryRoot = path.resolve(process.cwd());
+  const normalizedDir = path.resolve(dir);
+  const relative = path.relative(repositoryRoot, normalizedDir);
+  const insideRepository = relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+
+  if (insideRepository && !process.env.VERCEL) {
+    throw new Error("AURA_DATA_DIR não pode apontar para dentro do repositório. Estado operacional não pode ser armazenado no Git working tree.");
   }
 
-  return path.join(os.homedir(), ".aura-system", "data");
+  return normalizedDir;
 }
 
 export function getRuntimeSqliteFile(): string {
