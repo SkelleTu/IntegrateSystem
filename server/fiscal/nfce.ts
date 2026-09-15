@@ -179,6 +179,10 @@ export function generateNFCeXML(
           tPag:
             p.method === "cash"
               ? "01"
+              : p.method === "card_credit"
+              ? "03"
+              : p.method === "card_debit"
+              ? "04"
               : p.method === "card"
               ? "03"
               : p.method === "pix"
@@ -205,75 +209,42 @@ export function generateNFCeXML(
     },
   };
 
-  // Gera o XML do conteúdo interno
   const innerXml = builder.build(infNFeObj);
-
-  // Envolve no elemento NFe com namespace obrigatório
   return `<?xml version="1.0" encoding="UTF-8"?><NFe xmlns="http://www.portalfiscal.inf.br/nfe">${innerXml}</NFe>`;
 }
 
 // ─── Assinatura Digital Real (xml-crypto + node-forge) ────────────────────────
 export async function signXML(xml: string, settings: any): Promise<string> {
-  // Sem certificado em homologação → retorna sem assinar (modo dev/teste)
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
     if (settings.ambiente === "homologacao") {
       console.warn("[FISCAL] Sem certificado A1 configurado — XML não assinado (homologação)");
       return xml;
     }
-    throw new Error(
-      "Certificado A1 e senha são obrigatórios para emissão em produção."
-    );
+    throw new Error("Certificado A1 e senha são obrigatórios para emissão em produção.");
   }
 
   try {
-    // Importa dinamicamente para evitar carregar em ambientes sem certificado
     const forge = (await import("node-forge")).default;
     const { SignedXml } = await import("xml-crypto");
-
-    // Decodifica PFX de base64
     const pfxDer = Buffer.from(settings.certificadoA1, "base64").toString("binary");
     const pfxAsn1 = forge.asn1.fromDer(pfxDer);
-    const pfxObj = forge.pkcs12.pkcs12FromAsn1(
-      pfxAsn1,
-      false,
-      settings.certificadoSenha
-    );
-
-    // Extrai chave privada
-    const keyBags = pfxObj.getBags({
-      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
-    });
-    const keyBag =
-      keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0] ||
-      pfxObj.getBags({ bagType: forge.pki.oids.keyBag })?.[
-        forge.pki.oids.keyBag
-      ]?.[0];
-
+    const pfxObj = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, settings.certificadoSenha);
+    const keyBags = pfxObj.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+    const keyBag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0] || pfxObj.getBags({ bagType: forge.pki.oids.keyBag })?.[forge.pki.oids.keyBag]?.[0];
     if (!keyBag?.key) throw new Error("Chave privada não encontrada no certificado PFX");
     const privateKeyPem = forge.pki.privateKeyToPem(keyBag.key);
-
-    // Extrai certificado público
     const certBags = pfxObj.getBags({ bagType: forge.pki.oids.certBag });
     const certBag = certBags[forge.pki.oids.certBag]?.[0];
     if (!certBag?.cert) throw new Error("Certificado público não encontrado no PFX");
-
     const certPem = forge.pki.certificateToPem(certBag.cert);
-    // Certificado em base64 puro para KeyInfo
-    const certDer = forge.asn1.toDer(
-      forge.pki.certificateToAsn1(certBag.cert)
-    ).getBytes();
+    const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certBag.cert)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
-
-    // Assina com RSA-SHA1 conforme SEFAZ
     const sig = new SignedXml({
       privateKey: privateKeyPem,
       publicCert: certPem,
-      canonicalizationAlgorithm:
-        "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
-      signatureAlgorithm:
-        "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+      canonicalizationAlgorithm: "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
+      signatureAlgorithm: "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
     });
-
     sig.addReference({
       xpath: "//*[local-name(.)='infNFe']",
       digestAlgorithm: "http://www.w3.org/2000/09/xmldsig#sha1",
@@ -282,21 +253,13 @@ export async function signXML(xml: string, settings: any): Promise<string> {
         "http://www.w3.org/TR/2001/REC-xml-c14n-20010315",
       ],
     });
-
-    // KeyInfo com X509Certificate
     (sig as any).keyInfoProvider = {
-      getKeyInfo: () =>
-        `<X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data>`,
+      getKeyInfo: () => `<X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data>`,
       getKey: () => Buffer.from(privateKeyPem),
     };
-
     sig.computeSignature(xml, {
-      location: {
-        reference: "//*[local-name(.)='infNFe']",
-        action: "after",
-      },
+      location: { reference: "//*[local-name(.)='infNFe']", action: "after" },
     });
-
     console.log("[FISCAL] XML assinado com certificado A1 ✓");
     return sig.getSignedXml();
   } catch (err: any) {
@@ -307,75 +270,24 @@ export async function signXML(xml: string, settings: any): Promise<string> {
 
 // ─── Endpoints SEFAZ por UF ───────────────────────────────────────────────────
 const SEFAZ_ENDPOINTS: Record<string, { hom: string; prod: string }> = {
-  SP: {
-    hom: "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx",
-    prod: "https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx",
-  },
-  MG: {
-    hom: "https://hnfce.fazenda.mg.gov.br/nfce/services/NFeAutorizacao4",
-    prod: "https://nfce.fazenda.mg.gov.br/nfce/services/NFeAutorizacao4",
-  },
-  RJ: {
-    hom: "https://homologacao.nfe2.fazenda.rj.gov.br/nfce/NFeAutorizacao4",
-    prod: "https://nfe2.fazenda.rj.gov.br/nfce/NFeAutorizacao4",
-  },
-  RS: {
-    hom: "https://nfce-homologacao.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx",
-    prod: "https://nfce.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx",
-  },
-  PR: {
-    hom: "https://homologacao.nfce.sefa.pr.gov.br/nfce/NFeAutorizacao4",
-    prod: "https://nfce.sefa.pr.gov.br/nfce/NFeAutorizacao4",
-  },
-  SC: {
-    hom: "https://homologacao.nfe.sef.sc.gov.br/ws/NFeAutorizacao4/NFeAutorizacao4.asmx",
-    prod: "https://nfe.sef.sc.gov.br/ws/NFeAutorizacao4/NFeAutorizacao4.asmx",
-  },
-  BA: {
-    hom: "https://hnfce.sefaz.ba.gov.br/ws/NFeAutorizacao4.asmx",
-    prod: "https://nfce.sefaz.ba.gov.br/ws/NFeAutorizacao4.asmx",
-  },
-  GO: {
-    hom: "https://homologacao.sefaz.go.gov.br/nfeweb/services/NFeAutorizacao4",
-    prod: "https://nfe.sefaz.go.gov.br/nfeweb/services/NFeAutorizacao4",
-  },
-  MT: {
-    hom: "https://homologacao.sefaz.mt.gov.br/nfcews/services/NFeAutorizacao4",
-    prod: "https://nfce.sefaz.mt.gov.br/nfcews/services/NFeAutorizacao4",
-  },
-  MS: {
-    hom: "https://homologacao.nfce.sefaz.ms.gov.br/ws/NFeAutorizacao4.asmx",
-    prod: "https://nfce.sefaz.ms.gov.br/ws/NFeAutorizacao4.asmx",
-  },
-  ES: {
-    hom: "https://homologacao.nfe.sefaz.es.gov.br/nfce/NFeAutorizacao4",
-    prod: "https://nfe.sefaz.es.gov.br/nfce/NFeAutorizacao4",
-  },
-  CE: {
-    hom: "https://nfce.sefaz.ce.gov.br/nfce/services/NFeAutorizacao4",
-    prod: "https://nfce.sefaz.ce.gov.br/nfce/services/NFeAutorizacao4",
-  },
-  PE: {
-    hom: "https://nfcehomolog.sefaz.pe.gov.br/nfce-service/services/NFeAutorizacao4",
-    prod: "https://nfce.sefaz.pe.gov.br/nfce-service/services/NFeAutorizacao4",
-  },
-  // Estados que usam SVAN (Ambiente Nacional)
-  AM: {
-    hom: "https://hom.sefazvirtual.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx",
-    prod: "https://nfe.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx",
-  },
-  PA: {
-    hom: "https://hom.sefazvirtual.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx",
-    prod: "https://nfe.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx",
-  },
+  SP: { hom: "https://homologacao.nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx", prod: "https://nfce.fazenda.sp.gov.br/ws/NFeAutorizacao4.asmx" },
+  MG: { hom: "https://hnfce.fazenda.mg.gov.br/nfce/services/NFeAutorizacao4", prod: "https://nfce.fazenda.mg.gov.br/nfce/services/NFeAutorizacao4" },
+  RJ: { hom: "https://homologacao.nfe2.fazenda.rj.gov.br/nfce/NFeAutorizacao4", prod: "https://nfe2.fazenda.rj.gov.br/nfce/NFeAutorizacao4" },
+  RS: { hom: "https://nfce-homologacao.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx", prod: "https://nfce.sefazrs.rs.gov.br/ws/NfeAutorizacao/NFeAutorizacao4.asmx" },
+  PR: { hom: "https://homologacao.nfce.sefa.pr.gov.br/nfce/NFeAutorizacao4", prod: "https://nfce.sefa.pr.gov.br/nfce/NFeAutorizacao4" },
+  SC: { hom: "https://homologacao.nfe.sef.sc.gov.br/ws/NFeAutorizacao4/NFeAutorizacao4.asmx", prod: "https://nfe.sef.sc.gov.br/ws/NFeAutorizacao4/NFeAutorizacao4.asmx" },
+  BA: { hom: "https://hnfce.sefaz.ba.gov.br/ws/NFeAutorizacao4.asmx", prod: "https://nfce.sefaz.ba.gov.br/ws/NFeAutorizacao4.asmx" },
+  GO: { hom: "https://homologacao.sefaz.go.gov.br/nfeweb/services/NFeAutorizacao4", prod: "https://nfe.sefaz.go.gov.br/nfeweb/services/NFeAutorizacao4" },
+  MT: { hom: "https://homologacao.sefaz.mt.gov.br/nfcews/services/NFeAutorizacao4", prod: "https://nfce.sefaz.mt.gov.br/nfcews/services/NFeAutorizacao4" },
+  MS: { hom: "https://homologacao.nfce.sefaz.ms.gov.br/ws/NFeAutorizacao4.asmx", prod: "https://nfce.sefaz.ms.gov.br/ws/NFeAutorizacao4.asmx" },
+  ES: { hom: "https://homologacao.nfe.sefaz.es.gov.br/nfce/NFeAutorizacao4", prod: "https://nfe.sefaz.es.gov.br/nfce/NFeAutorizacao4" },
+  CE: { hom: "https://nfce.sefaz.ce.gov.br/nfce/services/NFeAutorizacao4", prod: "https://nfce.sefaz.ce.gov.br/nfce/services/NFeAutorizacao4" },
+  PE: { hom: "https://nfcehomolog.sefaz.pe.gov.br/nfce-service/services/NFeAutorizacao4", prod: "https://nfce.sefaz.pe.gov.br/nfce-service/services/NFeAutorizacao4" },
+  AM: { hom: "https://hom.sefazvirtual.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", prod: "https://nfe.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx" },
+  PA: { hom: "https://hom.sefazvirtual.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx", prod: "https://nfe.fazenda.gov.br/NFeAutorizacao4/NFeAutorizacao4.asmx" },
 };
 
-// Helper: faz requisição HTTPS com mTLS
-function httpsPost(
-  url: string,
-  body: string,
-  options: { key?: string; cert?: string; rejectUnauthorized?: boolean }
-): Promise<string> {
+function httpsPost(url: string, body: string, options: { key?: string; cert?: string; rejectUnauthorized?: boolean }): Promise<string> {
   return new Promise((resolve, reject) => {
     const parsed = new URL(url);
     const reqOptions: https.RequestOptions = {
@@ -393,41 +305,29 @@ function httpsPost(
       rejectUnauthorized: options.rejectUnauthorized ?? false,
       timeout: 30000,
     };
-
     const req = https.request(reqOptions, (res) => {
       let data = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => (data += chunk));
       res.on("end", () => resolve(data));
     });
-
     req.on("error", reject);
     req.on("timeout", () => {
       req.destroy();
       reject(new Error("Timeout na conexão com SEFAZ (30s)"));
     });
-
     req.write(body, "utf8");
     req.end();
   });
 }
 
-// ─── Transmissão Real SEFAZ via SOAP com mTLS ─────────────────────────────────
 export async function transmitToSefaz(
   xmlSigned: string,
   settings: any
-): Promise<{
-  success: boolean;
-  protocol: string;
-  key: string;
-  cStat: string;
-  xMotivo: string;
-  simulado?: boolean;
-}> {
+): Promise<{ success: boolean; protocol: string; key: string; cStat: string; xMotivo: string; simulado?: boolean }> {
   const isHomologacao = settings.ambiente !== "producao";
   const uf = settings.uf?.toUpperCase() || "SP";
 
-  // Sem certificado → simula resposta (modo desenvolvimento)
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
     console.warn("[FISCAL] Sem certificado — transmissão simulada");
     return {
@@ -442,157 +342,58 @@ export async function transmitToSefaz(
 
   const endpoints = SEFAZ_ENDPOINTS[uf] || SEFAZ_ENDPOINTS["SP"];
   const url = isHomologacao ? endpoints.hom : endpoints.prod;
-
   console.log(`[FISCAL] Transmitindo para SEFAZ-${uf} (${settings.ambiente}): ${url}`);
 
   try {
     const forge = (await import("node-forge")).default;
-
-    // Extrai chave e cert do PFX para mTLS
     const pfxDer = Buffer.from(settings.certificadoA1, "base64").toString("binary");
     const pfxAsn1 = forge.asn1.fromDer(pfxDer);
     const pfxObj = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, false, settings.certificadoSenha);
-
     const keyBags = pfxObj.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
     const keyBag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
     const certBags = pfxObj.getBags({ bagType: forge.pki.oids.certBag });
     const certBag = certBags[forge.pki.oids.certBag]?.[0];
-
     const privateKeyPem = keyBag?.key ? forge.pki.privateKeyToPem(keyBag.key) : undefined;
     const certPem = certBag?.cert ? forge.pki.certificateToPem(certBag.cert) : undefined;
-
-    // Monta envelope SOAP 1.2
     const cUF = settings.codigoIbge?.substring(0, 2) || "35";
     const idLote = Date.now().toString().substring(0, 15);
-
-    const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xmlns:xsd="http://www.w3.org/2001/XMLSchema"
-  xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Header>
-    <nfeCabecMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">
-      <cUF>${cUF}</cUF>
-      <versaoDados>4.00</versaoDados>
-    </nfeCabecMsg>
-  </soap12:Header>
-  <soap12:Body>
-    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">
-      <enviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">
-        <idLote>${idLote}</idLote>
-        <indSinc>1</indSinc>
-        ${xmlSigned}
-      </enviNFe>
-    </nfeDadosMsg>
-  </soap12:Body>
-</soap12:Envelope>`;
-
-    const responseXml = await httpsPost(url, soapEnvelope, {
-      key: privateKeyPem,
-      cert: certPem,
-      rejectUnauthorized: false,
-    });
-
+    const soapEnvelope = `<?xml version="1.0" encoding="UTF-8"?>\n<soap12:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n  xmlns:xsd="http://www.w3.org/2001/XMLSchema"\n  xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">\n  <soap12:Header>\n    <nfeCabecMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">\n      <cUF>${cUF}</cUF>\n      <versaoDados>4.00</versaoDados>\n    </nfeCabecMsg>\n  </soap12:Header>\n  <soap12:Body>\n    <nfeDadosMsg xmlns="http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4">\n      <enviNFe versao="4.00" xmlns="http://www.portalfiscal.inf.br/nfe">\n        <idLote>${idLote}</idLote>\n        <indSinc>1</indSinc>\n        ${xmlSigned}\n      </enviNFe>\n    </nfeDadosMsg>\n  </soap12:Body>\n</soap12:Envelope>`;
+    const responseXml = await httpsPost(url, soapEnvelope, { key: privateKeyPem, cert: certPem, rejectUnauthorized: false });
     console.log("[FISCAL] Resposta SEFAZ recebida");
-
-    // Parse da resposta SOAP
     const parser = new XMLParser({ ignoreAttributes: false, removeNSPrefix: true });
     const parsed = parser.parse(responseXml);
-
-    // Navega na estrutura SOAP até retConsReciNFe ou retEnviNFe
-    const body =
-      parsed?.Envelope?.Body ||
-      parsed?.["soap12:Envelope"]?.["soap12:Body"] ||
-      {};
-
-    const retMsg =
-      body?.nfeResultMsg?.retEnviNFe ||
-      body?.retEnviNFe ||
-      body?.nfeResultMsg?.retConsReciNFe ||
-      {};
-
-    const cStat =
-      retMsg?.infRec?.cStat ||
-      retMsg?.protNFe?.infProt?.cStat ||
-      retMsg?.cStat ||
-      "999";
-
-    const xMotivo =
-      retMsg?.infRec?.xMotivo ||
-      retMsg?.protNFe?.infProt?.xMotivo ||
-      retMsg?.xMotivo ||
-      "Resposta não reconhecida";
-
-    const protocol =
-      retMsg?.protNFe?.infProt?.nProt ||
-      retMsg?.infRec?.nRec ||
-      "";
-
-    const chaveFromResp =
-      retMsg?.protNFe?.infProt?.chNFe ||
-      xmlSigned.match(/Id="NFe(\d+)"/)?.[1] ||
-      "";
-
-    // cStat 100 = Autorizado, 150 = Autorizado fora do prazo
+    const body = parsed?.Envelope?.Body || parsed?.["soap12:Envelope"]?.["soap12:Body"] || {};
+    const retMsg = body?.nfeResultMsg?.retEnviNFe || body?.retEnviNFe || body?.nfeResultMsg?.retConsReciNFe || {};
+    const cStat = retMsg?.infRec?.cStat || retMsg?.protNFe?.infProt?.cStat || retMsg?.cStat || "999";
+    const xMotivo = retMsg?.infRec?.xMotivo || retMsg?.protNFe?.infProt?.xMotivo || retMsg?.xMotivo || "Resposta não reconhecida";
+    const protocol = retMsg?.protNFe?.infProt?.nProt || retMsg?.infRec?.nRec || "";
+    const chaveFromResp = retMsg?.protNFe?.infProt?.chNFe || xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "";
     const authorized = ["100", "150"].includes(String(cStat));
-
-    if (!authorized) {
-      console.error(`[FISCAL] SEFAZ rejeitou: ${cStat} - ${xMotivo}`);
-    } else {
-      console.log(`[FISCAL] ✅ Autorizado pelo SEFAZ: ${cStat} - ${xMotivo}`);
-    }
-
-    return {
-      success: authorized,
-      protocol: String(protocol),
-      key: chaveFromResp,
-      cStat: String(cStat),
-      xMotivo,
-    };
+    if (!authorized) console.error(`[FISCAL] SEFAZ rejeitou: ${cStat} - ${xMotivo}`);
+    else console.log(`[FISCAL] ✅ Autorizado pelo SEFAZ: ${cStat} - ${xMotivo}`);
+    return { success: authorized, protocol: String(protocol), key: chaveFromResp, cStat: String(cStat), xMotivo };
   } catch (err: any) {
     console.error("[FISCAL] Erro na transmissão:", err.message);
     throw new Error(`Falha na comunicação com SEFAZ: ${err.message}`);
   }
 }
 
-// ─── QR Code URL (SHA1 conforme manual SEFAZ) ────────────────────────────────
 export function generateQRCode(chave: string, settings: any): string {
   const isHomologacao = settings.ambiente !== "producao";
   const uf = settings.uf?.toUpperCase() || "SP";
-
-  // URL base por UF
   const urlBases: Record<string, { hom: string; prod: string }> = {
-    SP: {
-      hom: "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode",
-      prod: "https://www.nfce.fazenda.sp.gov.br/qrcode",
-    },
-    MG: {
-      hom: "https://hnfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml",
-      prod: "https://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml",
-    },
-    RJ: {
-      hom: "https://www.homologacao.nfe.fazenda.rj.gov.br/consulta/qr",
-      prod: "https://www.nfe.fazenda.rj.gov.br/consulta/qr",
-    },
-    RS: {
-      hom: "https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx",
-      prod: "https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx",
-    },
-    PR: {
-      hom: "https://www.homologacao.nfce.sefa.pr.gov.br/nfce/qrcode",
-      prod: "https://www.nfce.sefa.pr.gov.br/nfce/qrcode",
-    },
+    SP: { hom: "https://www.homologacao.nfce.fazenda.sp.gov.br/qrcode", prod: "https://www.nfce.fazenda.sp.gov.br/qrcode" },
+    MG: { hom: "https://hnfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml", prod: "https://nfce.fazenda.mg.gov.br/portalnfce/sistema/qrcode.xhtml" },
+    RJ: { hom: "https://www.homologacao.nfe.fazenda.rj.gov.br/consulta/qr", prod: "https://www.nfe.fazenda.rj.gov.br/consulta/qr" },
+    RS: { hom: "https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx", prod: "https://www.sefaz.rs.gov.br/NFCE/NFCE-COM.aspx" },
+    PR: { hom: "https://www.homologacao.nfce.sefa.pr.gov.br/nfce/qrcode", prod: "https://www.nfce.sefa.pr.gov.br/nfce/qrcode" },
   };
-
   const urls = urlBases[uf] || urlBases["SP"];
   const urlBase = isHomologacao ? urls.hom : urls.prod;
-
   const csc = settings.cscToken || "";
   const cscId = settings.cscId ? settings.cscId.toString().padStart(6, "0") : "000001";
   const tpAmb = isHomologacao ? "2" : "1";
-
-  // Hash = SHA1(chave|2|tpAmb|cscId + csc)
   const hashInput = `${chave}|2|${tpAmb}|${cscId}${csc}`;
   const hash = crypto.createHash("sha1").update(hashInput).digest("hex");
-
   return `${urlBase}?p=${chave}|2|${tpAmb}|${cscId}|${hash}`;
 }

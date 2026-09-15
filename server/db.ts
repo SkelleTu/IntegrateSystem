@@ -29,10 +29,13 @@ sqlJsDb.exec = function(...args: any[]) {
 };
 
 export const localSqlite = sqlJsDb;
-export const dbLocal = drizzle(localSqlite, { schema });
+export const dbLocal: any = drizzle(localSqlite, { schema });
 
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
-export let dbRemote: ReturnType<typeof drizzle> | null = null;
+// Local sql.js and remote libsql use different Drizzle dialect types. Keep the
+// boundary intentionally loose because the application exposes one unified
+// runtime database facade over both drivers.
+export let dbRemote: any = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
@@ -52,8 +55,8 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
 export const isRemoteEnabled = !!dbRemote;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
-const primaryDatabase = dbRemote ?? dbLocal;
-const mirrorDatabase = dbRemote ? dbLocal : null;
+const primaryDatabase: any = dbRemote ?? dbLocal;
+const mirrorDatabase: any = dbRemote ? dbLocal : null;
 
 function isPromiseLike(value: any): boolean {
   return !!value && typeof value.then === "function";
@@ -116,23 +119,23 @@ function createMirroredQuery(primaryQuery: any, mirrorQuery: any): any {
   });
 }
 
-export const db = (mirrorDatabase
-  ? new Proxy(primaryDatabase as any, {
+export const db: any = (mirrorDatabase
+  ? new Proxy(primaryDatabase, {
       get(target, property, receiver) {
         if (property === "insert" || property === "update" || property === "delete") {
           return (...args: any[]) => {
             const primaryQuery = target[property].apply(target, args);
-            const mirrorQuery = (mirrorDatabase as any)[property].apply(mirrorDatabase, args);
+            const mirrorQuery = mirrorDatabase[property].apply(mirrorDatabase, args);
             return createMirroredQuery(primaryQuery, mirrorQuery);
           };
         }
         return Reflect.get(target, property, receiver);
       },
     })
-  : primaryDatabase) as typeof dbLocal;
+  : primaryDatabase);
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
-export function getAllDatabases(): Array<typeof db> {
+export function getAllDatabases(): any[] {
   if (dbRemote) {
     return [dbRemote, dbLocal];
   }
@@ -141,7 +144,7 @@ export function getAllDatabases(): Array<typeof db> {
 
 // ─── 5. multiWrite — escreve em TODOS os bancos simultaneamente ──────────────
 export async function multiWrite<T>(
-  operation: (database: typeof db) => Promise<T>
+  operation: (database: any) => Promise<T>
 ): Promise<T> {
   const dbs = getAllDatabases();
 
@@ -240,6 +243,15 @@ const TABLE_DEFINITIONS = [
     closing_amount INTEGER,
     difference INTEGER,
     status TEXT NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS cash_register_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cash_register_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    reason TEXT,
+    created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -558,7 +570,6 @@ export async function setupDatabase() {
         updated_at INTEGER NOT NULL
       )`,
       "ALTER TABLE products ADD COLUMN em_liquidacao INTEGER NOT NULL DEFAULT 0",
-      // ── Novas colunas de variante por lote (sistema ERP/PDV) ────────────────
       "ALTER TABLE batches ADD COLUMN sku TEXT",
       "ALTER TABLE batches ADD COLUMN variant_name TEXT",
       "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
@@ -605,6 +616,15 @@ export async function setupDatabase() {
         products_json TEXT NOT NULL,
         batches_json TEXT NOT NULL,
         product_count INTEGER NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS cash_register_movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        cash_register_id INTEGER NOT NULL,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        amount INTEGER NOT NULL,
+        reason TEXT,
+        created_at INTEGER NOT NULL
       )`,
     ];
 
