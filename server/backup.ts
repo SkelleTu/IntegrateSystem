@@ -9,10 +9,12 @@ import { localSqlite, dbRemote } from "./db.js";
 import initSqlJs from "sql.js";
 import fs from "fs";
 import path from "path";
+import { ensureRuntimeDataDir, getRuntimeBackupDir, getRuntimeSqliteFile } from "./runtime-data.js";
 
-const SQLITE_FILE = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
-const BACKUP_DIR = path.join(process.cwd(), "attached_assets", "backups");
+const SQLITE_FILE = getRuntimeSqliteFile();
+const BACKUP_DIR = getRuntimeBackupDir();
 const AUTO_BACKUP_FILE = path.join(BACKUP_DIR, "auto-backup.json");
+ensureRuntimeDataDir();
 
 const LEGACY_TABLES = [
   "enterprises", "users", "user_sessions", "services", "tickets", "queue_state",
