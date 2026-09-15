@@ -1,11 +1,12 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useUser } from "@/hooks/use-auth";
-import { Loader2 } from "lucide-react";
+import { Loader2, Menu, Settings2 } from "lucide-react";
 import LandingPage from "@/pages/LandingPage";
 import AboutUs from "@/pages/AboutUs";
 import Solutions from "@/pages/Solutions";
@@ -30,7 +31,6 @@ import FiscalConfig from "@/pages/fiscal/FiscalConfig";
 import LabelSystem from "@/pages/LabelSystem";
 import NotFound from "@/pages/not-found";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
-import { Menu } from "lucide-react";
 import auraLogo from "@assets/AURA_1768346008566.png";
 import { Navbar } from "@/components/layout/Navbar";
 import { StatusBar } from "@/components/layout/StatusBar";
@@ -71,12 +71,57 @@ function LandingNavigation(){
   return <nav className="fixed top-0 left-0 w-full z-[100] px-4 md:px-6 py-3 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md"><div className="flex items-center gap-2 shrink-0"><img src={auraLogo} alt="Aura Logo" className="h-10 md:h-14 w-auto"/></div><div className="hidden lg:flex items-center gap-6 xl:gap-8">{navLinks.map(link=><a key={link.href} href={link.href} className="text-zinc-400 hover:text-white text-[11px] font-bold uppercase tracking-widest transition-colors whitespace-nowrap">{link.label}</a>)}</div><div className="flex items-center gap-3 shrink-0"><div className="hidden lg:flex items-center gap-4"><a href="/login" className="text-white font-bold text-xs uppercase tracking-widest hover:text-primary transition-colors whitespace-nowrap">Entrar</a><a href="/register" className="bg-primary text-white font-black text-xs uppercase tracking-widest px-6 py-2 rounded-md hover:scale-105 transition-transform shadow-[0_0_20px_rgba(0,229,255,0.3)] whitespace-nowrap">Assinar</a></div><div className="lg:hidden flex items-center gap-2"><a href="/login" className="text-white font-bold text-[10px] uppercase tracking-widest hover:text-primary transition-colors whitespace-nowrap">Entrar</a><a href="/register" className="bg-primary text-white font-black text-[10px] uppercase tracking-widest px-3 py-1.5 rounded-md shadow-[0_0_15px_rgba(0,229,255,0.3)] whitespace-nowrap">Assinar</a><Sheet><SheetTrigger asChild><Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-9 w-9 shrink-0"><Menu className="w-5 h-5"/></Button></SheetTrigger><SheetContent side="right" className="bg-zinc-950 border-white/10 p-0 w-[280px] z-[99999]"><div className="flex flex-col p-6 gap-6">{navLinks.map(link=><a key={link.href} href={link.href} className="text-lg font-bold text-white/70 hover:text-primary transition-colors">{link.label}</a>)}</div></SheetContent></Sheet></div></div></nav>
 }
 
+function CashRegisterInlineTrigger(){
+  const [target,setTarget]=useState<HTMLElement|null>(null);
+  const [legacyButton,setLegacyButton]=useState<HTMLButtonElement|null>(null);
+
+  useEffect(()=>{
+    const locate=()=>{
+      const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+      const legacy=buttons.find(button=>button.textContent?.toLowerCase().includes("opções do caixa"));
+      const headings=Array.from(document.querySelectorAll<HTMLHeadingElement>("h3"));
+      const cartHeading=headings.find(heading=>heading.textContent?.toLowerCase().includes("itens no carrinho"));
+      const host=cartHeading?.parentElement ?? null;
+      if(legacy){
+        legacy.classList.add("aura-cash-control-legacy-trigger");
+        setLegacyButton(legacy);
+      }
+      setTarget(host);
+    };
+    locate();
+    const observer=new MutationObserver(locate);
+    observer.observe(document.body,{childList:true,subtree:true});
+    window.addEventListener("resize",locate);
+    return()=>{
+      observer.disconnect();
+      window.removeEventListener("resize",locate);
+      if(legacyButton)legacyButton.classList.remove("aura-cash-control-legacy-trigger");
+    };
+  },[legacyButton]);
+
+  if(!target||!legacyButton)return null;
+
+  return createPortal(
+    <Button
+      type="button"
+      variant="outline"
+      aria-label="Opções do Caixa"
+      onClick={()=>legacyButton.click()}
+      className="ml-auto shrink-0 h-8 px-2.5 rounded-xl bg-zinc-950/95 border-white/10 text-white hover:text-primary hover:border-primary/40 shadow-xl backdrop-blur-md gap-1.5"
+    >
+      <Settings2 className="w-3.5 h-3.5" />
+      <span className="text-[8px] sm:text-[9px] font-black uppercase italic tracking-widest">Opções do Caixa</span>
+    </Button>,
+    target
+  );
+}
+
 function AppContent(){
   const {data:user}=useUser();
   const [location]=useLocation();
   const isLandingPage=["/","/quem-somos","/solucoes","/casos-de-sucesso","/blog","/contato","/privacy","/terms"].includes(location);
   const isCashierPage=location==="/caixa"||location==="/financeiro"||location==="/relatorios";
-  return <div className={`relative min-h-screen w-full bg-black pb-8 ${isCashierPage?"overflow-hidden":"overflow-x-hidden"}`}><BackgroundIcons/><div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen"><main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage&&!isCashierPage?"mb-12 sm:mb-0":""}`}><LandingNavigation/>{user&&!isLandingPage&&location!=="/setup"&&<Navbar/>}<Router/>{user&&<CashierDataPersistenceBridge/>}{user&&location==="/caixa"&&<CashRegisterControlCenter/>}</main></div><Toaster/>{user&&<StatusBar/>}<div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block"><img src={auraLogo} alt="Aura Logo Overlay" className="w-12 h-auto grayscale brightness-200"/></div></div>
+  return <div className={`relative min-h-screen w-full bg-black pb-8 ${isCashierPage?"overflow-hidden":"overflow-x-hidden"}`}><BackgroundIcons/><div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen"><main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage&&!isCashierPage?"mb-12 sm:mb-0":""}`}><LandingNavigation/><>{user&&!isLandingPage&&location!=="/setup"&&<Navbar/>}{<Router/>}{user&&<CashierDataPersistenceBridge/>}{user&&location==="/caixa"&&<><CashRegisterControlCenter/><CashRegisterInlineTrigger/></>}</main></div><Toaster/>{user&&<StatusBar/>}<div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block"><img src={auraLogo} alt="Aura Logo Overlay" className="w-12 h-auto grayscale brightness-200"/></div></div>
 }
 
 export default function App(){return <QueryClientProvider client={queryClient}><TooltipProvider><TourProvider><AppContent/><TourEngine/></TourProvider></TooltipProvider><Toaster/></QueryClientProvider>}
