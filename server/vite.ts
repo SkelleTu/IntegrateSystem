@@ -27,8 +27,10 @@ export async function setupVite(server: Server, app: Express) {
     customLogger: {
       ...viteLogger,
       error: (msg, options) => {
+        // Em desenvolvimento, um erro de transformação/HMR não pode derrubar
+        // o servidor Express inteiro. O erro continua sendo exibido pelo Vite,
+        // enquanto o backend permanece acessível para diagnóstico e recuperação.
         viteLogger.error(msg, options);
-        process.exit(1);
       },
     },
     server: serverOptions,
@@ -44,7 +46,6 @@ export async function setupVite(server: Server, app: Express) {
     "index.html",
   );
 
-  // Cache the base template (Vite's HMR handles cache invalidation automatically)
   let cachedTemplate: string | null = null;
 
   app.use("*", async (req, res, next) => {
