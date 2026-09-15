@@ -91,6 +91,9 @@
 - [x] O runtime não usa mais `process.cwd()/sqlite.db` como banco operacional
 - [x] O runtime não importa automaticamente um banco legado/checkpoint vindo do Git
 - [x] Migração do banco legado, quando necessária, é exclusivamente explícita via `AURA_MIGRATE_LEGACY_SQLITE=1`
+- [x] O espelho de persistência em tempo real grava no mesmo banco operacional externo ao repositório
+- [x] O sistema de backup e restauração grava no diretório persistente externo ao repositório
+- [x] O diagnóstico de persistência aponta para o banco operacional real, não para o Git working tree
 - [x] Git passa a conter código/schema, não o estado operacional atual do estabelecimento
 - [x] A regra de precedência fica explícita: dados persistidos em runtime/remoto são autoridade; commits não substituem estado operacional
 - [ ] Executar `/api/system/persistence-health` em produção
