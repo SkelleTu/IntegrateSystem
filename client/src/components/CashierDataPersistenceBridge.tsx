@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { queryClient } from "@tanstack/react-query";
+import { queryClient } from "../lib/queryClient";
 
 /**
  * Sincronizador transversal do PDV. As operações acontecem no backend;
