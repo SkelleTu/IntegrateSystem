@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft } from "lucide-react";
+import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft, Github } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import auraLogo from "@assets/AURA_1768346008566.png";
@@ -150,8 +150,12 @@ export default function LandingPage() {
               />
             </div>
           </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-2 text-[11px] font-black uppercase tracking-[0.25em] text-primary shadow-[0_0_20px_rgba(0,229,255,0.18)] backdrop-blur-md">
+            <Github className="h-4 w-4" />
+            GitHub Sync Ready
+          </div>
           <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
-            Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível.
+            Potencialize seu negócio com a estética do amanhã. O sistema definitivo para estabelecimentos de alto nível, agora preparado para versionamento e sincronização contínua.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center pt-8">
             <Button size="lg" onClick={() => setStep(2)} className="bg-[#00e5ff] text-black font-black uppercase px-10 h-16 text-xl hover:scale-105 transition-transform shadow-[0_0_30px_rgba(0,229,255,0.6)] border-none">
