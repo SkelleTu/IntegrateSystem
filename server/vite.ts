@@ -10,7 +10,14 @@ const viteLogger = createLogger();
 export async function setupVite(server: Server, app: Express) {
   const serverOptions = {
     middlewareMode: true,
-    hmr: { server, path: "/vite-hmr" },
+    hmr: {
+      server,
+      host: "localhost",
+      port: 5010,
+      clientPort: 5010,
+      protocol: "ws" as const,
+      path: "/vite-hmr",
+    },
     allowedHosts: true as const,
   };
 
