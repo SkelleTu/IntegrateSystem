@@ -3,12 +3,10 @@ import os from "os";
 import path from "path";
 
 /**
- * Runtime data belongs to the application, not to the Git working tree.
+ * Runtime data belongs to the application, never to the Git working tree.
  *
- * The previous implementation derived sqlite/backup paths from process.cwd().
- * Electron/Kilo/Vite can start the server with different working directories,
- * which can silently create a brand-new sqlite.db and make the application look
- * as if it had rolled back to a default checkpoint.
+ * Git contains code and schema. It is not an operational database and must not
+ * be able to roll the platform back to an old data snapshot after pull/restart.
  */
 export function getRuntimeDataDir(): string {
   if (process.env.VERCEL) return "/tmp/aura-system";
@@ -40,21 +38,19 @@ export function ensureRuntimeDataDir(): string {
 }
 
 /**
- * One-time migration from the historical cwd-based sqlite.db location.
- *
- * Only migrate when the new authoritative runtime file does not exist. Once
- * the runtime database exists, the repository working tree is never consulted
- * again for runtime state.
+ * Historical migration is deliberately opt-in. A Git checkout must never
+ * silently become the source of operational data.
  */
-export function migrateLegacySqliteIfNeeded(): string {
+export function migrateLegacySqliteExplicitly(): string | null {
+  if (process.env.AURA_MIGRATE_LEGACY_SQLITE !== "1") return null;
+
   const runtimeFile = getRuntimeSqliteFile();
   const legacyFile = path.join(process.cwd(), "sqlite.db");
-
   ensureRuntimeDataDir();
 
   if (!fs.existsSync(runtimeFile) && fs.existsSync(legacyFile)) {
     fs.copyFileSync(legacyFile, runtimeFile);
-    console.log(`[DB] Banco local migrado para armazenamento persistente: ${runtimeFile}`);
+    console.log(`[DB] Migração explícita do banco legado concluída: ${runtimeFile}`);
   }
 
   return runtimeFile;
