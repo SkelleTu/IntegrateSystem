@@ -85,6 +85,14 @@
 - [x] Sem armazenamento remoto configurado, a aplicação falha explicitamente em produção em vez de operar silenciosamente sobre `/tmp`
 - [x] PDV invalida leituras derivadas após vendas, estoque e operações administrativas
 - [x] Operações do Caixa invalidam estado de PDV, Financeiro e Relatórios
+- [x] Banco operacional local foi retirado do repositório Git
+- [x] `sqlite.db` e `sessions.db` deixaram de ser fontes de runtime/versionadas
+- [x] SQLite local operacional passa a usar diretório persistente do sistema operacional, fora do repositório
+- [x] O runtime não usa mais `process.cwd()/sqlite.db` como banco operacional
+- [x] O runtime não importa automaticamente um banco legado/checkpoint vindo do Git
+- [x] Migração do banco legado, quando necessária, é exclusivamente explícita via `AURA_MIGRATE_LEGACY_SQLITE=1`
+- [x] Git passa a conter código/schema, não o estado operacional atual do estabelecimento
+- [x] A regra de precedência fica explícita: dados persistidos em runtime/remoto são autoridade; commits não substituem estado operacional
 - [ ] Executar `/api/system/persistence-health` em produção
 - [ ] Confirmar `remoteEnabled: true`
 - [ ] Fazer venda e verificar incremento nas tabelas críticas
@@ -104,7 +112,7 @@
 - [ ] Não existe segundo dono real para fechamento do Caixa
 - [ ] Rotas legadas permanecem somente como compatibilidade, sem criar estado paralelo
 - [ ] Um único cálculo canônico é usado para fechamento e relatórios
-- [ ] Idempotência impede duplicação de operações críticas
+- [x] Idempotência impede duplicação de operações críticas
 - [ ] Backup inclui todas as tabelas necessárias ao estado operacional
 - [ ] Nenhum componente legado é montado simultaneamente no `App`
 - [ ] Nenhuma funcionalidade da plataforma depende exclusivamente de estado temporário de sessão para dados operacionais
