@@ -1,8 +1,10 @@
 import fs from "fs";
 import { sql } from "drizzle-orm";
-import { db, dbRemote, isRemoteEnabled, localSqlite } from "./db.js";
+import { db, isRemoteEnabled } from "./db.js";
+import { ensureRuntimeDataDir, getRuntimeSqliteFile } from "./runtime-data.js";
 
-const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : `${process.cwd()}/sqlite.db`;
+ensureRuntimeDataDir();
+const sqliteFile = getRuntimeSqliteFile();
 
 export function registerDatabasePersistenceHealth(app: any, isAuthenticated: any) {
   app.get("/api/system/persistence-health", isAuthenticated, async (_req: any, res: any) => {
