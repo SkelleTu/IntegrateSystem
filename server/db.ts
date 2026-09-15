@@ -4,9 +4,13 @@ import * as schema from "../shared/schema";
 import path from "path";
 import fs from "fs";
 import { sql } from "drizzle-orm";
+import { ensureRuntimeDataDir, getRuntimeSqliteFile } from "./runtime-data.js";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
-const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
+// Operational data must never live in the Git working tree. The repository's
+// sqlite.db is a historical artifact/checkpoint, not a runtime source of truth.
+ensureRuntimeDataDir();
+const sqliteFile = process.env.VERCEL ? "/tmp/aura-system/sqlite.db" : getRuntimeSqliteFile();
 console.log("[DB] sqliteFile=", sqliteFile, "exists=", fs.existsSync(sqliteFile), "size=", fs.existsSync(sqliteFile) ? fs.statSync(sqliteFile).size : 0);
 
 // Initialize sql.js database
