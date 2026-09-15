@@ -77,7 +77,7 @@ function CashRegisterInlineTrigger(){
 
   useEffect(()=>{
     const locate=()=>{
-      const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button"));
+      const buttons=Array.from(document.querySelectorAll<HTMLButtonElement>("button.fixed"));
       const legacy=buttons.find(button=>button.textContent?.toLowerCase().includes("opções do caixa"));
       const headings=Array.from(document.querySelectorAll<HTMLHeadingElement>("h3"));
       const cartHeading=headings.find(heading=>heading.textContent?.toLowerCase().includes("itens no carrinho"));
@@ -95,9 +95,8 @@ function CashRegisterInlineTrigger(){
     return()=>{
       observer.disconnect();
       window.removeEventListener("resize",locate);
-      if(legacyButton)legacyButton.classList.remove("aura-cash-control-legacy-trigger");
     };
-  },[legacyButton]);
+  },[]);
 
   if(!target||!legacyButton)return null;
 
