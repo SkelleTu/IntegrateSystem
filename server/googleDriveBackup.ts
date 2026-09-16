@@ -17,7 +17,7 @@ function timestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
 }
 
-function cleanupOldBackups(maxFiles = 48) {
+function cleanupOldBackups(maxFiles = 288) {
   const files = fs.readdirSync(BACKUP_DIR)
     .filter((file) => /^sqlite-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}\.db$/.test(file))
     .map((file) => ({ file, mtime: fs.statSync(path.join(BACKUP_DIR, file)).mtimeMs }))
