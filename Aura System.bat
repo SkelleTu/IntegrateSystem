@@ -10,6 +10,15 @@ echo ============================================================
 echo Aura System - Electron
 echo ============================================================
 echo.
+echo [INFO] Preparando build de producao...
+npm run build
+if errorlevel 1 (
+  echo.
+  echo [ERRO] Falha no build. O Aura System nao sera iniciado.
+  pause
+  exit /b 1
+)
+echo [INFO] Build de producao concluido.
 echo [INFO] Iniciando servidor e Electron...
 echo [INFO] Backup automatico do SQLite: ATIVO
 echo [INFO] Destino: %AURA_GOOGLE_DRIVE_BACKUP_DIR%
