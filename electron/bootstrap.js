@@ -10,7 +10,7 @@ async function killOldProcesses() {
   return new Promise((resolve) => {
     const cmd = process.platform === 'win32'
       ? 'taskkill /F /IM node.exe'
-      : 'pkill -f "node dist/index.cjs"';
+      : 'pkill -f "node dist/index.js"';
     exec(cmd, () => resolve());
   });
 }
@@ -38,7 +38,7 @@ async function start() {
   await killOldProcesses();
   console.log('[Bootstrap] Iniciando servidor Aura System em produção...');
 
-  const server = spawn(process.execPath, ['dist/index.cjs'], {
+  const server = spawn(process.execPath, ['dist/index.js'], {
     stdio: 'inherit',
     cwd: path.join(__dirname, '..'),
     env: { ...process.env, NODE_ENV: 'production' },
