@@ -1,10 +1,10 @@
-import express, { type Request, Response, NextFunction } from "express";
+import express, { type Express, Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
-import { startGoogleDriveBackupScheduler } from "./googleDriveBackup";
+import { startGoogleDriveBackupScheduler, getGoogleDriveBackupStatus } from "./googleDriveBackup";
 
 const app = express();
 const httpServer = createServer(app);
@@ -96,6 +96,13 @@ export async function initApp() {
   await setupDatabase();
   startGoogleDriveBackupScheduler();
   await registerRoutes(httpServer, app);
+
+  // Statuso leve do backup do Google Drive para a barra inferior.
+  // Não expõe caminho local nem informações sensíveis.
+  app.get("/api/google-drive/status", (_req: Request, res: Response) => {
+    const status = getGoogleDriveBackupStatus();
+    res.json(status);
+  });
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
