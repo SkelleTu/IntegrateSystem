@@ -4,6 +4,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
 import fs from "fs";
+import { startGoogleDriveBackupScheduler } from "./googleDriveBackup";
 
 const app = express();
 const httpServer = createServer(app);
@@ -93,6 +94,7 @@ app.use((req, res, next) => {
 export async function initApp() {
   const { setupDatabase } = await import("./db");
   await setupDatabase();
+  startGoogleDriveBackupScheduler();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
