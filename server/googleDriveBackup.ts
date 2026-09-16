@@ -11,6 +11,7 @@ const RETRY_UNAVAILABLE_MS = 15 * 1000;
 let timer: ReturnType<typeof setInterval> | null = null;
 let running = false;
 let lastSuccessfulBackupAt = 0;
+let lastAttemptAt = 0;
 let driveWasUnavailable = false;
 let lastErrorMessage: string | null = null;
 
@@ -35,6 +36,7 @@ export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
 export function backupSqliteToGoogleDrive(): string | null {
   if (process.env.VERCEL) return null;
 
+  lastAttemptAt = Date.now();
   const target = path.join(BACKUP_DIR, BACKUP_FILENAME);
   const temporary = `${target}.tmp`;
 
@@ -77,7 +79,8 @@ export function startGoogleDriveBackupScheduler() {
 
     const now = Date.now();
     const retryDelay = driveWasUnavailable ? RETRY_UNAVAILABLE_MS : BACKUP_INTERVAL_MS;
-    const needsBackup = now - lastSuccessfulBackupAt >= retryDelay;
+    const referenceTime = driveWasUnavailable ? lastAttemptAt : lastSuccessfulBackupAt;
+    const needsBackup = now - referenceTime >= retryDelay;
     if (!needsBackup) return;
 
     running = true;
