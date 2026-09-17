@@ -22,7 +22,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadURL('http://localhost:5010');
+  mainWindow.loadURL('http://localhost:5000');
 
   mainWindow.on('closed', () => {
     mainWindow = null;

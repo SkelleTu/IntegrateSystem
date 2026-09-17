@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AuraPrinter")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b087be24817e5de59ea065cbe1672ea64fd0dade")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d537ada7729ea5f9b885e153c33c0662cec30816")]
 [assembly: System.Reflection.AssemblyProductAttribute("AuraPrinter")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AuraPrinter")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
