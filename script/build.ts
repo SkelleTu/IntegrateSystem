@@ -19,6 +19,10 @@ async function buildAll() {
   // into the ESM server bundle. Node built-ins are also left as native imports.
   const externals = allDeps;
 
+  // The server uses top-level await in server/db.ts to initialize sql.js and
+  // optionally connect to Turso. CommonJS cannot represent top-level await,
+  // while this project is already declared as ESM in package.json. Keep the
+  // bundled server as ESM instead of forcing an incompatible CJS artifact.
   await esbuild({
     entryPoints: ["server/index.ts"],
     platform: "node",

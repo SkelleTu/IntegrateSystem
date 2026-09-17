@@ -1,60 +1,54 @@
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 const path = require('path');
 const http = require('http');
 
-const PORT = 5000;
+const PORT = 5010;
 const MAX_RETRIES = 30;
 const RETRY_MS = 1000;
 
-function isAuraServerReady() {
+async function killOldProcesses() {
+  return new Promise((resolve) => {
+    const cmd = process.platform === 'win32'
+      ? 'taskkill /F /IM node.exe'
+      : 'pkill -f "node server/index.ts"';
+    exec(cmd, () => resolve());
+  });
+}
+
+function isPortOpen() {
   return new Promise((resolve) => {
     const req = http.get(`http://localhost:${PORT}/api/db/status`, (res) => {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', (chunk) => { body += chunk; });
-      res.on('end', () => {
-        try {
-          const payload = JSON.parse(body);
-          resolve(res.statusCode === 200 && payload.status === 'online');
-        } catch {
-          resolve(false);
-        }
-      });
+      res.resume();
+      resolve(true);
     });
     req.on('error', () => resolve(false));
     req.setTimeout(1000, () => { req.destroy(); resolve(false); });
   });
 }
 
-async function waitForAuraServer() {
+async function waitForServer() {
   for (let i = 0; i < MAX_RETRIES; i++) {
-    if (await isAuraServerReady()) return true;
-    await new Promise((resolve) => setTimeout(resolve, RETRY_MS));
+    if (await isPortOpen()) return true;
+    await new Promise((r) => setTimeout(r, RETRY_MS));
   }
   return false;
 }
 
 async function start() {
-  const serverWasRunning = await isAuraServerReady();
-  let server = null;
+  await killOldProcesses();
+  console.log('[Bootstrap] Iniciando servidor Node.js (npm run dev)...');
 
-  if (!serverWasRunning) {
-    console.log('[Bootstrap] Iniciando servidor Aura System em produção...');
+  const server = spawn('npm', ['run', 'dev'], {
+    stdio: 'inherit',
+    shell: true,
+    cwd: path.join(__dirname, '..'),
+  });
 
-    server = spawn(process.execPath, ['dist/index.js'], {
-      stdio: 'inherit',
-      cwd: path.join(__dirname, '..'),
-      env: { ...process.env, NODE_ENV: 'production', PORT: String(PORT) },
-    });
-
-    const up = await waitForAuraServer();
-    if (!up) {
-      console.error('[Bootstrap] Servidor não subiu a tempo.');
-      server.kill();
-      process.exit(1);
-    }
-  } else {
-    console.log('[Bootstrap] Servidor Aura já está disponível.');
+  const up = await waitForServer();
+  if (!up) {
+    console.error('[Bootstrap] Servidor não subiu a tempo.');
+    server.kill();
+    process.exit(1);
   }
 
   console.log('[Bootstrap] Servidor OK. Iniciando Electron...');
@@ -62,6 +56,9 @@ async function start() {
   const electronPath = require('electron');
   const mainScript = path.join(__dirname, 'main.js');
   const electronEnv = { ...process.env, NODE_ENV: 'production' };
+
+  // O Electron deve iniciar como runtime Electron, nunca como Node.js puro.
+  // Essa variável pode ficar herdada do Git Bash ou de uma sessão anterior.
   delete electronEnv.ELECTRON_RUN_AS_NODE;
 
   const electron = spawn(electronPath, [mainScript], {
@@ -69,14 +66,8 @@ async function start() {
     env: electronEnv,
   });
 
-  electron.on('error', (error) => {
-    console.error(`[Bootstrap] Falha ao iniciar Electron: ${error.message}`);
-    if (server) server.kill();
-    process.exit(1);
-  });
-
   electron.on('close', () => {
-    if (server) server.kill();
+    server.kill();
     process.exit(0);
   });
 }
