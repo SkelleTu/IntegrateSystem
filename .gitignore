@@ -2,3 +2,13 @@ node_modules/
 dist/
 .env
 .DS_Store
+
+# Runtime databases and local operational state must never be versioned.
+sqlite.db
+sessions.db
+*.sqlite
+*.sqlite3
+*.db
+
+# Aura application runtime data may live outside the repository.
+.aura-system/

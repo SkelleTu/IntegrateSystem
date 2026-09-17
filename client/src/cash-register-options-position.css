@@ -1,4 +1,6 @@
-/* Mantém o botão de Opções do Caixa encaixado visualmente no cabeçalho do carrinho, sem alterar o tamanho ou a disposição do card. */
-div:has(> div > button[aria-label="Opções do Caixa"]) {
-  transform: translateY(12px);
+/* O gatilho antigo do centro de controle continua sendo o dono da lógica e dos diálogos,
+   mas fica invisível. O novo gatilho é renderizado diretamente no cabeçalho do carrinho. */
+.aura-cash-control-legacy-trigger {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }

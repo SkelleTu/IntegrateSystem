@@ -10,7 +10,7 @@ async function killOldProcesses() {
   return new Promise((resolve) => {
     const cmd = process.platform === 'win32'
       ? 'taskkill /F /IM node.exe'
-      : 'pkill -f "node dist/index.js"';
+      : 'pkill -f "node server/index.ts"';
     exec(cmd, () => resolve());
   });
 }
@@ -36,12 +36,12 @@ async function waitForServer() {
 
 async function start() {
   await killOldProcesses();
-  console.log('[Bootstrap] Iniciando servidor Aura System em produção...');
+  console.log('[Bootstrap] Iniciando servidor Node.js (npm run dev)...');
 
-  const server = spawn(process.execPath, ['dist/index.js'], {
+  const server = spawn('npm', ['run', 'dev'], {
     stdio: 'inherit',
+    shell: true,
     cwd: path.join(__dirname, '..'),
-    env: { ...process.env, NODE_ENV: 'production' },
   });
 
   const up = await waitForServer();
@@ -55,10 +55,15 @@ async function start() {
 
   const electronPath = require('electron');
   const mainScript = path.join(__dirname, 'main.js');
+  const electronEnv = { ...process.env, NODE_ENV: 'production' };
+
+  // O Electron deve iniciar como runtime Electron, nunca como Node.js puro.
+  // Essa variável pode ficar herdada do Git Bash ou de uma sessão anterior.
+  delete electronEnv.ELECTRON_RUN_AS_NODE;
 
   const electron = spawn(electronPath, [mainScript], {
     stdio: 'inherit',
-    env: { ...process.env, NODE_ENV: 'production' },
+    env: electronEnv,
   });
 
   electron.on('close', () => {

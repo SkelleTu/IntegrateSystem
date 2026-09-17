@@ -29,10 +29,16 @@ export default defineConfig({
   },
   server: {
     host: "0.0.0.0",
-    port: 5010,
+    port: 5000,
     strictPort: true,
     open: false,
-    hmr: false,
+    hmr: {
+      host: "localhost",
+      port: 5010,
+      clientPort: 5010,
+      protocol: "ws",
+      path: "/vite-hmr",
+    },
     fs: {
       strict: true,
       deny: ["**/.*"],
