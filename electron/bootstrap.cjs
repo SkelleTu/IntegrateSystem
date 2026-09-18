@@ -1,10 +1,27 @@
 const { spawn, exec } = require('child_process');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
+
+const PROJECT_ROOT = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main';
+const ELECTRON_DIR = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main\\electron';
 
 const PORT = 5010;
 const MAX_RETRIES = 30;
 const RETRY_MS = 1000;
+
+const ELECTRON_PKG = path.join(PROJECT_ROOT, 'node_modules', 'electron');
+
+function getElectronBinaryPath() {
+  const pathFile = path.join(ELECTRON_PKG, 'path.txt');
+  if (fs.existsSync(pathFile)) {
+    const executablePath = fs.readFileSync(pathFile, 'utf-8').trim();
+    return path.join(ELECTRON_PKG, 'dist', executablePath);
+  }
+  return path.join(ELECTRON_PKG, 'dist', 'electron.exe');
+}
+
+const electronPath = getElectronBinaryPath();
 
 async function killOldProcesses() {
   return new Promise((resolve) => {
@@ -40,7 +57,7 @@ async function start() {
 
   const server = spawn(process.execPath, ['dist/index.js'], {
     stdio: 'inherit',
-    cwd: path.join(__dirname, '..'),
+    cwd: PROJECT_ROOT,
     env: { ...process.env, NODE_ENV: 'production' },
   });
 
@@ -53,17 +70,22 @@ async function start() {
 
   console.log('[Bootstrap] Servidor OK. Iniciando Electron...');
 
-  const electronPath = require('electron');
-  const mainScript = path.join(__dirname, 'main.js');
-
-  const electron = spawn(electronPath, [mainScript], {
+  // Usa `electron .` a partir da pasta electron (que tem package.json com main: main.js)
+  const electron = spawn(electronPath, ['.'], {
     stdio: 'inherit',
+    cwd: ELECTRON_DIR,
     env: { ...process.env, NODE_ENV: 'production' },
   });
 
-  electron.on('close', () => {
+  electron.on('close', (code) => {
     server.kill();
-    process.exit(0);
+    process.exit(code || 0);
+  });
+
+  electron.on('error', (err) => {
+    console.error('[Bootstrap] Erro no Electron:', err);
+    server.kill();
+    process.exit(1);
   });
 }
 

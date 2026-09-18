@@ -1,6 +1,12 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs');
+import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const PROJECT_ROOT = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main';
+const ELECTRON_DIR = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main\\electron';
 
 let mainWindow = null;
 
@@ -11,12 +17,12 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Aura System',
-    icon: path.join(__dirname, '..', 'ico.ico'),
+    icon: path.join(PROJECT_ROOT, 'ico.ico'),
     frame: true,
     titleBarStyle: 'default',
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(ELECTRON_DIR, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -28,7 +34,6 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // Abre ferramentas de desenvolvedor em dev
   if (process.env.NODE_ENV !== 'production') {
     mainWindow.webContents.openDevTools();
   }
@@ -50,17 +55,14 @@ app.on('window-all-closed', () => {
   }
 });
 
-// Permitir que o frontend feche a janela
 ipcMain.on('close-app', () => {
   app.quit();
 });
 
-// Permitir que o frontend minimize a janela
 ipcMain.on('minimize-app', () => {
   if (mainWindow) mainWindow.minimize();
 });
 
-// Permitir que o frontend maximize/restaurar
 ipcMain.on('toggle-maximize', () => {
   if (mainWindow) {
     if (mainWindow.isMaximized()) {
@@ -71,7 +73,6 @@ ipcMain.on('toggle-maximize', () => {
   }
 });
 
-// Salvar SQL pelo diálogo nativo do Windows, sem expor Node ao renderer.
 ipcMain.handle('aura-save-text-file', async (_event, payload) => {
   if (!mainWindow) return { saved: false };
   if (!payload || typeof payload.content !== 'string') throw new Error('Conteúdo inválido');
