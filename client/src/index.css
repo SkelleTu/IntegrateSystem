@@ -1,6 +1,38 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme {
+  --color-background: 220 25% 3%;
+  --color-foreground: 210 20% 98%;
+  
+  --color-primary: 190 100% 50%;
+  --color-primary-foreground: 210 20% 98%;
+  
+  --color-secondary: 190 100% 50%;
+  --color-secondary-foreground: 210 20% 98%;
+  
+  --color-muted: 220 15% 10%;
+  --color-muted-foreground: 210 10% 70%;
+  
+  --color-accent: 190 100% 50%;
+  --color-accent-foreground: 210 20% 98%;
+  
+  --color-destructive: 0 100% 50%;
+  --color-destructive-foreground: 210 20% 98%;
+  
+  --color-border: 190 100% 50% / 0.2;
+  --color-input: 220 20% 10%;
+  --color-ring: 190 100% 50%;
+  
+  --color-card: 220 25% 5%;
+  --color-card-foreground: 210 20% 100%;
+  --color-card-border: 190 100% 50% / 0.1;
+  
+  --radius: 0.75rem;
+  
+  --font-display: "Segoe UI", Arial, sans-serif;
+  --font-body: "Segoe UI", Inter, Arial, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
+}
 
 @layer base {
   .no-scrollbar::-webkit-scrollbar {
@@ -47,42 +79,6 @@
     opacity: 0;
     transform: rotate(var(--tw-rotate)) translateX(40px) scaleX(1.5);
   }
-}
-
-:root {
-  /* HSL Values - Tech Neon Dark Theme */
-  --background: 220 25% 3%;
-  --foreground: 210 20% 98%;
-  
-  --primary: 190 100% 50%;
-  --primary-foreground: 210 20% 98%;
-  
-  --secondary: 190 100% 50%;
-  --secondary-foreground: 210 20% 98%;
-  
-  --muted: 220 15% 10%;
-  --muted-foreground: 210 10% 70%;
-  
-  --accent: 190 100% 50%;
-  --accent-foreground: 210 20% 98%;
-  
-  --destructive: 0 100% 50%;
-  --destructive-foreground: 210 20% 98%;
-  
-  --border: 190 100% 50% / 0.2;
-  --input: 220 20% 10%;
-  --ring: 190 100% 50%;
-  
-  --card: 220 25% 5%;
-  --card-foreground: 210 20% 100%;
-  --card-border: 190 100% 50% / 0.1;
-
-  --radius: 0.75rem;
-  
-  /* System fonts: desktop-safe and no network dependency */
-  --font-display: "Segoe UI", Arial, sans-serif;
-  --font-body: "Segoe UI", Inter, Arial, sans-serif;
-  --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 
 @layer base {
