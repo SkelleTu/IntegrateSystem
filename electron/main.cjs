@@ -1,12 +1,9 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const path = require('path');
+const fs = require('fs');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const PROJECT_ROOT = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main';
-const ELECTRON_DIR = 'C:\\Users\\Victor\\Desktop\\IntegrateSystem-main\\electron';
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const ELECTRON_DIR = __dirname;
 
 let mainWindow = null;
 
@@ -22,7 +19,7 @@ function createWindow() {
     titleBarStyle: 'default',
     trafficLightPosition: { x: 12, y: 12 },
     webPreferences: {
-      preload: path.join(ELECTRON_DIR, 'preload.js'),
+      preload: path.join(ELECTRON_DIR, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -41,51 +38,35 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.on('close-app', () => {
-  app.quit();
-});
-
-ipcMain.on('minimize-app', () => {
-  if (mainWindow) mainWindow.minimize();
-});
-
+ipcMain.on('close-app', () => app.quit());
+ipcMain.on('minimize-app', () => { if (mainWindow) mainWindow.minimize(); });
 ipcMain.on('toggle-maximize', () => {
   if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
+    if (mainWindow.isMaximized()) mainWindow.unmaximize();
+    else mainWindow.maximize();
   }
 });
 
 ipcMain.handle('aura-save-text-file', async (_event, payload) => {
   if (!mainWindow) return { saved: false };
-  if (!payload || typeof payload.content !== 'string') throw new Error('Conteúdo inválido');
-
+  if (!payload || typeof payload.content !== 'string') throw new Error('Invalid content');
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'Salvar Banco SQL',
+    title: 'Save SQL Database',
     defaultPath: payload.defaultFileName || 'aura-database.sql',
     filters: [
-      { name: 'Banco SQL', extensions: ['sql'] },
-      { name: 'Todos os arquivos', extensions: ['*'] },
+      { name: 'SQL Database', extensions: ['sql'] },
+      { name: 'All Files', extensions: ['*'] },
     ],
   });
-
   if (result.canceled || !result.filePath) return { saved: false };
   fs.writeFileSync(result.filePath, payload.content, 'utf8');
   return { saved: true, path: result.filePath };

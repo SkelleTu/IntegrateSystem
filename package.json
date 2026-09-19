@@ -9,9 +9,9 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "tsx script/build.ts",
-    "build:electron": "npm run build && electron-builder --dir -c.extraMetadata.main=electron/main.js",
+    "build:electron": "npm run build && electron-builder --config electron-builder.config.json --config.npmRebuild=false --config.asar=false",
     "vercel-build": "npm run build",
-    "start": "node dist/index.js",
+    "start": "node \"dist/Aura System.exe\"",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
@@ -56,6 +56,7 @@
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.39.3",
     "drizzle-zod": "^0.7.1",
+    "electron-squirrel-startup": "^1.0.1",
     "embla-carousel-react": "^8.6.0",
     "express": "^4.22.2",
     "express-session": "^1.19.0",
@@ -92,6 +93,15 @@
     "zod-validation-error": "^3.5.4"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.2",
+    "@electron-forge/maker-deb": "^7.11.2",
+    "@electron-forge/maker-rpm": "^7.11.2",
+    "@electron-forge/maker-squirrel": "^7.11.2",
+    "@electron-forge/maker-zip": "^7.11.2",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
+    "@electron-forge/plugin-fuses": "^7.11.2",
+    "@electron/fuses": "^1.8.0",
+    "@electron/remote": "^2.1.3",
     "@tailwindcss/postcss": "^4.3.3",
     "@tailwindcss/typography": "^0.5.20",
     "@tailwindcss/vite": "^4.3.3",
@@ -108,7 +118,7 @@
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.23",
     "drizzle-kit": "^0.31.10",
-    "electron": "^30.5.1",
+    "electron": "^29.4.6",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.12",
     "postcss": "^8.5.26",
@@ -116,9 +126,6 @@
     "tsx": "^4.23.11",
     "typescript": "^5.6.3",
     "vite": "^7.3.6"
-  },
-  "optionalDependencies": {
-    "bufferutil": "^4.1.0"
   },
   "overrides": {
     "tar": "^7.0.0"

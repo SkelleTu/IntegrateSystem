@@ -1,0 +1,21 @@
+#!/bin/bash
+# PowerShell mock for WSL
+# This allows electron-builder to run npm list commands on WSL
+# that thinks it's on Windows
+
+# Build the full command from arguments
+CMD="$@"
+
+# Execute using npm directly
+if command -v npm &> /dev/null; then
+  npm $CMD 2>&1
+else
+  # If npm isn't found, try with node
+  node -e "
+const { spawnSync } = require('child_process');
+const result = spawnSync('npm', process.argv.slice(1), { stdio: 'inherit' });
+process.exit(result.status);
+" $CMD 2>&1
+fi
+
+exit 0

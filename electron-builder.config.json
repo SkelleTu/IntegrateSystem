@@ -1,0 +1,24 @@
+{
+  "appId": "com.aurasystem.app",
+  "productName": "Aura System",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "electron/main.cjs",
+    "electron/preload.cjs",
+    "electron/package.json",
+    "dist/**/*",
+    "node_modules/electron/dist/**/*",
+    "node_modules/electron/path.txt",
+    "node_modules/electron/index.js"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "npmRebuild": false,
+  "asar": false,
+  "win": {
+    "target": "portable"
+  }
+}

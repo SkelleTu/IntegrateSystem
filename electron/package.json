@@ -1,6 +1,9 @@
 {
-  "name": "aura-system-electron",
+  "name": "aura-system",
   "version": "1.0.0",
-  "main": "main.js",
-  "type": "module"
+  "main": "main.cjs",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron ."
+  }
 }
