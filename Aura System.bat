@@ -9,7 +9,7 @@ echo ============================================================
 echo.
 
 echo [1/4] Build de producao...
-npm run build
+call npm run build
 if errorlevel 1 (
   echo.
   echo [ERRO] Falha no build!
@@ -21,7 +21,7 @@ echo.
 
 if not exist "dist\win-unpacked\Aura System.exe" (
   echo [2/4] Empacotando Electron...
-  npx electron-builder --config "electron-builder.config.json" --config.npmRebuild=false --config.asar=false
+  call npx electron-builder --config "electron-builder.config.json" --config.npmRebuild=false --config.asar=false
   if errorlevel 1 (
     echo [ERRO] Falha no empacotamento!
     pause
