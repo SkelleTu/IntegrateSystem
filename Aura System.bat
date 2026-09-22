@@ -38,13 +38,30 @@ start "Aura Server" cmd /c "node dist/index.js"
 echo [OK] Servidor iniciado em janela separada.
 echo.
 
-echo [4/4] Aguardando servidor subir...
-timeout /t 3 /nobreak >nul
-echo [OK] Servidor pronto.
+echo [4/4] Aguardando servidor responder na porta 5010...
+set "SERVER_READY=0"
+for /L %%N in (1,1,30) do (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5010' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+  if not errorlevel 1 (
+    set "SERVER_READY=1"
+    goto :server_ready
+  )
+  timeout /t 1 /nobreak >nul
+)
+:server_ready
+if "%SERVER_READY%"=="0" (
+  echo [ERRO] O servidor nao respondeu na porta 5010 apos 30 segundos.
+  echo.
+  echo Verifique a janela "Aura Server" para ver o erro do Node.
+  pause
+  taskkill /F /IM node.exe /T >nul 2>&1
+  exit /b 1
+)
+echo [OK] Servidor respondeu na porta 5010.
 echo.
 
 echo Iniciando Aura System...
-dist\win-unpacked\"Aura System.exe"
+"%~dp0dist\win-unpacked\Aura System.exe"
 
 echo.
 echo [INFO] Electron finalizou com codigo de saida: %ERRORLEVEL%
