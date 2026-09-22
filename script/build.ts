@@ -3,12 +3,13 @@ import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
 
 async function buildAll() {
+  console.log("[BUILD 10%] Limpando build anterior...");
   await rm("dist", { recursive: true, force: true });
 
-  console.log("building client...");
+  console.log("[BUILD 20%] Iniciando build do cliente...");
   await viteBuild();
 
-  console.log("building server...");
+  console.log("[BUILD 60%] Cliente concluido. Iniciando build do servidor...");
   const pkg = JSON.parse(await readFile("package.json", "utf-8"));
   const allDeps = [
     ...Object.keys(pkg.dependencies || {}),
@@ -32,9 +33,12 @@ async function buildAll() {
     external: externals,
     logLevel: "error",
   });
+
+  console.log("[BUILD 100%] Build do cliente e servidor concluido.");
 }
 
 buildAll().catch((err) => {
+  console.error("[BUILD ERRO] Falha durante o build:");
   console.error(err);
   process.exit(1);
 });
