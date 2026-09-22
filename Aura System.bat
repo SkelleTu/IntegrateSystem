@@ -9,10 +9,22 @@ echo ============================================================
 echo.
 
 echo [1/4] Build de producao...
-call npm run build
+call "%~dp0node_modules\.bin\tsx.cmd" script\build.ts
 if errorlevel 1 (
   echo.
   echo [ERRO] Falha no build!
+  pause
+  exit /b 1
+)
+if not exist "dist\index.js" (
+  echo.
+  echo [ERRO] Build terminou sem gerar dist\index.js!
+  pause
+  exit /b 1
+)
+if not exist "dist\public\index.html" (
+  echo.
+  echo [ERRO] Build terminou sem gerar dist\public\index.html!
   pause
   exit /b 1
 )
@@ -21,9 +33,14 @@ echo.
 
 if not exist "dist\win-unpacked\Aura System.exe" (
   echo [2/4] Empacotando Electron...
-  call npx electron-builder --config "electron-builder.config.json" --config.npmRebuild=false --config.asar=false
+  call "%~dp0node_modules\.bin\electron-builder.cmd" --config "electron-builder.config.json" --config.npmRebuild=false --config.asar=false
   if errorlevel 1 (
     echo [ERRO] Falha no empacotamento!
+    pause
+    exit /b 1
+  )
+  if not exist "dist\win-unpacked\Aura System.exe" (
+    echo [ERRO] Empacotamento terminou sem gerar o executavel do Electron!
     pause
     exit /b 1
   )
@@ -34,7 +51,7 @@ if not exist "dist\win-unpacked\Aura System.exe" (
 echo.
 
 echo [3/4] Iniciando servidor na porta 5010...
-start "Aura Server" cmd /c "node dist/index.js"
+start "Aura Server" cmd /k "cd /d ""%~dp0"" && node dist\index.js"
 echo [OK] Servidor iniciado em janela separada.
 echo.
 
@@ -46,7 +63,7 @@ for /L %%N in (1,1,30) do (
     set "SERVER_READY=1"
     goto :server_ready
   )
-  timeout /t 1 /nobreak >nul
+  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 1"
 )
 :server_ready
 if "%SERVER_READY%"=="0" (
@@ -62,7 +79,6 @@ echo.
 
 echo Iniciando Aura System...
 "%~dp0dist\win-unpacked\Aura System.exe"
-
 echo.
 echo [INFO] Electron finalizou com codigo de saida: %ERRORLEVEL%
 echo [INFO] Encerrando servidor...
