@@ -1,19 +1,49 @@
 import { initApp, log } from "./app";
+import { runtimeError, runtimeEvent } from "./runtimeMonitor";
 
 console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
 
 (async () => {
-  const { httpServer } = await initApp();
+  try {
+    runtimeEvent("server-start", "Processo Node do servidor iniciado", {
+      phase: "server",
+      progress: 0,
+    });
 
-  const port = parseInt(process.env.PORT || "5010", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
+    const { httpServer } = await initApp();
+
+    const port = parseInt(process.env.PORT || "5010", 10);
+    httpServer.on("error", (error) => {
+      runtimeError(error, "Erro no servidor HTTP", {
+        phase: "server",
+        port,
+      });
+    });
+
+    httpServer.on("close", () => {
+      runtimeEvent("http-server-close", "Servidor HTTP encerrado", {
+        phase: "shutdown",
+        progress: 100,
+      });
+    });
+
+    httpServer.listen(
+      {
+        port,
+        host: "0.0.0.0",
+        reusePort: true,
+      },
+      () => {
+        log(`serving on port ${port}`);
+        runtimeEvent("server-listening", `Servidor ouvindo na porta ${port}`, {
+          phase: "server",
+          progress: 100,
+          port,
+        });
+      },
+    );
+  } catch (error) {
+    runtimeError(error, "Falha fatal ao iniciar o servidor");
+    process.exitCode = 1;
+  }
 })();
