@@ -25,7 +25,7 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadURL('http://localhost:5010');
+  mainWindow.loadURL('http://localhost:5010').catch((error) => {\n    console.error('Falha ao carregar Aura System:', error);\n    dialog.showErrorBox(\n      'Aura System',\n      'Não foi possível conectar ao servidor local na porta 5010.\n\n' + error.message\n    );\n  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
