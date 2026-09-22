@@ -204,15 +204,19 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: number, update: Partial<User>): Promise<User> {
     this.logAction(`Atualização usuário ID:${id}`);
-    const [updated] = await dualWrite((database: any) =>
-      database.update(users).set(update).where(eq(users.id, id)).returning()
-    );
+    const [updated] = await dualWrite(async (database: any) => {
+      await database.update(users).set(update).where(eq(users.id, id));
+      const [rec] = await database.select().from(users).where(eq(users.id, id));
+      return rec;
+    });
     return updated;
   }
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
     this.logAction(`Criação de instituição: ${enterprise.name}`);
-    const [newEnterprise] = await db.insert(enterprises).values(enterprise).returning();
+    const insertResultenterprises: any = await db.insert(enterprises).values(enterprise);
+      const identerprises = insertResultenterprises.lastInsertRowid;
+      const [newEnterprise] = await db.select().from(enterprises).where(eq(enterprises.id, identerprises));
     // Initialize settings for new enterprise
     await db.insert(settings).values({ enterpriseId: newEnterprise.id });
     
@@ -229,7 +233,8 @@ export class DatabaseStorage implements IStorage {
 
   async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
     this.logAction(`Atualização instituição ID:${id}`);
-    const [updated] = await db.update(enterprises).set(update).where(eq(enterprises.id, id)).returning();
+    await db.update(enterprises).set(update).where(eq(enterprises.id, id));
+      const [updated] = await db.select().from(enterprises).where(eq(enterprises.id, id));
     return updated;
   }
 
@@ -254,7 +259,9 @@ export class DatabaseStorage implements IStorage {
   async createUser(user: InsertUser): Promise<User> {
     this.logAction(`Novo usuário cadastrado: ${user.username}`);
     return await dualWrite(async (database) => {
-      const [newUser] = await database.insert(users).values(user).returning();
+      const insertResultusers: any = await database.insert(users).values(user);
+      const idusers = insertResultusers.lastInsertRowid;
+      const [newUser] = await database.select().from(users).where(eq(users.id, idusers));
       return newUser;
     });
   }
@@ -273,7 +280,9 @@ export class DatabaseStorage implements IStorage {
   async createService(service: InsertService): Promise<Service> {
     this.logAction(`Criação de serviço: ${service.name}`);
     return await dualWrite(async (database) => {
-      const [newService] = await database.insert(services).values(service).returning();
+      const insertResultservices: any = await database.insert(services).values(service);
+      const idservices = insertResultservices.lastInsertRowid;
+      const [newService] = await database.select().from(services).where(eq(services.id, idservices));
       return newService;
     });
   }
@@ -281,7 +290,8 @@ export class DatabaseStorage implements IStorage {
   async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
     this.logAction(`Atualização serviço ID:${id}`);
     return await dualWrite(async (database) => {
-      const [updated] = await database.update(services).set(update).where(eq(services.id, id)).returning();
+      await database.update(services).set(update).where(eq(services.id, id));
+      const [updated] = await database.select().from(services).where(eq(services.id, id));
       return updated;
     });
   }
@@ -302,12 +312,13 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Exclusão usuário ID:${id}`);
     await db.delete(users).where(eq(users.id, id));
   }
-
   async getQueueState(): Promise<QueueState> {
     this.logAction("Consulta estado da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
+      const idqueueState = insertResultqueueState.lastInsertRowid;
+      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
     }
     return state;
   }
@@ -316,19 +327,23 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Atualização da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
+      const idqueueState = insertResultqueueState.lastInsertRowid;
+      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
     }
-    const [updated] = await db.update(queueState)
+    await db.update(queueState)
       .set(update)
-      .where(eq(queueState.id, state.id))
-      .returning();
+      .where(eq(queueState.id, state.id));
+    const [updated] = await db.select().from(queueState).where(eq(queueState.id, state.id));
     return updated;
   }
 
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
     this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
     return await dualWrite(async (database) => {
-      const [newTicket] = await database.insert(tickets).values(ticket).returning();
+      const insertResulttickets: any = await database.insert(tickets).values(ticket);
+      const idtickets = insertResulttickets.lastInsertRowid;
+      const [newTicket] = await database.select().from(tickets).where(eq(tickets.id, idtickets));
       return newTicket;
     });
   }
@@ -371,7 +386,9 @@ export class DatabaseStorage implements IStorage {
   async createCategory(category: InsertCategory): Promise<Category> {
     this.logAction(`Nova categoria: ${category.name}`);
     return await dualWrite(async (database) => {
-      const [newCategory] = await database.insert(categories).values(category).returning();
+      const insertResultcategories: any = await database.insert(categories).values(category);
+      const idcategories = insertResultcategories.lastInsertRowid;
+      const [newCategory] = await database.select().from(categories).where(eq(categories.id, idcategories));
       return newCategory;
     });
   }
@@ -393,7 +410,9 @@ export class DatabaseStorage implements IStorage {
       ...item,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
     };
-    const [newItem] = await db.insert(menuItems).values(itemToInsert).returning();
+    const insertResultmenuItems: any = await db.insert(menuItems).values(itemToInsert);
+      const idmenuItems = insertResultmenuItems.lastInsertRowid;
+      const [newItem] = await db.select().from(menuItems).where(eq(menuItems.id, idmenuItems));
     return newItem;
   }
 
@@ -409,7 +428,9 @@ export class DatabaseStorage implements IStorage {
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
     return await dualWrite(async (database) => {
-      const [newRegister] = await database.insert(cashRegisters).values(register).returning();
+      const insertResultcashRegisters: any = await database.insert(cashRegisters).values(register);
+      const idcashRegisters = insertResultcashRegisters.lastInsertRowid;
+      const [newRegister] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, idcashRegisters));
       
       if (newRegister.openingAmount && newRegister.openingAmount > 0) {
         await database.insert(transactions).values({
@@ -454,8 +475,7 @@ export class DatabaseStorage implements IStorage {
           closedAt: new Date(),
           status: "closed"
         })
-        .where(eq(cashRegisters.id, id))
-        .returning();
+        .where(eq(cashRegisters.id, id))
 
       await database.insert(transactions).values({
         businessType: "padaria",
@@ -473,7 +493,9 @@ export class DatabaseStorage implements IStorage {
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     return await dualWrite(async (database) => {
-      const [insertedSale] = await database.insert(sales).values(sale).returning();
+      const insertResultsales: any = await database.insert(sales).values(sale);
+      const idsales = insertResultsales.lastInsertRowid;
+      const [insertedSale] = await database.select().from(sales).where(eq(sales.id, idsales));
       
       const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
       await database.insert(saleItems).values(itemsWithSaleId);
@@ -645,8 +667,7 @@ export class DatabaseStorage implements IStorage {
 
         const [updatedSale] = await transaction.update(sales)
           .set({ status: "cancelled" })
-          .where(eq(sales.id, id))
-          .returning();
+          .where(eq(sales.id, id))
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
@@ -751,8 +772,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Ajuste manual estoque ID:${id}`);
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(inventory.id, id))
-      .returning();
+      .where(eq(inventory.id, id))
     return updated;
   }
 
@@ -782,8 +802,7 @@ export class DatabaseStorage implements IStorage {
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, id))
-            .returning();
+            .where(eq(inventory.id, id))
           return updated;
         }
       }
@@ -798,15 +817,13 @@ export class DatabaseStorage implements IStorage {
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, existing.id))
-            .returning();
+            .where(eq(inventory.id, existing.id))
           return updated;
         }
       }
 
       const [inserted] = await database.insert(inventory)
-        .values(itemToUpsert)
-        .returning();
+        .values(itemToUpsert)
       return inserted;
     });
   }
@@ -814,7 +831,9 @@ export class DatabaseStorage implements IStorage {
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
     return await dualWrite(async (database) => {
-      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
+      const insertResultinventoryLogs: any = await database.insert(inventoryLogs).values(log);
+      const idinventoryLogs = insertResultinventoryLogs.lastInsertRowid;
+      const [newLog] = await database.select().from(inventoryLogs).where(eq(inventoryLogs.id, idinventoryLogs));
       return newLog;
     });
   }
@@ -840,8 +859,7 @@ export class DatabaseStorage implements IStorage {
           quantity: item.quantity + data.quantity,
           updatedAt: new Date()
         })
-        .where(eq(inventory.id, id))
-        .returning();
+        .where(eq(inventory.id, id))
 
       await database.insert(inventoryRestocks).values({
         inventoryId: id,
@@ -859,19 +877,23 @@ export class DatabaseStorage implements IStorage {
 
   async updateInventoryItem(id: number, update: any): Promise<Inventory> {
     this.logAction(`Atualização item inventário ID:${id}`);
-    const [updated] = await db.update(inventory).set(update).where(eq(inventory.id, id)).returning();
+    await db.update(inventory).set(update).where(eq(inventory.id, id));
+      const [updated] = await db.select().from(inventory).where(eq(inventory.id, id));
     return updated;
   }
 
   async updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem> {
     this.logAction(`Atualização item menu ID:${id}`);
-    const [updated] = await db.update(menuItems).set(update).where(eq(menuItems.id, id)).returning();
+    await db.update(menuItems).set(update).where(eq(menuItems.id, id));
+      const [updated] = await db.select().from(menuItems).where(eq(menuItems.id, id));
     return updated;
   }
 
   async createTransaction(transaction: any): Promise<Transaction> {
     return await dualWrite(async (database) => {
-      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
+      const insertResulttransactions: any = await database.insert(transactions).values(transaction);
+      const idtransactions = insertResulttransactions.lastInsertRowid;
+      const [newTransaction] = await database.select().from(transactions).where(eq(transactions.id, idtransactions));
       return newTransaction;
     });
   }
@@ -885,8 +907,7 @@ export class DatabaseStorage implements IStorage {
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
     const [updated] = await db.update(tickets)
       .set({ items: JSON.stringify(items) })
-      .where(eq(tickets.id, id))
-      .returning();
+      .where(eq(tickets.id, id))
     return updated;
   }
 
@@ -901,12 +922,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const [clock] = await db.insert(timeClock).values(data).returning();
+    const insertResulttimeClock: any = await db.insert(timeClock).values(data);
+      const idtimeClock = insertResulttimeClock.lastInsertRowid;
+      const [clock] = await db.select().from(timeClock).where(eq(timeClock.id, idtimeClock));
     return clock;
   }
 
   async updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock> {
-    const [updated] = await db.update(timeClock).set(data).where(eq(timeClock.id, id)).returning();
+    await db.update(timeClock).set(data).where(eq(timeClock.id, id));
+      const [updated] = await db.select().from(timeClock).where(eq(timeClock.id, id));
     return updated;
   }
 
@@ -918,7 +942,9 @@ export class DatabaseStorage implements IStorage {
     }
     const [s] = await query.limit(1);
     if (!s) {
-      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
+      const insertResultsettings: any = await db.insert(settings).values({ enterpriseId });
+      const idsettings = insertResultsettings.lastInsertRowid;
+      const [newSettings] = await db.select().from(settings).where(eq(settings.id, idsettings));
       return newSettings;
     }
     return s;
@@ -930,13 +956,16 @@ export class DatabaseStorage implements IStorage {
     if (enterpriseId) {
       query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
     }
-    const [updated] = await query.returning();
+    await query;
+    const [updated] = await db.select().from(settings).where(eq(settings.enterpriseId, enterpriseId || 1));
     return updated;
   }
 
   // User Sessions
   async logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession> {
-    const [session] = await db.insert(userSessions).values(data).returning();
+    const insertResultuserSessions: any = await db.insert(userSessions).values(data);
+      const iduserSessions = insertResultuserSessions.lastInsertRowid;
+      const [session] = await db.select().from(userSessions).where(eq(userSessions.id, iduserSessions));
     return session;
   }
 
@@ -1023,13 +1052,11 @@ export class DatabaseStorage implements IStorage {
         const { id, ...updateData } = dataToSave as any;
         const [updated] = await db.update(fiscalSettings)
           .set(updateData)
-          .where(eq(fiscalSettings.id, existing.id))
-          .returning();
+          .where(eq(fiscalSettings.id, existing.id))
         return updated;
       } else {
         const [inserted] = await db.insert(fiscalSettings)
-          .values(dataToSave)
-          .returning();
+          .values(dataToSave)
         return inserted;
       }
     } catch (e: any) {
@@ -1052,7 +1079,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
-    const [updated] = await db.update(sales).set(update).where(eq(sales.id, id)).returning();
+    await db.update(sales).set(update).where(eq(sales.id, id));
+      const [updated] = await db.select().from(sales).where(eq(sales.id, id));
     return updated;
   }
 
@@ -1133,7 +1161,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNfce(data: InsertNfce): Promise<Nfce> {
-    const [inserted] = await db.insert(nfce).values(data).returning();
+    const insertResultnfce: any = await db.insert(nfce).values(data);
+      const idnfce = insertResultnfce.lastInsertRowid;
+      const [inserted] = await db.select().from(nfce).where(eq(nfce.id, idnfce));
     return inserted;
   }
 
@@ -1214,7 +1244,9 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Novo produto: ${data.name}`);
     return await dualWrite(async (database) => {
       const now = new Date();
-      const [p] = await database.insert(products).values({ ...data, createdAt: now, updatedAt: now } as any).returning();
+      const insertResultproducts: any = await database.insert(products).values({ ...data, createdAt: now, updatedAt: now } as any);
+      const idproducts = insertResultproducts.lastInsertRowid;
+      const [p] = await database.select().from(products).where(eq(products.id, idproducts));
       return p;
     });
   }
@@ -1222,7 +1254,8 @@ export class DatabaseStorage implements IStorage {
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
     this.logAction(`Atualização produto ID:${id}`);
     return await dualWrite(async (database) => {
-      const [p] = await database.update(products).set({ ...data, updatedAt: new Date() } as any).where(eq(products.id, id)).returning();
+      await database.update(products).set({ ...data, updatedAt: new Date() } as any).where(eq(products.id, id));
+      const [p] = await database.select().from(products).where(eq(products.id, id));
       return p;
     });
   }
@@ -1239,8 +1272,8 @@ export class DatabaseStorage implements IStorage {
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
     const result = await dualWrite(async (database) => {
-      const updated = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
-      return updated.length;
+      const res: any = await database.update(batches).set({ quantity: 0 }).run();
+      return res.rowsAffected;
     });
     return result as number;
   }
@@ -1316,13 +1349,16 @@ export class DatabaseStorage implements IStorage {
     for (const p of savedProducts) {
       const oldId = p.id;
       const { id: _id, ...rest } = p;
-      const [inserted] = await dualWrite(async (database) =>
-        database.insert(products).values({
+      const inserted = await dualWrite(async (database) => {
+        const insertResultProducts: any = await database.insert(products).values({
           ...rest,
           createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           updatedAt: new Date(),
-        }).returning()
-      );
+        });
+        const idProducts = insertResultProducts.lastInsertRowid;
+        const [rec] = await database.select().from(products).where(eq(products.id, idProducts));
+        return rec;
+      });
       idMap.set(oldId, inserted.id);
     }
 
@@ -1331,16 +1367,19 @@ export class DatabaseStorage implements IStorage {
       const newProductId = idMap.get(b.productId);
       if (!newProductId) continue;
       const { id: _id, ...rest } = b;
-      await dualWrite(async (database) =>
-        database.insert(batches).values({
+      await dualWrite(async (database) => {
+        const insertResultBatches: any = await database.insert(batches).values({
           ...rest,
           productId: newProductId,
           entryDate: b.entryDate ? new Date(b.entryDate) : new Date(),
           expiryDate: b.expiryDate ? new Date(b.expiryDate) : null,
           manufactureDate: b.manufactureDate ? new Date(b.manufactureDate) : null,
           createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
-        }).returning()
-      );
+        });
+        const idBatches = insertResultBatches.lastInsertRowid;
+        const [rec] = await database.select().from(batches).where(eq(batches.id, idBatches));
+        return rec;
+      });
     }
 
     this.logAction(`RESTAURAÇÃO DO ESTOQUE — ${savedProducts.length} produtos`);
@@ -1373,7 +1412,9 @@ export class DatabaseStorage implements IStorage {
     }
     return await dualWrite(async (database) => {
       const now = new Date();
-      const [b] = await database.insert(batches).values({ ...data, createdAt: now } as any).returning();
+      const insertResultbatches: any = await database.insert(batches).values({ ...data, createdAt: now } as any);
+      const idbatches = insertResultbatches.lastInsertRowid;
+      const [b] = await database.select().from(batches).where(eq(batches.id, idbatches));
       // log entry
       await database.insert(batchLogs).values({
         productId: data.productId,
@@ -1411,7 +1452,8 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return await dualWrite(async (database) => {
-      const [b] = await database.update(batches).set(data as any).where(eq(batches.id, id)).returning();
+      await database.update(batches).set(data as any).where(eq(batches.id, id));
+      const [b] = await database.select().from(batches).where(eq(batches.id, id));
       return b;
     });
   }
@@ -1518,7 +1560,9 @@ export class DatabaseStorage implements IStorage {
 
   async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
     return await dualWrite(async (database) => {
-      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
+      const insertResultbatchLogs: any = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any);
+      const idbatchLogs = insertResultbatchLogs.lastInsertRowid;
+      const [log] = await database.select().from(batchLogs).where(eq(batchLogs.id, idbatchLogs));
       return log;
     });
   }

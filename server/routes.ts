@@ -139,9 +139,9 @@ export async function registerRoutes(
       secret: process.env.SESSION_SECRET || "barber_shop_secret",
       resave: false,
       saveUninitialized: false,
-      cookie: { 
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 30 * 24 * 60 * 60 * 1000 // 30 dias
+      cookie: {
+        secure: process.env.SESSION_COOKIE_SECURE === "true",
+        maxAge: 30 * 24 * 60 * 60 * 1000
       },
     })
   );
@@ -212,15 +212,24 @@ export async function registerRoutes(
   });
 
   // Auth Routes
-  app.post(api.auth.login.path, passport.authenticate("local"), async (req, res) => {
-    const user = req.user as any;
-    await storage.logUserSession({
-      userId: user.id,
-      type: "login",
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent")
-    });
-    res.json(req.user);
+  app.post(api.auth.login.path, (req, res, next) => {
+    passport.authenticate("local", (err: any, user: any) => {
+      if (err || !user) {
+        return res.status(401).json({ message: "Incorrect username or password." });
+      }
+      req.login(user, (loginErr: any) => {
+        if (loginErr) {
+          return res.status(500).json({ message: "Login failed." });
+        }
+        storage.logUserSession({
+          userId: user.id,
+          type: "login",
+          ipAddress: req.ip,
+          userAgent: req.get("user-agent")
+        });
+        res.json(user);
+      });
+    })(req, res, next);
   });
 
   app.post(api.auth.logout.path, async (req, res) => {
