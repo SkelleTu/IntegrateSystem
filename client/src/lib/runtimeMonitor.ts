@@ -142,6 +142,64 @@ function requestFinished(
   });
 }
 
+function installConsoleTracking() {
+  const methods = ["log", "info", "warn", "error", "debug"] as const;
+
+  for (const level of methods) {
+    const original = console[level].bind(console);
+
+    console[level] = (...args: unknown[]) => {
+      original(...args);
+
+      postEvent("renderer-console", args.map((value) => {
+        if (value instanceof Error) {
+          return {
+            name: value.name,
+            message: value.message,
+            stack: value.stack,
+          };
+        }
+
+        if (
+          value === null ||
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean"
+        ) {
+          return value;
+        }
+
+        try {
+          const serialized = JSON.stringify(value);
+          return serialized && serialized.length <= 8000
+            ? JSON.parse(serialized)
+            : trim(value, 8000);
+        } catch {
+          return trim(value, 8000);
+        }
+      }).map((value) =>
+        typeof value === "string" ? value : JSON.stringify(value)
+      ).join(" "), {
+        level,
+        arguments: args.map((value) => {
+          if (value instanceof Error) {
+            return {
+              name: value.name,
+              message: value.message,
+              stack: value.stack,
+            };
+          }
+          try {
+            return JSON.parse(JSON.stringify(value));
+          } catch {
+            return trim(value, 8000);
+          }
+        }),
+      });
+    };
+  }
+}
+
 function installFetchTracking() {
   const originalFetch = window.fetch.bind(window);
 
@@ -451,6 +509,7 @@ export function installAuraRuntimeMonitor() {
   window.__AURA_RUNTIME_INSTALLED__ = true;
 
   installHistoryTracking();
+  installConsoleTracking();
   installFetchTracking();
   installXHRTracking();
   installDomTracking();
