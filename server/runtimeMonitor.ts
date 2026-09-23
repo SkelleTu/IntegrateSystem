@@ -24,6 +24,72 @@ let lastPhase = "server";
 let lastMessage = "Inicializando servidor";
 let lastProgress = 0;
 
+let consoleCaptureInstalled = false;
+const originalConsole = {
+  log: console.log.bind(console),
+  info: console.info.bind(console),
+  warn: console.warn.bind(console),
+  error: console.error.bind(console),
+  debug: console.debug.bind(console),
+};
+
+function serializeConsoleArgument(value: unknown): unknown {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return value;
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized && serialized.length <= 8000
+      ? JSON.parse(serialized)
+      : String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+export function installConsoleCapture() {
+  if (!enabled || consoleCaptureInstalled) return;
+  consoleCaptureInstalled = true;
+
+  const capture = (
+    level: "log" | "info" | "warn" | "error" | "debug",
+    original: (...args: any[]) => void,
+  ) => (...args: any[]) => {
+    original(...args);
+
+    try {
+      runtimeEvent("console", args.map(serializeConsoleArgument).join(" "), {
+        phase: "console",
+        level,
+        arguments: args.map(serializeConsoleArgument),
+      });
+    } catch {
+      // Diagnostic capture must never break application logging.
+    }
+  };
+
+  console.log = capture("log", originalConsole.log) as typeof console.log;
+  console.info = capture("info", originalConsole.info) as typeof console.info;
+  console.warn = capture("warn", originalConsole.warn) as typeof console.warn;
+  console.error = capture("error", originalConsole.error) as typeof console.error;
+  console.debug = capture("debug", originalConsole.debug) as typeof console.debug;
+}
+
+
 function ensureRuntimeDir() {
   if (!enabled) return;
   fs.mkdirSync(runtimeDir, { recursive: true });
