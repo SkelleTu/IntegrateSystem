@@ -19,6 +19,8 @@ $EventsSource = Join-Path $RuntimeDir "aura-runtime.jsonl"
 $Branch = "runtime-live"
 $StartTime = Get-Date
 $lastSignature = ""
+$lastSourceChange = Get-Date
+$shutdownSeenAt = $null
 
 function Write-SyncLog {
   param([string]$Message)
@@ -190,6 +192,7 @@ function Publish-Snapshot {
   }
 
   $lastSignature = $signature
+  $script:lastSourceChange = Get-Date
 
   Invoke-Git @("-C", $SyncRepo, "add", "-A") | Out-Null
 
@@ -248,10 +251,40 @@ if (-not (Ensure-SyncRepo)) {
 
 while ($true) {
   try {
+    $phase = ""
+    if (Test-Path $StatusSource) {
+      try {
+        $status = Get-Content -LiteralPath $StatusSource -Raw -Encoding UTF8 | ConvertFrom-Json
+        $phase = [string]$status.phase
+      } catch {}
+    }
+
     Publish-Snapshot
+
+    if ($phase -in @("success", "shutdown", "error")) {
+      if (-not $shutdownSeenAt) {
+        $shutdownSeenAt = Get-Date
+      }
+
+      if (((Get-Date) - $shutdownSeenAt).TotalSeconds -ge 3) {
+        break
+      }
+    } else {
+      $shutdownSeenAt = $null
+    }
+
+    if (((Get-Date) - $lastSourceChange).TotalSeconds -ge 15 -and
+        $phase -in @("server", "electron", "renderer", "http")) {
+      Write-SyncLog "Runtime ficou sem atualizacoes por 15 segundos; encerrando sincronizador."
+      break
+    }
   } catch {
     Write-SyncLog ("ERRO no ciclo de sincronizacao: " + $_.Exception.Message)
   }
 
   Start-Sleep -Milliseconds ([Math]::Max(500, $IntervalMs))
 }
+
+try {
+  Publish-Snapshot
+} catch {}
