@@ -437,6 +437,14 @@ function startHeartbeat() {
   }, 1000);
 }
 
+export function reportAuraRuntimeEvent(
+  event: string,
+  message: string,
+  data: RuntimeData = {},
+) {
+  postEvent(event, message, data);
+}
+
 export function installAuraRuntimeMonitor() {
   if (window.__AURA_RUNTIME_INSTALLED__) return;
   window.__AURA_RUNTIME_INSTALLED__ = true;
