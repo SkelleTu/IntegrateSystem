@@ -10,7 +10,10 @@ set "AURA_RUNTIME_DIR=%ROOT%runtime"
 set "AURA_RUNTIME_HEARTBEAT_MS=250"
 
 if not exist "%AURA_RUNTIME_DIR%" mkdir "%AURA_RUNTIME_DIR%" >nul 2>&1
+if exist "%AURA_RUNTIME_DIR%\runtime-sync.stop" del /f /q "%AURA_RUNTIME_DIR%\runtime-sync.stop" >nul 2>&1
 for /f "delims=" %%S in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "[guid]::NewGuid().ToString('N')"') do set "AURA_RUNTIME_SESSION=%%S"
+
+start "Aura Runtime Sync" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -SessionId "%AURA_RUNTIME_SESSION%" -IntervalMs 1000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
 
