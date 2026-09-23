@@ -18,8 +18,8 @@ $StatusSource = Join-Path $RuntimeDir "aura-runtime.json"
 $EventsSource = Join-Path $RuntimeDir "aura-runtime.jsonl"
 $Branch = "runtime-live"
 $StartTime = Get-Date
-$lastSignature = ""
-$lastSourceChange = Get-Date
+$script:lastSignature = ""
+$script:lastSourceChange = Get-Date
 $shutdownSeenAt = $null
 
 function Get-ParentProcessId {
@@ -104,39 +104,49 @@ function Ensure-SyncRepo {
 
   Write-SyncLog "Remote de runtime: $remote"
 
-  if (-not (Test-Path (Join-Path $SyncRepo ".git"))) {
-    New-Item -ItemType Directory -Force -Path $SyncRepo | Out-Null
+  New-Item -ItemType Directory -Force -Path $SyncRepo | Out-Null
 
+  if (-not (Test-Path (Join-Path $SyncRepo ".git"))) {
     $init = Invoke-Git @("-C", $SyncRepo, "init", "-b", $Branch)
     if ($init.ExitCode -ne 0) {
       return $false
     }
+  }
 
-    Invoke-Git @("-C", $SyncRepo, "config", "user.name", "Aura Runtime Monitor") | Out-Null
-    Invoke-Git @("-C", $SyncRepo, "config", "user.email", "aura-runtime@users.noreply.github.com") | Out-Null
+  Invoke-Git @("-C", $SyncRepo, "config", "user.name", "Aura Runtime Monitor") | Out-Null
+  Invoke-Git @("-C", $SyncRepo, "config", "user.email", "aura-runtime@users.noreply.github.com") | Out-Null
 
+  $originResult = Invoke-Git @("-C", $SyncRepo, "remote", "get-url", "origin")
+  if ($originResult.ExitCode -ne 0) {
     $addRemote = Invoke-Git @("-C", $SyncRepo, "remote", "add", "origin", $remote)
     if ($addRemote.ExitCode -ne 0) {
       return $false
     }
-
-    $fetch = Invoke-Git @("-C", $SyncRepo, "fetch", "--depth=1", "origin", $Branch)
-
-    if ($fetch.ExitCode -eq 0) {
-      Invoke-Git @("-C", $SyncRepo, "checkout", "-B", $Branch, "FETCH_HEAD") | Out-Null
-    } else {
-      Invoke-Git @("-C", $SyncRepo, "checkout", "--orphan", $Branch) | Out-Null
-
-      Get-ChildItem -LiteralPath $SyncRepo -Force |
-        Where-Object { $_.Name -ne ".git" } |
-        ForEach-Object {
-          Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-
-    Write-SyncLog "Repositorio de runtime inicializado. Branch=$Branch"
+  } else {
+    Invoke-Git @("-C", $SyncRepo, "remote", "set-url", "origin", $remote) | Out-Null
   }
 
+  $fetch = Invoke-Git @("-C", $SyncRepo, "fetch", "--depth=1", "origin", $Branch)
+
+  if ($fetch.ExitCode -eq 0) {
+    $checkout = Invoke-Git @("-C", $SyncRepo, "checkout", "-B", $Branch, "FETCH_HEAD")
+    if ($checkout.ExitCode -ne 0) {
+      return $false
+    }
+  } else {
+    Invoke-Git @("-C", $SyncRepo, "checkout", "--orphan", $Branch) | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+      return $false
+    }
+  }
+
+  Get-ChildItem -LiteralPath $SyncRepo -Force |
+    Where-Object { $_.Name -ne ".git" } |
+    ForEach-Object {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
+
+  Write-SyncLog "Repositorio de runtime pronto e limpo. Branch=$Branch"
   return $true
 }
 
@@ -216,11 +226,11 @@ function Publish-Snapshot {
     "|" +
     (($eventsHash.Output | Select-Object -First 1) | Out-String).Trim()
 
-  if ($signature -eq $lastSignature) {
+  if ($signature -eq $script:lastSignature) {
     return
   }
 
-  $lastSignature = $signature
+  $script:lastSignature = $signature
   $script:lastSourceChange = Get-Date
 
   Invoke-Git @("-C", $SyncRepo, "add", "-A") | Out-Null
@@ -261,7 +271,7 @@ function Publish-Snapshot {
   if ($push.ExitCode -eq 0) {
     Write-SyncLog "GitHub atualizado. Branch=$Branch Session=$SessionId"
   } else {
-    Write-SyncLog "Push inicial falhou. Tentando configurar autenticacao via GitHub CLI."
+    Write-SyncLog "Push falhou. Tentando configurar autenticacao via GitHub CLI."
 
     if (Ensure-GitHubCliAuth) {
       $retry = Invoke-Git @(
@@ -273,9 +283,10 @@ function Publish-Snapshot {
       )
 
       if ($retry.ExitCode -eq 0) {
-        Write-SyncLog "GitHub atualizado após gh auth setup-git. Branch=$Branch Session=$SessionId"
+        Write-SyncLog "GitHub atualizado apos gh auth setup-git. Branch=$Branch Session=$SessionId"
       } else {
-        Write-SyncLog "ERRO: push continuou falhando após GitHub CLI."
+        Write-SyncLog "ERRO: push continuou falhando apos GitHub CLI."
+        Write-SyncLog "O snapshot continua salvo localmente em $SyncRepo."
       }
     } else {
       Write-SyncLog "ERRO: nao foi possivel autenticar no GitHub automaticamente."
@@ -285,13 +296,14 @@ function Publish-Snapshot {
 
 Write-SyncLog "Sincronizador iniciado. Session=$SessionId IntervalMs=$IntervalMs"
 
-$parentPid = Get-ParentProcessId
-Write-SyncLog "Processo pai detectado: PID=$parentPid"
-
 $gitCheck = Invoke-Git @("--version")
 if ($gitCheck.ExitCode -ne 0) {
   Write-SyncLog "ERRO: Git nao encontrado no PATH."
   exit 1
+}
+
+if (-not (Ensure-GitHubCliAuth)) {
+  Write-SyncLog "AVISO: GitHub CLI nao esta autenticado no inicio; o push tentara recuperar autenticacao."
 }
 
 if (-not (Ensure-SyncRepo)) {
@@ -301,14 +313,6 @@ if (-not (Ensure-SyncRepo)) {
 
 while ($true) {
   try {
-    if ($parentPid -gt 0) {
-      try {
-        Get-Process -Id $parentPid -ErrorAction Stop | Out-Null
-      } catch {
-        Write-SyncLog "Processo pai encerrou. Finalizando sincronizador."
-        break
-      }
-    }
     $phase = ""
     if (Test-Path $StatusSource) {
       try {
