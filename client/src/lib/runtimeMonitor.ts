@@ -129,13 +129,29 @@ function installHistoryTracking() {
   window.addEventListener("hashchange", () => routeChanged("hashchange"));
 }
 
+function requestFinished(
+  event: string,
+  message: string,
+  data: RuntimeData,
+) {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  postEvent(event, message, {
+    ...data,
+    pendingRequests,
+  });
+}
+
 function installFetchTracking() {
   const originalFetch = window.fetch.bind(window);
 
   window.fetch = async function (input, init) {
     const started = performance.now();
-    const method = (init?.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+    const method = (
+      init?.method ||
+      (input instanceof Request ? input.method : "GET")
+    ).toUpperCase();
     const rawUrl = typeof input === "string" ? input : input.url;
+
     pendingRequests += 1;
 
     postEvent("network-request-start", `${method} ${safeUrl(rawUrl)}`, {
@@ -147,8 +163,10 @@ function installFetchTracking() {
     try {
       const response = await originalFetch(input, init);
 
-      postEvent(
-        response.ok ? "network-request-success" : "network-request-http-error",
+      requestFinished(
+        response.ok
+          ? "network-request-success"
+          : "network-request-http-error",
         `${method} ${safeUrl(rawUrl)} ${response.status}`,
         {
           method,
@@ -156,68 +174,223 @@ function installFetchTracking() {
           status: response.status,
           ok: response.ok,
           durationMs: Math.round(performance.now() - started),
-          pendingRequests: Math.max(0, pendingRequests - 1),
         },
       );
 
       return response;
     } catch (error) {
-      postEvent("network-request-failed", `${method} ${safeUrl(rawUrl)} falhou`, {
-        method,
-        url: safeUrl(rawUrl),
-        durationMs: Math.round(performance.now() - started),
-        pendingRequests: Math.max(0, pendingRequests - 1),
-        error: error instanceof Error
-          ? { name: error.name, message: error.message, stack: error.stack }
-          : { value: String(error) },
-      });
+      requestFinished(
+        "network-request-failed",
+        `${method} ${safeUrl(rawUrl)} falhou`,
+        {
+          method,
+          url: safeUrl(rawUrl),
+          durationMs: Math.round(performance.now() - started),
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message, stack: error.stack }
+              : { value: trim(error, 2000) },
+        },
+      );
 
       throw error;
-    } finally {
-      pendingRequests = Math.max(0, pendingRequests - 1);
     }
   };
 }
 
+function installXHRTracking() {
+  const proto = XMLHttpRequest.prototype;
+  const originalOpen = proto.open;
+  const originalSend = proto.send;
+
+  const meta = new WeakMap<XMLHttpRequest, {
+    method: string;
+    url: string;
+    started: number;
+  }>();
+
+  proto.open = function (
+    method: string,
+    url: string | URL,
+    ...rest: any[]
+  ) {
+    const normalizedMethod = String(method || "GET").toUpperCase();
+    const normalizedUrl = safeUrl(String(url));
+
+    meta.set(this, {
+      method: normalizedMethod,
+      url: normalizedUrl,
+      started: performance.now(),
+    });
+
+    return originalOpen.call(this, method, url, ...rest);
+  };
+
+  proto.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+    const info = meta.get(this) || {
+      method: "GET",
+      url: "unknown",
+      started: performance.now(),
+    };
+
+    pendingRequests += 1;
+    postEvent("xhr-request-start", `${info.method} ${info.url}`, {
+      method: info.method,
+      url: info.url,
+      pendingRequests,
+    });
+
+    const finish = (event: string, message: string, data: RuntimeData = {}) => {
+      requestFinished(event, message, {
+        method: info.method,
+        url: info.url,
+        durationMs: Math.round(performance.now() - info.started),
+        ...data,
+      });
+    };
+
+    this.addEventListener(
+      "load",
+      () => finish(
+        this.status >= 200 && this.status < 400
+          ? "xhr-request-success"
+          : "xhr-request-http-error",
+        `${info.method} ${info.url} ${this.status}`,
+        { status: this.status, ok: this.status >= 200 && this.status < 400 },
+      ),
+      { once: true },
+    );
+
+    this.addEventListener(
+      "error",
+      () => finish("xhr-request-failed", `${info.method} ${info.url} falhou`, {
+        status: this.status,
+      }),
+      { once: true },
+    );
+
+    this.addEventListener(
+      "abort",
+      () => finish("xhr-request-aborted", `${info.method} ${info.url} abortado`, {
+        status: this.status,
+      }),
+      { once: true },
+    );
+
+    this.addEventListener(
+      "timeout",
+      () => finish("xhr-request-timeout", `${info.method} ${info.url} expirou`, {
+        status: this.status,
+      }),
+      { once: true },
+    );
+
+    // Never store or inspect request bodies. This keeps credentials and form data out of diagnostics.
+    void body;
+    return originalSend.call(this, body);
+  };
+}
+
 function installDomTracking() {
-  document.addEventListener("click", (event) => {
-    const target = event.target instanceof Element
-      ? event.target.closest("button,a,[role='button'],input,select,textarea,[data-testid]")
-      : null;
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target =
+        event.target instanceof Element
+          ? event.target.closest(
+              "button,a,[role='button'],input,select,textarea,[data-testid]",
+            )
+          : null;
 
-    if (!target) return;
+      if (!target) return;
 
-    postEvent("ui-click", "Interação de clique detectada", {
-      element: elementDescriptor(target),
+      postEvent("ui-click", "Interação de clique detectada", {
+        element: elementDescriptor(target),
+      });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "change",
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      postEvent("ui-change", "Alteração de campo detectada", {
+        element: elementDescriptor(target),
+      });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "submit",
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+
+      postEvent("ui-submit", "Envio de formulário detectado", {
+        element: elementDescriptor(target),
+      });
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "focusin",
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      postEvent("ui-focus", "Foco de elemento detectado", {
+        element: elementDescriptor(target),
+      });
+    },
+    true,
+  );
+}
+
+function installEnvironmentTracking() {
+  window.addEventListener("online", () => {
+    postEvent("browser-online", "Renderer voltou a ficar online");
+  });
+
+  window.addEventListener("offline", () => {
+    postEvent("browser-offline", "Renderer ficou offline");
+  });
+
+  window.addEventListener("focus", () => {
+    postEvent("window-focus", "Janela recebeu foco");
+  });
+
+  window.addEventListener("blur", () => {
+    postEvent("window-blur", "Janela perdeu foco");
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    postEvent("visibility-change", "Visibilidade da interface mudou", {
+      visibilityState: document.visibilityState,
     });
-  }, true);
+  });
 
-  document.addEventListener("change", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
+  window.addEventListener(
+    "error",
+    (event) => {
+      const target = event.target instanceof Element ? event.target : null;
 
-    postEvent("ui-change", "Alteração de campo detectada", {
-      element: elementDescriptor(target),
-      // Intencionalmente não registramos o valor digitado.
-    });
-  }, true);
-
-  document.addEventListener("submit", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-
-    postEvent("ui-submit", "Envio de formulário detectado", {
-      element: elementDescriptor(target),
-    });
-  }, true);
-
-  document.addEventListener("focusin", (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-
-    postEvent("ui-focus", "Foco de elemento detectado", {
-      element: elementDescriptor(target),
-    });
-  }, true);
+      if (target && target !== document.documentElement) {
+        postEvent("resource-error", "Falha ao carregar recurso", {
+          element: elementDescriptor(target),
+          source:
+            (target as HTMLImageElement).src ||
+            (target as HTMLScriptElement).src ||
+            (target as HTMLLinkElement).href ||
+            undefined,
+        });
+      }
+    },
+    true,
+  );
 }
 
 function installErrorTracking() {
@@ -236,11 +409,20 @@ function installErrorTracking() {
 
   window.addEventListener("unhandledrejection", (event) => {
     const reason = event.reason;
-    postEvent("renderer-unhandled-rejection", "Promise rejeitada sem tratamento", {
-      reason: reason instanceof Error
-        ? { name: reason.name, message: reason.message, stack: reason.stack }
-        : { value: trim(reason, 2000) },
-    });
+    postEvent(
+      "renderer-unhandled-rejection",
+      "Promise rejeitada sem tratamento",
+      {
+        reason:
+          reason instanceof Error
+            ? {
+                name: reason.name,
+                message: reason.message,
+                stack: reason.stack,
+              }
+            : { value: trim(reason, 2000) },
+      },
+    );
   });
 }
 
@@ -250,6 +432,7 @@ function startHeartbeat() {
       uptimeMs: Date.now() - startedAt,
       pendingRequests,
       visibilityState: document.visibilityState,
+      online: navigator.onLine,
     });
   }, 1000);
 }
@@ -260,7 +443,9 @@ export function installAuraRuntimeMonitor() {
 
   installHistoryTracking();
   installFetchTracking();
+  installXHRTracking();
   installDomTracking();
+  installEnvironmentTracking();
   installErrorTracking();
   startHeartbeat();
 
