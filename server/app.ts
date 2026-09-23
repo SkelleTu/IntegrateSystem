@@ -10,6 +10,7 @@ import {
   runtimeError,
   runtimeEvent,
   startRuntimeMonitor,
+  installConsoleCapture,
 } from "./runtimeMonitor";
 
 const app = express();
@@ -19,6 +20,7 @@ const httpServer = createServer(app);
 process.env.TZ = "America/Sao_Paulo";
 
 startRuntimeMonitor();
+installConsoleCapture();
 runtimeEvent("server-bootstrap", "Servidor começando a inicialização", {
   phase: "server",
   progress: 5,
