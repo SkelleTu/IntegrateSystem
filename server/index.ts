@@ -1,7 +1,38 @@
-import { initApp, log } from "./app";
-import { runtimeError, runtimeEvent, stopRuntimeMonitor } from "./runtimeMonitor";
+import {
+  installConsoleCapture,
+  runtimeError,
+  runtimeEvent,
+  stopRuntimeMonitor,
+} from "./runtimeMonitor";
+
+installConsoleCapture();
 
 console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
+
+process.on("warning", (warning) => {
+  runtimeError(warning, "Warning emitido pelo Node.js", {
+    phase: "node",
+    warningName: warning.name,
+  });
+});
+
+process.on("beforeExit", (code) => {
+  runtimeEvent("before-exit", `Processo Node entrando em beforeExit (code ${code})`, {
+    phase: "shutdown",
+    exitCode: code,
+  });
+  stopRuntimeMonitor(`Servidor encerrando via beforeExit (code ${code})`);
+});
+
+process.once("SIGINT", () => {
+  runtimeEvent("signal", "Servidor recebeu SIGINT", { phase: "shutdown" });
+  stopRuntimeMonitor("Servidor encerrado por SIGINT");
+});
+
+process.once("SIGTERM", () => {
+  runtimeEvent("signal", "Servidor recebeu SIGTERM", { phase: "shutdown" });
+  stopRuntimeMonitor("Servidor encerrado por SIGTERM");
+});
 
 (async () => {
   try {
@@ -9,6 +40,10 @@ console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
       phase: "server",
       progress: 0,
     });
+
+    // Carregado depois do monitor para que logs emitidos durante a inicialização
+    // dos módulos da aplicação também sejam capturados.
+    const { initApp, log } = await import("./app");
 
     const { httpServer } = await initApp();
 
@@ -47,12 +82,3 @@ console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
     process.exitCode = 1;
   }
 })();
-\nprocess.once("SIGINT", () => {
-  runtimeEvent("signal", "Servidor recebeu SIGINT", { phase: "shutdown" });
-  stopRuntimeMonitor("Servidor encerrado por SIGINT");
-});
-
-process.once("SIGTERM", () => {
-  runtimeEvent("signal", "Servidor recebeu SIGTERM", { phase: "shutdown" });
-  stopRuntimeMonitor("Servidor encerrado por SIGTERM");
-});
