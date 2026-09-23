@@ -8,7 +8,6 @@ const RUNTIME_DIR = path.resolve(
   process.env.AURA_RUNTIME_DIR || path.join(process.cwd(), 'runtime')
 );
 const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-runtime.jsonl');
-const RUNTIME_STATUS_FILE = path.join(RUNTIME_DIR, 'aura-runtime.json');
 const runtimeStartedAt = Date.now();
 let runtimeSequence = 0;
 let mainWindow = null;
@@ -42,15 +41,6 @@ function writeLocalRuntime(event, message, data = {}) {
       'utf8'
     );
 
-    const status = {
-      ...record,
-      progress:
-        typeof data.progress === 'number'
-          ? Math.max(0, Math.min(100, data.progress))
-          : undefined,
-      phase: data.phase || 'electron',
-    };
-    fs.writeFileSync(RUNTIME_STATUS_FILE, JSON.stringify(status, null, 2), 'utf8');
   } catch {}
 }
 
@@ -307,7 +297,7 @@ ipcMain.handle('aura-save-text-file', async (_event, payload) => {
 
   sendRuntimeEvent('save-text-file-success', 'Arquivo salvo com sucesso', {
     phase: 'electron',
-    path: result.filePath,
+    saved: true,
   });
 
   return { saved: true, path: result.filePath };
