@@ -28,6 +28,12 @@ O `status` deve ficar limpo.
 
 Não executar `git clean -fdx`, porque isso também remove ferramentas/artefatos locais ignorados, inclusive dependências que podem ser reutilizadas.
 
+## Autenticação do runtime
+
+O primeiro uso em uma máquina exige uma autenticação local do GitHub para permitir que o sincronizador publique na branch `runtime-live`. O `.bat` verifica Git e GitHub CLI, instala ambos com winget quando ausentes e executa o fluxo web oficial de autenticação quando necessário. Depois usa `gh auth setup-git` para configurar o Git como credential helper. Nenhum token deve ser armazenado no repositório.
+
+A autenticação do GitHub CLI e o uso de `gh auth setup-git` são mecanismos oficiais do GitHub CLI. citeturn297905search4turn297905search1
+
 ## Regras obrigatórias
 
 - Não fazer merge de `runtime-live` na `main`.
