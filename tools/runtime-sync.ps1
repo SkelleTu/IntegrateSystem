@@ -53,6 +53,29 @@ function Invoke-Git {
   return @{ ExitCode = $exitCode; Output = $output }
 }
 
+function Ensure-GitHubCliAuth {
+  $gh = Get-Command gh -ErrorAction SilentlyContinue
+  if (-not $gh) {
+    Write-SyncLog "GitHub CLI nao encontrado."
+    return $false
+  }
+
+  $auth = & gh auth status 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "GitHub CLI encontrado, mas nao autenticado: $(($auth | Out-String).Trim())"
+    return $false
+  }
+
+  $setup = & gh auth setup-git 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-SyncLog "gh auth setup-git falhou: $(($setup | Out-String).Trim())"
+    return $false
+  }
+
+  Write-SyncLog "Autenticacao do Git configurada pelo GitHub CLI."
+  return $true
+}
+
 function Protect-RemoteText {
   param([string]$Text)
 
@@ -238,7 +261,25 @@ function Publish-Snapshot {
   if ($push.ExitCode -eq 0) {
     Write-SyncLog "GitHub atualizado. Branch=$Branch Session=$SessionId"
   } else {
-    Write-SyncLog "ERRO: GitHub nao recebeu a atualizacao. Verifique autenticacao/permissao do Git."
+    Write-SyncLog "Push inicial falhou. Tentando configurar autenticacao via GitHub CLI."
+
+    if (Ensure-GitHubCliAuth) {
+      $retry = Invoke-Git @(
+        "-C", $SyncRepo,
+        "push",
+        "--force",
+        "origin",
+        "HEAD:$Branch"
+      )
+
+      if ($retry.ExitCode -eq 0) {
+        Write-SyncLog "GitHub atualizado após gh auth setup-git. Branch=$Branch Session=$SessionId"
+      } else {
+        Write-SyncLog "ERRO: push continuou falhando após GitHub CLI."
+      }
+    } else {
+      Write-SyncLog "ERRO: nao foi possivel autenticar no GitHub automaticamente."
+    }
   }
 }
 
