@@ -102,7 +102,7 @@ app.use((req, res, next) => {
       contentLength: res.getHeader("content-length") || null,
     });
 
-    if (requestPath.startsWith("/api")) {
+    if (requestPath.startsWith("/api") && requestPath !== "/api/runtime/event") {
       log(`${req.method} ${requestPath} ${res.statusCode} in ${duration}ms`);
     }
   });
