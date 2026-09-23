@@ -71,7 +71,7 @@ if errorlevel 1 (
 echo [OK] Git e GitHub prontos para sincronizacao.
 call :runtime_event 3 "github-auth" "GitHub autenticado e Git configurado"
 
-start "Aura Runtime Sync" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -SessionId "%AURA_RUNTIME_SESSION%" -IntervalMs 1000
+start "Aura Runtime Sync" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -SessionId "%AURA_RUNTIME_SESSION%" -IntervalMs 5000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
 
