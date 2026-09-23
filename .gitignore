@@ -6,3 +6,6 @@ dist/
 out/
 runtime/*.json
 runtime/*.jsonl
+runtime/.sync-repo/
+runtime/runtime-sync.log
+runtime/runtime-sync.stop
