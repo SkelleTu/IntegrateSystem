@@ -126,9 +126,18 @@ export function startRuntimeMonitor() {
   });
 
   heartbeatTimer = setInterval(() => {
+    const memory = process.memoryUsage();
+
     writeStatus({
       lastEvent: "heartbeat",
       lastEventAt: new Date().toISOString(),
+      runtime: {
+        memoryRssBytes: memory.rss,
+        heapUsedBytes: memory.heapUsed,
+        heapTotalBytes: memory.heapTotal,
+        externalBytes: memory.external,
+        arrayBuffersBytes: memory.arrayBuffers,
+      },
     });
   }, heartbeatMs);
 
