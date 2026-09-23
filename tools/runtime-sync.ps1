@@ -60,19 +60,17 @@ function Protect-RemoteText {
 }
 
 function Ensure-SyncRepo {
+  $remote = "https://github.com/SkelleTu/IntegrateSystem.git"
   $remoteResult = Invoke-Git @("-C", $Root, "remote", "get-url", "origin")
 
-  if ($remoteResult.ExitCode -ne 0) {
-    Write-SyncLog "ERRO: remote origin nao encontrado."
-    return $false
+  if ($remoteResult.ExitCode -eq 0) {
+    $candidate = (($remoteResult.Output | Select-Object -First 1) | Out-String).Trim()
+    if (-not [string]::IsNullOrWhiteSpace($candidate)) {
+      $remote = $candidate
+    }
   }
 
-  $remote = (($remoteResult.Output | Select-Object -First 1) | Out-String).Trim()
-
-  if ([string]::IsNullOrWhiteSpace($remote)) {
-    Write-SyncLog "ERRO: URL do remote origin vazia."
-    return $false
-  }
+  Write-SyncLog "Remote de runtime: $remote"
 
   if (-not (Test-Path (Join-Path $SyncRepo ".git"))) {
     New-Item -ItemType Directory -Force -Path $SyncRepo | Out-Null
