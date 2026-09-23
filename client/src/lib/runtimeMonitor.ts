@@ -12,6 +12,7 @@ let sequence = 0;
 let heartbeatTimer: number | undefined;
 let lastRoute = window.location.href;
 let pendingRequests = 0;
+const telemetryFetch = window.fetch.bind(window);
 
 function trim(value: unknown, max = 300): string {
   const text = String(value ?? "");
@@ -74,7 +75,7 @@ function postEvent(event: string, message: string, data: RuntimeData = {}) {
       return;
     }
 
-    void window.fetch(ENDPOINT, {
+    void telemetryFetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body,
