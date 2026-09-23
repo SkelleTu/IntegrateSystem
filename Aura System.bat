@@ -13,6 +13,64 @@ if not exist "%AURA_RUNTIME_DIR%" mkdir "%AURA_RUNTIME_DIR%" >nul 2>&1
 if exist "%AURA_RUNTIME_DIR%\runtime-sync.stop" del /f /q "%AURA_RUNTIME_DIR%\runtime-sync.stop" >nul 2>&1
 for /f "delims=" %%S in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "[guid]::NewGuid().ToString('N')"') do set "AURA_RUNTIME_SESSION=%%S"
 
+call :runtime_event 0 "bootstrap" "Verificando acesso ao GitHub para runtime-live"
+
+where git >nul 2>&1
+if errorlevel 1 (
+  echo [INFO] Git nao encontrado. Tentando instalar automaticamente...
+  winget install --id Git.Git --exact --silent --accept-source-agreements --accept-package-agreements
+  if errorlevel 1 (
+    echo.
+    echo [ERRO] Nao foi possivel instalar o Git automaticamente.
+    call :runtime_event 0 "error" "Git ausente e instalacao automatica falhou"
+    pause
+    exit /b 1
+  )
+  set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
+)
+
+where gh >nul 2>&1
+if errorlevel 1 (
+  echo [INFO] GitHub CLI nao encontrado. Tentando instalar automaticamente...
+  winget install --id GitHub.cli --exact --silent --accept-source-agreements --accept-package-agreements
+  if errorlevel 1 (
+    echo.
+    echo [ERRO] Nao foi possivel instalar o GitHub CLI automaticamente.
+    call :runtime_event 0 "error" "GitHub CLI ausente e instalacao automatica falhou"
+    pause
+    exit /b 1
+  )
+  set "PATH=%ProgramFiles%\GitHub CLI;%PATH%"
+)
+
+gh auth status --hostname github.com >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo [INFO] GitHub ainda nao esta autenticado nesta maquina.
+  echo [INFO] Abrindo a autenticacao oficial do GitHub no navegador...
+  call :runtime_event 1 "github-auth" "Autenticacao GitHub necessaria; abrindo fluxo web"
+  gh auth login --hostname github.com --web --git-protocol https --skip-ssh-key
+  if errorlevel 1 (
+    echo.
+    echo [ERRO] A autenticacao do GitHub nao foi concluida.
+    call :runtime_event 1 "error" "Autenticacao do GitHub nao concluida"
+    pause
+    exit /b 1
+  )
+)
+
+gh auth setup-git --hostname github.com >nul 2>&1
+if errorlevel 1 (
+  echo.
+  echo [ERRO] Nao foi possivel configurar o Git para usar a autenticacao do GitHub CLI.
+  call :runtime_event 2 "error" "gh auth setup-git falhou"
+  pause
+  exit /b 1
+)
+
+echo [OK] Git e GitHub prontos para sincronizacao.
+call :runtime_event 3 "github-auth" "GitHub autenticado e Git configurado"
+
 start "Aura Runtime Sync" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -SessionId "%AURA_RUNTIME_SESSION%" -IntervalMs 1000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
