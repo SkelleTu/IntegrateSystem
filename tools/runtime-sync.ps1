@@ -47,48 +47,73 @@ function Protect-RemoteText {
   return $sanitized
 }
 
-function Invoke-GhApi {
-  param(
-    [string[]]$Arguments,
-    [string]$InputJson = ""
-  )
-
-  $temp = $null
-
+function Get-GitHubToken {
   try {
-    if (-not [string]::IsNullOrEmpty($InputJson)) {
-      $temp = Join-Path $RuntimeDir ("gh-request-" + [guid]::NewGuid().ToString("N") + ".json")
-      Set-Content -LiteralPath $temp -Value $InputJson -Encoding UTF8
-      $output = & gh api @Arguments --input $temp 2>&1
-    } else {
-      $output = & gh api @Arguments 2>&1
-    }
-
-    $exitCode = $LASTEXITCODE
-    if ($exitCode -ne 0) {
-      Write-SyncLog ("gh api " + ($Arguments -join " ") + " => exit " + $exitCode + ": " + (($output | Out-String).Trim()))
+    $token = (& gh auth token --hostname github.com 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($token)) {
+      Write-SyncLog "ERRO: gh auth token falhou."
       return $null
     }
 
-    return (($output | Out-String).Trim())
+    return $token
   } catch {
-    Write-SyncLog ("EXCEPTION gh api: " + $_.Exception.Message)
+    Write-SyncLog ("ERRO ao obter token do GitHub CLI: " + $_.Exception.Message)
     return $null
-  } finally {
-    if ($temp -and (Test-Path $temp)) {
-      Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
+  }
+}
+
+function Invoke-GhApi {
+  param(
+    [string]$Method,
+    [string]$Endpoint,
+    [hashtable]$Body = $null
+  )
+
+  try {
+    $token = Get-GitHubToken
+    if ([string]::IsNullOrWhiteSpace($token)) {
+      return $null
     }
+
+    $headers = @{
+      Authorization = "Bearer $token"
+      Accept = "application/vnd.github+json"
+      "X-GitHub-Api-Version" = "2022-11-28"
+    }
+
+    $uri = "https://api.github.com/" + $Endpoint.TrimStart("/")
+    $json = $null
+
+    if ($null -ne $Body) {
+      $json = $Body | ConvertTo-Json -Depth 50 -Compress
+    }
+
+    $response = if ($null -ne $json) {
+      Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers -ContentType "application/json" -Body $json
+    } else {
+      Invoke-RestMethod -Method $Method -Uri $uri -Headers $headers
+    }
+
+    return $response
+  } catch {
+    $detail = $_.ErrorDetails.Message
+    if ([string]::IsNullOrWhiteSpace($detail)) {
+      $detail = $_.Exception.Message
+    }
+
+    Write-SyncLog ("GitHub API " + $Method + " " + $Endpoint + " => ERRO: " + $detail)
+    return $null
   }
 }
 
 function Get-RemoteHead {
-  $raw = Invoke-GhApi @("repos/$Owner/$Repo/git/ref/heads/$Branch")
-  if ([string]::IsNullOrWhiteSpace($raw)) {
+  $raw = Invoke-GhApi "GET" "repos/$Owner/$Repo/git/ref/heads/$Branch"
+  if ($null -eq $raw) {
     return $null
   }
 
   try {
-    return ($raw | ConvertFrom-Json).object.sha
+    return [string]$raw.object.sha
   } catch {
     Write-SyncLog "Resposta invalida ao consultar HEAD de $Branch."
     return $null
@@ -104,17 +129,17 @@ function New-GitBlob {
     encoding = "utf-8"
   } | ConvertTo-Json -Depth 10 -Compress
 
-  $raw = Invoke-GhApi @(
-    "repos/$Owner/$Repo/git/blobs",
-    "--method", "POST"
-  ) $payload
+  $raw = Invoke-GhApi "POST" "repos/$Owner/$Repo/git/blobs" @{
+    content = $safe
+    encoding = "utf-8"
+  }
 
-  if ([string]::IsNullOrWhiteSpace($raw)) {
+  if ($null -eq $raw) {
     return $null
   }
 
   try {
-    return ($raw | ConvertFrom-Json).sha
+    return [string]$raw.sha
   } catch {
     Write-SyncLog "Resposta invalida ao criar blob."
     return $null
@@ -138,17 +163,16 @@ function New-GitTree {
     tree = $tree
   } | ConvertTo-Json -Depth 20 -Compress
 
-  $raw = Invoke-GhApi @(
-    "repos/$Owner/$Repo/git/trees",
-    "--method", "POST"
-  ) $payload
+  $raw = Invoke-GhApi "POST" "repos/$Owner/$Repo/git/trees" @{
+    tree = $tree
+  }
 
-  if ([string]::IsNullOrWhiteSpace($raw)) {
+  if ($null -eq $raw) {
     return $null
   }
 
   try {
-    return ($raw | ConvertFrom-Json).sha
+    return [string]$raw.sha
   } catch {
     Write-SyncLog "Resposta invalida ao criar tree."
     return $null
@@ -174,17 +198,18 @@ function New-GitCommit {
     parents = $parents
   } | ConvertTo-Json -Depth 20 -Compress
 
-  $raw = Invoke-GhApi @(
-    "repos/$Owner/$Repo/git/commits",
-    "--method", "POST"
-  ) $payload
+  $raw = Invoke-GhApi "POST" "repos/$Owner/$Repo/git/commits" @{
+    message = "runtime: live state $SessionId"
+    tree = $TreeSha
+    parents = $parents
+  }
 
-  if ([string]::IsNullOrWhiteSpace($raw)) {
+  if ($null -eq $raw) {
     return $null
   }
 
   try {
-    return ($raw | ConvertFrom-Json).sha
+    return [string]$raw.sha
   } catch {
     Write-SyncLog "Resposta invalida ao criar commit."
     return $null
@@ -199,12 +224,12 @@ function Update-RemoteRef {
     force = $true
   } | ConvertTo-Json -Depth 10 -Compress
 
-  $raw = Invoke-GhApi @(
-    "repos/$Owner/$Repo/git/refs/heads/$Branch",
-    "--method", "PATCH"
-  ) $payload
+  $raw = Invoke-GhApi "PATCH" "repos/$Owner/$Repo/git/refs/heads/$Branch" @{
+    sha = $CommitSha
+    force = $true
+  }
 
-  return -not [string]::IsNullOrWhiteSpace($raw)
+  return $null -ne $raw
 }
 
 function Ensure-RemoteBranch {
@@ -213,14 +238,14 @@ function Ensure-RemoteBranch {
     return $head
   }
 
-  $base = Invoke-GhApi @("repos/$Owner/$Repo/git/ref/heads/main")
-  if ([string]::IsNullOrWhiteSpace($base)) {
+  $base = Invoke-GhApi "GET" "repos/$Owner/$Repo/git/ref/heads/main"
+  if ($null -eq $base) {
     Write-SyncLog "ERRO: nao foi possivel obter main para criar $Branch."
     return $null
   }
 
   try {
-    $baseSha = ($base | ConvertFrom-Json).object.sha
+    $baseSha = [string]$base.object.sha
   } catch {
     Write-SyncLog "ERRO: resposta invalida ao consultar main."
     return $null
@@ -231,12 +256,12 @@ function Ensure-RemoteBranch {
     sha = $baseSha
   } | ConvertTo-Json -Depth 10 -Compress
 
-  $created = Invoke-GhApi @(
-    "repos/$Owner/$Repo/git/refs",
-    "--method", "POST"
-  ) $payload
+  $created = Invoke-GhApi "POST" "repos/$Owner/$Repo/git/refs" @{
+    ref = "refs/heads/$Branch"
+    sha = $baseSha
+  }
 
-  if ([string]::IsNullOrWhiteSpace($created)) {
+  if ($null -eq $created) {
     Write-SyncLog "ERRO: falha ao criar branch $Branch."
     return $null
   }
@@ -313,6 +338,7 @@ function Publish-Snapshot {
     return
   }
 
+  Write-SyncLog "Publicacao: criando blobs."
   $statusSha = New-GitBlob $snapshot.status
   if (-not $statusSha) { return }
 
@@ -322,13 +348,16 @@ function Publish-Snapshot {
   $sessionSha = New-GitBlob $snapshot.session
   if (-not $sessionSha) { return }
 
+  Write-SyncLog "Publicacao: criando tree."
   $treeSha = New-GitTree $statusSha $eventsSha $sessionSha
   if (-not $treeSha) { return }
 
   $parentSha = Get-RemoteHead
+  Write-SyncLog "Publicacao: criando commit. Parent=$parentSha"
   $commitSha = New-GitCommit $treeSha $parentSha
   if (-not $commitSha) { return }
 
+  Write-SyncLog "Publicacao: atualizando branch $Branch."
   if (-not (Update-RemoteRef $commitSha)) {
     Write-SyncLog "ERRO: commit criado mas nao foi possivel atualizar $Branch."
     return
