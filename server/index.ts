@@ -1,5 +1,5 @@
 import { initApp, log } from "./app";
-import { runtimeError, runtimeEvent } from "./runtimeMonitor";
+import { runtimeError, runtimeEvent, stopRuntimeMonitor } from "./runtimeMonitor";
 
 console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
 
@@ -47,3 +47,12 @@ console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
     process.exitCode = 1;
   }
 })();
+\nprocess.once("SIGINT", () => {
+  runtimeEvent("signal", "Servidor recebeu SIGINT", { phase: "shutdown" });
+  stopRuntimeMonitor("Servidor encerrado por SIGINT");
+});
+
+process.once("SIGTERM", () => {
+  runtimeEvent("signal", "Servidor recebeu SIGTERM", { phase: "shutdown" });
+  stopRuntimeMonitor("Servidor encerrado por SIGTERM");
+});
