@@ -22,6 +22,15 @@ $lastSignature = ""
 $lastSourceChange = Get-Date
 $shutdownSeenAt = $null
 
+function Get-ParentProcessId {
+  try {
+    $me = Get-CimInstance Win32_Process -Filter "ProcessId=$PID" -ErrorAction Stop
+    return [int]$me.ParentProcessId
+  } catch {
+    return 0
+  }
+}
+
 function Write-SyncLog {
   param([string]$Message)
 
@@ -158,8 +167,7 @@ function Build-RemoteSnapshot {
   [ordered]@{
     sessionId = $SessionId
     synchronizedAt = $now
-    machine = $env:COMPUTERNAME
-    user = $env:USERNAME
+    role = "runtime-session"
   } |
     ConvertTo-Json -Depth 20 |
     Set-Content -LiteralPath (Join-Path $snapshotDir "session.json") -Encoding UTF8
@@ -236,6 +244,9 @@ function Publish-Snapshot {
 
 Write-SyncLog "Sincronizador iniciado. Session=$SessionId IntervalMs=$IntervalMs"
 
+$parentPid = Get-ParentProcessId
+Write-SyncLog "Processo pai detectado: PID=$parentPid"
+
 $gitCheck = Invoke-Git @("--version")
 if ($gitCheck.ExitCode -ne 0) {
   Write-SyncLog "ERRO: Git nao encontrado no PATH."
@@ -249,6 +260,14 @@ if (-not (Ensure-SyncRepo)) {
 
 while ($true) {
   try {
+    if ($parentPid -gt 0) {
+      try {
+        Get-Process -Id $parentPid -ErrorAction Stop | Out-Null
+      } catch {
+        Write-SyncLog "Processo pai encerrou. Finalizando sincronizador."
+        break
+      }
+    }
     $phase = ""
     if (Test-Path $StatusSource) {
       try {
