@@ -2,11 +2,19 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Root,
 
-  [Parameter(Mandatory = $true)]
-  [string]$SessionId,
+  [string]$SessionId = "",
 
   [int]$IntervalMs = 5000
 )
+
+if ([string]::IsNullOrWhiteSpace($SessionId)) {
+  $SessionId = [string]$env:AURA_RUNTIME_SESSION
+}
+
+if ([string]::IsNullOrWhiteSpace($SessionId)) {
+  $SessionId = [guid]::NewGuid().ToString("N")
+  $env:AURA_RUNTIME_SESSION = $SessionId
+}
 
 $ErrorActionPreference = "Continue"
 
