@@ -16,7 +16,7 @@ if not exist "%POWERSHELL_EXE%" (
 if not exist "%POWERSHELL_EXE%" (
   echo.
   echo [ERRO] Windows PowerShell nao foi encontrado.
-  echo Caminho esperado: %SystemRoot%\System32\WindowsPowerShell\v1.0\%POWERSHELL_EXE%
+  echo Caminho esperado: %SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe
   pause
   exit /b 1
 )
@@ -100,7 +100,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "" /b %POWERSHELL_EXE% -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
+start "" /b "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
 
