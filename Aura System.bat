@@ -32,7 +32,7 @@ if exist "%LocalAppData%\Programs\GitHub CLI\gh.exe" set "PATH=%LocalAppData%\Pr
 
 if not exist "%AURA_RUNTIME_DIR%" mkdir "%AURA_RUNTIME_DIR%" >nul 2>&1
 if exist "%AURA_RUNTIME_DIR%\runtime-sync.stop" del /f /q "%AURA_RUNTIME_DIR%\runtime-sync.stop" >nul 2>&1
-for /f "delims=" %%S in ('powershell -NoProfile -ExecutionPolicy Bypass -Command "[guid]::NewGuid().ToString('N')"') do set "AURA_RUNTIME_SESSION=%%S"
+for /f "delims=" %%S in ('"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "[guid]::NewGuid().ToString('N')"') do set "AURA_RUNTIME_SESSION=%%S"
 
 call :runtime_event 0 "bootstrap" "Verificando acesso ao GitHub para runtime-live"
 
