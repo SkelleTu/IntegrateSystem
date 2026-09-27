@@ -1,2 +1,0 @@
-/home/runner/workspace/attached_assets/dist_windows/AuraPrinter.pdb
-/home/runner/workspace/attached_assets/dist_windows/AuraPrinter.exe
