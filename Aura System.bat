@@ -71,7 +71,15 @@ if errorlevel 1 (
 echo [OK] Git e GitHub prontos para sincronizacao.
 call :runtime_event 3 "github-auth" "GitHub autenticado e Git configurado"
 
-start "Aura Runtime Sync" /min powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
+call :refresh_runtime_sync
+if errorlevel 1 (
+  echo.
+  echo [ERRO] Nao foi possivel preparar o sincronizador de runtime.
+  pause
+  exit /b 1
+)
+
+start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
 
@@ -363,6 +371,13 @@ echo.
 echo Inicializacao concluida com sucesso.
 call :runtime_event 100 "success" "Inicializacao concluida com sucesso"
 pause
+exit /b 0
+
+:refresh_runtime_sync
+echo [INFO] Verificando sincronizador de runtime no GitHub...
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=Join-Path '%ROOT%' 'tools\\runtime-sync.ps1'; try { $b=(& gh api 'repos/SkelleTu/IntegrateSystem/contents/tools/runtime-sync.ps1?ref=main' --jq .content 2>&1 | Out-String).Trim(); if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($b)) { Write-Error $b; exit 1 }; $bytes=[Convert]::FromBase64String(($b -replace '\s','')); [IO.File]::WriteAllText($p,[Text.Encoding]::UTF8.GetString($bytes),[Text.UTF8Encoding]::new($false)); exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }"
+if errorlevel 1 exit /b 1
+echo [OK] Sincronizador de runtime atualizado a partir do GitHub.
 exit /b 0
 
 :progress
