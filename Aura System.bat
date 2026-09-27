@@ -6,8 +6,29 @@ title Aura System - Inicializacao
 set "ROOT=%~dp0"
 set "NODE_EXE=node"
 set "NPM_CMD=npm"
+set "POWERSHELL_EXE=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "AURA_RUNTIME_DIR=%ROOT%runtime"
 set "AURA_RUNTIME_HEARTBEAT_MS=250"
+
+if not exist "%POWERSHELL_EXE%" (
+  set "POWERSHELL_EXE=%SystemRoot%\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
+)
+if not exist "%POWERSHELL_EXE%" (
+  echo.
+  echo [ERRO] Windows PowerShell nao foi encontrado.
+  echo Caminho esperado: %SystemRoot%\System32\WindowsPowerShell\v1.0\%POWERSHELL_EXE%
+  pause
+  exit /b 1
+)
+
+if exist "%ProgramFiles%\Git\cmd\git.exe" set "PATH=%ProgramFiles%\Git\cmd;%PATH%"
+  if exist "%ProgramFiles(x86)%\Git\cmd\git.exe" set "PATH=%ProgramFiles(x86)%\Git\cmd;%PATH%"
+  if exist "%LocalAppData%\Programs\Git\cmd\git.exe" set "PATH=%LocalAppData%\Programs\Git\cmd;%PATH%"
+if exist "%ProgramFiles(x86)%\Git\cmd\git.exe" set "PATH=%ProgramFiles(x86)%\Git\cmd;%PATH%"
+if exist "%LocalAppData%\Programs\Git\cmd\git.exe" set "PATH=%LocalAppData%\Programs\Git\cmd;%PATH%"
+if exist "%ProgramFiles%\GitHub CLI\gh.exe" set "PATH=%ProgramFiles%\GitHub CLI;%PATH%"
+  if exist "%LocalAppData%\Programs\GitHub CLI\gh.exe" set "PATH=%LocalAppData%\Programs\GitHub CLI;%PATH%"
+if exist "%LocalAppData%\Programs\GitHub CLI\gh.exe" set "PATH=%LocalAppData%\Programs\GitHub CLI;%PATH%"
 
 if not exist "%AURA_RUNTIME_DIR%" mkdir "%AURA_RUNTIME_DIR%" >nul 2>&1
 if exist "%AURA_RUNTIME_DIR%\runtime-sync.stop" del /f /q "%AURA_RUNTIME_DIR%\runtime-sync.stop" >nul 2>&1
@@ -79,7 +100,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-start "" /b powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
+start "" /b %POWERSHELL_EXE% -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%ROOT%tools\runtime-sync.ps1" -Root "%ROOT%" -IntervalMs 5000
 
 call :runtime_event 0 "bootstrap" "Arquivo .bat aberto"
 
