@@ -122,7 +122,7 @@ if not exist "%ProgramFiles%\nodejs\node.exe" (
     echo [INFO] Node.js nao encontrado. Tentando instalar automaticamente...
     call :runtime_event 6 "environment" "Node.js nao encontrado; tentando instalar via winget"
 
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
+    "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command winget -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }"
     if errorlevel 1 (
       echo.
       echo [ERRO] Node.js nao esta instalado e o winget nao esta disponivel.
@@ -328,7 +328,7 @@ call :runtime_event 90 "server" "Aguardando servidor responder na porta 5010"
 
 set "SERVER_READY=0"
 for /L %%N in (1,1,30) do (
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5010' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
+  "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "try { $r=Invoke-WebRequest -UseBasicParsing -Uri 'http://127.0.0.1:5010' -TimeoutSec 1; if ($r.StatusCode -ge 200 -and $r.StatusCode -lt 500) { exit 0 } else { exit 1 } } catch { exit 1 }" >nul 2>&1
 
   if not errorlevel 1 (
     set "SERVER_READY=1"
@@ -338,7 +338,7 @@ for /L %%N in (1,1,30) do (
   set /a "WAIT_PCT=90 + (%%N * 5 / 30)"
   call :progress !WAIT_PCT! "Aguardando servidor (%%N/30)"
   call :runtime_event !WAIT_PCT! "server" "Aguardando servidor (%%N/30)"
-  powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 1"
+  "%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "Start-Sleep -Seconds 1"
 )
 
 :server_ready
@@ -396,7 +396,7 @@ exit /b 0
 
 :refresh_runtime_sync
 echo [INFO] Verificando sincronizador de runtime no GitHub...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=Join-Path '%ROOT%' 'tools\\runtime-sync.ps1'; try { $b=(& gh api 'repos/SkelleTu/IntegrateSystem/contents/tools/runtime-sync.ps1?ref=main' --jq .content 2>&1 | Out-String).Trim(); if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($b)) { Write-Error $b; exit 1 }; $bytes=[Convert]::FromBase64String(($b -replace '\s','')); [IO.File]::WriteAllText($p,[Text.Encoding]::UTF8.GetString($bytes),[Text.UTF8Encoding]::new($false)); exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }"
+"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "$p=Join-Path '%ROOT%' 'tools\\runtime-sync.ps1'; try { $b=(& gh api 'repos/SkelleTu/IntegrateSystem/contents/tools/runtime-sync.ps1?ref=main' --jq .content 2>&1 | Out-String).Trim(); if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($b)) { Write-Error $b; exit 1 }; $bytes=[Convert]::FromBase64String(($b -replace '\s','')); [IO.File]::WriteAllText($p,[Text.Encoding]::UTF8.GetString($bytes),[Text.UTF8Encoding]::new($false)); exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }"
 if errorlevel 1 exit /b 1
 echo [OK] Sincronizador de runtime atualizado a partir do GitHub.
 exit /b 0
@@ -404,12 +404,12 @@ exit /b 0
 :progress
 set "PCT=%~1"
 set "PMSG=%~2"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$p=[int]'%PCT%'; $n=[math]::Floor($p/5); $bar=('=' * $n)+('.' * (20-$n)); Write-Host ('Progresso geral: ['+$bar+'] '+$p+'%%  '+('%PMSG%'))"
+"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "$p=[int]'%PCT%'; $n=[math]::Floor($p/5); $bar=('=' * $n)+('.' * (20-$n)); Write-Host ('Progresso geral: ['+$bar+'] '+$p+'%%  '+('%PMSG%'))"
 exit /b
 
 :runtime_event
 set "RUNTIME_PROGRESS=%~1"
 set "RUNTIME_PHASE=%~2"
 set "RUNTIME_MESSAGE=%~3"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$dir=$env:AURA_RUNTIME_DIR; if (-not $dir) { exit 0 }; New-Item -ItemType Directory -Force -Path $dir | Out-Null; $now=(Get-Date).ToUniversalTime().ToString('o'); $record=[ordered]@{sequence=[int64]((Get-Date).Ticks); sessionId=$env:AURA_RUNTIME_SESSION; timestamp=$now; process='bootstrap'; pid=$PID; event='bootstrap-status'; message=$env:RUNTIME_MESSAGE; data=[ordered]@{phase=$env:RUNTIME_PHASE; progress=[int]$env:RUNTIME_PROGRESS}}; $line=$record | ConvertTo-Json -Compress -Depth 8; Add-Content -LiteralPath (Join-Path $dir 'aura-runtime.jsonl') -Value $line -Encoding UTF8; $status=[ordered]@{sessionId=$env:AURA_RUNTIME_SESSION; process='bootstrap'; updatedAt=$now; phase=$env:RUNTIME_PHASE; message=$env:RUNTIME_MESSAGE; progress=[int]$env:RUNTIME_PROGRESS; heartbeatMs=[int]($env:AURA_RUNTIME_HEARTBEAT_MS); pid=$PID}; $status | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $dir 'aura-runtime.json') -Encoding UTF8" >nul 2>&1
+"%POWERSHELL_EXE%" -NoProfile -ExecutionPolicy Bypass -Command "$dir=$env:AURA_RUNTIME_DIR; if (-not $dir) { exit 0 }; New-Item -ItemType Directory -Force -Path $dir | Out-Null; $now=(Get-Date).ToUniversalTime().ToString('o'); $record=[ordered]@{sequence=[int64]((Get-Date).Ticks); sessionId=$env:AURA_RUNTIME_SESSION; timestamp=$now; process='bootstrap'; pid=$PID; event='bootstrap-status'; message=$env:RUNTIME_MESSAGE; data=[ordered]@{phase=$env:RUNTIME_PHASE; progress=[int]$env:RUNTIME_PROGRESS}}; $line=$record | ConvertTo-Json -Compress -Depth 8; Add-Content -LiteralPath (Join-Path $dir 'aura-runtime.jsonl') -Value $line -Encoding UTF8; $status=[ordered]@{sessionId=$env:AURA_RUNTIME_SESSION; process='bootstrap'; updatedAt=$now; phase=$env:RUNTIME_PHASE; message=$env:RUNTIME_MESSAGE; progress=[int]$env:RUNTIME_PROGRESS; heartbeatMs=[int]($env:AURA_RUNTIME_HEARTBEAT_MS); pid=$PID}; $status | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $dir 'aura-runtime.json') -Encoding UTF8" >nul 2>&1
 exit /b 0
