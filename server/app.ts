@@ -214,6 +214,33 @@ export async function initApp() {
       progress: 90,
     });
 
+    // ─── UNIVERSAL SERVER INTEGRATION ───────────────────────────────────────
+    const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\\/$/, "");
+    app.get("/api/universal/status", async (_req: Request, res: Response) => {
+      const startedAt = Date.now();
+      try {
+        const response = await fetch(universalServerUrl + "/api/healthz", {
+          headers: { Accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+        });
+        const body = await response.json().catch(() => null);
+        res.status(response.ok ? 200 : 503).json({
+          connected: response.ok,
+          url: universalServerUrl,
+          latencyMs: Date.now() - startedAt,
+          statusCode: response.status,
+          universal: body,
+        });
+      } catch (error: any) {
+        res.status(503).json({
+          connected: false,
+          url: universalServerUrl,
+          latencyMs: Date.now() - startedAt,
+          error: error?.message || String(error),
+        });
+      }
+    });
+
     return { app, httpServer };
   } catch (error) {
     runtimeError(error, "Falha crítica durante a inicialização do servidor", {
