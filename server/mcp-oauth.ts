@@ -86,7 +86,7 @@ export function registerMcpOAuth(app: Express) {
       authorization_response_iss_parameter_supported: true,
       authorization_endpoint: `${ISSUER}/oauth/authorize`,
       token_endpoint: `${ISSUER}/oauth/token`,
-      client_id_metadata_document_supported: true,
+      client_id_metadata_document_supported: false,
       token_endpoint_auth_methods_supported: ["none"],
       code_challenge_methods_supported: ["S256"],
       scopes_supported: ["aura.read", "aura.execute"],
