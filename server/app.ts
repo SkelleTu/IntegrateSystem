@@ -13,11 +13,11 @@ import {
   startRuntimeMonitor,
   installConsoleCapture,
 } from "./runtimeMonitor";
+import { supremeOperatorMiddleware } from "./supreme-operator";
 
 const app = express();
 const httpServer = createServer(app);
 
-// Configurar fuso horário para Brasília
 process.env.TZ = "America/Sao_Paulo";
 
 startRuntimeMonitor();
@@ -27,7 +27,6 @@ runtimeEvent("server-bootstrap", "Servidor começando a inicialização", {
   progress: 5,
 });
 
-// Serve attached assets/uploads
 const uploadsPath = process.env.VERCEL
   ? path.join("/tmp", "uploads")
   : path.join(process.cwd(), "attached_assets", "uploads");
@@ -53,17 +52,14 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
-
-// Configuração de proxy e caminhos públicos
 app.set("trust proxy", 1);
 
 app.use((req, res, next) => {
-  // Ajuste de Headers para evitar bloqueios de conexão
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, X-Trace-Id, X-Request-Id",
+    "Content-Type, Authorization, X-Requested-With, X-Trace-Id, X-Request-Id, X-Aurora-Operator-Mode",
   );
 
   if (req.method === "OPTIONS") {
@@ -72,9 +68,8 @@ app.use((req, res, next) => {
   next();
 });
 
-// Propaga a correlação ponta a ponta. O Universal/Aurora pode enviar os IDs;
-// quando ausentes, o IntegrateSystem cria IDs novos para que toda requisição
-// continue sendo rastreável.
+// O gateway Aurora/Universal pode transportar a correlação ponta a ponta.
+// O IntegrateSystem preserva os IDs e cria novos apenas quando necessário.
 app.use((req, res, next) => {
   const traceId = req.get("x-trace-id")?.trim() || randomUUID();
   const requestId = req.get("x-request-id")?.trim() || randomUUID();
@@ -93,6 +88,10 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// O nível Supremo é o único modo operacional ativo inicialmente.
+// A política fica centralizada e os IDs continuam disponíveis para auditoria.
+app.use(supremeOperatorMiddleware);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -127,6 +126,7 @@ app.use((req, res, next) => {
       contentLength: res.getHeader("content-length") || null,
       traceId: res.locals.traceId || null,
       requestId: res.locals.requestId || null,
+      operatorMode: res.locals.operatorMode || null,
     });
 
     if (requestPath.startsWith("/api") && requestPath !== "/api/runtime/event") {
@@ -137,7 +137,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Eventos enviados pela interface Electron/renderer.
 app.post("/api/runtime/event", (req: Request, res: Response) => {
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const event = typeof body.event === "string" ? body.event.slice(0, 200) : "renderer-event";
@@ -153,6 +152,7 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
     source: "electron",
     traceId: res.locals.traceId || null,
     requestId: res.locals.requestId || null,
+    operatorMode: res.locals.operatorMode || null,
     ...data,
   });
 
@@ -160,10 +160,14 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
 });
 
 app.get("/api/runtime/status", (_req: Request, res: Response) => {
-  res.json(getRuntimeStatus());
+  res.json({
+    ...getRuntimeStatus(),
+    operatorMode: res.locals.operatorMode || "supreme",
+    traceId: res.locals.traceId || null,
+    requestId: res.locals.requestId || null,
+  });
 });
 
-// Wrapper function to initialize routes and static serving
 export async function initApp() {
   try {
     runtimeEvent("database-init", "Iniciando banco de dados", {
@@ -193,8 +197,6 @@ export async function initApp() {
       progress: 55,
     });
 
-    // Statuso leve do backup do Google Drive para a barra inferior.
-    // Não expõe caminho local nem informações sensíveis.
     app.get("/api/google-drive/status", (_req: Request, res: Response) => {
       const status = getGoogleDriveBackupStatus();
       res.json(status);
@@ -209,6 +211,7 @@ export async function initApp() {
         statusCode: status,
         traceId: res.locals.traceId || null,
         requestId: res.locals.requestId || null,
+        operatorMode: res.locals.operatorMode || null,
       });
 
       res.status(status).json({ message });
@@ -243,7 +246,6 @@ export async function initApp() {
       progress: 90,
     });
 
-    // ─── UNIVERSAL SERVER INTEGRATION ───────────────────────────────────────
     const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\/$/, "");
     app.get("/api/universal/status", async (req: Request, res: Response) => {
       const startedAt = Date.now();
@@ -253,6 +255,7 @@ export async function initApp() {
             Accept: "application/json",
             "X-Trace-Id": res.locals.traceId,
             "X-Request-Id": res.locals.requestId,
+            "X-Aurora-Operator-Mode": res.locals.operatorMode || "supreme",
           },
           signal: AbortSignal.timeout(8000),
         });
@@ -264,6 +267,7 @@ export async function initApp() {
           statusCode: response.status,
           traceId: res.locals.traceId,
           requestId: res.locals.requestId,
+          operatorMode: res.locals.operatorMode || "supreme",
           universal: body,
         });
       } catch (error: any) {
@@ -273,6 +277,7 @@ export async function initApp() {
           latencyMs: Date.now() - startedAt,
           traceId: res.locals.traceId,
           requestId: res.locals.requestId,
+          operatorMode: res.locals.operatorMode || "supreme",
           error: error?.message || String(error),
         });
       }
@@ -297,5 +302,4 @@ process.on("unhandledRejection", (reason) => {
   runtimeError(reason, "unhandledRejection no servidor");
 });
 
-// Default export for serverless-http
 export default app;
