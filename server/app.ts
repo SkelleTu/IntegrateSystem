@@ -1,4 +1,5 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
+import { randomUUID } from "node:crypto";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -62,12 +63,34 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With",
+    "Content-Type, Authorization, X-Requested-With, X-Trace-Id, X-Request-Id",
   );
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
+  next();
+});
+
+// Propaga a correlação ponta a ponta. O Universal/Aurora pode enviar os IDs;
+// quando ausentes, o IntegrateSystem cria IDs novos para que toda requisição
+// continue sendo rastreável.
+app.use((req, res, next) => {
+  const traceId = req.get("x-trace-id")?.trim() || randomUUID();
+  const requestId = req.get("x-request-id")?.trim() || randomUUID();
+
+  res.setHeader("X-Trace-Id", traceId);
+  res.setHeader("X-Request-Id", requestId);
+
+  res.locals.traceId = traceId;
+  res.locals.requestId = requestId;
+
+  runtimeEvent("request-correlation", `${req.method} ${req.path}`, {
+    phase: "http",
+    traceId,
+    requestId,
+  });
+
   next();
 });
 
@@ -102,10 +125,12 @@ app.use((req, res, next) => {
       statusCode: res.statusCode,
       durationMs: duration,
       contentLength: res.getHeader("content-length") || null,
+      traceId: res.locals.traceId || null,
+      requestId: res.locals.requestId || null,
     });
 
     if (requestPath.startsWith("/api") && requestPath !== "/api/runtime/event") {
-      log(`${req.method} ${requestPath} ${res.statusCode} in ${duration}ms`);
+      log(`${req.method} ${requestPath} ${res.statusCode} in ${duration}ms`, "express");
     }
   });
 
@@ -126,6 +151,8 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
   runtimeEvent(event, message, {
     phase: "electron",
     source: "electron",
+    traceId: res.locals.traceId || null,
+    requestId: res.locals.requestId || null,
     ...data,
   });
 
@@ -180,6 +207,8 @@ export async function initApp() {
       runtimeError(err, "Erro do servidor ao processar uma requisição", {
         phase: "http",
         statusCode: status,
+        traceId: res.locals.traceId || null,
+        requestId: res.locals.requestId || null,
       });
 
       res.status(status).json({ message });
@@ -216,11 +245,15 @@ export async function initApp() {
 
     // ─── UNIVERSAL SERVER INTEGRATION ───────────────────────────────────────
     const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\/$/, "");
-    app.get("/api/universal/status", async (_req: Request, res: Response) => {
+    app.get("/api/universal/status", async (req: Request, res: Response) => {
       const startedAt = Date.now();
       try {
         const response = await fetch(universalServerUrl + "/api/healthz", {
-          headers: { Accept: "application/json" },
+          headers: {
+            Accept: "application/json",
+            "X-Trace-Id": res.locals.traceId,
+            "X-Request-Id": res.locals.requestId,
+          },
           signal: AbortSignal.timeout(8000),
         });
         const body = await response.json().catch(() => null);
@@ -229,6 +262,8 @@ export async function initApp() {
           url: universalServerUrl,
           latencyMs: Date.now() - startedAt,
           statusCode: response.status,
+          traceId: res.locals.traceId,
+          requestId: res.locals.requestId,
           universal: body,
         });
       } catch (error: any) {
@@ -236,6 +271,8 @@ export async function initApp() {
           connected: false,
           url: universalServerUrl,
           latencyMs: Date.now() - startedAt,
+          traceId: res.locals.traceId,
+          requestId: res.locals.requestId,
           error: error?.message || String(error),
         });
       }
@@ -245,6 +282,8 @@ export async function initApp() {
   } catch (error) {
     runtimeError(error, "Falha crítica durante a inicialização do servidor", {
       phase: "initialization",
+      traceId: undefined,
+      requestId: undefined,
     });
     throw error;
   }
