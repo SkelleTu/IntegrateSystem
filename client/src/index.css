@@ -181,6 +181,14 @@
     box-shadow: 0 0 15px rgba(0, 229, 255, 0.2);
   }
 
+  /* Aura neon icon standard: every button icon uses the platform cyan glow */
+  button svg,
+  [role="button"] svg {
+    color: #00e5ff !important;
+    stroke: currentColor !important;
+    filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.75)) drop-shadow(0 0 9px rgba(0, 229, 255, 0.35));
+  }
+
   button:not(.ghost):not(.outline), .btn-neon {
     box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
     transition: box-shadow 0.3s ease, transform 0.3s ease;
