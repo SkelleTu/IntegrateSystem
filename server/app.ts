@@ -14,6 +14,7 @@ import {
   installConsoleCapture,
 } from "./runtimeMonitor";
 import { supremeOperatorMiddleware } from "./supreme-operator";
+import { registerMcpOAuth } from "./mcp-oauth";
 
 const app = express();
 const httpServer = createServer(app);
@@ -92,6 +93,7 @@ app.use((req, res, next) => {
 // O nível Supremo é o único modo operacional ativo inicialmente.
 // A política fica centralizada e os IDs continuam disponíveis para auditoria.
 app.use(supremeOperatorMiddleware);
+registerMcpOAuth(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
