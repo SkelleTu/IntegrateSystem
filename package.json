@@ -11,7 +11,7 @@
     "build": "tsx script/build.ts",
     "build:electron": "npm run build && electron-builder --config electron-builder.config.json --config.npmRebuild=false --config.asar=false",
     "vercel-build": "npm run build",
-    "start": "node \"dist/Aura System.exe\"",
+    "start": "node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push"
   },
