@@ -215,7 +215,7 @@ export async function initApp() {
     });
 
     // ─── UNIVERSAL SERVER INTEGRATION ───────────────────────────────────────
-    const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\\/$/, "");
+    const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\/$/, "");
     app.get("/api/universal/status", async (_req: Request, res: Response) => {
       const startedAt = Date.now();
       try {
