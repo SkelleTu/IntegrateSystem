@@ -3,7 +3,7 @@ import path from "path";
 import { localSqlite } from "./db";
 
 const DEFAULT_BACKUP_DIR = "G:\\Meu Drive\\Aura System - Backups\\Banco de Dados\\sqlite";
-const BACKUP_DIR = process.env.AURA_GOOGLE_DRIVE_BACKUP_DIR || DEFAULT_BACKUP_DIR;
+const BACKUP_DIR = process.env.AURA_GOOGLE_DRIVE_BACKUP_DIR || (process.platform === "win32" ? DEFAULT_BACKUP_DIR : "");
 const BACKUP_FILENAME = "sqlite-backup.db";
 const BACKUP_INTERVAL_MS = 5 * 60 * 1000;
 const RETRY_UNAVAILABLE_MS = 15 * 1000;
@@ -34,7 +34,7 @@ export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
 }
 
 export function backupSqliteToGoogleDrive(): string | null {
-  if (process.env.VERCEL) return null;
+  if (process.env.VERCEL || !BACKUP_DIR) return null;
 
   lastAttemptAt = Date.now();
   const target = path.join(BACKUP_DIR, BACKUP_FILENAME);
@@ -67,7 +67,7 @@ export function backupSqliteToGoogleDrive(): string | null {
 }
 
 export function startGoogleDriveBackupScheduler() {
-  if (process.env.VERCEL || timer) return;
+  if (process.env.VERCEL || !BACKUP_DIR || timer) return;
 
   // Primeira tentativa imediatamente ao iniciar.
   backupSqliteToGoogleDrive();
