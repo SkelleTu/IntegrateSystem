@@ -195,11 +195,13 @@ export function registerMcpOAuth(app: Express) {
     const code = String(req.body?.code ?? "");
     const verifier = String(req.body?.code_verifier ?? "");
     const clientId = String(req.body?.client_id ?? "");
+    const redirectUri = String(req.body?.redirect_uri ?? "");
+    const resource = String(req.body?.resource ?? "");
     const record = codeStore.get(code);
     if (!record) return res.status(400).json({ error: "invalid_grant" });
     codeStore.delete(code);
 
-    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== RESOURCE) {
+    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== resource || resource !== RESOURCE || (redirectUri && redirectUri !== record.redirectUri)) {
       return res.status(400).json({ error: "invalid_grant" });
     }
 
