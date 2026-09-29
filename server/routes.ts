@@ -51,7 +51,7 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db } from "./db";
+import { db, localSqlite } from "./db";
 import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema";
 
 export async function registerRoutes(
@@ -1697,6 +1697,7 @@ export async function registerRoutes(
     importDataFromSnapshot,
     restoreFromFile,
     getAutoBackupInfo,
+    buildSqlDump,
   } = await import("./backup.js");
 
   // GET /api/backup/status — info do auto-backup e bancos ativos
