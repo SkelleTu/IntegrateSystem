@@ -5,6 +5,7 @@ import { storage } from "./storage";
 const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const RESOURCE = String(process.env.MCP_RESOURCE_URL ?? "https://universal-server1.onrender.com").replace(/\/$/, "");
 const SECRET = String(process.env.MCP_OAUTH_SECRET ?? "");
+const CLIENT_ID = String(process.env.MCP_OAUTH_CLIENT_ID ?? "aura-chatgpt");
 const codeStore = new Map<string, {
   clientId: string;
   redirectUri: string;
@@ -51,7 +52,8 @@ function comparePassword(stored: string, supplied: string): boolean {
 }
 
 function validClient(clientId: string): boolean {
-  return clientId === "https://chatgpt.com/oauth/client.json"
+  return clientId === CLIENT_ID
+    || clientId === "https://chatgpt.com/oauth/client.json"
     || /^https:\/\/chatgpt\.com\/oauth\/[^\s]+$/.test(clientId);
 }
 
