@@ -63,6 +63,36 @@ function validRedirect(uri: string): boolean {
     || /^https:\/\/chatgpt\.com\/oauth\/[^\s]+$/.test(uri);
 }
 
+type CimdDocument = {
+  client_id?: string;
+  redirect_uris?: string[];
+  response_types?: string[];
+};
+
+async function fetchCimdDocument(clientId: string): Promise<CimdDocument | null> {
+  if (clientId !== "https://chatgpt.com/oauth/client.json") return null;
+  try {
+    const response = await fetch(clientId, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    const document = await response.json() as CimdDocument;
+    if (document.client_id !== clientId) return null;
+    if (!Array.isArray(document.redirect_uris) || !document.redirect_uris.includes("https://chatgpt.com/connector_platform_oauth_redirect")) return null;
+    if (!Array.isArray(document.response_types) || !document.response_types.includes("code")) return null;
+    return document;
+  } catch {
+    return null;
+  }
+}
+
+async function validClientForRequest(clientId: string, redirectUri: string): Promise<boolean> {
+  if (clientId !== "https://chatgpt.com/oauth/client.json") return validClient(clientId);
+  const document = await fetchCimdDocument(clientId);
+  return Boolean(document?.redirect_uris?.includes(redirectUri));
+}
+
 function cleanScopes(value: string): string[] {
   const allowed = new Set(["aura.read", "aura.execute"]);
   return [...new Set(String(value || "aura.read").split(/\s+/).filter((scope) => allowed.has(scope)))];
@@ -108,7 +138,7 @@ export function registerMcpOAuth(app: Express) {
     const scopes = cleanScopes(String(req.query.scope ?? "aura.read"));
 
     if (!SECRET) return res.status(503).send("MCP OAuth is not configured.");
-    if (!validClient(clientId)) return res.status(400).send("Unsupported OAuth client.");
+    if (!(await validClientForRequest(clientId, redirectUri))) return res.status(400).send("Unsupported OAuth client.");
     if (!validRedirect(redirectUri)) return res.status(400).send("Unsupported redirect URI.");
     if (responseType !== "code") return res.status(400).send("Only response_type=code is supported.");
     if (codeChallengeMethod !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)) return res.status(400).send("PKCE S256 code challenge is required.");
@@ -129,7 +159,7 @@ export function registerMcpOAuth(app: Express) {
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? "");
 
-    if (!validClient(clientId) || !validRedirect(redirectUri) || resource !== RESOURCE) {
+    if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || resource !== RESOURCE) {
       return res.status(400).send("Invalid OAuth request.");
     }
     if (!SECRET) return res.status(503).send("MCP OAuth is not configured.");
