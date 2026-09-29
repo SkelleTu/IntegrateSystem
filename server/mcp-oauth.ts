@@ -5,7 +5,7 @@ import { storage } from "./storage";
 const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const RESOURCE = String(process.env.MCP_RESOURCE_URL ?? "https://universal-server1.onrender.com").replace(/\/$/, "");
 const SECRET = String(process.env.MCP_OAUTH_SECRET ?? "");
-const CLIENT_ID = String(process.env.MCP_OAUTH_CLIENT_ID ?? "aura-chatgpt");
+const CLIENT_ID = String(process.env.MCP_OAUTH_CLIENT_ID ?? "https://chatgpt.com/oauth/client.json");
 const codeStore = new Map<string, {
   clientId: string;
   redirectUri: string;
@@ -88,7 +88,7 @@ export function registerMcpOAuth(app: Express) {
       authorization_response_iss_parameter_supported: true,
       authorization_endpoint: `${ISSUER}/oauth/authorize`,
       token_endpoint: `${ISSUER}/oauth/token`,
-      client_id_metadata_document_supported: false,
+      client_id_metadata_document_supported: true,
       token_endpoint_auth_methods_supported: ["none"],
       grant_types_supported: ["authorization_code"],
       response_types_supported: ["code"],
