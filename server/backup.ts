@@ -114,7 +114,7 @@ function getSqlStatements(database: any): { statements: string[]; tableRows: Rec
   return { statements, tableRows };
 }
 
-function buildSqlDump(database: any): { sql: string; tableRows: Record<string, number> } {
+export function buildSqlDump(database: any): { sql: string; tableRows: Record<string, number> } {
   const { statements, tableRows } = getSqlStatements(database);
   const totalRows = Object.values(tableRows).reduce((sum, value) => sum + value, 0);
   const exportedAt = new Date().toISOString();
