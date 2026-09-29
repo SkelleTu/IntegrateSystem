@@ -68,6 +68,7 @@ export default function Backup() {
   const [saveName, setSaveName] = useState("");
   const [isRestoring, setIsRestoring] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const sqlFileInputRef = useRef<HTMLInputElement>(null);
 
   // Status
   const { data: status, refetch: refetchStatus } = useQuery<BackupStatus>({
@@ -155,6 +156,29 @@ export default function Backup() {
 
   const handleExport = () => {
     window.open("/api/backup/export", "_blank");
+  };
+
+  const handleSqlExport = () => {
+    window.open("/api/backup/export-sql", "_blank");
+  };
+
+  const handleSqlImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const sql = String(reader.result || "");
+        const data = await apiRequest("POST", "/api/backup/import-sql", { sql }) as any;
+        toast({ title: "✅ SQL restaurado!", description: data.message });
+        qc.invalidateQueries();
+      } catch (err: any) {
+        toast({ title: "Erro ao restaurar SQL", description: err.message, variant: "destructive" });
+      } finally {
+        e.target.value = "";
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleDownload = (filename: string) => {
@@ -366,6 +390,28 @@ export default function Backup() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ── SQL portátil ── */}
+        <Card className="bg-zinc-900/60 border-primary/20 border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Database className="w-4 h-4 text-primary" />
+              Backup SQL portátil
+            </CardTitle>
+            <CardDescription>
+              Exporte ou restaure o banco SQL em qualquer computador ou navegador. O arquivo não depende de Google Drive, Windows ou de uma letra de unidade.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row gap-2">
+            <Button onClick={handleSqlExport} className="bg-primary hover:bg-primary/90 text-black font-bold">
+              <Download className="w-4 h-4 mr-2" /> Baixar SQL
+            </Button>
+            <input ref={sqlFileInputRef} type="file" accept=".sql,text/sql" className="hidden" onChange={handleSqlImport} />
+            <Button variant="outline" onClick={() => sqlFileInputRef.current?.click()} className="border-primary/30 text-primary hover:bg-primary/10">
+              <Upload className="w-4 h-4 mr-2" /> Restaurar SQL
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* ── Auto-backup restore ── */}
         {status?.autoBackup.exists && (
