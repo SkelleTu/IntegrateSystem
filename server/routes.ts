@@ -60,6 +60,32 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Trusted Aurora/Universal service-to-service operator authentication.
+  // This keeps the normal browser session flow intact while allowing the
+  // Universal Server to execute the same authenticated Aura modules on behalf
+  // of Aurora. The token must be shared only between trusted services.
+  app.use(async (req: any, res: any, next: any) => {
+    const expectedToken = String(process.env.AURORA_OPERATOR_TOKEN || process.env.AURA_AGENT_TOKEN || "").trim();
+    const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "").trim();
+    if (!expectedToken || suppliedToken !== expectedToken) return next();
+
+    try {
+      const operatorUsername = String(process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
+      const operator = operatorUsername
+        ? await storage.getUserByUsername(operatorUsername)
+        : (await storage.getUsers()).find((candidate: any) => ["admin", "owner"].includes(String(candidate.role).toLowerCase()));
+      if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
+        return res.status(403).json({ message: "Configured Aurora operator is missing or lacks admin privileges" });
+      }
+      req.user = operator;
+      req.auroraOperator = true;
+      return next();
+    } catch (error) {
+      console.error("Aurora service authentication failed:", error);
+      return res.status(503).json({ message: "Aurora service authentication failed" });
+    }
+  });
+
   // WebSocket for Label System
   const wss = new WebSocketServer({ noServer: true });
   let windowsClient: WebSocket | null = null;
@@ -150,32 +176,6 @@ export async function registerRoutes(
 
   app.use(passport.initialize());
   app.use(passport.session());
-
-  // Trusted Aurora/Universal service-to-service operator authentication.
-  // This keeps the normal browser session flow intact while allowing the
-  // Universal Server to execute the same authenticated Aura modules on behalf
-  // of Aurora. The token must be shared only between trusted services.
-  app.use(async (req: any, res: any, next: any) => {
-    const expectedToken = String(process.env.AURORA_OPERATOR_TOKEN || process.env.AURA_AGENT_TOKEN || "").trim();
-    const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "").trim();
-    if (!expectedToken || suppliedToken !== expectedToken) return next();
-
-    try {
-      const operatorUsername = String(process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
-      const operator = operatorUsername
-        ? await storage.getUserByUsername(operatorUsername)
-        : (await storage.getUsers()).find((candidate: any) => ["admin", "owner"].includes(String(candidate.role).toLowerCase()));
-      if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
-        return res.status(403).json({ message: "Configured Aurora operator is missing or lacks admin privileges" });
-      }
-      req.user = operator;
-      req.auroraOperator = true;
-      return next();
-    } catch (error) {
-      console.error("Aurora service authentication failed:", error);
-      return res.status(503).json({ message: "Aurora service authentication failed" });
-    }
-  });
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
