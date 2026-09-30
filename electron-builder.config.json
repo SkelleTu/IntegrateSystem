@@ -1,6 +1,7 @@
 {
   "appId": "com.aurasystem.app",
   "productName": "Aura System",
+  "icon": "client/public/aura-system-logo.svg",
   "directories": {
     "output": "dist"
   },
