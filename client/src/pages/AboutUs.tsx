@@ -1,5 +1,5 @@
 import { Building2, Users, Target, Award, ShieldCheck } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
