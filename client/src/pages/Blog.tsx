@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { ArrowLeft, Calendar, Clock, Share2, Bookmark, ArrowRight, ShieldCheck, Zap, Globe, BarChart3 } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 import { useToast } from "@/hooks/use-toast";
 
