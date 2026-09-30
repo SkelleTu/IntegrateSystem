@@ -15,6 +15,7 @@ import {
 } from "./runtimeMonitor";
 import { supremeOperatorMiddleware } from "./supreme-operator";
 import { registerMcpOAuth } from "./mcp-oauth";
+import { registerAuraDirectMcp } from "./direct-mcp";
 
 const app = express();
 const httpServer = createServer(app);
@@ -94,6 +95,7 @@ app.use((req, res, next) => {
 // A política fica centralizada e os IDs continuam disponíveis para auditoria.
 app.use(supremeOperatorMiddleware);
 registerMcpOAuth(app);
+registerAuraDirectMcp(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
