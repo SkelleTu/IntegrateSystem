@@ -71,7 +71,7 @@ export function Navbar() {
   return (
     <div className="fixed top-2 left-1/2 -translate-x-1/2 z-[100] w-[98%] max-w-[1700px] h-16 flex items-center gap-3">
       <div className="hidden sm:flex items-center gap-2 h-12 px-3 rounded-2xl border border-cyan-400/15 bg-black/55 backdrop-blur-xl shadow-[0_8px_32px_rgba(0,0,0,.45)]">
-        <img src="/favicon.ico?v=3" alt="Aura System" className="w-7 h-7 object-contain drop-shadow-[0_0_10px_rgba(0,229,255,.45)]" />
+        <img src="/aura-system-logo.svg?v=4" alt="Aura System" className="w-7 h-7 object-contain drop-shadow-[0_0_10px_rgba(0,229,255,.45)]" />
         <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white/75">Aura System</span>
       </div>
 
