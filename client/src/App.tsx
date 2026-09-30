@@ -36,7 +36,7 @@ import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 
 import { Navbar } from "@/components/layout/Navbar";
 import { StatusBar } from "@/components/layout/StatusBar";
