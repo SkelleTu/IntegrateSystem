@@ -1,4 +1,4 @@
-const CACHE_NAME = "aurora-agent-v1";
+const CACHE_NAME = "aura-system-pwa-v2";
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
