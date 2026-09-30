@@ -10,7 +10,7 @@ import {
   Building2, Plus, ChevronRight, Loader2, Store, Scissors,
   Coffee, UtensilsCrossed, Sparkles, ShoppingBag, Check,
 } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 
 const BUSINESS_TYPES = [
   { value: "barbearia",    label: "Barbearia",    icon: Scissors },
