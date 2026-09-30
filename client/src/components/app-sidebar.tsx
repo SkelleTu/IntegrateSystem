@@ -42,7 +42,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { useState, useEffect } from "react"
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 import { MasterPasswordGuard } from "@/components/MasterPasswordGuard"
 
 export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
