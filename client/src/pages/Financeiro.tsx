@@ -28,6 +28,7 @@ export default function Financeiro() {
     end: format(new Date(), "yyyy-MM-dd"),
   });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const dateRangeValid = dateRange.start <= dateRange.end;
 
   if (user?.role !== "admin") {
     return (
@@ -49,6 +50,7 @@ export default function Financeiro() {
       const res = await fetch(`/api/sales?start=${start.toISOString()}&end=${end.toISOString()}`);
       return res.json();
     },
+    enabled: dateRangeValid,
     refetchInterval: 30000,
   });
 
@@ -62,6 +64,7 @@ export default function Financeiro() {
       if (!res.ok) throw new Error("Erro ao buscar transações");
       return res.json();
     },
+    enabled: dateRangeValid,
     refetchInterval: 15000,
   });
 
@@ -288,7 +291,7 @@ export default function Financeiro() {
                       <FormItem>
                         <FormLabel className="text-[10px] uppercase font-black tracking-widest text-zinc-500">Descrição</FormLabel>
                         <FormControl>
-                          <Input {...field} className="bg-black border-white/10 h-12 rounded-xl" />
+                          <Input {...field} required aria-required="true" className="bg-black border-white/10 h-12 rounded-xl" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -307,6 +310,8 @@ export default function Financeiro() {
                               type="text" 
                               inputMode="numeric"
                               placeholder="0,00"
+                              required
+                              aria-required="true"
                               className="bg-black border-white/10 h-14 rounded-xl font-black text-xl italic pl-14 text-right" 
                               onChange={(e) => handleAmountChange(e, field.onChange)} 
                               value={amountDisplay} 
@@ -334,9 +339,9 @@ export default function Financeiro() {
       <main className="flex-1 flex flex-col h-full overflow-hidden">
         <header className="p-6 border-b border-white/5 flex flex-wrap items-center justify-between gap-4 bg-zinc-900/20">
           <div className="flex items-center gap-4 bg-black/40 p-1.5 rounded-xl border border-white/5">
-            <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent text-white text-[11px] font-bold border-0 focus:ring-0 [color-scheme:dark] px-3" />
+            <input type="date" max={dateRange.end} value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent text-white text-[11px] font-bold border-0 focus:ring-0 [color-scheme:dark] px-3" />
             <div className="h-4 w-[1px] bg-white/10" />
-            <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent text-white text-[11px] font-bold border-0 focus:ring-0 [color-scheme:dark] px-3" />
+            <input type="date" min={dateRange.start} value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent text-white text-[11px] font-bold border-0 focus:ring-0 [color-scheme:dark] px-3" />
           </div>
           
           <Select value={businessType} onValueChange={(v: any) => setBusinessType(v)}>
@@ -350,6 +355,11 @@ export default function Financeiro() {
         </header>
 
         <div className="flex-1 overflow-hidden p-6">
+          {!dateRangeValid && (
+            <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-bold text-red-300">
+              Intervalo inválido: a data inicial não pode ser posterior à data final.
+            </div>
+          )}
           <Tabs defaultValue="transactions" className="h-full flex flex-col">
             <TabsList className="bg-zinc-900/50 border border-white/5 self-start p-1 mb-6 rounded-xl h-12">
               <TabsTrigger value="transactions" className="rounded-lg data-[state=active]:bg-primary data-[state=active]:text-black font-black uppercase italic text-xs px-6">
