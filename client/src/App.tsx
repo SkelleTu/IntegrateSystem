@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/sheet";
 
 import MasterControl from "./pages/MasterControl";
+import Monitoring from "./pages/Monitoring";
 import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
 import AuraWindows from "./pages/AuraWindows";
 import Backup from "./pages/Backup";
@@ -124,7 +125,7 @@ function Router() {
             <Route path="/inventory" component={Inventory} />
             <Route path="/fiscal" component={FiscalConfig} />
             <Route path="/admin/labels" component={LabelSystem} />
-            <Route path="/admin/monitoring" component={MasterControl} />
+            <Route path="/admin/monitoring" component={Monitoring} />
             <Route path="/cart" component={ClientCart} />
             <Route path="/admin/master" component={MasterControl} />
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
