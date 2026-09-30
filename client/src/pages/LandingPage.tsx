@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Building2, ArrowRight, ShieldCheck, Zap, CreditCard, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
