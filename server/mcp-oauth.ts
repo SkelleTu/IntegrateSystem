@@ -4,6 +4,13 @@ import { storage } from "./storage";
 
 const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const RESOURCE = String(process.env.MCP_RESOURCE_URL ?? "https://universal-server1.onrender.com").replace(/\/$/, "");
+const RESOURCE_ALLOWLIST = new Set(
+  String(process.env.MCP_RESOURCE_URLS ?? [
+    RESOURCE,
+    "https://integrated-system-gzyu.onrender.com",
+    "https://aurora-agent-o9x5.onrender.com",
+  ].join(",")).split(",").map((value) => value.trim().replace(/\/$/, "")).filter(Boolean),
+);
 const SECRET = String(process.env.MCP_OAUTH_SECRET ?? "");
 const CLIENT_ID = String(process.env.MCP_OAUTH_CLIENT_ID ?? "https://chatgpt.com/oauth/client.json");
 const codeStore = new Map<string, {
@@ -111,6 +118,33 @@ function htmlEscape(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]!));
 }
 
+
+export function verifyMcpAccessToken(raw: string, requiredScope: string, resource = String(process.env.AURA_MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "")) {
+  if (!SECRET) return null;
+  const parts = raw.split(".");
+  if (parts.length !== 3) return null;
+  let header: any, payload: any;
+  try {
+    header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+    payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+  } catch { return null; }
+  const signature = b64url(crypto.createHmac("sha256", SECRET).update(`${parts[0]}.${parts[1]}`).digest());
+  const now = Math.floor(Date.now() / 1000);
+  const scopes = String(payload.scope ?? "").split(/\s+/).filter(Boolean);
+  if (
+    header?.alg !== "HS256" ||
+    header?.typ !== "JWT" ||
+    !timingEqual(signature, parts[2]) ||
+    payload.iss !== ISSUER ||
+    payload.aud !== resource ||
+    !payload.sub ||
+    Number(payload.exp) <= now ||
+    Number(payload.iat) > now + 120 ||
+    !scopes.includes(requiredScope)
+  ) return null;
+  return payload as { sub: string; username?: string; scope?: string; aud: string; iss: string; exp: number; iat: number };
+}
+
 export function registerMcpOAuth(app: Express) {
   app.get("/.well-known/oauth-authorization-server", (_req, res) => {
     res.json({
@@ -142,7 +176,7 @@ export function registerMcpOAuth(app: Express) {
     if (!validRedirect(redirectUri)) return res.status(400).send("Unsupported redirect URI.");
     if (responseType !== "code") return res.status(400).send("Only response_type=code is supported.");
     if (codeChallengeMethod !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)) return res.status(400).send("PKCE S256 code challenge is required.");
-    if (resource !== RESOURCE) return res.status(400).send("Invalid resource.");
+    if (!RESOURCE_ALLOWLIST.has(resource)) return res.status(400).send("Invalid resource.");
 
     const actionScope = scopes.includes("aura.execute");
     const scopeText = scopes.join(" ");
@@ -159,7 +193,7 @@ export function registerMcpOAuth(app: Express) {
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? "");
 
-    if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || resource !== RESOURCE) {
+    if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || !RESOURCE_ALLOWLIST.has(resource)) {
       return res.status(400).send("Invalid OAuth request.");
     }
     if (!SECRET) return res.status(503).send("MCP OAuth is not configured.");
@@ -201,7 +235,7 @@ export function registerMcpOAuth(app: Express) {
     if (!record) return res.status(400).json({ error: "invalid_grant" });
     codeStore.delete(code);
 
-    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== resource || resource !== RESOURCE || (redirectUri && redirectUri !== record.redirectUri)) {
+    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== resource || !RESOURCE_ALLOWLIST.has(resource) || (redirectUri && redirectUri !== record.redirectUri)) {
       return res.status(400).json({ error: "invalid_grant" });
     }
 
