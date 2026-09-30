@@ -4,6 +4,15 @@ import { installAuraRuntimeMonitor } from "./lib/runtimeMonitor";
 
 installAuraRuntimeMonitor();
 
+// Habilita o modo PWA do Aurora Agent no Chrome e em navegadores compatíveis.
+if ("serviceWorker" in navigator && import.meta.env.PROD) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch((error) => {
+      console.error("Falha ao registrar o Service Worker do Aurora Agent:", error);
+    });
+  });
+}
+
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
