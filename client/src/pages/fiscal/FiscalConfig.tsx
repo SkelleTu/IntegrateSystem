@@ -108,6 +108,10 @@ export default function FiscalConfig() {
     queryKey: ["/api/fiscal/history"],
   });
 
+  const { data: fiscalLogs = [], isLoading: isLoadingLogs } = useQuery<any[]>({
+    queryKey: ["/api/fiscal/logs"],
+  });
+
   const mutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/fiscal/settings", data);
@@ -718,6 +722,123 @@ export default function FiscalConfig() {
               {mutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Salvar Configurações"}
             </Button>
           </div>
+        </TabsContent>
+
+        {/* ─── ABA IMPRESSORAS ─────────────────────────────────── */}
+        <TabsContent value="printers">
+          <Card className="panel-translucent border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                <Printer className="w-6 h-6 text-primary" /> Impressoras
+              </CardTitle>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">
+                Estado do gateway local de impressão
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-black uppercase text-white">Gateway Windows</p>
+                    <p className="text-xs text-white/40 mt-1">A impressão física depende do aplicativo Windows conectado.</p>
+                  </div>
+                  <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20">OFFLINE</Badge>
+                </div>
+              </div>
+              <Button type="button" variant="outline" disabled className="border-white/10 text-white/40">
+                <Printer className="w-4 h-4 mr-2" /> Testar impressão
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── ABA LEITOR ────────────────────────────────────── */}
+        <TabsContent value="barcode">
+          <Card className="panel-translucent border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                <Barcode className="w-6 h-6 text-primary" /> Leitor de Barras
+              </CardTitle>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">
+                Diagnóstico seguro do fluxo de leitura
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+                <p className="text-sm font-bold text-white">Leitor pronto para receber EAN/GTIN.</p>
+                <p className="text-xs text-white/40 mt-2">A busca e o cadastro permanecem integrados ao Estoque. Nenhum produto é alterado durante o teste.</p>
+                <div className="mt-4 flex items-center gap-2">
+                  <Badge className="bg-primary/10 text-primary border-primary/20">WEB</Badge>
+                  <span className="text-xs text-white/40">Use o leitor do Estoque para localizar o produto por código.</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── ABA SIMULAÇÃO ─────────────────────────────────── */}
+        <TabsContent value="simulacao">
+          <Card className="panel-translucent border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                <Play className="w-6 h-6 text-primary" /> Testes de Simulação
+              </CardTitle>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">
+                Ambiente seguro, sem emissão fiscal real
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5">
+                <p className="font-black text-blue-300 uppercase">Homologação</p>
+                <p className="text-xs text-white/50 mt-1">A configuração atual deve permanecer em Homologação durante testes. A emissão real só deve ocorrer após a configuração fiscal estar completa.</p>
+              </div>
+              <div className="rounded-xl border border-white/10 p-4 text-xs text-white/50">
+                Fluxo validado: Caixa → Venda → Fiscal → Histórico. Nenhuma venda é criada nesta aba.
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── ABA LOGS ──────────────────────────────────────── */}
+        <TabsContent value="logs">
+          <Card className="panel-translucent border-white/10">
+            <CardHeader>
+              <CardTitle className="text-white font-black uppercase italic tracking-tighter text-2xl flex items-center gap-3">
+                <Terminal className="w-6 h-6 text-primary" /> Logs Fiscais
+              </CardTitle>
+              <CardDescription className="text-white/40 uppercase font-bold text-[10px] tracking-widest">
+                Eventos registrados pelo módulo fiscal
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingLogs ? (
+                <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+              ) : fiscalLogs.length === 0 ? (
+                <div className="rounded-xl border border-white/10 p-12 text-center text-white/30 font-bold uppercase tracking-widest">
+                  Nenhum log fiscal registrado
+                </div>
+              ) : (
+                <div className="rounded-xl border border-white/10 overflow-hidden">
+                  <Table>
+                    <TableHeader className="bg-black/40">
+                      <TableRow>
+                        <TableHead>Data/Hora</TableHead><TableHead>Evento</TableHead><TableHead>Detalhes</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {fiscalLogs.map((log: any, i: number) => (
+                        <TableRow key={log.id ?? i} className="border-white/10">
+                          <TableCell className="text-xs text-white/60">{log.createdAt ? format(new Date(log.createdAt), "dd/MM/yyyy HH:mm", { locale: ptBR }) : "-"}</TableCell>
+                          <TableCell className="text-xs font-bold text-primary">{log.type ?? log.event ?? "Evento fiscal"}</TableCell>
+                          <TableCell className="text-xs text-white/50">{log.message ?? log.details ?? JSON.stringify(log)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ─── ABA HISTÓRICO ─────────────────────────────────── */}
