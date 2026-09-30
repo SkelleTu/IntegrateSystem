@@ -247,7 +247,7 @@ export function registerMcpOAuth(app: Express) {
     const now = Math.floor(Date.now() / 1000);
     const accessToken = signJwt({
       iss: ISSUER,
-      aud: RESOURCE,
+      aud: record.resource,
       sub: record.userId,
       username: record.username,
       scope: record.scope,
