@@ -156,16 +156,15 @@ export async function registerRoutes(
   // Universal Server to execute the same authenticated Aura modules on behalf
   // of Aurora. The token must be shared only between trusted services.
   app.use(async (req: any, res: any, next: any) => {
-    const expectedToken = String(process.env.AURA_AGENT_TOKEN || "").trim();
+    const expectedToken = String(process.env.AURORA_OPERATOR_TOKEN || process.env.AURA_AGENT_TOKEN || "").trim();
     const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "").trim();
     if (!expectedToken || suppliedToken !== expectedToken) return next();
 
     try {
       const operatorUsername = String(process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
-      if (!operatorUsername) {
-        return res.status(503).json({ message: "AURA_AGENT_OPERATOR_USERNAME is not configured" });
-      }
-      const operator = await storage.getUserByUsername(operatorUsername);
+      const operator = operatorUsername
+        ? await storage.getUserByUsername(operatorUsername)
+        : (await storage.getUsers()).find((candidate: any) => ["admin", "owner"].includes(String(candidate.role).toLowerCase()));
       if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
         return res.status(403).json({ message: "Configured Aurora operator is missing or lacks admin privileges" });
       }
