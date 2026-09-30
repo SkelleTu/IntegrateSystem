@@ -1,6 +1,6 @@
 import { useLocation } from "wouter";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
-import auraLogo from "@assets/AURA_1768346008566.png";
+const auraLogo = "/aura-system-logo.svg";
 import {
   ClipboardList, Landmark, Search, Lock,
   Clock, Star, Shield, Download, BookOpen, Power,
