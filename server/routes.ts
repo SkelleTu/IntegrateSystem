@@ -10,7 +10,9 @@ import {
   insertPaymentSchema, 
   insertTransactionSchema, 
   insertTimeClockSchema,
-  insertInventorySchema
+  insertInventorySchema,
+  insertProductSchema,
+  insertBatchSchema
 } from "../shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -1022,14 +1024,15 @@ export async function registerRoutes(
   app.post("/api/products", isAuthenticated, async (req, res) => {
     try {
       const { salePrice, minStock, ...rest } = req.body;
-      const data = {
+      const data = insertProductSchema.parse({
         ...rest,
         salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
-        minStock: minStock ? Number(minStock) : 5,
-      };
+        minStock: minStock !== undefined && minStock !== "" ? Number(minStock) : 5,
+      });
       const p = await storage.createProduct(data);
-      res.json(p);
+      res.status(201).json(p);
     } catch (err: any) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Dados do produto inválidos" });
       res.status(500).json({ message: err.message || "Erro ao criar produto" });
     }
   });
@@ -1135,20 +1138,22 @@ export async function registerRoutes(
     try {
       const user = req.user as any;
       const productId = Number(req.params.id);
+      if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Produto inválido" });
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
-      const b = await storage.createBatch({
+      const payload = insertBatchSchema.parse({
         productId,
         ...rest,
-        quantity: Number(quantity) || 0,
+        quantity: Number(quantity),
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(",", ".")) * 100) : 0,
         salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
         expiryDate: expiryDate ? new Date(expiryDate) : null,
         manufactureDate: manufactureDate ? new Date(manufactureDate) : null,
         entryDate: entryDate ? new Date(entryDate) : new Date(),
-        userId: user.id,
-      } as any);
-      res.json(b);
+      });
+      const b = await storage.createBatch({ ...payload, userId: user.id } as any);
+      res.status(201).json(b);
     } catch (err: any) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Dados do lote inválidos" });
       res.status(500).json({ message: err.message || "Erro ao criar lote" });
     }
   });
