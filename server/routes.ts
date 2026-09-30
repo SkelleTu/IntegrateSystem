@@ -26,6 +26,7 @@ import { promisify } from "util";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { verifyMcpAccessToken } from "./mcp-oauth";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -66,8 +67,13 @@ export async function registerRoutes(
   // of Aurora. The token must be shared only between trusted services.
   app.use(async (req: any, res: any, next: any) => {
     const expectedToken = String(process.env.AURORA_OPERATOR_TOKEN || process.env.AURA_AGENT_TOKEN || "").trim();
-    const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\\s+/i, "").trim();
-    if (!expectedToken || suppliedToken !== expectedToken) return next();
+    const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+    const isDirectMcp = String(req.headers["x-mcp-direct-control"] || "") === "true";
+    const mcpResource = String(process.env.AURA_MCP_RESOURCE_URL || "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
+    const mcpClaims = isDirectMcp
+      ? (verifyMcpAccessToken(suppliedToken, "aura.read", mcpResource) || verifyMcpAccessToken(suppliedToken, "aura.execute", mcpResource))
+      : null;
+    if ((!expectedToken || suppliedToken !== expectedToken) && !mcpClaims) return next();
 
     try {
       const operatorUsername = String(process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
@@ -79,6 +85,7 @@ export async function registerRoutes(
       }
       req.user = operator;
       req.auroraOperator = true;
+      req.mcpClaims = mcpClaims;
       return next();
     } catch (error) {
       console.error("Aurora service authentication failed:", error);
