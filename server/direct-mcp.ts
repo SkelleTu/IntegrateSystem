@@ -17,7 +17,8 @@ function challenge(res: Response, scope: string) {
 }
 
 function requireToken(req: Request, res: Response, scope: "aura.read" | "aura.execute") {
-  const raw = bearer(req);\n  const claims = verifyMcpAccessToken(raw, scope, RESOURCE_URL) || (scope === "aura.read" ? verifyMcpAccessToken(raw, "aura.execute", RESOURCE_URL) : null);
+  const raw = bearer(req);
+  const claims = verifyMcpAccessToken(raw, scope, RESOURCE_URL) || (scope === "aura.read" ? verifyMcpAccessToken(raw, "aura.execute", RESOURCE_URL) : null);
   if (!claims) {
     challenge(res, scope);
     res.status(401).json({ error: "unauthorized", error_description: "A valid OAuth access token is required." });
