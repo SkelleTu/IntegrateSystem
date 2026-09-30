@@ -270,8 +270,16 @@ export const batchLogs = pgTable("batch_logs", {
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
-export const insertProductSchema = createInsertSchema(products).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertBatchSchema   = createInsertSchema(batches).omit({ id: true, createdAt: true });
+export const insertProductSchema = createInsertSchema(products, {
+  name: z.string().trim().min(1, "Nome do produto é obrigatório"),
+  unit: z.string().trim().min(1, "Unidade é obrigatória"),
+  minStock: z.number().int().min(0, "Estoque mínimo não pode ser negativo"),
+}).omit({ id: true, createdAt: true, updatedAt: true });
+
+export const insertBatchSchema = createInsertSchema(batches, {
+  quantity: z.number().positive("Quantidade deve ser maior que zero"),
+  costPrice: z.number().int().min(0, "Custo não pode ser negativo"),
+}).omit({ id: true, createdAt: true });
 export const insertBatchLogSchema = createInsertSchema(batchLogs).omit({ id: true, createdAt: true });
 
 export type Product       = typeof products.$inferSelect;
@@ -348,7 +356,13 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({ saleId: t
 export const insertMenuItemSchema = createInsertSchema(menuItems, {
   tags: z.union([z.string(), z.array(z.string())]).optional().nullable(),
 });
-export const insertTransactionSchema = createInsertSchema(transactions);
+export const insertTransactionSchema = createInsertSchema(transactions, {
+  businessType: z.string().trim().min(1, "Unidade é obrigatória"),
+  type: z.enum(["income", "expense"]),
+  category: z.string().trim().min(1, "Categoria é obrigatória"),
+  description: z.string().trim().min(1, "Descrição é obrigatória"),
+  amount: z.number().int().positive("Valor deve ser maior que zero"),
+});
 export const insertTimeClockSchema = createInsertSchema(timeClock);
 export const insertEnterpriseSchema = createInsertSchema(enterprises);
 export const insertSettingsSchema = createInsertSchema(settings);
