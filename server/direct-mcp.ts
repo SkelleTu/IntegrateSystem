@@ -13,7 +13,7 @@ function bearer(req: Request) {
 }
 
 function challenge(res: Response, scope: string) {
-  res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${RESOURCE_URL}/.well-known/oauth-protected-resource", scope="${scope}"`);
+  res.setHeader("WWW-Authenticate", `Bearer resource_metadata="${RESOURCE_URL}/.well-known/oauth-protected-resource/mcp", scope="${scope}"`);
 }
 
 function requireToken(req: Request, res: Response, scope: "aura.read" | "aura.execute") {
@@ -116,9 +116,9 @@ function createServer(token: string) {
 }
 
 export function registerAuraDirectMcp(app: Express) {
-  app.get("/.well-known/oauth-protected-resource", (_req, res) => {
+  app.get("/.well-known/oauth-protected-resource/mcp", (_req, res) => {
     res.json({
-      resource: RESOURCE_URL,
+      resource: RESOURCE_URL + "/mcp",
       authorization_servers: [OAUTH_ISSUER],
       scopes_supported: ["aura.read", "aura.execute"],
       bearer_methods_supported: ["header"],
