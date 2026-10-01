@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { z } from "zod";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 
-const RESOURCE_URL = String(process.env.AURA_MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
+const RESOURCE_URL = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const OAUTH_ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 
 function bearer(req: Request) {
@@ -18,7 +18,7 @@ function challenge(res: Response, scope: string) {
 
 function requireToken(req: Request, res: Response, scope: "aura.read" | "aura.execute") {
   const raw = bearer(req);
-  const claims = verifyMcpAccessToken(raw, scope, RESOURCE_URL) || (scope === "aura.read" ? verifyMcpAccessToken(raw, "aura.execute", RESOURCE_URL) : null);
+  const claims = verifyMcpAccessToken(raw, scope, RESOURCE_URL) || verifyMcpAccessToken(raw, scope, `${RESOURCE_URL}/mcp`) || (scope === "aura.read" ? verifyMcpAccessToken(raw, "aura.execute", RESOURCE_URL) || verifyMcpAccessToken(raw, "aura.execute", `${RESOURCE_URL}/mcp`) : null);
   if (!claims) {
     challenge(res, scope);
     res.status(401).json({ error: "unauthorized", error_description: "A valid OAuth access token is required." });
@@ -100,7 +100,7 @@ function createServer(token: string) {
     },
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
   }, async ({ method, path, body }) => {
-    const claims = verifyMcpAccessToken(token, "aura.execute", RESOURCE_URL);
+    const claims = verifyMcpAccessToken(token, "aura.execute", RESOURCE_URL) || verifyMcpAccessToken(token, "aura.execute", `${RESOURCE_URL}/mcp`);
     if (!claims) return { isError: true, content: [{ type: "text" as const, text: "aura.execute scope is required." }] };
     return result(await local(path, {
       method,
