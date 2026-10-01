@@ -4,6 +4,7 @@ import { storage } from "./storage";
 
 const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const RESOURCE = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
+const MCP_RESOURCE = `${RESOURCE}/mcp`;
 const RESOURCE_ALLOWLIST = new Set(
   String(process.env.MCP_RESOURCE_URLS ?? [
     RESOURCE,
@@ -148,6 +149,20 @@ export function verifyMcpAccessToken(raw: string, requiredScope: string, resourc
 }
 
 export function registerMcpOAuth(app: Express) {
+  const protectedResourceMetadata = (_req: Request, res: Response) => {
+    res.json({
+      resource: MCP_RESOURCE,
+      authorization_servers: [OAUTH_ISSUER],
+      scopes_supported: ["aura.read", "aura.execute"],
+      bearer_methods_supported: ["header"],
+      resource_documentation: `${RESOURCE}/mcp`,
+    });
+  };
+
+  app.get("/.well-known/oauth-protected-resource", protectedResourceMetadata);
+  app.get("/.well-known/oauth-protected-resource/mcp", protectedResourceMetadata);
+  app.get("/mcp/.well-known/oauth-protected-resource", protectedResourceMetadata);
+
   app.get("/.well-known/oauth-authorization-server", (_req, res) => {
     res.json({
       issuer: ISSUER,
@@ -178,7 +193,7 @@ export function registerMcpOAuth(app: Express) {
     if (!validRedirect(redirectUri)) return res.status(400).send("Unsupported redirect URI.");
     if (responseType !== "code") return res.status(400).send("Only response_type=code is supported.");
     if (codeChallengeMethod !== "S256" || !/^[A-Za-z0-9_-]{43,128}$/.test(codeChallenge)) return res.status(400).send("PKCE S256 code challenge is required.");
-    if (!RESOURCE_ALLOWLIST.has(resource)) return res.status(400).send("Invalid resource.");
+    if (!RESOURCE_ALLOWLIST.has(resource) && resource !== MCP_RESOURCE) return res.status(400).send("Invalid resource.");
 
     const actionScope = scopes.includes("aura.execute");
     const scopeText = scopes.join(" ");
@@ -195,7 +210,7 @@ export function registerMcpOAuth(app: Express) {
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? "");
 
-    if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || !RESOURCE_ALLOWLIST.has(resource)) {
+    if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || (!RESOURCE_ALLOWLIST.has(resource) && resource !== MCP_RESOURCE)) {
       return res.status(400).send("Invalid OAuth request.");
     }
     if (!SECRET) return res.status(503).send("MCP OAuth is not configured.");
@@ -237,7 +252,7 @@ export function registerMcpOAuth(app: Express) {
     if (!record) return res.status(400).json({ error: "invalid_grant" });
     codeStore.delete(code);
 
-    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== resource || !RESOURCE_ALLOWLIST.has(resource) || (redirectUri && redirectUri !== record.redirectUri)) {
+    if (record.expiresAt < Date.now() || record.clientId !== clientId || record.resource !== resource || (!RESOURCE_ALLOWLIST.has(resource) && resource !== MCP_RESOURCE) || (redirectUri && redirectUri !== record.redirectUri)) {
       return res.status(400).json({ error: "invalid_grant" });
     }
 
