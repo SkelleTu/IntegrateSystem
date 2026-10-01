@@ -1,4 +1,5 @@
 import type { Express, Request, Response } from "express";
+import crypto from "node:crypto";
 import { runtimeEvent } from "./runtimeMonitor";
 
 type CompatibilityState = {
@@ -47,6 +48,24 @@ function localUrl(path: string) {
   return `http://127.0.0.1:${process.env.PORT || "5010"}${path}`;
 }
 
+function signSelfTestToken() {
+  const secret = String(process.env.MCP_OAUTH_SECRET ?? "");
+  if (!secret) return null;
+  const now = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    iss: RESOURCE,
+    aud: RESOURCE,
+    sub: "mcp-compatibility-controller",
+    username: "mcp-compatibility-controller",
+    scope: "aura.read aura.execute",
+    iat: now,
+    exp: now + 300,
+  })).toString("base64url");
+  const signature = crypto.createHmac("sha256", secret).update(header + "." + payload).digest("base64url");
+  return header + "." + payload + "." + signature;
+}
+
 async function probe(path: string, options: RequestInit = {}) {
   const response = await fetch(localUrl(path), {
     ...options,
@@ -81,6 +100,9 @@ async function checkOnce(reason: string) {
       );
     }
 
+    const selfTestToken = signSelfTestToken();
+    if (!selfTestToken) throw new Error("MCP_OAUTH_SECRET is missing; authenticated MCP self-test cannot run");
+
     const challenge = await probe("/mcp", {
       method: "POST",
       headers: {
@@ -113,6 +135,48 @@ async function checkOnce(reason: string) {
       );
     }
 
+    const authenticatedInitialize = await probe("/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "MCP-Protocol-Version": state.adaptiveProfile.protocolVersion,
+        authorization: `Bearer ${selfTestToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "authenticated-initialize",
+        method: "initialize",
+        params: {
+          protocolVersion: state.adaptiveProfile.protocolVersion,
+          capabilities: {},
+          clientInfo: { name: "chatgpt-mcp-compatibility-self-test", version: "1.0.0" },
+        },
+      }),
+    });
+
+    if (authenticatedInitialize.status !== 200 || !authenticatedInitialize.bodyPreview.includes('"result"')) {
+      throw new Error(`Authenticated MCP initialize failed: status=${authenticatedInitialize.status}, body=${authenticatedInitialize.bodyPreview}`);
+    }
+
+    const toolsList = await probe("/mcp", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "MCP-Protocol-Version": state.adaptiveProfile.protocolVersion,
+        authorization: `Bearer ${selfTestToken}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "authenticated-tools-list",
+        method: "tools/list",
+        params: {},
+      }),
+    });
+
+    if (toolsList.status !== 200 || !toolsList.bodyPreview.includes('"tools"')) {
+      throw new Error(`Authenticated MCP tools/list failed: status=${toolsList.status}, body=${toolsList.bodyPreview}`);
+    }
+
     state.lastResult = "pass";
     state.lastError = null;
 
@@ -123,6 +187,8 @@ async function checkOnce(reason: string) {
       protectedResourceStatus: protectedResource.status,
       authorizationServerStatus: authorizationServer.status,
       initializeWithoutTokenStatus: challenge.status,
+      authenticatedInitializeStatus: authenticatedInitialize.status,
+      toolsListStatus: toolsList.status,
       adaptiveProfile: state.adaptiveProfile,
     });
 
