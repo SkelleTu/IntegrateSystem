@@ -198,8 +198,7 @@ export async function initApp() {
 
     await registerRoutes(httpServer, app);
 
-    void runMcpCompatibilityCheck("startup");
-
+    // A checagem MCP roda depois que o HTTP server estiver efetivamente escutando.\n
     runtimeEvent("routes-ready", "Rotas da aplicação registradas", {
       phase: "initialization",
       progress: 55,
