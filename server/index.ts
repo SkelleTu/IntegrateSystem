@@ -75,6 +75,9 @@ process.once("SIGTERM", () => {
           progress: 100,
           port,
         });
+        void import("./mcp-compatibility-controller").then(({ runMcpCompatibilityCheck }) =>
+          runMcpCompatibilityCheck("server-listening"),
+        );
       },
     );
   } catch (error) {
