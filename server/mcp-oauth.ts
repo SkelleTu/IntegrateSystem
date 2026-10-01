@@ -3,7 +3,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 
 const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
-const RESOURCE = String(process.env.MCP_RESOURCE_URL ?? "https://universal-server1.onrender.com").replace(/\/$/, "");
+const RESOURCE = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
 const RESOURCE_ALLOWLIST = new Set(
   String(process.env.MCP_RESOURCE_URLS ?? [
     RESOURCE,
@@ -119,7 +119,7 @@ function htmlEscape(value: string): string {
 }
 
 
-export function verifyMcpAccessToken(raw: string, requiredScope: string, resource = String(process.env.AURA_MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "")) {
+export function verifyMcpAccessToken(raw: string, requiredScope: string, resource = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "")) {
   if (!SECRET) return null;
   const parts = raw.split(".");
   if (parts.length !== 3) return null;
@@ -136,7 +136,7 @@ export function verifyMcpAccessToken(raw: string, requiredScope: string, resourc
     header?.typ !== "JWT" ||
     !timingEqual(signature, parts[2]) ||
     payload.iss !== ISSUER ||
-    payload.aud !== resource ||
+    !new Set([resource, `${resource}/mcp`]).has(String(payload.aud ?? "").replace(/\/$/, "")) ||
     !payload.sub ||
     Number(payload.exp) <= now ||
     Number(payload.iat) > now + 120 ||
