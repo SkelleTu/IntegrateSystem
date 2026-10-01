@@ -41,18 +41,12 @@ process.once("SIGTERM", () => {
       progress: 0,
     });
 
-    // Carregado depois do monitor para que logs emitidos durante a inicialização
-    // dos módulos da aplicação também sejam capturados.
     const { initApp, log } = await import("./app");
-
     const { httpServer } = await initApp();
 
     const port = parseInt(process.env.PORT || "5010", 10);
     httpServer.on("error", (error) => {
-      runtimeError(error, "Erro no servidor HTTP", {
-        phase: "server",
-        port,
-      });
+      runtimeError(error, "Erro no servidor HTTP", { phase: "server", port });
     });
 
     httpServer.on("close", () => {
@@ -63,11 +57,7 @@ process.once("SIGTERM", () => {
     });
 
     httpServer.listen(
-      {
-        port,
-        host: "0.0.0.0",
-        reusePort: true,
-      },
+      { port, host: "0.0.0.0", reusePort: true },
       () => {
         log(`serving on port ${port}`);
         runtimeEvent("server-listening", `Servidor ouvindo na porta ${port}`, {
@@ -75,8 +65,9 @@ process.once("SIGTERM", () => {
           progress: 100,
           port,
         });
-        void import("./mcp-compatibility-controller").then(({ runMcpCompatibilityCheck }) =>
-          runMcpCompatibilityCheck("server-listening"),
+
+        void import("./mcp-compatibility-controller").then(
+          ({ startMcpCompatibilityLoop }) => startMcpCompatibilityLoop(),
         );
       },
     );
