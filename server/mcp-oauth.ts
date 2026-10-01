@@ -7,7 +7,9 @@ const RESOURCE = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RES
 const RESOURCE_ALLOWLIST = new Set(
   String(process.env.MCP_RESOURCE_URLS ?? [
     RESOURCE,
+    `${RESOURCE}/mcp`,
     "https://integrated-system-gzyu.onrender.com",
+    "https://integrated-system-gzyu.onrender.com/mcp",
     "https://aurora-agent-o9x5.onrender.com",
   ].join(",")).split(",").map((value) => value.trim().replace(/\/$/, "")).filter(Boolean),
 );
