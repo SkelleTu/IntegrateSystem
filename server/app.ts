@@ -16,6 +16,7 @@ import {
 import { supremeOperatorMiddleware } from "./supreme-operator";
 import { registerMcpOAuth } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
+import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 
 const app = express();
 const httpServer = createServer(app);
@@ -96,6 +97,7 @@ app.use((req, res, next) => {
 app.use(supremeOperatorMiddleware);
 registerMcpOAuth(app);
 registerAuraDirectMcp(app);
+registerMcpCompatibilityController(app);
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -195,6 +197,8 @@ export async function initApp() {
     });
 
     await registerRoutes(httpServer, app);
+
+    void runMcpCompatibilityCheck("startup");
 
     runtimeEvent("routes-ready", "Rotas da aplicação registradas", {
       phase: "initialization",
