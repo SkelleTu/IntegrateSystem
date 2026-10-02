@@ -1,6 +1,7 @@
 import type { Express, Request, Response } from "express";
 import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { OpenAIExtensions } from "@openai/mcp-extensions/server";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { verifyMcpAccessToken } from "./mcp-oauth";
@@ -52,6 +53,10 @@ function createServer(token: string) {
     { name: "aura-system-direct", version: "1.0.0" },
     { instructions: "Direct ChatGPT control surface for Aura System. Read before mutation. Mutating operations require aura.execute." },
   );
+
+  // Enable the official OpenAI MCP server extensions on the existing Aura MCP server.
+  // We intentionally do not enable MCP App/UI features here because Aura currently exposes a server-only surface.
+  new OpenAIExtensions(server);
 
   server.registerTool("get_runtime_status", {
     title: "Get Aura runtime status",
