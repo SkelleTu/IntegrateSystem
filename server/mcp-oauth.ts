@@ -171,8 +171,9 @@ export function registerMcpOAuth(app: Express) {
       token_endpoint: `${ISSUER}/oauth/token`,
       client_id_metadata_document_supported: true,
       token_endpoint_auth_methods_supported: ["none"],
-      grant_types_supported: ["authorization_code"],
+      grant_types_supported: ["authorization_code", "refresh_token"],
       response_types_supported: ["code"],
+      refresh_token_grant_supported: true,
       code_challenge_methods_supported: ["S256"],
       scopes_supported: ["aura.read", "aura.execute"],
     });
@@ -241,13 +242,65 @@ export function registerMcpOAuth(app: Express) {
 
   app.post("/oauth/token", async (req: Request, res: Response) => {
     if (!SECRET) return res.status(503).json({ error: "server_error", error_description: "MCP OAuth is not configured." });
-    if (String(req.body?.grant_type ?? "") !== "authorization_code") return res.status(400).json({ error: "unsupported_grant_type" });
+
+    const grantType = String(req.body?.grant_type ?? "");
+    const clientId = String(req.body?.client_id ?? "");
+    const resource = String(req.body?.resource ?? "");
+
+    if (grantType === "refresh_token") {
+      const refreshToken = String(req.body?.refresh_token ?? "");
+      const parts = refreshToken.split(".");
+      if (parts.length !== 3) return res.status(400).json({ error: "invalid_grant" });
+
+      let payload: any;
+      try {
+        payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
+      } catch {
+        return res.status(400).json({ error: "invalid_grant" });
+      }
+
+      const signature = b64url(crypto.createHmac("sha256", SECRET).update(`${parts[0]}.${parts[1]}`).digest());
+      const now = Math.floor(Date.now() / 1000);
+      const tokenResource = String(payload.aud ?? "").replace(/\/$/, "");
+      const scopes = String(payload.scope ?? "").split(/\s+/).filter(Boolean);
+
+      if (
+        payload.typ !== "refresh" ||
+        !timingEqual(signature, parts[2]) ||
+        payload.iss !== ISSUER ||
+        !payload.sub ||
+        Number(payload.exp) <= now ||
+        payload.client_id !== clientId ||
+        tokenResource !== resource ||
+        (!RESOURCE_ALLOWLIST.has(resource) && resource !== MCP_RESOURCE)
+      ) {
+        return res.status(400).json({ error: "invalid_grant" });
+      }
+
+      const accessToken = signJwt({
+        iss: ISSUER,
+        aud: resource,
+        sub: String(payload.sub),
+        username: String(payload.username ?? ""),
+        scope: scopes.join(" "),
+        iat: now,
+        exp: now + 3600,
+      });
+
+      res.json({
+        access_token: accessToken,
+        token_type: "Bearer",
+        expires_in: 3600,
+        scope: scopes.join(" "),
+      });
+      return;
+    }
+
+    if (grantType !== "authorization_code") return res.status(400).json({ error: "unsupported_grant_type" });
 
     const code = String(req.body?.code ?? "");
     const verifier = String(req.body?.code_verifier ?? "");
-    const clientId = String(req.body?.client_id ?? "");
     const redirectUri = String(req.body?.redirect_uri ?? "");
-    const resource = String(req.body?.resource ?? "");
     const record = codeStore.get(code);
     if (!record) return res.status(400).json({ error: "invalid_grant" });
     codeStore.delete(code);
@@ -262,21 +315,34 @@ export function registerMcpOAuth(app: Express) {
     }
 
     const now = Math.floor(Date.now() / 1000);
+    const scope = record.scope;
     const accessToken = signJwt({
       iss: ISSUER,
       aud: record.resource,
       sub: record.userId,
       username: record.username,
-      scope: record.scope,
+      scope,
       iat: now,
       exp: now + 3600,
+    });
+    const refreshToken = signJwt({
+      typ: "refresh",
+      iss: ISSUER,
+      aud: record.resource,
+      sub: record.userId,
+      username: record.username,
+      scope,
+      client_id: record.clientId,
+      iat: now,
+      exp: now + 180 * 24 * 3600,
     });
 
     res.json({
       access_token: accessToken,
+      refresh_token: refreshToken,
       token_type: "Bearer",
       expires_in: 3600,
-      scope: record.scope,
+      scope,
     });
   });
 
