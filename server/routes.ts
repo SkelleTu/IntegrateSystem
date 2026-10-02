@@ -1250,13 +1250,30 @@ export async function registerRoutes(
 
   app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
+
       const id = Number(req.params.id);
       const { rotation, imageScale } = req.body;
-      const updated = await storage.updateMenuItem(id, { rotation, imageScale });
+
+      // IDs acima de 10000 representam itens do inventário no menu.
+      if (id > 10000) {
+        const inventoryId = id - 10000;
+        const updated = await storage.updateInventoryItem(inventoryId, {
+          rotation: Number(rotation),
+          imageScale: Number(imageScale)
+        });
+        return res.json(updated);
+      }
+
+      const updated = await storage.updateMenuItem(id, {
+        rotation: Number(rotation),
+        imageScale: Number(imageScale)
+      });
       res.json(updated);
     } catch (err) {
-      console.error("Erro ao ajustar produto:", err);
-      res.status(500).json({ message: "Erro ao salvar ajustes do produto" });
+      console.error("Erro ao ajustar item do menu:", err);
+      res.status(500).json({ message: "Erro ao salvar ajustes" });
     }
   });
 
@@ -1508,36 +1525,6 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
-    try {
-      const user = req.user as any;
-      if (user.role !== "admin") return res.status(403).json({ message: "Acesso restrito" });
-      
-      const id = Number(req.params.id);
-      const { rotation, imageScale } = req.body;
-      
-      // Se for um item do inventário (ID > 10000), precisamos atualizar no inventário
-      if (id > 10000) {
-        const inventoryId = id - 10000;
-        const updated = await storage.updateInventoryItem(inventoryId, { 
-          rotation: Number(rotation), 
-          imageScale: Number(imageScale) 
-        });
-        return res.json(updated);
-      }
-      
-      const updated = await storage.updateMenuItem(id, { 
-        rotation: Number(rotation), 
-        imageScale: Number(imageScale) 
-      });
-      
-      res.json(updated);
-    } catch (err) {
-      console.error("Erro ao ajustar item do menu:", err);
-      res.status(500).json({ message: "Erro ao salvar ajustes" });
-    }
-  });
-
   app.get("/api/transactions", isAuthenticated, async (req, res) => {
     try {
       const { start, end, businessType } = req.query;
@@ -1597,49 +1584,6 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.get("/api/inventory", isAuthenticated, async (req, res) => {
-    const items = await storage.getInventory();
-    // Garantir que o campo imageUrl esteja preenchido corretamente no retorno
-    const normalizedItems = items.map(item => ({
-      ...item,
-      imageUrl: item.imageUrl || (item as any).image_url || null
-    }));
-    res.json(normalizedItems);
-  });
-
-  app.post("/api/inventory", isAuthenticated, async (req, res) => {
-    try {
-      const user = req.user as any;
-      if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
-      
-      const { id, ...data } = req.body;
-      
-      // Map frontend fields to database fields if necessary
-      const inventoryData = {
-        ...data,
-        id: (id !== undefined && id !== null && id !== "") ? Number(id) : undefined,
-        rotation: data.rotation || 0,
-        imageScale: data.imageScale || 100,
-        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null,
-      };
-
-      const item = await storage.upsertInventory(inventoryData);
-      
-      await storage.createInventoryLog({
-        inventoryId: item.id,
-        type: "in",
-        quantity: Number(data.quantity) || 0,
-        reason: id ? "Update" : "Initial Stock",
-        userId: user.id
-      });
-      
-      res.json(item);
-    } catch (err) {
-      console.error("Error updating inventory:", err);
-      res.status(500).json({ message: "Erro ao atualizar estoque" });
-    }
-  });
-
   app.post("/api/inventory/log", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const log = await storage.createInventoryLog({ ...req.body, userId: user.id });
