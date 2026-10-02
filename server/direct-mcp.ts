@@ -274,6 +274,28 @@ function createServer(token: string) {
     },
   );
 
+  server.registerTool(
+    "get_aura_capabilities",
+    {
+      title: "Get Aura complete capabilities",
+      description: "Return the production API capability inventory. Use read_api or execute_api for the listed operations.",
+      inputSchema: {},
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    },
+    async () => result({
+      service: "Aura System",
+      production: true,
+      controlSurface: "MCP",
+      scopes: ["aura.read", "aura.execute"],
+      tools: ["get_conduct_status", "get_profile", "get_runtime_status", "get_database_status", "get_universal_status", "get_google_drive_status", "get_aura_capabilities", "read_api", "execute_api"],
+      apiEndpoints: ["POST /api/labels/print","GET /api/labels/status","GET /api/db/status","GET /api/inventory/search","GET /api/menu/search","GET /api/admin/monitoring","DELETE /api/admin/users/:id","POST /api/admin/register-barber","GET /api/my-enterprises","POST /api/my-enterprises","PUT /api/my-enterprises/:id/select","GET /api/admin/enterprises","POST /api/admin/enterprises","PUT /api/admin/enterprises/:id","PUT /api/admin/enterprises/:id/status","DELETE /api/admin/enterprises/:id","GET /api/settings","POST /api/settings","POST /api/public/upload","POST /api/admin/upload","GET /api/download/app","GET /api/windows/stream","GET /api/fiscal/settings","POST /api/fiscal/settings","GET /api/fiscal/logs","POST /api/fiscal/emitir/:saleId","GET /api/fiscal/history","GET /api/categories","POST /api/inventory","GET /api/inventory","GET /api/inventory/barcode/:barcode","DELETE /api/inventory/:id","POST /api/inventory/:id/restock","GET /api/inventory/:id/restocks","GET /api/inventory-restocks","GET /api/products","GET /api/products/cashier-items","GET /api/products/barcode/:barcode","GET /api/products/sku/:sku","GET /api/products/:id","POST /api/products/swap-codigo","POST /api/products/check-duplicate","POST /api/products","PUT /api/products/:id","DELETE /api/products","GET /api/products/snapshot","POST /api/products/restore","POST /api/products/zero-quantities","DELETE /api/products/:id","GET /api/products/:id/batches","POST /api/products/:id/batches","PUT /api/batches/:id","DELETE /api/batches/:id","POST /api/products/:id/deduct","GET /api/products/:id/logs","GET /api/menu-items","PATCH /api/menu-items/:id/adjust","GET /api/cash-register/open","POST /api/cash-register/open","POST /api/cash-register/adjust","POST /api/cash-register/close","POST /api/sales","GET /api/cash-registers/history","GET /api/sales","POST /api/sales/:id/cancel","POST /api/sales/:id/emit-fiscal","GET /api/transactions","POST /api/transactions","DELETE /api/transactions/:id","POST /api/inventory/log","POST /api/tickets/:id/items","GET /api/time-clock/history","GET /api/admin/time-clock/history/:userId","GET /api/time-clock/status","POST /api/time-clock/register","POST /api/auth/register-fingerprint","GET /api/tickets/:number","GET /api/backup/status","GET /api/backup/export","POST /api/backup/save","GET /api/backup/list","GET /api/backup/download/:filename","POST /api/backup/import","POST /api/backup/restore/:filename","POST /api/backup/restore-auto"],
+      totalApiOperations: 85,
+      note: "execute_api is the universal authenticated execution surface for Aura /api endpoints; aura.execute is required for mutations.",
+    }),
+  );
+
   return server;
 }
 
