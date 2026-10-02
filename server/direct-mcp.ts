@@ -88,9 +88,12 @@ function result(value: unknown) {
   };
 }
 
+const READ_SECURITY = [{ type: "oauth2" as const, scopes: ["aura.read"] }];
+const EXECUTE_SECURITY = [{ type: "oauth2" as const, scopes: ["aura.execute"] }];
+
 function createServer(token: string) {
   const server = new McpServer(
-    { name: "aura-system-direct", version: "1.0.1" },
+    { name: "aura-system-direct", version: "1.0.2" },
     {
       instructions:
         "Direct ChatGPT control surface for Aura System. Read before mutation. Mutating operations require aura.execute.",
@@ -103,7 +106,8 @@ function createServer(token: string) {
       title: "Get Aura runtime status",
       description: "Read runtime health, telemetry and current server state.",
       inputSchema: {},
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/runtime/status")),
@@ -115,7 +119,8 @@ function createServer(token: string) {
       title: "Get Aura database status",
       description: "Read the active database backend and last recorded action.",
       inputSchema: {},
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/db/status")),
@@ -127,7 +132,8 @@ function createServer(token: string) {
       title: "Get Universal Server status",
       description: "Read Aura's direct connectivity status to Universal Server.",
       inputSchema: {},
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/universal/status")),
@@ -139,7 +145,8 @@ function createServer(token: string) {
       title: "Get Google Drive status",
       description: "Read the configured Google Drive backup status.",
       inputSchema: {},
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/google-drive/status")),
@@ -151,7 +158,8 @@ function createServer(token: string) {
       title: "Read Aura API",
       description: "Directly read any Aura /api GET endpoint.",
       inputSchema: { path: z.string().regex(/^\/api(?:\/|$)/) },
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async ({ path }) =>
@@ -173,7 +181,8 @@ function createServer(token: string) {
         path: z.string().regex(/^\/api(?:\/|$)/),
         body: z.record(z.unknown()).optional().default({}),
       },
-      securitySchemes: [{ type: "oauth2", scopes: ["aura.execute"] }],
+      securitySchemes: EXECUTE_SECURITY,
+      _meta: { securitySchemes: EXECUTE_SECURITY },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ method, path, body }) => {
@@ -276,11 +285,6 @@ export function registerAuraDirectMcp(app: Express) {
 
       try {
         await transport.handleRequest(req, res, req.body);
-
-        // Some SDK versions finalize the session id during handleRequest without
-        // invoking onsessioninitialized before the HTTP response completes.
-        // Persist it explicitly so the very next tools/list request can resolve
-        // the session deterministically.
         const initializedSessionId = transport.sessionId;
         if (initializedSessionId) {
           sessions.set(initializedSessionId, session);
