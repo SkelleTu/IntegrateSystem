@@ -357,7 +357,9 @@ export function registerAuraDirectMcp(app: Express) {
     const rawToken = bearer(req);
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
     const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken;
-    const isPublicConductRequest = req.method === "POST" && !rawToken && (req.body?.method === "tools/list" || req.body?.method === "tools/call");
+    const conductMethod = Array.isArray(req.body) ? req.body[0]?.method : req.body?.method;
+    const conductId = Array.isArray(req.body) ? req.body[0]?.id : req.body?.id;
+    const isPublicConductRequest = req.method === "POST" && !rawToken && (conductMethod === "tools/list" || conductMethod === "tools/call");
     if (!isPublicConductRequest && !isPublicInitialize && !sessionId.startsWith("conduct-")) {
       const claims = requireToken(req, res, "aura.read");
       if (!claims) return;
@@ -368,7 +370,7 @@ export function registerAuraDirectMcp(app: Express) {
       res.setHeader("MCP-Session-Id", publicSessionId);
       return res.status(200).json({
         jsonrpc: "2.0",
-        id: req.body?.id ?? null,
+        id: conductId ?? null,
         result: {
           protocolVersion: String(req.body?.params?.protocolVersion ?? "2025-06-18"),
           capabilities: { tools: {} },
@@ -433,7 +435,7 @@ export function registerAuraDirectMcp(app: Express) {
     }
 
     if (sessionId.startsWith("conduct-")) {
-      if (req.method === "POST" && req.body?.method === "tools/list") {
+      if (req.method === "POST" && conductMethod === "tools/list") {
         return res.status(200).json({
           jsonrpc: "2.0",
           id: req.body?.id ?? null,
@@ -452,7 +454,7 @@ export function registerAuraDirectMcp(app: Express) {
           },
         });
       }
-      if (req.method === "POST" && req.body?.method === "tools/call" && req.body?.params?.name === "get_conduct_status") {
+      if (req.method === "POST" && conductMethod === "tools/call" && (Array.isArray(req.body) ? req.body[0]?.params?.name : req.body?.params?.name) === "get_conduct_status") {
         return res.status(200).json({
           jsonrpc: "2.0",
           id: req.body?.id ?? null,
