@@ -357,7 +357,8 @@ export function registerAuraDirectMcp(app: Express) {
     const rawToken = bearer(req);
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
     const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken;
-    if (!isPublicInitialize && !sessionId.startsWith("conduct-")) {
+    const isPublicConductRequest = req.method === "POST" && !rawToken && (req.body?.method === "tools/list" || req.body?.method === "tools/call");
+    if (!isPublicConductRequest && !isPublicInitialize && !sessionId.startsWith("conduct-")) {
       const claims = requireToken(req, res, "aura.read");
       if (!claims) return;
     }
