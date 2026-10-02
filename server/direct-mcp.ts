@@ -355,13 +355,12 @@ export function registerAuraDirectMcp(app: Express) {
     if (req.method === "OPTIONS") return res.sendStatus(204);
 
     const rawToken = bearer(req);
-    const isPublicInitialize = req.method === "POST" && !req.headers["mcp-session-id"] && isInitializeRequest(req) && !rawToken;
+    const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
+    const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken;
     if (!isPublicInitialize && !sessionId.startsWith("conduct-")) {
       const claims = requireToken(req, res, "aura.read");
       if (!claims) return;
     }
-
-    const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
 
     if (req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken) {
       const publicSessionId = `conduct-${crypto.randomUUID()}`;
