@@ -57,7 +57,7 @@ function requireToken(req: Request, res: Response, scope: "aura.read" | "aura.ex
   return claims;
 }
 
-async function local(path: string, options: RequestInit = {}) {
+async function local(path: string, options: RequestInit = {}, token?: string) {
   const response = await fetch(
     `http://127.0.0.1:${process.env.PORT || "10000"}${path}`,
     {
@@ -65,6 +65,7 @@ async function local(path: string, options: RequestInit = {}) {
       headers: {
         Accept: "application/json",
         "X-MCP-Direct-Control": "true",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
         ...(options.headers ?? {}),
       },
       signal: options.signal ?? AbortSignal.timeout(30000),
@@ -166,7 +167,7 @@ function createServer(token: string) {
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
-    async () => result(await local("/api/runtime/status")),
+    async () => result(await local("/api/runtime/status", {}, token)),
   );
 
   server.registerTool(
@@ -179,7 +180,7 @@ function createServer(token: string) {
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
-    async () => result(await local("/api/db/status")),
+    async () => result(await local("/api/db/status", {}, token)),
   );
 
   server.registerTool(
@@ -192,7 +193,7 @@ function createServer(token: string) {
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
-    async () => result(await local("/api/universal/status")),
+    async () => result(await local("/api/universal/status", {}, token)),
   );
 
   server.registerTool(
@@ -205,7 +206,7 @@ function createServer(token: string) {
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
-    async () => result(await local("/api/google-drive/status")),
+    async () => result(await local("/api/google-drive/status", {}, token)),
   );
 
   server.registerTool(
@@ -219,11 +220,7 @@ function createServer(token: string) {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async ({ path }) =>
-      result(
-        await local(path, {
-          headers: { authorization: `Bearer ${token}` },
-        }),
-      ),
+      result(await local(path, {}, token)),
   );
 
   server.registerTool(
