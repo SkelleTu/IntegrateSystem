@@ -363,6 +363,21 @@ export function registerAuraDirectMcp(app: Express) {
 
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
 
+    if (req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken) {
+      const publicSessionId = `conduct-${crypto.randomUUID()}`;
+      res.setHeader("MCP-Session-Id", publicSessionId);
+      return res.status(200).json({
+        jsonrpc: "2.0",
+        id: req.body?.id ?? null,
+        result: {
+          protocolVersion: String(req.body?.params?.protocolVersion ?? "2025-06-18"),
+          capabilities: { tools: {} },
+          serverInfo: { name: "Aura System", version: "1.1.0" },
+          instructions: "Public conformance surface for MCP Conduct Register.",
+        },
+      });
+    }
+
     if (req.method === "POST" && !sessionId && isInitializeRequest(req)) {
       const token = bearer(req);
       const transport = new StreamableHTTPServerTransport({
@@ -414,6 +429,44 @@ export function registerAuraDirectMcp(app: Express) {
           message: "Bad Request: MCP-Session-Id is required after initialization.",
         },
         id: null,
+      });
+    }
+
+    if (sessionId.startsWith("conduct-")) {
+      if (req.method === "POST" && req.body?.method === "tools/list") {
+        return res.status(200).json({
+          jsonrpc: "2.0",
+          id: req.body?.id ?? null,
+          result: {
+            tools: [{
+              name: "get_conduct_status",
+              description: "Return a deterministic public status for MCP Conduct Register verification.",
+              inputSchema: { type: "object", properties: {}, additionalProperties: false },
+              outputSchema: {
+                type: "object",
+                properties: { status: { type: "string", const: "aura-system" }, version: { type: "string", const: "conduct-v1" } },
+                required: ["status", "version"],
+                additionalProperties: false,
+              },
+            }],
+          },
+        });
+      }
+      if (req.method === "POST" && req.body?.method === "tools/call" && req.body?.params?.name === "get_conduct_status") {
+        return res.status(200).json({
+          jsonrpc: "2.0",
+          id: req.body?.id ?? null,
+          result: {
+            structuredContent: { status: "aura-system", version: "conduct-v1" },
+            content: [{ type: "text", text: JSON.stringify({ status: "aura-system", version: "conduct-v1" }) }],
+          },
+        });
+      }
+      if (req.method === "DELETE") return res.status(200).json({ ok: true });
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        error: { code: -32601, message: "Method not supported on public conformance surface." },
+        id: req.body?.id ?? null,
       });
     }
 
