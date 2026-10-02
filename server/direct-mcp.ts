@@ -93,10 +93,53 @@ const EXECUTE_SECURITY = [{ type: "oauth2" as const, scopes: ["aura.execute"] }]
 
 function createServer(token: string) {
   const server = new McpServer(
-    { name: "aura-system-direct", version: "1.0.2" },
+    { name: "aura-system-direct", version: "1.0.3" },
     {
       instructions:
         "Direct ChatGPT control surface for Aura System. Read before mutation. Mutating operations require aura.execute.",
+    },
+  );
+
+  server.registerTool(
+    "get_profile",
+    {
+      title: "Get Aura profile",
+      description: "Return the authenticated Aura profile represented by this OAuth connection.",
+      inputSchema: {},
+      outputSchema: {
+        id: z.string().min(1),
+        name: z.string().optional(),
+        nickname: z.string().optional(),
+      },
+      securitySchemes: READ_SECURITY,
+      _meta: { securitySchemes: READ_SECURITY, "openai/profile": true },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+    },
+    async () => {
+      const claims =
+        verifyMcpAccessToken(token, "aura.read", RESOURCE_URL) ||
+        verifyMcpAccessToken(token, "aura.read", `${RESOURCE_URL}/mcp`) ||
+        verifyMcpAccessToken(token, "aura.execute", RESOURCE_URL) ||
+        verifyMcpAccessToken(token, "aura.execute", `${RESOURCE_URL}/mcp`);
+      if (!claims) {
+        return {
+          isError: true,
+          content: [{ type: "text" as const, text: "Authentication required." }],
+          _meta: {
+            "mcp/www_authenticate": [
+              `Bearer resource_metadata="${RESOURCE_URL}/.well-known/oauth-protected-resource/mcp", error="invalid_token", error_description="A valid Aura OAuth token is required."`,
+            ],
+          },
+        };
+      }
+      const profile = {
+        id: String(claims.sub),
+        ...(claims.username ? { name: String(claims.username), nickname: String(claims.username) } : {}),
+      };
+      return {
+        structuredContent: profile,
+        content: [{ type: "text" as const, text: JSON.stringify(profile) }],
+      };
     },
   );
 
@@ -183,7 +226,7 @@ function createServer(token: string) {
       },
       securitySchemes: EXECUTE_SECURITY,
       _meta: { securitySchemes: EXECUTE_SECURITY },
-      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     },
     async ({ method, path, body }) => {
       const claims =
