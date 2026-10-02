@@ -152,7 +152,7 @@ export function registerMcpOAuth(app: Express) {
   const protectedResourceMetadata = (_req: Request, res: Response) => {
     res.json({
       resource: MCP_RESOURCE,
-      authorization_servers: [OAUTH_ISSUER],
+      authorization_servers: [ISSUER],
       scopes_supported: ["aura.read", "aura.execute"],
       bearer_methods_supported: ["header"],
       resource_documentation: `${RESOURCE}/mcp`,
