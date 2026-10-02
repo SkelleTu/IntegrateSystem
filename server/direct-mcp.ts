@@ -236,7 +236,7 @@ function createServer(token: string) {
       },
       securitySchemes: EXECUTE_SECURITY,
       _meta: { securitySchemes: EXECUTE_SECURITY },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ method, path, body }) => {
       const claims =
@@ -375,7 +375,9 @@ export function registerAuraDirectMcp(app: Express) {
 
     const rawToken = bearer(req);
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
-    const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken;
+    const clientInfoName = String(req.body?.params?.clientInfo?.name ?? "").toLowerCase();
+    const isConductClient = /conduct|horizon.?shield/i.test(clientInfoName);
+    const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken && isConductClient;
     const conductMethod = Array.isArray(req.body) ? req.body[0]?.method : req.body?.method;
     const conductId = Array.isArray(req.body) ? req.body[0]?.id : req.body?.id;
     const isPublicConductRequest = req.method === "POST" && !rawToken && (conductMethod === "tools/list" || conductMethod === "tools/call");
@@ -550,7 +552,9 @@ export function registerAuraDirectMcp(app: Express) {
     const sessionClaims = session.publicConduct
       ? { sub: "conduct-public" }
       : verifyMcpAccessToken(session.token, "aura.read", RESOURCE_URL) ||
-        verifyMcpAccessToken(session.token, "aura.read", `${RESOURCE_URL}/mcp`);
+        verifyMcpAccessToken(session.token, "aura.read", `${RESOURCE_URL}/mcp`) ||
+        verifyMcpAccessToken(session.token, "aura.execute", RESOURCE_URL) ||
+        verifyMcpAccessToken(session.token, "aura.execute", `${RESOURCE_URL}/mcp`);
 
     if (!sessionClaims) {
       closeSession(sessionId);
