@@ -423,6 +423,50 @@ export function registerAuraDirectMcp(app: Express) {
       return;
     }
 
+    // MCP Conduct Register may probe a read-only public conformance surface
+    // statelessly after initialize. Keep this surface independent of OAuth
+    // session state so tools/list and the deterministic status tool remain
+    // publicly inspectable as documented.
+    if (isPublicConductRequest && !sessionId) {
+      if (req.method === "POST" && conductMethod === "tools/list") {
+        return res.status(200).json({
+          jsonrpc: "2.0",
+          id: conductId ?? null,
+          result: {
+            tools: [{
+              name: "get_conduct_status",
+              description: "Return a deterministic public status for MCP Conduct Register verification.",
+              inputSchema: { type: "object", properties: {}, additionalProperties: false },
+              outputSchema: {
+                type: "object",
+                properties: {
+                  status: { type: "string", const: "aura-system" },
+                  version: { type: "string", const: "conduct-v1" },
+                },
+                required: ["status", "version"],
+                additionalProperties: false,
+              },
+            }],
+          },
+        });
+      }
+
+      if (
+        req.method === "POST" &&
+        conductMethod === "tools/call" &&
+        (Array.isArray(req.body) ? req.body[0]?.params?.name : req.body?.params?.name) === "get_conduct_status"
+      ) {
+        return res.status(200).json({
+          jsonrpc: "2.0",
+          id: conductId ?? null,
+          result: {
+            structuredContent: { status: "aura-system", version: "conduct-v1" },
+            content: [{ type: "text", text: JSON.stringify({ status: "aura-system", version: "conduct-v1" }) }],
+          },
+        });
+      }
+    }
+
     if (!sessionId) {
       return res.status(400).json({
         jsonrpc: "2.0",
@@ -438,7 +482,7 @@ export function registerAuraDirectMcp(app: Express) {
       if (req.method === "POST" && conductMethod === "tools/list") {
         return res.status(200).json({
           jsonrpc: "2.0",
-          id: req.body?.id ?? null,
+          id: conductId ?? null,
           result: {
             tools: [{
               name: "get_conduct_status",
@@ -457,7 +501,7 @@ export function registerAuraDirectMcp(app: Express) {
       if (req.method === "POST" && conductMethod === "tools/call" && (Array.isArray(req.body) ? req.body[0]?.params?.name : req.body?.params?.name) === "get_conduct_status") {
         return res.status(200).json({
           jsonrpc: "2.0",
-          id: req.body?.id ?? null,
+          id: conductId ?? null,
           result: {
             structuredContent: { status: "aura-system", version: "conduct-v1" },
             content: [{ type: "text", text: JSON.stringify({ status: "aura-system", version: "conduct-v1" }) }],
