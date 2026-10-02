@@ -265,6 +265,15 @@ export function registerAuraDirectMcp(app: Express) {
 
       try {
         await transport.handleRequest(req, res, req.body);
+
+        // Some SDK versions finalize the session id during handleRequest without
+        // invoking onsessioninitialized before the HTTP response completes.
+        // Persist it explicitly so the very next tools/list request can resolve
+        // the session deterministically.
+        const initializedSessionId = transport.sessionId;
+        if (initializedSessionId) {
+          sessions.set(initializedSessionId, session);
+        }
       } catch (error) {
         if (!res.headersSent) {
           res.status(500).json({
