@@ -381,12 +381,26 @@ export function registerAuraDirectMcp(app: Express) {
     const conductMethod = Array.isArray(req.body) ? req.body[0]?.method : req.body?.method;
     const conductId = Array.isArray(req.body) ? req.body[0]?.id : req.body?.id;
     const isPublicConductRequest = req.method === "POST" && !rawToken && (conductMethod === "tools/list" || conductMethod === "tools/call");
-    if (!isPublicConductRequest && !isPublicInitialize && !sessionId.startsWith("conduct-")) {
+    if (sessionId.startsWith("conduct-")) {
+      // Public Conduct sessions expose only the deterministic conformance tool below.
+    } else if (req.method === "POST" && !sessionId && isPublicInitialize) {
+      // The Conduct Register is the only unauthenticated MCP client allowed to initialize a public session.
+    } else {
+      // Authenticate every non-public request, including every request on an existing session.
+      // This prevents a leaked/guessed session ID from bypassing the OAuth boundary.
       const claims = requireToken(req, res, "aura.read");
       if (!claims) return;
+      const session = sessionId ? sessions.get(sessionId) : null;
+      if (session && session.token !== rawToken) {
+        res.status(403).json({
+          error: "forbidden",
+          error_description: "MCP session is bound to a different access token.",
+        });
+        return;
+      }
     }
 
-    if (req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken) {
+    if (req.method === "POST" && !sessionId && isPublicInitialize) {
       const publicSessionId = `conduct-${crypto.randomUUID()}`;
       res.setHeader("MCP-Session-Id", publicSessionId);
       return res.status(200).json({
