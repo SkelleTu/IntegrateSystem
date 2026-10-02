@@ -103,6 +103,7 @@ function createServer(token: string) {
       title: "Get Aura runtime status",
       description: "Read runtime health, telemetry and current server state.",
       inputSchema: {},
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/runtime/status")),
@@ -114,6 +115,7 @@ function createServer(token: string) {
       title: "Get Aura database status",
       description: "Read the active database backend and last recorded action.",
       inputSchema: {},
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/db/status")),
@@ -125,6 +127,7 @@ function createServer(token: string) {
       title: "Get Universal Server status",
       description: "Read Aura's direct connectivity status to Universal Server.",
       inputSchema: {},
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/universal/status")),
@@ -136,6 +139,7 @@ function createServer(token: string) {
       title: "Get Google Drive status",
       description: "Read the configured Google Drive backup status.",
       inputSchema: {},
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async () => result(await local("/api/google-drive/status")),
@@ -147,6 +151,7 @@ function createServer(token: string) {
       title: "Read Aura API",
       description: "Directly read any Aura /api GET endpoint.",
       inputSchema: { path: z.string().regex(/^\/api(?:\/|$)/) },
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.read"] }],
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async ({ path }) =>
@@ -168,6 +173,7 @@ function createServer(token: string) {
         path: z.string().regex(/^\/api(?:\/|$)/),
         body: z.record(z.unknown()).optional().default({}),
       },
+      securitySchemes: [{ type: "oauth2", scopes: ["aura.execute"] }],
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
     async ({ method, path, body }) => {
@@ -179,6 +185,11 @@ function createServer(token: string) {
         return {
           isError: true,
           content: [{ type: "text" as const, text: "aura.execute scope is required." }],
+          _meta: {
+            "mcp/www_authenticate": [
+              `Bearer resource_metadata="${RESOURCE_URL}/.well-known/oauth-protected-resource/mcp", error="insufficient_scope", error_description="The aura.execute scope is required."`,
+            ],
+          },
         };
       }
 
