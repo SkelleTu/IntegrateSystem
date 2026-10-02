@@ -114,6 +114,7 @@ async function probe(path: string, options: RequestInit = {}) {
     ok: response.ok,
     contentType: response.headers.get("content-type"),
     wwwAuthenticate: response.headers.get("www-authenticate"),
+    sessionId: response.headers.get("mcp-session-id"),
     bodyPreview: body.slice(0, 1000),
   };
 }
@@ -138,6 +139,7 @@ async function authenticatedProbe(
   protocolVersion: string,
   resource: string,
   method: "initialize" | "tools/list",
+  sessionId?: string,
 ) {
   const token = signSelfTestToken(resource);
   if (!token) throw new Error("MCP_OAUTH_SECRET is missing; authenticated MCP self-test cannot run");
@@ -148,6 +150,7 @@ async function authenticatedProbe(
       "content-type": "application/json",
       "MCP-Protocol-Version": protocolVersion,
       authorization: `Bearer ${token}`,
+      ...(sessionId ? { "MCP-Session-Id": sessionId } : {}),
     },
     body: method === "initialize"
       ? initializeBody(protocolVersion, "authenticated-initialize")
@@ -254,7 +257,13 @@ async function checkOnce(reason: string) {
           continue;
         }
 
-        const toolsList = await authenticatedProbe(protocolVersion, resource, "tools/list");
+        const sessionId = initialize.sessionId;
+        if (!sessionId) {
+          lastFailure = `Authenticated initialize did not return MCP-Session-Id for resource=${resource}, protocol=${protocolVersion}`;
+          continue;
+        }
+
+        const toolsList = await authenticatedProbe(protocolVersion, resource, "tools/list", sessionId);
 
         if (toolsList.status !== 200 || !toolsList.bodyPreview.includes('"tools"')) {
           lastFailure = `Authenticated tools/list failed for resource=${resource}, protocol=${protocolVersion}: status=${toolsList.status}, body=${toolsList.bodyPreview}`;
