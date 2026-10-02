@@ -19,6 +19,7 @@ type McpSession = {
   transport: StreamableHTTPServerTransport;
   server: McpServer;
   token: string;
+  publicConduct: boolean;
 };
 
 const sessions = new Map<string, McpSession>();
@@ -93,11 +94,23 @@ const EXECUTE_SECURITY = [{ type: "oauth2" as const, scopes: ["aura.execute"] }]
 
 function createServer(token: string) {
   const server = new McpServer(
-    { name: "aura-system-direct", version: "1.0.3" },
+    { name: "aura-system-direct", version: "1.1.0" },
     {
       instructions:
         "Direct ChatGPT control surface for Aura System. Read before mutation. Mutating operations require aura.execute.",
     },
+  );
+
+  server.registerTool(
+    "get_conduct_status",
+    {
+      title: "Get Aura Conduct status",
+      description: "Return a deterministic public status for MCP Conduct Register verification.",
+      inputSchema: {},
+      outputSchema: { status: z.literal("aura-system"), version: z.literal("conduct-v1") },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
+    async () => result({ status: "aura-system", version: "conduct-v1" }),
   );
 
   server.registerTool(
@@ -283,6 +296,51 @@ function closeSession(sessionId: string) {
 }
 
 export function registerAuraDirectMcp(app: Express) {
+  app.get("/.well-known/agent-card.json", (_req, res) => {
+    res.json({
+      name: "Aura System",
+      description: "Universal integration and automation MCP server for Aura System.",
+      url: RESOURCE_URL,
+      capabilities: {
+        extensions: [{
+          uri: "https://w3id.org/horizonshield/conduct/v1",
+          params: {
+            compensation: {
+              paid_by: "public",
+              referral_fee: false,
+              listing_fee: false,
+              success_fee_pct: 0,
+              disclosure_url: `${RESOURCE_URL}/conduct`,
+            },
+          },
+        }],
+      },
+      compensation: {
+        paid_by: "public",
+        referral_fee: false,
+        listing_fee: false,
+        success_fee_pct: 0,
+        disclosure_url: `${RESOURCE_URL}/conduct`,
+      },
+    });
+  });
+
+  app.get("/.well-known/mcp-conduct.json", (_req, res) => {
+    res.json({
+      allow_tool_call: true,
+      endpoints: [`${RESOURCE_URL}/mcp`],
+      identity: RESOURCE_URL,
+    });
+  });
+
+  app.get("/conduct", (_req, res) => {
+    res.json({
+      service: "Aura System",
+      compensation: { paid_by: "public", referral_fee: false, listing_fee: false, success_fee_pct: 0 },
+      note: "Public disclosure for MCP Conduct Register.",
+    });
+  });
+
   app.get("/.well-known/oauth-protected-resource/mcp", (_req, res) => {
     res.json({
       resource: `${RESOURCE_URL}/mcp`,
@@ -296,8 +354,12 @@ export function registerAuraDirectMcp(app: Express) {
   app.all("/mcp", async (req: Request, res: Response) => {
     if (req.method === "OPTIONS") return res.sendStatus(204);
 
-    const claims = requireToken(req, res, "aura.read");
-    if (!claims) return;
+    const rawToken = bearer(req);
+    const isPublicInitialize = req.method === "POST" && !req.headers["mcp-session-id"] && isInitializeRequest(req) && !rawToken;
+    if (!isPublicInitialize) {
+      const claims = requireToken(req, res, "aura.read");
+      if (!claims) return;
+    }
 
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
 
@@ -308,7 +370,7 @@ export function registerAuraDirectMcp(app: Express) {
         enableJsonResponse: true,
       });
       const server = createServer(token);
-      const session: McpSession = { transport, server, token };
+      const session: McpSession = { transport, server, token, publicConduct: !token };
 
       transport.onclose = () => {
         const id = transport.sessionId;
@@ -367,9 +429,10 @@ export function registerAuraDirectMcp(app: Express) {
       });
     }
 
-    const sessionClaims =
-      verifyMcpAccessToken(session.token, "aura.read", RESOURCE_URL) ||
-      verifyMcpAccessToken(session.token, "aura.read", `${RESOURCE_URL}/mcp`);
+    const sessionClaims = session.publicConduct
+      ? { sub: "conduct-public" }
+      : verifyMcpAccessToken(session.token, "aura.read", RESOURCE_URL) ||
+        verifyMcpAccessToken(session.token, "aura.read", `${RESOURCE_URL}/mcp`);
 
     if (!sessionClaims) {
       closeSession(sessionId);
@@ -378,6 +441,12 @@ export function registerAuraDirectMcp(app: Express) {
         error: "unauthorized",
         error_description: "The MCP access token is no longer valid.",
       });
+    }
+
+    if (session.publicConduct) {
+      if (req.method === "POST" && req.body?.method === "tools/call" && req.body?.params?.name !== "get_conduct_status") {
+        return res.status(403).json({ jsonrpc: "2.0", error: { code: -32003, message: "Authentication is required for this tool." }, id: req.body?.id ?? null });
+      }
     }
 
     if (req.method === "DELETE") {
