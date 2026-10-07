@@ -1348,18 +1348,9 @@ export async function registerRoutes(
       const product = await storage.createProduct({
         name: marker,
         unit: "Unidade",
-        brand: null,
-        category: null,
-        flavor: null,
-        weight: null,
-        description: null,
-        imageUrl: null,
+        unit: "Unidade",
         minStock: 0,
         salePrice: 3750,
-        emLiquidacao: 0,
-        ncm: null,
-        cfop: null,
-        codigoBalanca: null,
         codigoProduto: marker,
       } as any);
       productId = product.id;
