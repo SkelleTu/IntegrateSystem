@@ -95,7 +95,6 @@ app.use((req, res, next) => {
 // O nível Supremo é o único modo operacional ativo inicialmente.
 // A política fica centralizada e os IDs continuam disponíveis para auditoria.
 app.use(supremeOperatorMiddleware);
-registerMcpOAuth(app);
 registerAuraDirectMcp(app);
 registerMcpCompatibilityController(app);
 
@@ -197,6 +196,10 @@ export async function initApp() {
     });
 
     await registerRoutes(httpServer, app);
+
+    // OAuth do MCP é registrado depois das sessões/Passport para que uma sessão
+    // mestre já autenticada possa autorizar o ChatGPT sem pedir usuário e senha novamente.
+    registerMcpOAuth(app);
 
     // A checagem MCP roda depois que o HTTP server estiver efetivamente escutando.\n
     runtimeEvent("routes-ready", "Rotas da aplicação registradas", {
