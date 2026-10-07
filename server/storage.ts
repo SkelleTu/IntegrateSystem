@@ -1283,9 +1283,13 @@ export class DatabaseStorage implements IStorage {
 
     let productId: number;
     if (dbRemote) {
-      const [remoteProduct]: any[] = await dbRemote.insert(products).values(clean as any).returning({ id: products.id });
+      await dbRemote.insert(products).values(clean as any);
+      const [remoteProduct]: any[] = await dbRemote.select().from(products)
+        .where(eq(products.name, String(data.name)))
+        .orderBy(desc(products.id))
+        .limit(1);
       productId = Number(remoteProduct?.id);
-      if (!Number.isFinite(productId)) throw new Error("Turso não retornou o ID do produto criado.");
+      if (!Number.isFinite(productId)) throw new Error("Turso não localizou o produto recém-criado.");
       writeLocal(productId);
     } else {
       productId = writeLocal();
