@@ -32,6 +32,11 @@ import {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne } from "drizzle-orm";
 
+// sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
+function withoutUndefined<T extends Record<string, any>>(value: T): T {
+  return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
+}
+
 // Helper de escrita simultânea em TODOS os bancos ativos
 // Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
 // Após cada write crítico, agenda um auto-backup JSON (debounced 5s).
