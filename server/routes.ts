@@ -1291,9 +1291,6 @@ export async function registerRoutes(
   // Aura MCP operator. It exercises the same storage/business operations used by
   // the normal cashier flow, then removes every test artifact in a finally block.
   app.post("/api/audit/e2e/cash", async (req, res) => {
-    if (process.env.AURA_E2E_AUDIT_ENABLED === "false") {
-      return res.status(404).json({ message: "E2E audit disabled" });
-    }
     if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
       return res.status(403).json({ message: "E2E audit requires authenticated Aura MCP execution" });
     }
