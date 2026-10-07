@@ -1244,7 +1244,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Novo produto: ${data.name}`);
     return await dualWrite(async (database) => {
       const now = new Date();
-      const insertResultproducts: any = await database.insert(products).values({ ...data, createdAt: now, updatedAt: now } as any);
+      const insertResultproducts: any = await database.insert(products).values(withoutUndefined({ ...data, createdAt: now, updatedAt: now }) as any);
       const idproducts = insertResultproducts.lastInsertRowid;
       const [p] = await database.select().from(products).where(eq(products.id, idproducts));
       return p;
@@ -1254,7 +1254,7 @@ export class DatabaseStorage implements IStorage {
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
     this.logAction(`Atualização produto ID:${id}`);
     return await dualWrite(async (database) => {
-      await database.update(products).set({ ...data, updatedAt: new Date() } as any).where(eq(products.id, id));
+      await database.update(products).set(withoutUndefined({ ...data, updatedAt: new Date() }) as any).where(eq(products.id, id));
       const [p] = await database.select().from(products).where(eq(products.id, id));
       return p;
     });
@@ -1412,7 +1412,7 @@ export class DatabaseStorage implements IStorage {
     }
     return await dualWrite(async (database) => {
       const now = new Date();
-      const insertResultbatches: any = await database.insert(batches).values({ ...data, createdAt: now } as any);
+      const insertResultbatches: any = await database.insert(batches).values(withoutUndefined({ ...data, createdAt: now }) as any);
       const idbatches = insertResultbatches.lastInsertRowid;
       const [b] = await database.select().from(batches).where(eq(batches.id, idbatches));
       // log entry
@@ -1452,7 +1452,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
     return await dualWrite(async (database) => {
-      await database.update(batches).set(data as any).where(eq(batches.id, id));
+      await database.update(batches).set(withoutUndefined(data as any)).where(eq(batches.id, id));
       const [b] = await database.select().from(batches).where(eq(batches.id, id));
       return b;
     });
