@@ -124,7 +124,7 @@ function createServer(token: string) {
         id: z.string().min(1),
         name: z.string().optional(),
         nickname: z.string().optional(),
-      },,
+      },
       _meta: { securitySchemes: READ_SECURITY, "openai/profile": true },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     },
