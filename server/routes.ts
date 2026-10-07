@@ -55,7 +55,10 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db, localSqlite } from "./db";
-import { tickets, users, fiscalSettings, insertFiscalSettingsSchema } from "../shared/schema";
+import {
+  tickets, users, fiscalSettings, insertFiscalSettingsSchema,
+  products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
+} from "../shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1279,6 +1282,232 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Erro ao ajustar item do menu:", err);
       res.status(500).json({ message: "Erro ao salvar ajustes" });
+    }
+  });
+
+
+  // Controlled production E2E audit. This route is intentionally disabled unless
+  // AURA_E2E_AUDIT_ENABLED=true and can only be reached through the authenticated
+  // Aura MCP operator. It exercises the same storage/business operations used by
+  // the normal cashier flow, then removes every test artifact in a finally block.
+  app.post("/api/audit/e2e/cash", async (req, res) => {
+    if (process.env.AURA_E2E_AUDIT_ENABLED !== "true") {
+      return res.status(404).json({ message: "E2E audit disabled" });
+    }
+    if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
+      return res.status(403).json({ message: "E2E audit requires authenticated Aura MCP execution" });
+    }
+
+    const marker = "__AURA_E2E_CASH__" + Date.now().toString(36) + "_" + Math.random().toString(16).slice(2);
+    const cpf = "12345678909";
+    let testUserId: number | null = null;
+    let productId: number | null = null;
+    let batchId: number | null = null;
+    let registerId: number | null = null;
+    let saleId: number | null = null;
+
+    const cleanup = async () => {
+      // Cleanup is deliberately ID-scoped and runs in reverse dependency order.
+      // If a step fails halfway through, no test artifact is intentionally left behind.
+      for (const database of [db]) {
+        try {
+          if (saleId) {
+            await database.delete(payments).where(eq(payments.saleId, saleId));
+            await database.delete(saleItems).where(eq(saleItems.saleId, saleId));
+            await database.delete(sales).where(eq(sales.id, saleId));
+          }
+          if (registerId) {
+            await database.delete(cashRegisters).where(eq(cashRegisters.id, registerId));
+          }
+          if (batchId) {
+            await database.delete(batchLogs).where(eq(batchLogs.batchId, batchId));
+            await database.delete(batches).where(eq(batches.id, batchId));
+          }
+          if (productId) {
+            await database.delete(products).where(eq(products.id, productId));
+          }
+          if (testUserId) {
+            await database.delete(users).where(eq(users.id, testUserId));
+          }
+          if (saleId) {
+            await database.delete(transactions).where(
+              or(
+                eq(transactions.description, `Venda PDV #${saleId}`),
+                eq(transactions.description, `ESTORNO: Venda PDV #${saleId} CANCELADA`),
+              ),
+            );
+          }
+          if (registerId) {
+            await database.delete(transactions).where(
+              eq(transactions.description, `Fechamento de Caixa #${registerId} - Valor em Gaveta`),
+            );
+          }
+        } catch (cleanupError) {
+          console.error("[AURA E2E] cleanup failed:", cleanupError);
+        }
+      }
+    };
+
+    try {
+      const passwordHash = await hashPassword(crypto.randomUUID());
+      const testUser = await storage.createUser({
+        username: marker,
+        password: passwordHash,
+        role: "admin",
+      } as any);
+      testUserId = testUser.id;
+
+      const product = await storage.createProduct({
+        name: marker,
+        unit: "Unidade",
+        minStock: 0,
+        salePrice: 3750,
+        codigoProduto: marker,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+      productId = product.id;
+
+      const batch = await storage.createBatch({
+        productId,
+        quantity: 2,
+        costPrice: 1000,
+        salePrice: 3750,
+        batchNumber: marker,
+        variantName: "E2E TEST",
+        entryDate: new Date(),
+        createdAt: new Date(),
+        userId: testUserId,
+      } as any);
+      batchId = batch.id;
+
+      const opened = await storage.openCashRegister({
+        userId: testUserId,
+        openingAmount: 0,
+        status: "open",
+        openedAt: new Date(),
+      } as any);
+      registerId = opened.id;
+
+      const createdSale = await storage.createSale(
+        {
+          cashRegisterId: registerId,
+          userId: testUserId,
+          totalAmount: 3750,
+          customerTaxId: cpf,
+          customerName: marker,
+          fiscalStatus: "none",
+          fiscalType: "NFCe",
+          status: "completed",
+          createdAt: new Date(),
+        } as any,
+        [{
+          itemType: "product",
+          itemId: 500000 + batchId,
+          quantity: 1,
+          unitPrice: 3750,
+          totalPrice: 3750,
+          unitType: "unit",
+        }] as any,
+        [{
+          method: "cash",
+          amount: 3750,
+          createdAt: new Date(),
+        }] as any,
+      );
+      saleId = createdSale.id;
+
+      const stockAfterSale = await storage.getProductBatches(productId);
+      if (Number(stockAfterSale.find((b: any) => b.id === batchId)?.quantity) !== 1) {
+        throw new Error("E2E stock deduction failed: expected 2 -> 1");
+      }
+
+      const salesAfter = await storage.getSales({});
+      const matchedSale = salesAfter.find((s: any) => s.id === saleId);
+      if (!matchedSale || matchedSale.customerTaxId !== cpf || matchedSale.status !== "completed") {
+        throw new Error("E2E sale persistence/CPF verification failed");
+      }
+
+      const transactionsAfterSale = await storage.getTransactions({});
+      if (!transactionsAfterSale.some((t: any) =>
+        t.description === `Venda PDV #${saleId}` &&
+        t.type === "income" &&
+        Number(t.amount) === 3750
+      )) {
+        throw new Error("E2E financial income transaction missing");
+      }
+
+      const cancelled = await storage.cancelSale(saleId);
+      if (cancelled.status !== "cancelled") {
+        throw new Error("E2E sale cancellation failed");
+      }
+
+      const stockAfterCancel = await storage.getProductBatches(productId);
+      if (Number(stockAfterCancel.find((b: any) => b.id === batchId)?.quantity) !== 2) {
+        throw new Error("E2E stock reversal failed: expected 1 -> 2");
+      }
+
+      const transactionsAfterCancel = await storage.getTransactions({});
+      if (!transactionsAfterCancel.some((t: any) =>
+        t.description === `ESTORNO: Venda PDV #${saleId} CANCELADA` &&
+        t.type === "expense" &&
+        Number(t.amount) === 3750
+      )) {
+        throw new Error("E2E financial reversal transaction missing");
+      }
+
+      const closed = await storage.closeCashRegister(registerId, 0);
+      if (closed.status !== "closed" || Number(closed.difference) !== 0) {
+        throw new Error("E2E cash close failed: expected zero difference");
+      }
+
+      const history = await storage.getCashRegisters({});
+      const historicalRegister = history.find((r: any) => r.id === registerId);
+      const historicalSales = await storage.getSalesByRegisterId(registerId);
+      const historicalSale = historicalSales.find((s: any) => s.id === saleId);
+      if (!historicalRegister || !historicalSale || historicalSale.status !== "cancelled") {
+        throw new Error("E2E cash history verification failed");
+      }
+
+      return res.json({
+        ok: true,
+        certifiedChain: [
+          "authenticated MCP execute",
+          "test operator",
+          "cash open",
+          "product + batch",
+          "sale + CPF + cash payment",
+          "stock 2 -> 1",
+          "financial income",
+          "sale cancellation",
+          "stock 1 -> 2",
+          "financial reversal",
+          "cash close",
+          "cash history",
+        ],
+        evidence: {
+          marker,
+          cpf,
+          amount: 37.5,
+          registerId,
+          saleId,
+          productId,
+          batchId,
+          stock: "2 -> 1 -> 2",
+          financial: "income -> reversal expense",
+          cashDifference: 0,
+        },
+        cleanup: "scheduled in finally; no test sale/register/product/user is intentionally retained",
+      });
+    } catch (error: any) {
+      console.error("[AURA E2E] failed:", error);
+      return res.status(500).json({
+        ok: false,
+        message: error?.message || "Controlled cash E2E failed",
+        evidence: { marker, registerId, saleId, productId, batchId },
+      });
+    } finally {
+      await cleanup();
     }
   });
 
