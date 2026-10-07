@@ -198,7 +198,17 @@ export function registerMcpOAuth(app: Express) {
 
     const actionScope = scopes.includes("aura.execute");
     const scopeText = scopes.join(" ");
-    res.type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Aura authorization</title></head><body style="font-family:system-ui;max-width:520px;margin:48px auto;padding:24px"><h1>Authorize Aura</h1><p>ChatGPT is requesting access to the Aura / Supreme Operator tools.</p><p>Requested permissions: <strong>${htmlEscape(scopeText)}</strong>${actionScope ? " (includes actions that can change system state)" : ""}</p><form method="post" action="/oauth/authorize"><input type="hidden" name="client_id" value="${htmlEscape(clientId)}"><input type="hidden" name="redirect_uri" value="${htmlEscape(redirectUri)}"><input type="hidden" name="response_type" value="code"><input type="hidden" name="code_challenge" value="${htmlEscape(codeChallenge)}"><input type="hidden" name="code_challenge_method" value="S256"><input type="hidden" name="state" value="${htmlEscape(state)}"><input type="hidden" name="resource" value="${htmlEscape(resource)}"><input type="hidden" name="scope" value="${htmlEscape(scopeText)}"><label>Usuário<br><input name="username" autocomplete="username" required></label><br><br><label>Senha<br><input type="password" name="password" autocomplete="current-password" required></label><br><br><button type="submit">Autorizar</button></form></body></html>`);
+    const sessionUser = (req as any).user;
+    const isAuthenticated = Boolean((req as any).isAuthenticated?.() && sessionUser);
+    const isMasterSession = isAuthenticated && ["admin", "owner"].includes(String(sessionUser.role).toLowerCase());
+    const authenticatedName = isMasterSession ? String(sessionUser.username ?? "") : "";
+    const sessionHint = isMasterSession
+      ? `<p>Conta mestre já autenticada: <strong>${htmlEscape(authenticatedName || "conta mestre")}</strong>. Não é necessário informar usuário ou senha novamente.</p>`
+      : "";
+    const credentialsForm = isMasterSession
+      ? `<input type="hidden" name="use_session" value="true"><button type="submit">Autorizar com a conta mestre já autenticada</button>`
+      : `<label>Usuário<br><input name="username" autocomplete="username" required></label><br><br><label>Senha<br><input type="password" name="password" autocomplete="current-password" required></label><br><br><button type="submit">Autorizar</button>`;
+    res.type("html").send(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>Autorizar Aura</title></head><body style="font-family:system-ui;max-width:520px;margin:48px auto;padding:24px"><h1>Autorizar Aura</h1><p>O ChatGPT está solicitando acesso às ferramentas do Aura / Supreme Operator.</p><p>Permissões solicitadas: <strong>${htmlEscape(scopeText)}</strong>${actionScope ? " (inclui ações que podem alterar o estado do sistema)" : ""}</p>${sessionHint}<form method="post" action="/oauth/authorize"><input type="hidden" name="client_id" value="${htmlEscape(clientId)}"><input type="hidden" name="redirect_uri" value="${htmlEscape(redirectUri)}"><input type="hidden" name="response_type" value="code"><input type="hidden" name="code_challenge" value="${htmlEscape(codeChallenge)}"><input type="hidden" name="code_challenge_method" value="S256"><input type="hidden" name="state" value="${htmlEscape(state)}"><input type="hidden" name="resource" value="${htmlEscape(resource)}"><input type="hidden" name="scope" value="${htmlEscape(scopeText)}">${credentialsForm}</form></body></html>`);
   });
 
   app.post("/oauth/authorize", async (req: Request, res: Response) => {
