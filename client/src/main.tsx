@@ -7,7 +7,9 @@ installAuraRuntimeMonitor();
 
 // Expose structured Aura operations to WebMCP-capable browsers/agents.
 // The bridge uses the current browser session; credentials are never passed to WebMCP.
-void installAuraWebMCP().catch((error) => {
+void installAuraWebMCP().then((cleanup) => {
+  window.addEventListener("pagehide", cleanup, { once: true });
+}).catch((error) => {
   console.warn("WebMCP do Aura não pôde ser instalado:", error);
 });
 
