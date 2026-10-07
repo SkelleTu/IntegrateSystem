@@ -1302,6 +1302,7 @@ export async function registerRoutes(
     let batchId: number | null = null;
     let registerId: number | null = null;
     let saleId: number | null = null;
+    let step = "init";
 
     const cleanup = async () => {
       // Cleanup is deliberately ID-scoped and runs in reverse dependency order.
@@ -1343,6 +1344,7 @@ export async function registerRoutes(
     };
 
     try {
+      step = "createProduct";
       const product = await storage.createProduct({
         name: marker,
         unit: "Unidade",
@@ -1352,6 +1354,7 @@ export async function registerRoutes(
       } as any);
       productId = product.id;
 
+      step = "createBatch";
       const batch = await storage.createBatch({
         productId,
         quantity: 2,
@@ -1363,6 +1366,7 @@ export async function registerRoutes(
       } as any);
       batchId = batch.id;
 
+      step = "openCashRegister";
       const opened = await storage.openCashRegister({
         userId: testUserId,
         openingAmount: 0,
@@ -1371,6 +1375,7 @@ export async function registerRoutes(
       } as any);
       registerId = opened.id;
 
+      step = "createSale";
       const createdSale = await storage.createSale(
         {
           cashRegisterId: registerId,
@@ -1418,6 +1423,7 @@ export async function registerRoutes(
         throw new Error("E2E financial income transaction missing");
       }
 
+      step = "cancelSale";
       const cancelled = await storage.cancelSale(saleId);
       if (cancelled.status !== "cancelled") {
         throw new Error("E2E sale cancellation failed");
@@ -1437,6 +1443,7 @@ export async function registerRoutes(
         throw new Error("E2E financial reversal transaction missing");
       }
 
+      step = "closeCashRegister";
       const closed = await storage.closeCashRegister(registerId, 0);
       if (closed.status !== "closed" || Number(closed.difference) !== 0) {
         throw new Error("E2E cash close failed: expected zero difference");
@@ -1485,7 +1492,7 @@ export async function registerRoutes(
       return res.status(500).json({
         ok: false,
         message: error?.message || "Controlled cash E2E failed",
-        evidence: { marker, registerId, saleId, productId, batchId },
+        evidence: { marker, step, registerId, saleId, productId, batchId },
       });
     } finally {
       await cleanup();
