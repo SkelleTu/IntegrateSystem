@@ -65,6 +65,8 @@ app.use((req, res, next) => {
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, X-Requested-With, X-Trace-Id, X-Request-Id, X-Aurora-Operator-Mode",
   );
+  // WebMCP is allowed on top-level Aura pages. Cross-origin frames still need explicit delegation.
+  res.header("Permissions-Policy", "tools=(self)");
 
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
