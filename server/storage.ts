@@ -1252,15 +1252,16 @@ export class DatabaseStorage implements IStorage {
 
     // sql.js is used as the local mirror. Its prepared binder is stricter than
     // the remote libSQL driver, so write the local row with primitive SQLite values.
-    const writeLocal = () => {
+    const writeLocal = (forcedId?: number) => {
       const nowSec = Math.floor(now.getTime() / 1000);
       const result: any = localSqlite.prepare(
         `INSERT INTO products
-          (name, brand, category, flavor, unit, weight, description, image_url,
+          (id, name, brand, category, flavor, unit, weight, description, image_url,
            min_stock, sale_price, em_liquidacao, ncm, cfop, codigo_balanca,
            codigo_produto, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
+        forcedId ?? null,
         clean.name,
         clean.brand ?? null,
         clean.category ?? null,
@@ -1279,15 +1280,14 @@ export class DatabaseStorage implements IStorage {
         nowSec,
         nowSec
       );
-      const id = Number(result.lastInsertRowid);
-      return id;
+      return forcedId ?? Number(result.lastInsertRowid);
     };
 
     let productId: number;
     if (dbRemote) {
       const remoteResult: any = await dbRemote.insert(products).values(clean as any);
       productId = Number(remoteResult.lastInsertRowid);
-      writeLocal();
+      writeLocal(productId);
     } else {
       productId = writeLocal();
     }
