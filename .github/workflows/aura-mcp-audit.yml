@@ -1,4 +1,5 @@
 name: Aura MCP Full Audit
+# Audit rerun after Render deployment to verify the live MCP surface.
 
 on:
   push:
