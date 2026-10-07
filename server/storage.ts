@@ -615,7 +615,7 @@ export class DatabaseStorage implements IStorage {
     return await dualWrite(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
-      return await database.transaction(async (transaction: any) => {
+      const transaction = database;
         const [sale] = await transaction.select().from(sales).where(eq(sales.id, id));
         if (!sale) throw new Error("Venda não encontrada");
         if (sale.status === "cancelled") return sale;
