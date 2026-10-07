@@ -95,7 +95,7 @@ const EXECUTE_SECURITY = [{ type: "oauth2" as const, scopes: ["aura.execute"] }]
 
 function createServer(token: string) {
   const server = new McpServer(
-    { name: "aura-system-direct", version: "1.1.0" },
+    { name: "Aura System", version: "1.1.0" },
     {
       instructions:
         "Direct ChatGPT control surface for Aura System. Read before mutation. Mutating operations require aura.execute.",
