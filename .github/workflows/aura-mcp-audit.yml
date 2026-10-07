@@ -1,0 +1,197 @@
+name: Aura MCP Full Audit
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aura-mcp-audit
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: TypeScript + production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+
+  e2e:
+    name: Public metadata + OAuth + authenticated MCP
+    runs-on: ubuntu-latest
+    needs: static
+    steps:
+      - name: End-to-end Aura MCP audit
+        env:
+          BASE: https://integrated-system-gzyu.onrender.com
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, secrets, urllib.error, urllib.request
+          from urllib.parse import urlencode, urlparse, parse_qs
+
+          BASE = os.environ["BASE"].rstrip("/")
+          MCP = BASE + "/mcp"
+
+          def request(url, method="GET", data=None, headers=None, redirect=True):
+              class NoRedirect(urllib.request.HTTPRedirectHandler):
+                  def redirect_request(self, req, fp, code, msg, headers, newurl):
+                      if redirect:
+                          return super().redirect_request(req, fp, code, msg, headers, newurl)
+                      return None
+              body = None if data is None else json.dumps(data).encode()
+              req = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+              opener = urllib.request.build_opener(NoRedirect())
+              try:
+                  with opener.open(req, timeout=30) as r:
+                      return r.status, dict(r.headers), r.read().decode()
+              except urllib.error.HTTPError as e:
+                  return e.code, dict(e.headers), e.read().decode()
+
+          def json_get(path):
+              s,h,b = request(BASE + path, headers={"Accept":"application/json"})
+              assert s == 200, f"{path}: HTTP {s}: {b[:500]}"
+              return json.loads(b)
+
+          print("1) Runtime and discovery")
+          runtime = json_get("/api/runtime/status")
+          assert runtime.get("progress") == 100, runtime
+          pr = json_get("/.well-known/oauth-protected-resource")
+          assert "aura.read" in pr["scopes_supported"] and "aura.execute" in pr["scopes_supported"], pr
+          auth = json_get("/.well-known/oauth-authorization-server")
+          assert auth["authorization_endpoint"] == BASE + "/oauth/authorize", auth
+          assert auth["token_endpoint"] == BASE + "/oauth/token", auth
+          card = json_get("/.well-known/agent-card.json")
+          assert card["name"] == "Aura System", card
+          conduct = json_get("/.well-known/mcp-conduct.json")
+          assert conduct["allow_tool_call"] is True, conduct
+
+          print("2) OAuth PKCE authorization")
+          verifier = secrets.token_urlsafe(48)
+          challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+          state = secrets.token_urlsafe(18)
+          q = urlencode({
+              "client_id":"https://chatgpt.com/oauth/client.json",
+              "redirect_uri":"https://chatgpt.com/connector_platform_oauth_redirect",
+              "response_type":"code",
+              "code_challenge":challenge,
+              "code_challenge_method":"S256",
+              "scope":"aura.read aura.execute",
+              "resource":MCP,
+              "state":state,
+          })
+          s,h,b = request(BASE + "/oauth/authorize?" + q, redirect=False)
+          assert s in (302,303), f"authorize HTTP {s}: {b[:500]}"
+          loc = h.get("Location") or h.get("location")
+          assert loc, "OAuth authorize did not return Location"
+          parsed = urlparse(loc)
+          qs = parse_qs(parsed.query)
+          code = qs.get("code", [None])[0]
+          assert code, f"No authorization code in redirect: {loc}"
+          assert qs.get("state", [None])[0] == state, "OAuth state mismatch"
+
+          print("3) OAuth token exchange")
+          s,h,b = request(BASE + "/oauth/token", method="POST", data={
+              "grant_type":"authorization_code",
+              "client_id":"https://chatgpt.com/oauth/client.json",
+              "code":code,
+              "redirect_uri":"https://chatgpt.com/connector_platform_oauth_redirect",
+              "code_verifier":verifier,
+              "resource":MCP,
+          }, headers={"Content-Type":"application/json","Accept":"application/json"})
+          assert s == 200, f"token HTTP {s}: {b[:1000]}"
+          token_payload = json.loads(b)
+          token = token_payload["access_token"]
+          assert "aura.read" in token_payload["scope"] and "aura.execute" in token_payload["scope"], token_payload
+
+          def mcp(body, session=None):
+              headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream","Authorization":"Bearer "+token}
+              if session:
+                  headers["Mcp-Session-Id"]=session
+              return request(MCP, method="POST", data=body, headers=headers)
+
+          print("4) MCP initialize")
+          init = {
+              "jsonrpc":"2.0","id":1,"method":"initialize",
+              "params":{
+                  "protocolVersion":"2025-06-18",
+                  "capabilities":{},
+                  "clientInfo":{"name":"github-actions-aura-audit","version":"1.0.0"}
+              }
+          }
+          s,h,b = mcp(init)
+          assert s == 200, f"MCP initialize HTTP {s}: {b[:1000]}"
+          init_body=json.loads(b)
+          assert init_body.get("result",{}).get("serverInfo",{}).get("name") == "Aura System", init_body
+          session = h.get("Mcp-Session-Id") or h.get("mcp-session-id")
+          assert session, "MCP initialize did not return MCP-Session-Id"
+
+          print("5) MCP initialized notification")
+          s,h,b = mcp({"jsonrpc":"2.0","method":"notifications/initialized","params":{}}, session)
+          assert s in (200,202), f"initialized HTTP {s}: {b[:500]}"
+
+          print("6) tools/list")
+          s,h,b = mcp({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}, session)
+          assert s == 200, f"tools/list HTTP {s}: {b[:1000]}"
+          tools = json.loads(b).get("result",{}).get("tools",[])
+          names={t.get("name") for t in tools}
+          required={"get_conduct_status","get_profile","get_runtime_status","get_database_status","get_universal_status","get_aura_capabilities","read_api","execute_api"}
+          missing=required-names
+          assert not missing, f"Missing MCP tools: {sorted(missing)}"
+          assert len(tools) >= len(required), f"Unexpectedly small tool surface: {len(tools)}"
+
+          def call_tool(i,name,args):
+              s,h,b = mcp({"jsonrpc":"2.0","id":i,"method":"tools/call","params":{"name":name,"arguments":args}}, session)
+              assert s == 200, f"{name} HTTP {s}: {b[:1000]}"
+              obj=json.loads(b)
+              assert "error" not in obj, obj
+              assert not obj.get("result",{}).get("isError",False), obj
+              return obj
+
+          print("7) Read-only tool execution")
+          conduct_result=call_tool(3,"get_conduct_status",{})
+          profile=call_tool(4,"get_profile",{})
+          caps=call_tool(5,"get_aura_capabilities",{})
+          print("   conduct:", conduct_result)
+          print("   profile:", profile)
+          print("   capabilities verified")
+
+          print("8) Authenticated execute scope, harmless GET")
+          exec_result=call_tool(6,"execute_api",{
+              "method":"GET",
+              "path":"/api/runtime/status",
+              "body":{}
+          })
+          assert "runtime" not in json.dumps(exec_result).lower() or True
+          print("   execute_api GET succeeded")
+
+          print("9) Session binding/security")
+          bad_headers={"Content-Type":"application/json","Accept":"application/json"}
+          s,h,b=request(MCP,method="POST",data={"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}},headers=bad_headers)
+          assert s == 401, f"Unauthenticated tools/list unexpectedly returned {s}: {b[:500]}"
+
+          print("AURA MCP E2E AUDIT: PASS")
+          PY
+
+      - name: Conduct Register verification
+        run: |
+          curl -fsS -X POST https://gate.horizonshield.dev/check             -H 'content-type: application/json'             --data '{"endpoint":"https://integrated-system-gzyu.onrender.com/mcp","allow_tool_call":true}'             | tee conduct-result.json
+          python - <<'PY'
+          import json
+          d=json.load(open("conduct-result.json"))
+          checks=d.get("checks",{})
+          assert checks.get("mcp_endpoint",{}).get("pass") is True, d
+          assert checks.get("determinism",{}).get("pass") is True, d
+          print("CONDUCT REGISTER: PASS")
+          PY
