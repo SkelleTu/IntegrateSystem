@@ -27,6 +27,28 @@ jobs:
           cache: npm
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - name: WebMCP bridge static contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path("client/src/lib/webmcp.ts").read_text()
+          required = [
+              "document.modelContext",
+              "registerTool",
+              "aura_get_runtime_status",
+              "aura_get_observability",
+              "aura_list_products",
+              "aura_list_inventory",
+              "aura_get_product",
+              "aura_restock_inventory",
+              'https://chatgpt.com',
+          ]
+          missing = [x for x in required if x not in p]
+          assert not missing, f"WebMCP bridge missing: {missing}"
+          assert "Authorization" not in p, "WebMCP bridge must not embed Authorization credentials"
+          assert 'credentials: "include"' in p, "WebMCP bridge must use the browser session"
+          print("WEBMCP STATIC CONTRACT: PASS")
+          PY
 
   e2e:
     name: Public metadata + OAuth + authenticated MCP
