@@ -1349,7 +1349,7 @@ export async function registerRoutes(
     };
 
     try {
-      const passwordHash = await hashPassword(crypto.randomUUID());
+      const passwordHash = await hashPassword(randomBytes(32).toString("hex"));
       const testUser = await storage.createUser({
         username: marker,
         password: passwordHash,
