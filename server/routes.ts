@@ -54,7 +54,7 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db, localSqlite } from "./db";
+import { db, localSqlite, getAllDatabases } from "./db";
 import {
   tickets, users, fiscalSettings, insertFiscalSettingsSchema,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
