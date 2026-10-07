@@ -1348,8 +1348,18 @@ export async function registerRoutes(
       const product = await storage.createProduct({
         name: marker,
         unit: "Unidade",
+        brand: null,
+        category: null,
+        flavor: null,
+        weight: null,
+        description: null,
+        imageUrl: null,
         minStock: 0,
         salePrice: 3750,
+        emLiquidacao: false,
+        ncm: null,
+        cfop: null,
+        codigoBalanca: null,
         codigoProduto: marker,
       } as any);
       productId = product.id;
@@ -1358,10 +1368,16 @@ export async function registerRoutes(
       const batch = await storage.createBatch({
         productId,
         quantity: 2,
+        sku: null,
+        variantName: "E2E TEST",
+        barcode: null,
+        batchNumber: marker,
+        supplierCode: null,
+        supplier: null,
+        manufactureDate: null,
+        expiryDate: null,
         costPrice: 1000,
         salePrice: 3750,
-        batchNumber: marker,
-        variantName: "E2E TEST",
         userId: testUserId,
       } as any);
       batchId = batch.id;
