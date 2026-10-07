@@ -1307,7 +1307,7 @@ export async function registerRoutes(
     const cleanup = async () => {
       // Cleanup is deliberately ID-scoped and runs in reverse dependency order.
       // If a step fails halfway through, no test artifact is intentionally left behind.
-      for (const database of [db]) {
+      for (const database of getAllDatabases()) {
         try {
           if (saleId) {
             await database.delete(payments).where(eq(payments.saleId, saleId));
@@ -1349,7 +1349,6 @@ export async function registerRoutes(
       const product = await storage.createProduct({
         id: testProductId,
         name: marker,
-        unit: "Unidade",
         unit: "Unidade",
         minStock: 0,
         salePrice: 3750,
