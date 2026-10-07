@@ -85,7 +85,7 @@ async function local(path: string, options: RequestInit = {}, token?: string) {
 
 function result(value: unknown) {
   return {
-    structuredContent: value,
+    structuredContent: (value && typeof value === "object" ? value : { value }) as Record<string, unknown>,
     content: [{ type: "text" as const, text: JSON.stringify(value) }],
   };
 }
@@ -125,7 +125,6 @@ function createServer(token: string) {
         name: z.string().optional(),
         nickname: z.string().optional(),
       },
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY, "openai/profile": true },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
     },
@@ -163,7 +162,6 @@ function createServer(token: string) {
       title: "Get Aura runtime status",
       description: "Read runtime health, telemetry and current server state.",
       inputSchema: {},
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -176,7 +174,6 @@ function createServer(token: string) {
       title: "Get Aura database status",
       description: "Read the active database backend and last recorded action.",
       inputSchema: {},
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -189,7 +186,6 @@ function createServer(token: string) {
       title: "Get Universal Server status",
       description: "Read Aura's direct connectivity status to Universal Server.",
       inputSchema: {},
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -202,7 +198,6 @@ function createServer(token: string) {
       title: "Get Google Drive status",
       description: "Read the configured Google Drive backup status.",
       inputSchema: {},
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -215,7 +210,6 @@ function createServer(token: string) {
       title: "Read Aura API",
       description: "Directly read any Aura /api GET endpoint.",
       inputSchema: { path: z.string().regex(/^\/api(?:\/|$)/) },
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -234,7 +228,6 @@ function createServer(token: string) {
         path: z.string().regex(/^\/api(?:\/|$)/),
         body: z.record(z.unknown()).optional().default({}),
       },
-      securitySchemes: EXECUTE_SECURITY,
       _meta: { securitySchemes: EXECUTE_SECURITY },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
@@ -277,7 +270,6 @@ function createServer(token: string) {
       title: "Get Aura complete capabilities",
       description: "Return the production API capability inventory. Use read_api or execute_api for the listed operations.",
       inputSchema: {},
-      securitySchemes: READ_SECURITY,
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -432,10 +424,6 @@ export function registerAuraDirectMcp(app: Express) {
 
       transport.onerror = (error) => {
         console.error("[MCP] transport error", error);
-      };
-
-      transport.onsessioninitialized = (id) => {
-        sessions.set(id, session);
       };
 
       await server.connect(transport);
