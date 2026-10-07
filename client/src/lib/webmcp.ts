@@ -1,9 +1,3 @@
-      annotations: { readOnlyHint: false, consequentialHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n/**
- * Aura System WebMCP bridge.
- *
- * Exposes authenticated, same-origin Aura operations to WebMCP-capable agents.
- * WebMCP never receives credentials: browser session cookies stay in the page.
- */
 
 type WebMCPTool = {
   name: string;
