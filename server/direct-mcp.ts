@@ -369,7 +369,7 @@ export function registerAuraDirectMcp(app: Express) {
     const sessionId = String(req.headers["mcp-session-id"] ?? "").trim();
     const clientInfoName = String(req.body?.params?.clientInfo?.name ?? "").toLowerCase();
     const isConductClient = /conduct|horizon.?shield/i.test(clientInfoName);
-    const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken && (isConductClient || String(req.headers["user-agent"] ?? "").toLowerCase().includes("mcp-conduct"));
+    const isPublicInitialize = req.method === "POST" && !sessionId && isInitializeRequest(req) && !rawToken;
     const conductMethod = Array.isArray(req.body) ? req.body[0]?.method : req.body?.method;
     const conductId = Array.isArray(req.body) ? req.body[0]?.id : req.body?.id;
     const isPublicConductRequest = req.method === "POST" && !rawToken && (conductMethod === "tools/list" || conductMethod === "tools/call");
