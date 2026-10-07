@@ -220,15 +220,27 @@ export function registerMcpOAuth(app: Express) {
     const scope = cleanScopes(String(req.body?.scope ?? "aura.read")).join(" ");
     const username = String(req.body?.username ?? "").trim();
     const password = String(req.body?.password ?? "");
+    const useSession = String(req.body?.use_session ?? "") === "true";
 
     if (!(await validClientForRequest(clientId, redirectUri)) || !validRedirect(redirectUri) || (!RESOURCE_ALLOWLIST.has(resource) && resource !== MCP_RESOURCE)) {
       return res.status(400).send("Invalid OAuth request.");
     }
     if (!SECRET) return res.status(503).send("MCP OAuth is not configured.");
 
-    const user = await storage.getUserByUsername(username);
-    if (!user || !comparePassword(String((user as any).password ?? ""), password)) {
-      return errorRedirect(res, redirectUri, state, "access_denied", "Invalid username or password.");
+    const sessionUser = (req as any).user;
+    const hasAuthenticatedMasterSession = Boolean(
+      useSession &&
+      (req as any).isAuthenticated?.() &&
+      sessionUser &&
+      ["admin", "owner"].includes(String(sessionUser.role).toLowerCase()),
+    );
+
+    let user: any = hasAuthenticatedMasterSession ? sessionUser : null;
+    if (!user) {
+      user = await storage.getUserByUsername(username);
+      if (!user || !comparePassword(String((user as any).password ?? ""), password)) {
+        return errorRedirect(res, redirectUri, state, "access_denied", "Invalid username or password.");
+      }
     }
 
     const code = crypto.randomBytes(32).toString("base64url");
