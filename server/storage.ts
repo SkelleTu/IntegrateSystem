@@ -472,14 +472,15 @@ export class DatabaseStorage implements IStorage {
       const expectedAmount = (register.openingAmount || 0) + totalCashSales;
       const difference = closingAmount - expectedAmount;
 
-      const [updated] = await database.update(cashRegisters)
+      await database.update(cashRegisters)
         .set({ 
           closingAmount, 
           difference,
           closedAt: new Date(),
           status: "closed"
         })
-        .where(eq(cashRegisters.id, id))
+        .where(eq(cashRegisters.id, id));
+      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
 
       await database.insert(transactions).values({
         businessType: "padaria",
