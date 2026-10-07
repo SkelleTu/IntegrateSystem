@@ -1,8 +1,15 @@
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { installAuraRuntimeMonitor } from "./lib/runtimeMonitor";
+import { installAuraWebMCP } from "./lib/webmcp";
 
 installAuraRuntimeMonitor();
+
+// Expose structured Aura operations to WebMCP-capable browsers/agents.
+// The bridge uses the current browser session; credentials are never passed to WebMCP.
+void installAuraWebMCP().catch((error) => {
+  console.warn("WebMCP do Aura não pôde ser instalado:", error);
+});
 
 // Habilita o modo PWA do Aurora Agent no Chrome e em navegadores compatíveis.
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
