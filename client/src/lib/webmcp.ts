@@ -1,4 +1,4 @@
-/**
+      annotations: { readOnlyHint: false, consequentialHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n      annotations: { readOnlyHint: true },\n/**
  * Aura System WebMCP bridge.
  *
  * Exposes authenticated, same-origin Aura operations to WebMCP-capable agents.
@@ -14,7 +14,6 @@ type WebMCPTool = {
 
 type ModelContext = {
   registerTool?: (tool: WebMCPTool, options?: { exposedTo?: string[] }) => Promise<unknown> | unknown;
-  unregisterTool?: (name: string) => Promise<unknown> | unknown;
 };
 
 declare global {
@@ -87,9 +86,9 @@ function assertSafeQuery(value: unknown): string {
   return q;
 }
 
-export async function installAuraWebMCP(): Promise<boolean> {
+export async function installAuraWebMCP(): Promise<() => void> {
   const modelContext = document.modelContext;
-  if (!modelContext?.registerTool) return false;
+  if (!modelContext?.registerTool) return () => {};
 
   const tools: WebMCPTool[] = [
     {
@@ -189,6 +188,7 @@ export async function installAuraWebMCP(): Promise<boolean> {
     },
   ];
 
+  const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
     "https://chat.openai.com",
@@ -198,8 +198,8 @@ export async function installAuraWebMCP(): Promise<boolean> {
     // Allow ChatGPT/OpenAI WebMCP clients to discover the Aura tools when the
     // browser uses cross-origin model-context discovery. The actual API call
     // still executes in this authenticated Aura page and never exposes tokens.
-    await modelContext.registerTool(tool, { exposedTo: trustedAgentOrigins });
+    await modelContext.registerTool(tool, { signal: controller.signal, exposedTo: trustedAgentOrigins });
   }
 
-  return true;
+  return () => controller.abort();
 }
