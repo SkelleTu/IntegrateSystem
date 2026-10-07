@@ -1282,17 +1282,22 @@ export class DatabaseStorage implements IStorage {
     };
 
     let productId: number;
+    const requestedId = Number((data as any).id);
     if (dbRemote) {
       await dbRemote.insert(products).values(clean as any);
-      const [remoteProduct]: any[] = await db.select().from(products)
-        .where(eq(products.name, String(data.name)))
-        .orderBy(desc(products.id))
-        .limit(1);
-      productId = Number(remoteProduct?.id);
+      if (Number.isFinite(requestedId) && requestedId > 0) {
+        productId = requestedId;
+      } else {
+        const [remoteProduct]: any[] = await db.select().from(products)
+          .where(eq(products.name, String(data.name)))
+          .orderBy(desc(products.id))
+          .limit(1);
+        productId = Number(remoteProduct?.id);
+      }
       if (!Number.isFinite(productId)) throw new Error("Turso não localizou o produto recém-criado.");
       writeLocal(productId);
     } else {
-      productId = writeLocal();
+      productId = Number.isFinite(requestedId) && requestedId > 0 ? writeLocal(requestedId) : writeLocal();
     }
 
     scheduleAutoBackup();
