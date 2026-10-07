@@ -103,6 +103,52 @@ async function validClientForRequest(clientId: string, redirectUri: string): Pro
   return Boolean(document?.redirect_uris?.includes(redirectUri));
 }
 
+async function resolveMasterUser() {
+  const explicitId = String(process.env.MCP_MASTER_USER_ID || process.env.AURA_MCP_MASTER_USER_ID || "").trim();
+  if (explicitId) {
+    const user = await storage.getUser(Number(explicitId));
+    if (user && ["admin", "owner"].includes(String((user as any).role).toLowerCase())) return user;
+  }
+  const explicitUsername = String(
+    process.env.MCP_MASTER_USERNAME ||
+    process.env.AURA_MCP_MASTER_USERNAME ||
+    process.env.AURA_AGENT_OPERATOR_USERNAME ||
+    ""
+  ).trim();
+  if (explicitUsername) {
+    const user = await storage.getUserByUsername(explicitUsername);
+    if (user && ["admin", "owner"].includes(String((user as any).role).toLowerCase())) return user;
+  }
+  const users = await storage.getUsers();
+  const privileged = users.filter((user: any) => ["admin", "owner"].includes(String(user.role).toLowerCase()));
+  const owners = privileged.filter((user: any) => String(user.role).toLowerCase() === "owner");
+  if (owners.length === 1) return owners[0];
+  if (privileged.length === 1) return privileged[0];
+  throw new Error("MCP master identity is ambiguous; configure MCP_MASTER_USER_ID or MCP_MASTER_USERNAME.");
+}
+
+function mintAuthorizationCode(args: {
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  user: any;
+  scope: string;
+  resource: string;
+}) {
+  const code = crypto.randomBytes(32).toString("base64url");
+  codeStore.set(code, {
+    clientId: args.clientId,
+    redirectUri: args.redirectUri,
+    codeChallenge: args.codeChallenge,
+    username: String(args.user.username ?? ""),
+    userId: String(args.user.id ?? ""),
+    scope: args.scope,
+    resource: args.resource,
+    expiresAt: Date.now() + 5 * 60 * 1000,
+  });
+  return code;
+}
+
 function cleanScopes(value: string): string[] {
   const allowed = new Set(["aura.read", "aura.execute"]);
   return [...new Set(String(value || "aura.read").split(/\s+/).filter((scope) => allowed.has(scope)))];
@@ -198,6 +244,22 @@ export function registerMcpOAuth(app: Express) {
 
     const actionScope = scopes.includes("aura.execute");
     const scopeText = scopes.join(" ");
+
+    if (String(process.env.MCP_MASTER_AUTO_AUTHORIZE || "").toLowerCase() === "true" &&
+        clientId === "https://chatgpt.com/oauth/client.json") {
+      try {
+        const master = await resolveMasterUser();
+        const code = mintAuthorizationCode({ clientId, redirectUri, codeChallenge, user: master, scope: scopeText, resource });
+        const url = new URL(redirectUri);
+        url.searchParams.set("code", code);
+        url.searchParams.set("iss", ISSUER);
+        if (state) url.searchParams.set("state", state);
+        return res.redirect(302, url.toString());
+      } catch (error) {
+        console.error("MCP master auto-authorization failed:", error);
+        return errorRedirect(res, redirectUri, state, "server_error", "MCP master identity is not configured.");
+      }
+    }
     const sessionUser = (req as any).user;
     const isAuthenticated = Boolean((req as any).isAuthenticated?.() && sessionUser);
     const isMasterSession = isAuthenticated && ["admin", "owner"].includes(String(sessionUser.role).toLowerCase());
