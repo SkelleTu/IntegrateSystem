@@ -76,12 +76,17 @@ export async function registerRoutes(
     if ((!expectedToken || suppliedToken !== expectedToken) && !mcpClaims) return next();
 
     try {
+      const tokenSubject = mcpClaims?.sub ? String(mcpClaims.sub).trim() : "";
       const operatorUsername = String(process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
-      const operator = operatorUsername
+      const configuredOperator = operatorUsername
         ? await storage.getUserByUsername(operatorUsername)
-        : (await storage.getUsers()).find((candidate: any) => ["admin", "owner"].includes(String(candidate.role).toLowerCase()));
+        : null;
+      const tokenOperator = tokenSubject
+        ? await storage.getUser(Number(tokenSubject)).catch(() => undefined)
+        : null;
+      const operator = tokenOperator || configuredOperator;
       if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
-        return res.status(403).json({ message: "Configured Aurora operator is missing or lacks admin privileges" });
+        return res.status(403).json({ message: "Configured Aura operator is missing or lacks admin privileges" });
       }
       req.user = operator;
       req.auroraOperator = true;
