@@ -376,7 +376,9 @@ export function registerAuraDirectMcp(app: Express) {
     if (sessionId.startsWith("conduct-")) {
       // Public Conduct sessions expose only the deterministic conformance tool below.
     } else if (req.method === "POST" && !sessionId && isPublicInitialize) {
-      // The Conduct Register is the only unauthenticated MCP client allowed to initialize a public session.
+      // Public conformance initialize is intentionally limited to the harmless conduct surface below.
+    } else if (isPublicConductRequest && !sessionId) {
+      // Public conformance tools/list/tools/call are harmless and do not expose operational tools.
     } else {
       // Authenticate every non-public request, including every request on an existing session.
       // This prevents a leaked/guessed session ID from bypassing the OAuth boundary.
