@@ -1512,6 +1512,17 @@ export async function registerRoutes(
       await cleanup();
     }
 
+    if (responseStatus === 200) {
+      const residuals = await Promise.all(getAllDatabases().map(async (database) => ({
+        products: (await database.select().from(products).where(eq(products.codigoProduto, marker))).length,
+        sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
+        batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
+      })));
+      responsePayload.cleanupVerified = residuals.every((r) => r.products === 0 && r.sales === 0 && r.batches === 0);
+      responsePayload.cleanupEvidence = residuals;
+      if (!responsePayload.cleanupVerified) responseStatus = 500;
+    }
+
     return res.status(responseStatus).json(responsePayload);
   });
 
