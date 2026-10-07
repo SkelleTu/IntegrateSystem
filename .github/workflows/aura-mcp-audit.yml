@@ -181,6 +181,8 @@ jobs:
               "body":{}
           })
           e2e_data=e2e.get("result",{}).get("structuredContent", e2e.get("result",{}))
+          if isinstance(e2e_data.get("result"), dict) and "evidence" in e2e_data["result"]:
+              e2e_data=e2e_data["result"]
           assert e2e_data.get("ok") is True, e2e
           assert float(e2e_data.get("evidence",{}).get("cashDifference", 999)) == 0.0, e2e
           assert e2e_data.get("evidence",{}).get("stock") == "2 -> 1 -> 2", e2e
