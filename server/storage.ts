@@ -1284,7 +1284,7 @@ export class DatabaseStorage implements IStorage {
     let productId: number;
     if (dbRemote) {
       await dbRemote.insert(products).values(clean as any);
-      const [remoteProduct]: any[] = await dbRemote.select().from(products)
+      const [remoteProduct]: any[] = await db.select().from(products)
         .where(eq(products.name, String(data.name)))
         .orderBy(desc(products.id))
         .limit(1);
