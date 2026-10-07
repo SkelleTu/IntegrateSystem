@@ -161,7 +161,7 @@ function createServer(token: string) {
     {
       title: "Get Aura runtime status",
       description: "Read runtime health, telemetry and current server state.",
-      inputSchema: {},,
+      inputSchema: {},
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -173,7 +173,7 @@ function createServer(token: string) {
     {
       title: "Get Aura database status",
       description: "Read the active database backend and last recorded action.",
-      inputSchema: {},,
+      inputSchema: {},
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -185,7 +185,7 @@ function createServer(token: string) {
     {
       title: "Get Universal Server status",
       description: "Read Aura's direct connectivity status to Universal Server.",
-      inputSchema: {},,
+      inputSchema: {},
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -197,7 +197,7 @@ function createServer(token: string) {
     {
       title: "Get Google Drive status",
       description: "Read the configured Google Drive backup status.",
-      inputSchema: {},,
+      inputSchema: {},
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -209,7 +209,7 @@ function createServer(token: string) {
     {
       title: "Read Aura API",
       description: "Directly read any Aura /api GET endpoint.",
-      inputSchema: { path: z.string().regex(/^\/api(?:\/|$)/) },,
+      inputSchema: { path: z.string().regex(/^\/api(?:\/|$)/) },
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
@@ -227,7 +227,7 @@ function createServer(token: string) {
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
         path: z.string().regex(/^\/api(?:\/|$)/),
         body: z.record(z.unknown()).optional().default({}),
-      },,
+      },
       _meta: { securitySchemes: EXECUTE_SECURITY },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     },
@@ -269,7 +269,7 @@ function createServer(token: string) {
     {
       title: "Get Aura complete capabilities",
       description: "Return the production API capability inventory. Use read_api or execute_api for the listed operations.",
-      inputSchema: {},,
+      inputSchema: {},
       _meta: { securitySchemes: READ_SECURITY },
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
