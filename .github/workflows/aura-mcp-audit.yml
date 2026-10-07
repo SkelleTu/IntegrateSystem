@@ -179,7 +179,9 @@ jobs:
           print("9) Session binding/security")
           bad_headers={"Content-Type":"application/json","Accept":"application/json"}
           s,h,b=request(MCP,method="POST",data={"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}},headers=bad_headers)
-          assert s == 401, f"Unauthenticated tools/list unexpectedly returned {s}: {b[:500]}"
+          assert s == 200, f"Public conformance tools/list failed: HTTP {s}: {b[:500]}"
+          public_tools = json.loads(b).get("result",{}).get("tools",[])
+          assert {t.get("name") for t in public_tools} == {"get_conduct_status"}, f"Unauthenticated surface leaked tools: {public_tools}"
 
           print("AURA MCP E2E AUDIT: PASS")
           PY
