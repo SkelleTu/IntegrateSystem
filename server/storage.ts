@@ -1,4 +1,4 @@
-import { db, multiWrite, localSqlite } from "./db.js";
+import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
@@ -1247,13 +1247,55 @@ export class DatabaseStorage implements IStorage {
 
   async createProduct(data: InsertProduct): Promise<Product> {
     this.logAction(`Novo produto: ${data.name}`);
-    return await dualWrite(async (database) => {
-      const now = new Date();
-      const insertResultproducts: any = await database.insert(products).values(withoutUndefined({ ...data, createdAt: now, updatedAt: now }) as any);
-      const idproducts = insertResultproducts.lastInsertRowid;
-      const [p] = await database.select().from(products).where(eq(products.id, idproducts));
-      return p;
-    });
+    const now = new Date();
+    const clean = withoutUndefined({ ...data, createdAt: now, updatedAt: now } as any);
+
+    // sql.js is used as the local mirror. Its prepared binder is stricter than
+    // the remote libSQL driver, so write the local row with primitive SQLite values.
+    const writeLocal = () => {
+      const nowSec = Math.floor(now.getTime() / 1000);
+      const result: any = localSqlite.prepare(
+        `INSERT INTO products
+          (name, brand, category, flavor, unit, weight, description, image_url,
+           min_stock, sale_price, em_liquidacao, ncm, cfop, codigo_balanca,
+           codigo_produto, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).run(
+        clean.name,
+        clean.brand ?? null,
+        clean.category ?? null,
+        clean.flavor ?? null,
+        clean.unit ?? "Unidade",
+        clean.weight ?? null,
+        clean.description ?? null,
+        clean.imageUrl ?? null,
+        clean.minStock ?? 5,
+        clean.salePrice ?? null,
+        clean.emLiquidacao ? 1 : 0,
+        clean.ncm ?? null,
+        clean.cfop ?? null,
+        clean.codigoBalanca ?? null,
+        clean.codigoProduto ?? null,
+        nowSec,
+        nowSec
+      );
+      const id = Number(result.lastInsertRowid);
+      return id;
+    };
+
+    let productId: number;
+    if (dbRemote) {
+      const remoteResult: any = await dbRemote.insert(products).values(clean as any);
+      productId = Number(remoteResult.lastInsertRowid);
+      writeLocal();
+    } else {
+      productId = writeLocal();
+    }
+
+    scheduleAutoBackup();
+    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    if (!product) throw new Error(`Produto criado mas não localizado: ID ${productId}`);
+    return product;
   }
 
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
