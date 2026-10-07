@@ -1356,7 +1356,7 @@ export async function registerRoutes(
         imageUrl: null,
         minStock: 0,
         salePrice: 3750,
-        emLiquidacao: false,
+        emLiquidacao: 0,
         ncm: null,
         cfop: null,
         codigoBalanca: null,
