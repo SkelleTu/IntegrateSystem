@@ -433,9 +433,8 @@ export class DatabaseStorage implements IStorage {
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
     return await dualWrite(async (database) => {
-      const insertResultcashRegisters: any = await database.insert(cashRegisters).values(register);
-      const idcashRegisters = insertResultcashRegisters.lastInsertRowid;
-      const [newRegister] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, idcashRegisters));
+      const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
+      if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       
       if (newRegister.openingAmount && newRegister.openingAmount > 0) {
         await database.insert(transactions).values({
@@ -498,9 +497,8 @@ export class DatabaseStorage implements IStorage {
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     return await dualWrite(async (database) => {
-      const insertResultsales: any = await database.insert(sales).values(sale);
-      const idsales = insertResultsales.lastInsertRowid;
-      const [insertedSale] = await database.select().from(sales).where(eq(sales.id, idsales));
+      const [insertedSale]: any[] = await database.insert(sales).values(sale).returning();
+      if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       
       const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
       await database.insert(saleItems).values(itemsWithSaleId);
@@ -1460,9 +1458,8 @@ export class DatabaseStorage implements IStorage {
     }
     return await dualWrite(async (database) => {
       const now = new Date();
-      const insertResultbatches: any = await database.insert(batches).values(withoutUndefined({ ...data, createdAt: now }) as any);
-      const idbatches = insertResultbatches.lastInsertRowid;
-      const [b] = await database.select().from(batches).where(eq(batches.id, idbatches));
+      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, createdAt: now }) as any).returning();
+      if (!b) throw new Error("Não foi possível obter o lote recém-criado.");
       // log entry
       await database.insert(batchLogs).values({
         productId: data.productId,
