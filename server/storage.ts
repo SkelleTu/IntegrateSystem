@@ -668,9 +668,10 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
-        const [updatedSale] = await transaction.update(sales)
+        await transaction.update(sales)
           .set({ status: "cancelled" })
-          .where(eq(sales.id, id))
+          .where(eq(sales.id, id));
+        const [updatedSale] = await transaction.select().from(sales).where(eq(sales.id, id)).limit(1);
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
