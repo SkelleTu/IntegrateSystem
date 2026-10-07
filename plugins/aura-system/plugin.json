@@ -1,0 +1,41 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aura-system",
+  "version": "1.0.0",
+  "description": "Conecte o ChatGPT ao Aura System para consultar status, dados e executar operações autorizadas nos módulos integrados do sistema.",
+  "author": {
+    "name": "Aura System",
+    "url": "https://integrated-system-gzyu.onrender.com"
+  },
+  "homepage": "https://integrated-system-gzyu.onrender.com",
+  "repository": "https://github.com/SkelleTu/IntegrateSystem",
+  "keywords": [
+    "ERP",
+    "PDV",
+    "caixa",
+    "estoque",
+    "financeiro",
+    "fiscal",
+    "MCP"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Aura System",
+        "shortDescription": "Integração MCP do Aura System",
+        "longDescription": "Conecte o ChatGPT ao Aura System para leitura e execução autorizada de operações empresariais através do Model Context Protocol, com OAuth e ferramentas protegidas.",
+        "developerName": "Aura System",
+        "category": "Business",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://integrated-system-gzyu.onrender.com",
+        "defaultPrompt": [
+          "Use o Aura System para consultar o estado integrado dos módulos.",
+          "Use o Aura System para executar operações autorizadas e verificar o resultado entre Caixa, Estoque, Financeiro e Fiscal."
+        ]
+      }
+    }
+  }
+}
