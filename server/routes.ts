@@ -1324,6 +1324,7 @@ export async function registerRoutes(
           if (productId) {
             await database.delete(products).where(eq(products.id, productId));
           }
+          await database.delete(products).where(eq(products.codigoProduto, marker));
           if (saleId) {
             await database.delete(transactions).where(
               or(
@@ -1332,6 +1333,7 @@ export async function registerRoutes(
               ),
             );
           }
+          await database.delete(sales).where(eq(sales.customerName, marker));
           if (registerId) {
             await database.delete(transactions).where(
               eq(transactions.description, `Fechamento de Caixa #${registerId} - Valor em Gaveta`),
