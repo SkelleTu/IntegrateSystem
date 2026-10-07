@@ -1345,7 +1345,9 @@ export async function registerRoutes(
 
     try {
       step = "createProduct";
+      const testProductId = 900000000 + Math.floor(Math.random() * 90000000);
       const product = await storage.createProduct({
+        id: testProductId,
         name: marker,
         unit: "Unidade",
         unit: "Unidade",
