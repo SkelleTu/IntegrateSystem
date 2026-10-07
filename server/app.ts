@@ -17,6 +17,7 @@ import { supremeOperatorMiddleware } from "./supreme-operator";
 import { registerMcpOAuth } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
+import { getRuntimeObservability } from "./runtime-observability";
 
 const app = express();
 const httpServer = createServer(app);
@@ -164,7 +165,7 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-app.get("/api/runtime/status", (_req: Request, res: Response) => {
+app.get("/api/runtime/observability", (req: Request, res: Response) => {\n  if (req.get("X-MCP-Direct-Control") !== "true") {\n    return res.status(403).json({ ok: false, error: "MCP direct control required" });\n  }\n  res.json(getRuntimeObservability({\n    limit: Number(req.query.limit ?? 250),\n    sinceSequence: Number(req.query.sinceSequence ?? 0),\n    event: typeof req.query.event === "string" ? req.query.event : undefined,\n    traceId: typeof req.query.traceId === "string" ? req.query.traceId : undefined,\n    requestId: typeof req.query.requestId === "string" ? req.query.requestId : undefined,\n  }));\n});\n\napp.get("/api/runtime/status", (_req: Request, res: Response) => {
   res.json({
     ...getRuntimeStatus(),
     operatorMode: res.locals.operatorMode || "supreme",
