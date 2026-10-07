@@ -189,8 +189,16 @@ export async function installAuraWebMCP(): Promise<boolean> {
     },
   ];
 
+  const trustedAgentOrigins = [
+    "https://chatgpt.com",
+    "https://chat.openai.com",
+  ];
+
   for (const tool of tools) {
-    await modelContext.registerTool(tool);
+    // Allow ChatGPT/OpenAI WebMCP clients to discover the Aura tools when the
+    // browser uses cross-origin model-context discovery. The actual API call
+    // still executes in this authenticated Aura page and never exposes tokens.
+    await modelContext.registerTool(tool, { exposedTo: trustedAgentOrigins });
   }
 
   return true;
