@@ -479,7 +479,7 @@ export class DatabaseStorage implements IStorage {
           closedAt: new Date(),
           status: "closed"
         })
-        .where(eq(cashRegisters.id, id))
+        .where(eq(cashRegisters.id, id))
 
       await database.insert(transactions).values({
         businessType: "padaria",
@@ -670,7 +670,7 @@ export class DatabaseStorage implements IStorage {
 
         const [updatedSale] = await transaction.update(sales)
           .set({ status: "cancelled" })
-          .where(eq(sales.id, id))
+          .where(eq(sales.id, id))
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
@@ -717,7 +717,6 @@ export class DatabaseStorage implements IStorage {
         });
 
         return updatedSale;
-      });
     });
   }
 
@@ -775,7 +774,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Ajuste manual estoque ID:${id}`);
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(inventory.id, id))
+      .where(eq(inventory.id, id))
     return updated;
   }
 
@@ -805,7 +804,7 @@ export class DatabaseStorage implements IStorage {
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, id))
+            .where(eq(inventory.id, id))
           return updated;
         }
       }
@@ -820,13 +819,13 @@ export class DatabaseStorage implements IStorage {
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, existing.id))
+            .where(eq(inventory.id, existing.id))
           return updated;
         }
       }
 
       const [inserted] = await database.insert(inventory)
-        .values(itemToUpsert)
+        .values(itemToUpsert)
       return inserted;
     });
   }
@@ -862,7 +861,7 @@ export class DatabaseStorage implements IStorage {
           quantity: item.quantity + data.quantity,
           updatedAt: new Date()
         })
-        .where(eq(inventory.id, id))
+        .where(eq(inventory.id, id))
 
       await database.insert(inventoryRestocks).values({
         inventoryId: id,
@@ -910,7 +909,7 @@ export class DatabaseStorage implements IStorage {
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
     const [updated] = await db.update(tickets)
       .set({ items: JSON.stringify(items) })
-      .where(eq(tickets.id, id))
+      .where(eq(tickets.id, id))
     return updated;
   }
 
@@ -1055,11 +1054,11 @@ export class DatabaseStorage implements IStorage {
         const { id, ...updateData } = dataToSave as any;
         const [updated] = await db.update(fiscalSettings)
           .set(updateData)
-          .where(eq(fiscalSettings.id, existing.id))
+          .where(eq(fiscalSettings.id, existing.id))
         return updated;
       } else {
         const [inserted] = await db.insert(fiscalSettings)
-          .values(dataToSave)
+          .values(dataToSave)
         return inserted;
       }
     } catch (e: any) {
