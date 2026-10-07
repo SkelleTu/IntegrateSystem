@@ -189,11 +189,22 @@ jobs:
           assert e2e_data.get("evidence",{}).get("financial") == "income -> reversal expense", e2e
           print("   CASH E2E PASS:", json.dumps(e2e_data, ensure_ascii=False))
 
-          print("9) Post-cleanup proof")
+          print("9) Complete observability")
+          observability=call_tool(8,"get_observability",{
+              "limit":1000,
+              "sinceSequence":0
+          })
+          obs=observability.get("result",{}).get("structuredContent", observability.get("result",{}))
+          assert obs.get("ok") is True, observability
+          assert obs.get("enabled") is True, observability
+          assert isinstance(obs.get("events"), list), observability
+          print("   OBSERVABILITY PASS:", json.dumps({"returned":obs.get("returned"),"latestSequence":obs.get("latestSequence"),"hasMore":obs.get("hasMore")}, ensure_ascii=False))
+
+          print("10) Post-cleanup proof")
           assert e2e_data.get("cleanupVerified") is True, e2e
           print("   cleanup both DB sides:", json.dumps(e2e_data.get("cleanupEvidence"), ensure_ascii=False))
-          call_tool(8,"read_api",{"path":"/api/products"})
-          call_tool(9,"read_api",{"path":"/api/sales"})
+          call_tool(9,"read_api",{"path":"/api/products"})
+          call_tool(10,"read_api",{"path":"/api/sales"})
 
           print("10) Session binding/security")
           bad_headers={"Content-Type":"application/json","Accept":"application/json"}
