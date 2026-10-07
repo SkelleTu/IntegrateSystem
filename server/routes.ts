@@ -1345,6 +1345,9 @@ export async function registerRoutes(
       }
     };
 
+    let responsePayload: any = null;
+    let responseStatus = 200;
+
     try {
       step = "createProduct";
       const testProductId = 900000000 + Math.floor(Math.random() * 90000000);
@@ -1467,7 +1470,7 @@ export async function registerRoutes(
         throw new Error("E2E cash history verification failed");
       }
 
-      return res.json({
+      responsePayload = {
         ok: true,
         certifiedChain: [
           "authenticated MCP execute",
@@ -1495,18 +1498,21 @@ export async function registerRoutes(
           financial: "income -> reversal expense",
           cashDifference: 0,
         },
-        cleanup: "scheduled in finally; no test sale/register/product/user is intentionally retained",
-      });
+        cleanup: "completed in finally; both Aura database sides cleaned",
+      };
     } catch (error: any) {
       console.error("[AURA E2E] failed:", error);
-      return res.status(500).json({
+      responseStatus = 500;
+      responsePayload = {
         ok: false,
         message: error?.message || "Controlled cash E2E failed",
         evidence: { marker, step, registerId, saleId, productId, batchId },
-      });
+      };
     } finally {
       await cleanup();
     }
+
+    return res.status(responseStatus).json(responsePayload);
   });
 
   // Cashier API
