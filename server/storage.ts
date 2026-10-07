@@ -1285,8 +1285,9 @@ export class DatabaseStorage implements IStorage {
 
     let productId: number;
     if (dbRemote) {
-      const remoteResult: any = await dbRemote.insert(products).values(clean as any);
-      productId = Number(remoteResult.lastInsertRowid);
+      const [remoteProduct]: any[] = await dbRemote.insert(products).values(clean as any).returning({ id: products.id });
+      productId = Number(remoteProduct?.id);
+      if (!Number.isFinite(productId)) throw new Error("Turso não retornou o ID do produto criado.");
       writeLocal(productId);
     } else {
       productId = writeLocal();
