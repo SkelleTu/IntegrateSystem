@@ -1260,7 +1260,7 @@ export class DatabaseStorage implements IStorage {
            min_stock, sale_price, em_liquidacao, ncm, cfop, codigo_balanca,
            codigo_produto, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(
+      ).run([
         forcedId ?? null,
         String(data.name),
         data.brand ?? null,
@@ -1279,7 +1279,7 @@ export class DatabaseStorage implements IStorage {
         data.codigoProduto ?? null,
         nowSec,
         nowSec
-      );
+      ]);
       return forcedId ?? Number(result.lastInsertRowid);
     };
 
