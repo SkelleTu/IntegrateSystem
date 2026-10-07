@@ -167,16 +167,37 @@ jobs:
           print("   profile:", profile)
           print("   capabilities verified")
 
-          print("8) Authenticated execute scope, harmless GET")
+          print("8) Authenticated execute scope + controlled cash E2E")
           exec_result=call_tool(6,"execute_api",{
               "method":"GET",
               "path":"/api/runtime/status",
               "body":{}
           })
-          assert "runtime" not in json.dumps(exec_result).lower() or True
           print("   execute_api GET succeeded")
 
-          print("9) Session binding/security")
+          e2e=call_tool(7,"execute_api",{
+              "method":"POST",
+              "path":"/api/audit/e2e/cash",
+              "body":{}
+          })
+          e2e_data=e2e.get("result",{}).get("structuredContent", e2e.get("result",{}))
+          assert e2e_data.get("ok") is True, e2e
+          assert e2e_data.get("evidence",{}).get("cashDifference") == 0, e2e
+          assert e2e_data.get("evidence",{}).get("stock") == "2 -> 1 -> 2", e2e
+          assert e2e_data.get("evidence",{}).get("financial") == "income -> reversal expense", e2e
+          print("   CASH E2E PASS:", json.dumps(e2e_data, ensure_ascii=False))
+
+          print("9) Post-cleanup proof")
+          marker=e2e_data["evidence"]["marker"]
+          products_after_e2e=call_tool(8,"read_api",{"path":"/api/products"})
+          products_payload=products_after_e2e.get("result",{}).get("structuredContent", products_after_e2e.get("result",{}))
+          assert not any(p.get("name")==marker for p in products_payload), "E2E product was not cleaned up"
+
+          sales_after_e2e=call_tool(9,"read_api",{"path":"/api/sales"})
+          sales_payload= sales_after_e2e.get("result",{}).get("structuredContent", sales_after_e2e.get("result",{}))
+          assert not any(s.get("customerName")==marker for s in sales_payload), "E2E sale was not cleaned up"
+
+          print("10) Session binding/security")
           bad_headers={"Content-Type":"application/json","Accept":"application/json"}
           s,h,b=request(MCP,method="POST",data={"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}},headers=bad_headers)
           assert s == 200, f"Public conformance tools/list failed: HTTP {s}: {b[:500]}"
