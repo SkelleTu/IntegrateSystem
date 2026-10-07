@@ -182,7 +182,7 @@ jobs:
           })
           e2e_data=e2e.get("result",{}).get("structuredContent", e2e.get("result",{}))
           assert e2e_data.get("ok") is True, e2e
-          assert e2e_data.get("evidence",{}).get("cashDifference") == 0, e2e
+          assert float(e2e_data.get("evidence",{}).get("cashDifference", 999)) == 0.0, e2e
           assert e2e_data.get("evidence",{}).get("stock") == "2 -> 1 -> 2", e2e
           assert e2e_data.get("evidence",{}).get("financial") == "income -> reversal expense", e2e
           print("   CASH E2E PASS:", json.dumps(e2e_data, ensure_ascii=False))
