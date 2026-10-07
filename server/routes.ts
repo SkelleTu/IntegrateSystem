@@ -1297,7 +1297,7 @@ export async function registerRoutes(
 
     const marker = "__AURA_E2E_CASH__" + Date.now().toString(36) + "_" + Math.random().toString(16).slice(2);
     const cpf = "12345678909";
-    let testUserId: number | null = null;
+    const testUserId = 1;
     let productId: number | null = null;
     let batchId: number | null = null;
     let registerId: number | null = null;
@@ -1323,9 +1323,6 @@ export async function registerRoutes(
           if (productId) {
             await database.delete(products).where(eq(products.id, productId));
           }
-          if (testUserId) {
-            await database.delete(users).where(eq(users.id, testUserId));
-          }
           if (saleId) {
             await database.delete(transactions).where(
               or(
@@ -1346,22 +1343,12 @@ export async function registerRoutes(
     };
 
     try {
-      const passwordHash = await hashPassword(randomBytes(32).toString("hex"));
-      const testUser = await storage.createUser({
-        username: marker,
-        password: passwordHash,
-        role: "admin",
-      } as any);
-      testUserId = testUser.id;
-
       const product = await storage.createProduct({
         name: marker,
         unit: "Unidade",
         minStock: 0,
         salePrice: 3750,
         codigoProduto: marker,
-        createdAt: new Date(),
-        updatedAt: new Date(),
       } as any);
       productId = product.id;
 
@@ -1372,8 +1359,6 @@ export async function registerRoutes(
         salePrice: 3750,
         batchNumber: marker,
         variantName: "E2E TEST",
-        entryDate: new Date(),
-        createdAt: new Date(),
         userId: testUserId,
       } as any);
       batchId = batch.id;
@@ -1396,7 +1381,6 @@ export async function registerRoutes(
           fiscalStatus: "none",
           fiscalType: "NFCe",
           status: "completed",
-          createdAt: new Date(),
         } as any,
         [{
           itemType: "product",
