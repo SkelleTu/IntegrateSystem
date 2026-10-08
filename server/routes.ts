@@ -72,7 +72,7 @@ export async function registerRoutes(
     const expectedToken = String(process.env.AURORA_OPERATOR_TOKEN || process.env.AURA_AGENT_TOKEN || "").trim();
     const suppliedToken = String(req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
     const isDirectMcp = String(req.headers["x-mcp-direct-control"] || "") === "true";
-    const mcpResource = String(process.env.AURA_MCP_RESOURCE_URL || "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
+    const mcpResource = String(process.env.AURA_MCP_RESOURCE_URL || "https://integrated-system-1c86.onrender.com").replace(/\/$/, "");
     const mcpClaims = isDirectMcp
       ? (verifyMcpAccessToken(suppliedToken, "aura.read", mcpResource) || verifyMcpAccessToken(suppliedToken, "aura.execute", mcpResource))
       : null;
