@@ -21,6 +21,9 @@ const API = {
   observability: "/api/runtime/observability",
   products: "/api/products",
   inventory: "/api/inventory",
+  cashOpen: "/api/cash-register/open",
+  cashClose: "/api/cash-register/close",
+  sales: "/api/sales",
 };
 
 async function auraFetch(
@@ -149,6 +152,48 @@ export async function installAuraWebMCP(): Promise<() => void> {
       },
       execute: (input, { signal } = {}) =>
         auraFetch(`${API.products}/${assertPositiveInt(input.productId, "productId")}`, {}, signal),
+    },
+    {
+      name: "aura_get_open_cash_register",
+      description: "Read the currently open Aura cash register for the authenticated operator. Read-only.",
+      inputSchema: { type: "object", properties: {} },
+      annotations: { readOnlyHint: true, consequentialHint: false },
+      execute: (_input, { signal } = {}) => auraFetch(API.cashOpen, {}, signal),
+    },
+    {
+      name: "aura_open_cash_register",
+      description: "Open the authenticated operator cash register with an opening amount in BRL. Real operation; only use when explicitly requested.",
+      inputSchema: { type: "object", properties: { openingAmount: { type: "number", minimum: 0 } }, required: ["openingAmount"] },
+      annotations: { readOnlyHint: false, consequentialHint: true },
+      execute: (input, { signal } = {}) => auraFetch(API.cashOpen, { method: "POST", body: JSON.stringify({ openingAmount: assertMoney(input.openingAmount, "openingAmount") }) }, signal),
+    },
+    {
+      name: "aura_create_cash_sale",
+      description: "Create a real sale in the authenticated Aura cash register, updating stock and financial records. Only use after explicit confirmation of sale details.",
+      inputSchema: { type: "object", properties: {
+        totalAmount: { type: "integer", minimum: 1 }, customerTaxId: { type: "string" }, customerName: { type: "string" },
+        items: { type: "array" }, payments: { type: "array" }
+      }, required: ["totalAmount", "items", "payments"] },
+      annotations: { readOnlyHint: false, consequentialHint: true },
+      execute: (input, { signal } = {}) => {
+        const totalAmount = assertPositiveInt(input.totalAmount, "totalAmount");
+        if (!Array.isArray(input.items) || !input.items.length) throw new Error("items must contain at least one item");
+        if (!Array.isArray(input.payments) || !input.payments.length) throw new Error("payments must contain at least one payment");
+        const items = input.items.map((item: any) => ({ itemType: String(item.itemType), itemId: assertPositiveInt(item.itemId, "itemId"), quantity: assertPositiveInt(item.quantity, "quantity"), unitPrice: assertPositiveInt(item.unitPrice, "unitPrice"), totalPrice: assertPositiveInt(item.totalPrice, "totalPrice"), unitType: item.unitType ? String(item.unitType) : "unit" }));
+        const payments = input.payments.map((p: any) => ({ method: String(p.method), amount: assertPositiveInt(p.amount, "payment.amount") }));
+        if (payments.reduce((sum: number, p: any) => sum + p.amount, 0) !== totalAmount) throw new Error("Payment total must equal sale total");
+        const sale: Record<string, unknown> = { totalAmount };
+        if (input.customerTaxId) sale.customerTaxId = String(input.customerTaxId);
+        if (input.customerName) sale.customerName = String(input.customerName);
+        return auraFetch(API.sales, { method: "POST", body: JSON.stringify({ sale, items, payments }) }, signal);
+      },
+    },
+    {
+      name: "aura_close_cash_register",
+      description: "Close the authenticated operator cash register using the counted closing amount in BRL. Real operation; only use when explicitly requested.",
+      inputSchema: { type: "object", properties: { closingAmount: { type: "number", minimum: 0 } }, required: ["closingAmount"] },
+      annotations: { readOnlyHint: false, consequentialHint: true },
+      execute: (input, { signal } = {}) => auraFetch(API.cashClose, { method: "POST", body: JSON.stringify({ closingAmount: assertMoney(input.closingAmount, "closingAmount") }) }, signal),
     },
     {
       name: "aura_restock_inventory",
