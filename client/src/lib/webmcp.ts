@@ -3,6 +3,7 @@ type WebMCPTool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
   execute: (input: any, context?: { signal?: AbortSignal }) => Promise<unknown>;
 };
 
