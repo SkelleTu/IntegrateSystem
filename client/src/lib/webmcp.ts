@@ -7,7 +7,7 @@ type WebMCPTool = {
 };
 
 type ModelContext = {
-  registerTool?: (tool: WebMCPTool, options?: { exposedTo?: string[] }) => Promise<unknown> | unknown;
+  registerTool?: (tool: WebMCPTool, options?: { exposedTo?: string[]; signal?: AbortSignal }) => Promise<unknown> | unknown;
 };
 
 declare global {
@@ -227,6 +227,43 @@ export async function installAuraWebMCP(): Promise<() => void> {
     },
   ];
 
+
+  const managedTool = (
+    name: string,
+    description: string,
+    actions: Record<string, { method: string; path: (input: any) => string; body?: (input: any) => unknown }>,
+    consequential: boolean,
+  ): WebMCPTool => ({
+    name,
+    description,
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: Object.keys(actions) },
+        payload: { type: "object", additionalProperties: true },
+      },
+      required: ["action"],
+    },
+    annotations: { readOnlyHint: !consequential, consequentialHint: consequential },
+    execute: async (input = {}, { signal } = {}) => {
+      const action = String(input.action || "");
+      const spec = actions[action];
+      if (!spec) throw new Error("Unsupported action: " + action);
+      const payload = input.payload && typeof input.payload === "object" ? input.payload : {};
+      const init: RequestInit = { method: spec.method };
+      if (spec.body) init.body = JSON.stringify(spec.body(payload));
+      return auraFetch(spec.path(payload), init, signal);
+    },
+  });
+
+  const id = (input: any, field = "id") => assertPositiveInt(input[field], field);
+  const q = (input: any) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(input || {})) {
+      if (value != null && value !== "") params.set(key, String(value));
+    }
+    return params.toString();
+  };
   const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
