@@ -264,6 +264,39 @@ export async function installAuraWebMCP(): Promise<() => void> {
     }
     return params.toString();
   };
+
+  tools.push(
+    managedTool("aura_get_system", "Read Aura system/database status and authenticated session state.", {
+      database: { method: "GET", path: () => "/api/db/status" },
+      session: { method: "GET", path: () => "/api/auth/me" },
+    }, false),
+    managedTool("aura_manage_auth", "Manage the current Aura browser session. Logout changes session state.", {
+      me: { method: "GET", path: () => "/api/auth/me" },
+      logout: { method: "POST", path: () => "/api/auth/logout" },
+    }, true),
+    managedTool("aura_read_enterprises", "Read establishments available to the current Aura owner or admin.", {
+      mine: { method: "GET", path: () => "/api/my-enterprises" },
+      admin_list: { method: "GET", path: () => "/api/admin/enterprises" },
+    }, false),
+    managedTool("aura_manage_enterprises", "Create, select, update, approve/reject, or delete Aura establishments.", {
+      create_mine: { method: "POST", path: () => "/api/my-enterprises", body: p => p },
+      select_mine: { method: "PUT", path: p => "/api/my-enterprises/" + id(p) + "/select", body: () => ({}) },
+      admin_create: { method: "POST", path: () => "/api/admin/enterprises", body: p => p },
+      admin_update: { method: "PUT", path: p => "/api/admin/enterprises/" + id(p), body: p => p },
+      admin_status: { method: "PUT", path: p => "/api/admin/enterprises/" + id(p) + "/status", body: p => ({ status: p.status }) },
+      admin_delete: { method: "DELETE", path: p => "/api/admin/enterprises/" + id(p) },
+    }, true),
+    managedTool("aura_manage_admin", "Manage administrative monitoring, users and employee accounts.", {
+      monitoring: { method: "GET", path: () => "/api/admin/monitoring" },
+      delete_user: { method: "DELETE", path: p => "/api/admin/users/" + id(p) },
+      register_barber: { method: "POST", path: () => "/api/admin/register-barber", body: p => p },
+    }, true),
+    managedTool("aura_manage_settings", "Read or update Aura enterprise settings.", {
+      get: { method: "GET", path: p => "/api/settings" + (q(p) ? "?" + q(p) : "") },
+      update: { method: "POST", path: () => "/api/settings", body: p => p },
+    }, true),
+  );
+
   const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
