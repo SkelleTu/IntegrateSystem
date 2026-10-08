@@ -817,6 +817,7 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
       .where(eq(inventory.id, id))
+      .returning();
     return updated;
   }
 
@@ -952,6 +953,7 @@ export class DatabaseStorage implements IStorage {
     const [updated] = await db.update(tickets)
       .set({ items: JSON.stringify(items) })
       .where(eq(tickets.id, id))
+      .returning();
     return updated;
   }
 
@@ -1097,10 +1099,12 @@ export class DatabaseStorage implements IStorage {
         const [updated] = await db.update(fiscalSettings)
           .set(updateData)
           .where(eq(fiscalSettings.id, existing.id))
+          .returning();
         return updated;
       } else {
         const [inserted] = await db.insert(fiscalSettings)
           .values(dataToSave)
+          .returning();
         return inserted;
       }
     } catch (e: any) {
