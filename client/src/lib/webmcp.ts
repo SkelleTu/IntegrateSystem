@@ -297,6 +297,62 @@ export async function installAuraWebMCP(): Promise<() => void> {
     }, true),
   );
 
+
+  tools.push(
+    managedTool("aura_read_fiscal", "Read fiscal settings, logs and fiscal history.", {
+      settings: { method: "GET", path: () => "/api/fiscal/settings" },
+      logs: { method: "GET", path: () => "/api/fiscal/logs" },
+      history: { method: "GET", path: () => "/api/fiscal/history" },
+    }, false),
+    managedTool("aura_manage_fiscal", "Save fiscal configuration or emit a fiscal document for a sale.", {
+      save_settings: { method: "POST", path: () => "/api/fiscal/settings", body: p => p },
+      emitir: { method: "POST", path: p => "/api/fiscal/emitir/" + id(p, "saleId"), body: p => p },
+    }, true),
+    managedTool("aura_manage_categories", "List or create Aura product/menu categories.", {
+      list: { method: "GET", path: () => "/api/categories" },
+      create: { method: "POST", path: () => "/api/categories", body: p => p },
+    }, true),
+    managedTool("aura_read_inventory", "Read inventory, barcode/search results and restock history.", {
+      list: { method: "GET", path: () => "/api/inventory" },
+      search: { method: "GET", path: p => "/api/inventory/search" + (q(p) ? "?" + q(p) : "") },
+      barcode: { method: "GET", path: p => "/api/inventory/barcode/" + encodeURIComponent(String(p.barcode || "")) },
+      restocks: { method: "GET", path: () => "/api/inventory-restocks" },
+      item_restocks: { method: "GET", path: p => "/api/inventory/" + id(p, "inventoryId") + "/restocks" },
+    }, false),
+    managedTool("aura_manage_inventory", "Create, delete, restock and log inventory movements.", {
+      create: { method: "POST", path: () => "/api/inventory", body: p => p },
+      delete: { method: "DELETE", path: p => "/api/inventory/" + id(p, "inventoryId") },
+      restock: { method: "POST", path: p => "/api/inventory/" + id(p, "inventoryId") + "/restock", body: p => p },
+      log: { method: "POST", path: () => "/api/inventory/log", body: p => p },
+    }, true),
+    managedTool("aura_read_products", "Read products, cashier catalog, barcode/SKU lookups, batches and stock logs.", {
+      list: { method: "GET", path: p => "/api/products" + (q(p) ? "?" + q(p) : "") },
+      cashier_items: { method: "GET", path: () => "/api/products/cashier-items" },
+      barcode: { method: "GET", path: p => "/api/products/barcode/" + encodeURIComponent(String(p.barcode || "")) },
+      sku: { method: "GET", path: p => "/api/products/sku/" + encodeURIComponent(String(p.sku || "")) },
+      get: { method: "GET", path: p => "/api/products/" + id(p, "productId") },
+      batches: { method: "GET", path: p => "/api/products/" + id(p, "productId") + "/batches" },
+      logs: { method: "GET", path: p => "/api/products/" + id(p, "productId") + "/logs" },
+      snapshot: { method: "GET", path: () => "/api/products/snapshot" },
+    }, false),
+    managedTool("aura_manage_products", "Create, update, delete and administer the Aura product catalog.", {
+      create: { method: "POST", path: () => "/api/products", body: p => p },
+      update: { method: "PUT", path: p => "/api/products/" + id(p, "productId"), body: p => p.data || p },
+      delete: { method: "DELETE", path: p => "/api/products/" + id(p, "productId") },
+      swap_codigo: { method: "POST", path: () => "/api/products/swap-codigo", body: p => p },
+      check_duplicate: { method: "POST", path: () => "/api/products/check-duplicate", body: p => p },
+      clear_all: { method: "DELETE", path: () => "/api/products", body: p => p },
+      restore_snapshot: { method: "POST", path: () => "/api/products/restore", body: p => p },
+      zero_quantities: { method: "POST", path: () => "/api/products/zero-quantities", body: p => p },
+    }, true),
+    managedTool("aura_manage_batches", "Create, update, delete lots and deduct product stock.", {
+      create: { method: "POST", path: p => "/api/products/" + id(p, "productId") + "/batches", body: p => p.data || p },
+      update: { method: "PUT", path: p => "/api/batches/" + id(p, "batchId"), body: p => p.data || p },
+      delete: { method: "DELETE", path: p => "/api/batches/" + id(p, "batchId") },
+      deduct: { method: "POST", path: p => "/api/products/" + id(p, "productId") + "/deduct", body: p => p },
+    }, true),
+  );
+
   const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
