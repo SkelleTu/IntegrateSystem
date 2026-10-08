@@ -86,13 +86,17 @@ app.use((req, res, next) => {
   res.locals.traceId = traceId;
   res.locals.requestId = requestId;
 
-  runtimeEvent("request-correlation", `${req.method} ${req.path}`, {
-    phase: "http",
-    traceId,
-    requestId,
-  });
-
-  next();
+  runWithAuraContext(
+    { traceId, requestId, source: "http" },
+    () => {
+      runtimeEvent("request-correlation", `${req.method} ${req.path}`, {
+        phase: "http",
+        traceId,
+        requestId,
+      });
+      next();
+    },
+  );
 });
 
 // O nível Supremo é o único modo operacional ativo inicialmente.
@@ -167,11 +171,11 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
   res.json({ ok: true });
 });
 
-app.get("/api/runtime/observability", (req: Request, res: Response) => {
+app.get("/api/runtime/observability", async (req: Request, res: Response) => {
   if (req.get("X-MCP-Direct-Control") !== "true") {
     return res.status(403).json({ ok: false, error: "MCP direct control required" });
   }
-  res.json(getRuntimeObservability({
+  res.json(await getRuntimeObservability({
     limit: Number(req.query.limit ?? 250),
     sinceSequence: Number(req.query.sinceSequence ?? 0),
     event: typeof req.query.event === "string" ? req.query.event : undefined,
