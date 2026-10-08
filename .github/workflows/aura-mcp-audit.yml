@@ -45,12 +45,40 @@ jobs:
               "aura_open_cash_register",
               "aura_create_cash_sale",
               "aura_close_cash_register",
+              "aura_get_system",
+              "aura_manage_auth",
+              "aura_read_enterprises",
+              "aura_manage_enterprises",
+              "aura_manage_admin",
+              "aura_manage_settings",
+              "aura_read_fiscal",
+              "aura_manage_fiscal",
+              "aura_manage_categories",
+              "aura_read_inventory",
+              "aura_manage_inventory",
+              "aura_read_products",
+              "aura_manage_products",
+              "aura_manage_batches",
+              "aura_manage_menu",
+              "aura_read_cash_register",
+              "aura_manage_cash_register",
+              "aura_read_sales",
+              "aura_manage_sales",
+              "aura_manage_finance",
+              "aura_manage_tickets",
+              "aura_read_time_clock",
+              "aura_manage_time_clock",
+              "aura_manage_labels",
+              "aura_read_backups",
+              "aura_manage_backups",
               'https://chatgpt.com',
           ]
           missing = [x for x in required if x not in p]
           assert not missing, f"WebMCP bridge missing: {missing}"
           assert "Authorization" not in p, "WebMCP bridge must not embed Authorization credentials"
           assert 'credentials: "include"' in p, "WebMCP bridge must use the browser session"
+          assert p.count("managedTool(") + p.count('name: "') - 1 <= 40, "Keep the WebMCP tool surface at or below 40"
+          print("WEBMCP TOOL COUNT:", p.count("managedTool(") + p.count('name: "') - 1)
           print("WEBMCP STATIC CONTRACT: PASS")
           PY
 
