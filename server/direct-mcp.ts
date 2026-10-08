@@ -173,7 +173,7 @@ function createServer(token: string) {
       annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
     },
     async ({ limit, sinceSequence, event, traceId, requestId }) =>
-      result(getRuntimeObservability({ limit, sinceSequence, event, traceId, requestId })),
+      result(await getRuntimeObservability({ limit, sinceSequence, event, traceId, requestId })),
   );
 
   server.registerTool(
