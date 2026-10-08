@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { and, asc, eq, gt } from "drizzle-orm";
+import { runtimeEvents } from "../shared/schema";
+import { db } from "./db";
 
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
 const runtimeDir = process.env.AURA_RUNTIME_DIR
@@ -41,51 +44,30 @@ export type RuntimeObservationQuery = {
   requestId?: string;
 };
 
-export function getRuntimeObservability(query: RuntimeObservationQuery = {}) {
+function readStatus() {
+  try {
+    return JSON.parse(fs.readFileSync(statusFile, "utf8"));
+  } catch {
+    return { enabled, unavailable: true };
+  }
+}
+
+function parseFileFallback(query: RuntimeObservationQuery) {
   const limit = Math.min(1000, Math.max(1, Number(query.limit ?? 250) || 250));
   const sinceSequence = Math.max(0, Number(query.sinceSequence ?? 0) || 0);
   const eventFilter = query.event?.trim();
   const traceFilter = query.traceId?.trim();
   const requestFilter = query.requestId?.trim();
 
-  let status: unknown = null;
-  try {
-    status = JSON.parse(fs.readFileSync(statusFile, "utf8"));
-  } catch {
-    status = { enabled, unavailable: true };
-  }
-
-  if (!enabled) {
-    return {
-      ok: true,
-      enabled: false,
-      source: "aura-runtime",
-      host: os.hostname(),
-      status,
-      events: [],
-      returned: 0,
-      hasMore: false,
-    };
-  }
-
   let raw = "";
   try {
     raw = fs.readFileSync(eventsFile, "utf8");
   } catch {
-    return {
-      ok: true,
-      enabled: true,
-      source: "aura-runtime",
-      host: os.hostname(),
-      status,
-      events: [],
-      returned: 0,
-      hasMore: false,
-    };
+    return { events: [], latestSequence: sinceSequence, hasMore: false };
   }
 
   const parsed: Array<Record<string, unknown>> = [];
-  for (const line of raw.split(/\\r?\\n/)) {
+  for (const line of raw.split(/\r?\n/)) {
     if (!line.trim()) continue;
     try {
       const item = JSON.parse(line) as Record<string, unknown>;
@@ -97,29 +79,120 @@ export function getRuntimeObservability(query: RuntimeObservationQuery = {}) {
       if (requestFilter && String(data.requestId ?? "") !== requestFilter) continue;
       parsed.push(redact(item) as Record<string, unknown>);
     } catch {
-      // Ignore a partially written/corrupt line without breaking observability.
+      // Ignore a partial local line. Durable storage is the authoritative source.
     }
   }
 
-  const events = parsed.slice(-limit);
-  const latestSequence = events.length ? Number(events[events.length - 1].sequence ?? sinceSequence) : sinceSequence;
+  const events = parsed.slice(0, limit);
+  const latestSequence = events.length
+    ? Number(events[events.length - 1].sequence ?? sinceSequence)
+    : sinceSequence;
 
   return {
-    ok: true,
-    enabled: true,
-    source: "aura-runtime",
-    host: os.hostname(),
-    status: redact(status),
     events,
-    returned: events.length,
-    hasMore: parsed.length > events.length,
     latestSequence,
-    filters: {
-      limit,
-      sinceSequence,
-      event: eventFilter || null,
-      traceId: traceFilter || null,
-      requestId: requestFilter || null,
-    },
+    hasMore: parsed.length > events.length,
   };
+}
+
+export async function getRuntimeObservability(query: RuntimeObservationQuery = {}) {
+  const limit = Math.min(1000, Math.max(1, Number(query.limit ?? 250) || 250));
+  const sinceSequence = Math.max(0, Number(query.sinceSequence ?? 0) || 0);
+  const eventFilter = query.event?.trim();
+  const traceFilter = query.traceId?.trim();
+  const requestFilter = query.requestId?.trim();
+
+  if (!enabled) {
+    return {
+      ok: true,
+      enabled: false,
+      source: "aura-runtime",
+      host: os.hostname(),
+      status: readStatus(),
+      events: [],
+      returned: 0,
+      hasMore: false,
+      nextSequence: sinceSequence,
+    };
+  }
+
+  try {
+    const conditions = [gt(runtimeEvents.id, sinceSequence)];
+    if (eventFilter) conditions.push(eq(runtimeEvents.event, eventFilter));
+    if (traceFilter) conditions.push(eq(runtimeEvents.traceId, traceFilter));
+    if (requestFilter) conditions.push(eq(runtimeEvents.requestId, requestFilter));
+
+    const rows = await db
+      .select()
+      .from(runtimeEvents)
+      .where(and(...conditions))
+      .orderBy(asc(runtimeEvents.id))
+      .limit(limit + 1);
+
+    const hasMore = rows.length > limit;
+    const selected = rows.slice(0, limit);
+    const events = selected.map((row) => ({
+      id: row.id,
+      sequence: row.id,
+      sessionId: row.sessionId,
+      timestamp: row.timestamp,
+      process: row.process,
+      pid: row.pid,
+      event: row.event,
+      message: row.message,
+      data: (() => {
+        try {
+          return redact(row.data ? JSON.parse(row.data) : {});
+        } catch {
+          return { raw: "[INVALID_EVENT_DATA]" };
+        }
+      })(),
+    }));
+
+    const latestSequence = events.length
+      ? Number(events[events.length - 1].sequence)
+      : sinceSequence;
+
+    return {
+      ok: true,
+      enabled: true,
+      source: "aura-runtime-ledger",
+      host: os.hostname(),
+      status: redact(readStatus()),
+      events,
+      returned: events.length,
+      hasMore,
+      latestSequence,
+      nextSequence: latestSequence,
+      filters: {
+        limit,
+        sinceSequence,
+        event: eventFilter || null,
+        traceId: traceFilter || null,
+        requestId: requestFilter || null,
+      },
+    };
+  } catch {
+    const fallback = parseFileFallback(query);
+    return {
+      ok: true,
+      enabled: true,
+      source: "aura-runtime-file-fallback",
+      host: os.hostname(),
+      status: redact(readStatus()),
+      events: fallback.events,
+      returned: fallback.events.length,
+      hasMore: fallback.hasMore,
+      latestSequence: fallback.latestSequence,
+      nextSequence: fallback.latestSequence,
+      degraded: true,
+      filters: {
+        limit,
+        sinceSequence,
+        event: eventFilter || null,
+        traceId: traceFilter || null,
+        requestId: requestFilter || null,
+      },
+    };
+  }
 }
