@@ -353,6 +353,40 @@ export async function installAuraWebMCP(): Promise<() => void> {
     }, true),
   );
 
+
+  tools.push(
+    managedTool("aura_manage_menu", "Read menu items or adjust menu presentation.", {
+      list: { method: "GET", path: () => "/api/menu-items" },
+      adjust: { method: "PATCH", path: p => "/api/menu-items/" + id(p, "menuItemId") + "/adjust", body: p => p },
+    }, true),
+    managedTool("aura_read_cash_register", "Read the open cash register and detailed register history.", {
+      open: { method: "GET", path: () => "/api/cash-register/open" },
+      history: { method: "GET", path: p => "/api/cash-registers/history" + (q(p) ? "?" + q(p) : "") },
+    }, false),
+    managedTool("aura_manage_cash_register", "Open, adjust or close the real Aura cash register. Financial writes require explicit user intent.", {
+      open: { method: "POST", path: () => "/api/cash-register/open", body: p => ({ openingAmount: assertMoney(p.openingAmount, "openingAmount") }) },
+      adjust: { method: "POST", path: () => "/api/cash-register/adjust", body: p => p },
+      close: { method: "POST", path: () => "/api/cash-register/close", body: p => ({ closingAmount: assertMoney(p.closingAmount, "closingAmount") }) },
+    }, true),
+    managedTool("aura_read_sales", "Read Aura sales by date range.", {
+      list: { method: "GET", path: p => "/api/sales" + (q(p) ? "?" + q(p) : "") },
+    }, false),
+    managedTool("aura_manage_sales", "Create, cancel or process fiscal actions for real sales.", {
+      create: { method: "POST", path: () => "/api/sales", body: p => p },
+      cancel: { method: "POST", path: p => "/api/sales/" + id(p, "saleId") + "/cancel", body: p => p },
+      emit_fiscal: { method: "POST", path: p => "/api/sales/" + id(p, "saleId") + "/emit-fiscal", body: p => p },
+    }, true),
+    managedTool("aura_manage_finance", "Read, create or delete Aura financial transactions.", {
+      list: { method: "GET", path: p => "/api/transactions" + (q(p) ? "?" + q(p) : "") },
+      create: { method: "POST", path: () => "/api/transactions", body: p => p },
+      delete: { method: "DELETE", path: p => "/api/transactions/" + id(p, "transactionId") },
+    }, true),
+    managedTool("aura_manage_tickets", "Read a customer ticket/order and update its items.", {
+      get: { method: "GET", path: p => "/api/tickets/" + id(p, "number") },
+      update_items: { method: "POST", path: p => "/api/tickets/" + id(p, "ticketId") + "/items", body: p => ({ items: p.items }) },
+    }, true),
+  );
+
   const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
