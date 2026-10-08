@@ -32,7 +32,7 @@ export const localSqlite = sqlJsDb;
 export const dbLocal = drizzle(localSqlite, { schema });
 
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
-export let dbRemote: ReturnType<typeof drizzle> | null = null;
+export let dbRemote: any = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
@@ -52,8 +52,8 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
 export const isRemoteEnabled = !!dbRemote;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
-const primaryDatabase = dbRemote ?? dbLocal;
-const mirrorDatabase = dbRemote ? dbLocal : null;
+const primaryDatabase: any = dbRemote ?? dbLocal;
+const mirrorDatabase: any = dbRemote ? dbLocal : null;
 
 function isPromiseLike(value: any): boolean {
   return !!value && typeof value.then === "function";
