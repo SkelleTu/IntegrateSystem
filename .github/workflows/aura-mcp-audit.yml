@@ -91,6 +91,7 @@ jobs:
           assert runtime.get("progress") == 100, runtime
           pr = json_get("/.well-known/oauth-protected-resource")
           assert "aura.read" in pr["scopes_supported"] and "aura.execute" in pr["scopes_supported"], pr
+          assert pr["resource"] == MCP, pr
           auth = json_get("/.well-known/oauth-authorization-server")
           assert auth["authorization_endpoint"] == BASE + "/oauth/authorize", auth
           assert auth["token_endpoint"] == BASE + "/oauth/token", auth
