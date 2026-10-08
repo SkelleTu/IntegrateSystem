@@ -31,6 +31,7 @@ import {
   type BatchLog, type InsertBatchLog,
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne } from "drizzle-orm";
+import { runtimeEvent } from "./runtimeMonitor";
 
 // sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
 function withoutUndefined<T extends Record<string, any>>(value: T): T {
@@ -179,6 +180,7 @@ export class DatabaseStorage implements IStorage {
   private logAction(action: string) {
     this.lastAction = `${action} em ${new Date().toLocaleTimeString('pt-BR')}`;
     console.log(`[DB ACTION]: ${this.lastAction}`);
+    runtimeEvent("db-action", action, { phase: "database", operation: action });
   }
 
   getLastAction(): string {
@@ -500,12 +502,23 @@ export class DatabaseStorage implements IStorage {
     return await dualWrite(async (database) => {
       const [insertedSale]: any[] = await database.insert(sales).values(sale).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
+      runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
+        phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
+        userId: sale.userId ?? null, totalAmount: insertedSale.totalAmount,
+      });
       
       const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
       await database.insert(saleItems).values(itemsWithSaleId);
+      runtimeEvent("sale-items-created", `Itens da venda #${insertedSale.id} gravados`, {
+        phase: "sale", saleId: insertedSale.id, itemCount: itemsWithSaleId.length,
+      });
       
       const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
       await database.insert(payments).values(paymentsWithSaleId);
+      runtimeEvent("sale-payments-created", `Pagamentos da venda #${insertedSale.id} gravados`, {
+        phase: "finance", saleId: insertedSale.id, paymentCount: paymentsWithSaleId.length,
+        paymentTotal: paymentsWithSaleId.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
+      });
 
       for (const item of items) {
         // Itens vindos do catálogo Produto → Lote usam um ID virtual
@@ -535,6 +548,10 @@ export class DatabaseStorage implements IStorage {
             .set({ quantity: batch.quantity - item.quantity })
             .where(eq(batches.id, batchId));
 
+          runtimeEvent("sale-batch-deduction", `Baixa do lote ${batch.id} na venda #${insertedSale.id}`, {
+            phase: "inventory", saleId: insertedSale.id, batchId: batch.id,
+            productId: batch.productId, quantity: item.quantity,
+          });
           await database.insert(batchLogs).values({
             productId: batch.productId,
             batchId: batch.id,
@@ -575,6 +592,9 @@ export class DatabaseStorage implements IStorage {
             })
             .where(eq(inventory.id, inventoryItem.id));
           
+          runtimeEvent("sale-inventory-deduction", `Baixa do estoque ${inventoryItem.id} na venda #${insertedSale.id}`, {
+            phase: "inventory", saleId: insertedSale.id, inventoryId: inventoryItem.id, quantity: item.quantity,
+          });
           await database.insert(inventoryLogs).values({
             inventoryId: inventoryItem.id,
             type: "out",
@@ -594,7 +614,13 @@ export class DatabaseStorage implements IStorage {
         amount: insertedSale.totalAmount,
         createdAt: new Date()
       });
-      
+      runtimeEvent("sale-financial-transaction", `Receita financeira da venda #${insertedSale.id} gravada`, {
+        phase: "finance", saleId: insertedSale.id, amount: insertedSale.totalAmount, category: "vendas",
+      });
+      runtimeEvent("sale-completed", `Fluxo da venda #${insertedSale.id} concluído`, {
+        phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
+        totalAmount: insertedSale.totalAmount,
+      });
       return insertedSale;
     });
   }
