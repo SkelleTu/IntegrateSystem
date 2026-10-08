@@ -3,6 +3,26 @@ import path from "path";
 import os from "os";
 import { getAuraContext } from "./aura-request-context";
 
+function redact(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redact);
+  if (!value || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+    const lower = key.toLowerCase();
+    if (
+      lower.includes("authorization") ||
+      lower === "token" ||
+      lower.includes("access_token") ||
+      lower.includes("refresh_token") ||
+      lower.includes("client_secret") ||
+      lower.includes("password") ||
+      lower.includes("secret")
+    ) out[key] = "[REDACTED]";
+    else out[key] = redact(raw);
+  }
+  return out;
+}
+
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
 const runtimeDir = process.env.AURA_RUNTIME_DIR
   ? path.resolve(process.env.AURA_RUNTIME_DIR)
