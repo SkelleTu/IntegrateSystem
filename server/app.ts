@@ -1,5 +1,6 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
 import { randomUUID } from "node:crypto";
+import { runWithAuraContext } from "./aura-request-context";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
