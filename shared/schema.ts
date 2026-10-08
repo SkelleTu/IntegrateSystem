@@ -2,6 +2,22 @@ import { sqliteTable as pgTable, text, integer, numeric } from "drizzle-orm/sqli
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const runtimeEvents = pgTable("runtime_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sequence: integer("sequence").notNull(),
+  sessionId: text("session_id").notNull(),
+  timestamp: integer("timestamp", { mode: "timestamp" }).notNull(),
+  process: text("process").notNull().default("server"),
+  pid: integer("pid"),
+  event: text("event").notNull(),
+  message: text("message").notNull(),
+  traceId: text("trace_id"),
+  requestId: text("request_id"),
+  source: text("source"),
+  severity: text("severity").notNull().default("info"),
+  data: text("data"),
+});
+
 export const userSessions = pgTable("user_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
