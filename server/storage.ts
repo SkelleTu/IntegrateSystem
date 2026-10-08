@@ -702,6 +702,10 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
+        runtimeEvent("sale-cancellation-start", `Iniciando estorno da venda #${id}`, {
+          phase: "sale", saleId: id, userId: sale.userId ?? null, totalAmount: sale.totalAmount,
+        });
+
         await transaction.update(sales)
           .set({ status: "cancelled" })
           .where(eq(sales.id, id));
@@ -749,6 +753,9 @@ export class DatabaseStorage implements IStorage {
           description: `ESTORNO: Venda PDV #${id} CANCELADA`,
           amount: sale.totalAmount,
           createdAt: new Date()
+        });
+        runtimeEvent("sale-cancelled", `Venda #${id} cancelada e estorno financeiro gravado`, {
+          phase: "sale", saleId: id, amount: sale.totalAmount,
         });
 
         return updatedSale;
