@@ -209,7 +209,7 @@ function installFetchTracking() {
       init?.method ||
       (input instanceof Request ? input.method : "GET")
     ).toUpperCase();
-    const rawUrl = typeof input === "string" ? input : input.url;
+    const rawUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
 
     pendingRequests += 1;
 
@@ -282,7 +282,7 @@ function installXHRTracking() {
       started: performance.now(),
     });
 
-    return originalOpen.call(this, method, url, ...rest);
+    return (originalOpen as any).call(this, method, url, ...rest);
   };
 
   proto.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
