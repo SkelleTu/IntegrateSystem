@@ -9,11 +9,11 @@ import { getRuntimeObservability } from "./runtime-observability";
 const RESOURCE_URL = String(
   process.env.AURA_MCP_RESOURCE_URL ??
     process.env.MCP_RESOURCE_URL ??
-    "https://integrated-system-gzyu.onrender.com",
+    "https://integrated-system-1c86.onrender.com",
 ).replace(/\/$/, "");
 
 const OAUTH_ISSUER = String(
-  process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com",
+  process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-1c86.onrender.com",
 ).replace(/\/$/, "");
 
 type McpSession = {
