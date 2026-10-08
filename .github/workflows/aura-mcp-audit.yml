@@ -41,6 +41,10 @@ jobs:
               "aura_list_inventory",
               "aura_get_product",
               "aura_restock_inventory",
+              "aura_get_open_cash_register",
+              "aura_open_cash_register",
+              "aura_create_cash_sale",
+              "aura_close_cash_register",
               'https://chatgpt.com',
           ]
           missing = [x for x in required if x not in p]
