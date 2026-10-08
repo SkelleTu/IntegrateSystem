@@ -437,6 +437,10 @@ export class DatabaseStorage implements IStorage {
     return await dualWrite(async (database) => {
       const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
+      runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
+        phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
+        openingAmount: newRegister.openingAmount ?? 0,
+      });
       
       if (newRegister.openingAmount && newRegister.openingAmount > 0) {
         await database.insert(transactions).values({
@@ -493,6 +497,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: new Date()
       } as any);
 
+      runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
+        phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
+      });
       return updated;
     });
   }
