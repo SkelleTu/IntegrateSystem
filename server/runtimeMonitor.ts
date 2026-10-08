@@ -190,6 +190,43 @@ export function runtimeEvent(
   });
 }
 
+const RUNTIME_EVENT_TABLE_SQL = `
+  CREATE TABLE IF NOT EXISTS runtime_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sequence INTEGER NOT NULL,
+    session_id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    process TEXT NOT NULL DEFAULT 'server',
+    pid INTEGER,
+    event TEXT NOT NULL,
+    message TEXT NOT NULL,
+    trace_id TEXT,
+    request_id TEXT,
+    source TEXT,
+    severity TEXT NOT NULL DEFAULT 'info',
+    data TEXT
+  )
+`;
+
+let runtimeTableReady: Promise<void> | null = null;
+
+async function ensureRuntimeEventTable() {
+  if (!runtimeTableReady) {
+    runtimeTableReady = (async () => {
+      const [{ localSqlite, dbRemote }] = await Promise.all([import("./db")]);
+      localSqlite.exec(RUNTIME_EVENT_TABLE_SQL);
+      const client = (dbRemote as any)?.$client ?? (dbRemote as any)?.client;
+      if (client && typeof client.execute === "function") {
+        await client.execute(RUNTIME_EVENT_TABLE_SQL);
+      }
+    })().catch((error) => {
+      runtimeTableReady = null;
+      throw error;
+    });
+  }
+  await runtimeTableReady;
+}
+
 async function persistRuntimeEvent(record: {
   sequence: number;
   sessionId: string;
@@ -205,6 +242,7 @@ async function persistRuntimeEvent(record: {
       import("./db"),
       import("../shared/schema"),
     ]);
+    await ensureRuntimeEventTable();
     const context = record.data;
     const redactedData = redact(context);
     await db.insert(runtimeEvents).values({
