@@ -387,6 +387,34 @@ export async function installAuraWebMCP(): Promise<() => void> {
     }, true),
   );
 
+
+  tools.push(
+    managedTool("aura_read_time_clock", "Read employee time-clock history and current status.", {
+      history: { method: "GET", path: () => "/api/time-clock/history" },
+      admin_history: { method: "GET", path: p => "/api/admin/time-clock/history/" + id(p, "userId") },
+      status: { method: "GET", path: () => "/api/time-clock/status" },
+    }, false),
+    managedTool("aura_manage_time_clock", "Register employee clock-in, break start/end or clock-out using the authenticated identity.", {
+      register: { method: "POST", path: () => "/api/time-clock/register", body: p => p },
+    }, true),
+    managedTool("aura_manage_labels", "Check the Windows label bridge or send a label-print job.", {
+      status: { method: "GET", path: () => "/api/labels/status" },
+      print: { method: "POST", path: () => "/api/labels/print", body: p => p },
+    }, true),
+    managedTool("aura_read_backups", "Read backup status, list saved backups, export or download backup data.", {
+      status: { method: "GET", path: () => "/api/backup/status" },
+      list: { method: "GET", path: () => "/api/backup/list" },
+      export: { method: "GET", path: () => "/api/backup/export" },
+      download: { method: "GET", path: p => "/api/backup/download/" + encodeURIComponent(String(p.filename || "")) },
+    }, false),
+    managedTool("aura_manage_backups", "Create or restore Aura backups. Restore operations replace application data and are consequential.", {
+      save: { method: "POST", path: () => "/api/backup/save", body: p => p },
+      import: { method: "POST", path: () => "/api/backup/import", body: p => p },
+      restore_file: { method: "POST", path: p => "/api/backup/restore/" + encodeURIComponent(String(p.filename || "")), body: p => p },
+      restore_auto: { method: "POST", path: () => "/api/backup/restore-auto", body: p => p },
+    }, true),
+  );
+
   const controller = new AbortController();
   const trustedAgentOrigins = [
     "https://chatgpt.com",
