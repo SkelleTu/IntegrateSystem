@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { getAuraContext } from "./aura-request-context";
 
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
 const runtimeDir = process.env.AURA_RUNTIME_DIR
@@ -140,6 +141,14 @@ export function runtimeEvent(
     lastProgress = Math.max(0, Math.min(100, data.progress));
   }
 
+  const context = getAuraContext();
+  const enrichedData = {
+    ...data,
+    traceId: data.traceId ?? context.traceId ?? null,
+    requestId: data.requestId ?? context.requestId ?? null,
+    source: data.source ?? context.source ?? "server",
+  };
+
   const record = {
     sequence,
     sessionId,
@@ -149,15 +158,54 @@ export function runtimeEvent(
     pid: process.pid,
     event,
     message,
-    data,
+    data: enrichedData,
   };
 
   fs.appendFileSync(eventsFile, JSON.stringify(record) + os.EOL, "utf8");
+  void persistRuntimeEvent(record);
   writeStatus({
     lastEvent: event,
     lastEventAt: record.timestamp,
     lastData: data,
   });
+}
+
+async function persistRuntimeEvent(record: {
+  sequence: number;
+  sessionId: string;
+  timestamp: string;
+  process: string;
+  pid: number;
+  event: string;
+  message: string;
+  data: Record<string, unknown>;
+}) {
+  try {
+    const [{ db }, { runtimeEvents }] = await Promise.all([
+      import("./db"),
+      import("../shared/schema"),
+    ]);
+    const context = record.data;
+    const redactedData = redact(context);
+    await db.insert(runtimeEvents).values({
+      sequence: record.sequence,
+      sessionId: record.sessionId,
+      timestamp: new Date(record.timestamp),
+      process: record.process,
+      pid: record.pid,
+      event: record.event,
+      message: record.message,
+      traceId: typeof context.traceId === "string" ? context.traceId : null,
+      requestId: typeof context.requestId === "string" ? context.requestId : null,
+      source: typeof context.source === "string" ? context.source : "server",
+      severity: record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
+      data: JSON.stringify(redactedData),
+    } as any);
+  } catch (error) {
+    try {
+      originalConsole.error("[RUNTIME OBSERVABILITY] durable event persistence failed:", error);
+    } catch {}
+  }
 }
 
 export function runtimeError(
