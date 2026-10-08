@@ -170,6 +170,22 @@ export async function multiWrite<T>(
 
 // ─── 6. Setup / auto-migração das tabelas ────────────────────────────────────
 const TABLE_DEFINITIONS = [
+  `CREATE TABLE IF NOT EXISTS runtime_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sequence INTEGER NOT NULL,
+    session_id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    process TEXT NOT NULL DEFAULT 'server',
+    pid INTEGER,
+    event TEXT NOT NULL,
+    message TEXT NOT NULL,
+    trace_id TEXT,
+    request_id TEXT,
+    source TEXT,
+    severity TEXT NOT NULL DEFAULT 'info',
+    data TEXT
+  )`,
+
   `CREATE TABLE IF NOT EXISTS user_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
