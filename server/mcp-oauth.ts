@@ -2,15 +2,15 @@ import crypto from "node:crypto";
 import type { Express, Request, Response } from "express";
 import { storage } from "./storage";
 
-const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
-const RESOURCE = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "");
+const ISSUER = String(process.env.MCP_OAUTH_ISSUER ?? "https://integrated-system-1c86.onrender.com").replace(/\/$/, "");
+const RESOURCE = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-1c86.onrender.com").replace(/\/$/, "");
 const MCP_RESOURCE = `${RESOURCE}/mcp`;
 const RESOURCE_ALLOWLIST = new Set(
   String(process.env.MCP_RESOURCE_URLS ?? [
     RESOURCE,
     `${RESOURCE}/mcp`,
-    "https://integrated-system-gzyu.onrender.com",
-    "https://integrated-system-gzyu.onrender.com/mcp",
+    "https://integrated-system-1c86.onrender.com",
+    "https://integrated-system-1c86.onrender.com/mcp",
     "https://aurora-agent-o9x5.onrender.com",
   ].join(",")).split(",").map((value) => value.trim().replace(/\/$/, "")).filter(Boolean),
 );
@@ -168,7 +168,7 @@ function htmlEscape(value: string): string {
 }
 
 
-export function verifyMcpAccessToken(raw: string, requiredScope: string, resource = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-gzyu.onrender.com").replace(/\/$/, "")) {
+export function verifyMcpAccessToken(raw: string, requiredScope: string, resource = String(process.env.AURA_MCP_RESOURCE_URL ?? process.env.MCP_RESOURCE_URL ?? "https://integrated-system-1c86.onrender.com").replace(/\/$/, "")) {
   if (!SECRET) return null;
   const parts = raw.split(".");
   if (parts.length !== 3) return null;
