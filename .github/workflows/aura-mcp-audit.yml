@@ -261,7 +261,20 @@ jobs:
           call_tool(9,"read_api",{"path":"/api/products"})
           call_tool(10,"read_api",{"path":"/api/sales"})
 
-          print("10) Session binding/security")
+          print("11) Live Turso/SQLite schema and row-count parity")
+          parity_result=call_tool(11,"execute_api",{
+              "method":"GET",
+              "path":"/api/audit/db-parity",
+              "body":{}
+          })
+          parity_data=parity_result.get("result",{}).get("structuredContent", parity_result.get("result",{}))
+          if isinstance(parity_data.get("result"), dict):
+              parity_data=parity_data["result"]
+          assert parity_data.get("ok") is True, parity_result
+          assert not parity_data.get("mismatches"), parity_result
+          print("   DATABASE PARITY PASS:", json.dumps({"tablesChecked":parity_data.get("tablesChecked"),"rowCountsCompared":parity_data.get("rowCountsCompared")}, ensure_ascii=False))
+
+          print("12) Session binding/security")
           bad_headers={"Content-Type":"application/json","Accept":"application/json"}
           s,h,b=request(MCP,method="POST",data={"jsonrpc":"2.0","id":99,"method":"tools/list","params":{}},headers=bad_headers)
           assert s == 200, f"Public conformance tools/list failed: HTTP {s}: {b[:500]}"
