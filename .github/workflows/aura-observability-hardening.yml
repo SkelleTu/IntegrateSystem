@@ -36,4 +36,5 @@ jobs:
           fi
       - run: npm run check
       - run: npm run build
+      - run: node scripts/verify-db-schema.mjs
       - run: node scripts/verify-observability.mjs
