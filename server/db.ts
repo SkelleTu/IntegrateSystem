@@ -485,11 +485,8 @@ const TABLE_DEFINITIONS = [
 export async function setupDatabase() {
   // ── SQLite local: cria tabelas via SQL direto ──────────────────────────────
   for (const stmt of TABLE_DEFINITIONS) {
-    try {
-      localSqlite.prepare(stmt).run();
-    } catch {
-      // tabela já existe — ignora
-    }
+    // CREATE TABLE IF NOT EXISTS é idempotente. Qualquer outro erro deve interromper o boot.
+    localSqlite.prepare(stmt).run();
   }
 
   // ── SQLite local: migrações incrementais (espelho das remotas) ───────────
@@ -524,8 +521,8 @@ export async function setupDatabase() {
     try {
       localSqlite.prepare(migration).run();
     } catch (e: any) {
-      if (!e.message?.includes("duplicate column") && !e.message?.includes("already exists")) {
-        console.warn(`[DB] Migração local avisou: ${e.message}`);
+      if (!/duplicate column|already exists/i.test(String(e.message))) {
+        throw new Error(`[DB] Migração local falhou: ${migration}: ${e.message}`, { cause: e });
       }
     }
   }
@@ -629,8 +626,8 @@ export async function setupDatabase() {
       try {
         await tursoClient.execute(migration);
       } catch (e: any) {
-        if (!e.message?.includes("duplicate column") && !e.message?.includes("already exists")) {
-          console.warn(`[DB] Migração remota avisou: ${e.message}`);
+        if (!/duplicate column|already exists/i.test(String(e.message))) {
+          throw new Error(`[DB] Migração Turso falhou: ${migration}: ${e.message}`, { cause: e });
         }
       }
     }
