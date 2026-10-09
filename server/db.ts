@@ -591,9 +591,9 @@ export async function auditDatabaseParity() {
   for (const table of tableNames) {
     try {
       const localInfo = localSqlite.exec(`PRAGMA table_info("${table}")`);
-      const localColumns = (localInfo[0]?.values ?? []).map((row: any[]) => String(row[1])).sort();
+      const localColumns: string[] = (localInfo[0]?.values ?? []).map((row: any[]) => String(row[1])).sort();
       const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const remoteColumns = remoteInfo.rows.map((row: any) => String(row.name)).sort();
+      const remoteColumns: string[] = remoteInfo.rows.map((row: any) => String(row.name)).sort();
       const localCountResult = localSqlite.exec(`SELECT COUNT(*) AS count FROM "${table}"`);
       const localRows = Number(localCountResult[0]?.values?.[0]?.[0] ?? 0);
       const remoteCountResult = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${table}"`);
