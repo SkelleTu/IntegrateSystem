@@ -608,7 +608,18 @@ export async function setupDatabase() {
       };
       copyIfBlank('username', remote.username, username);
       copyIfBlank('password', remote.password, password);
-      copyIfBlank('role', remote.role, role);
+      // A legacy Turso migration can create role with DEFAULT 'barber', masking
+      // an existing admin/owner role from the local row. Restore only that
+      // known migration artifact for the same stable user ID; never downgrade
+      // or replace a populated privileged role.
+      const localRole = String(role ?? '').trim().toLowerCase();
+      const remoteRole = String(remote.role ?? '').trim().toLowerCase();
+      if (['admin', 'owner'].includes(localRole) && remoteRole === 'barber') {
+        updates.push('"role" = ?');
+        args.push(role);
+      } else {
+        copyIfBlank('role', remote.role, role);
+      }
       copyIfBlank('fingerprint_id', remote.fingerprint_id, fingerprintId);
       if ((remote.enterprise_id === null || remote.enterprise_id === undefined) && enterpriseId !== null && enterpriseId !== undefined) {
         updates.push('enterprise_id = ?');
