@@ -1329,6 +1329,7 @@ export class DatabaseStorage implements IStorage {
     let productId: number;
     const requestedId = Number((data as any).id);
     if (dbRemote) {
+      // Turso is written first so its generated ID can be mirrored exactly to sql.js.
       await dbRemote.insert(products).values(clean as any);
       if (Number.isFinite(requestedId) && requestedId > 0) {
         productId = requestedId;
@@ -1339,8 +1340,20 @@ export class DatabaseStorage implements IStorage {
           .limit(1);
         productId = Number(remoteProduct?.id);
       }
-      if (!Number.isFinite(productId)) throw new Error("Turso não localizou o produto recém-criado.");
-      writeLocal(productId);
+      if (!Number.isFinite(productId) || productId <= 0) {
+        throw new Error("Turso não localizou o produto recém-criado; gravação local cancelada.");
+      }
+      try {
+        writeLocal(productId);
+      } catch (localError) {
+        // Compensate the remote insert if local mirroring fails, preventing a silent split.
+        try {
+          await dbRemote.delete(products).where(eq(products.id, productId));
+        } catch (rollbackError) {
+          console.error("[DB CONSISTENCY] Falha ao reverter produto no Turso após falha local:", rollbackError);
+        }
+        throw new Error(`Falha ao espelhar produto ID ${productId} no SQLite local.`, { cause: localError });
+      }
     } else {
       productId = Number.isFinite(requestedId) && requestedId > 0 ? writeLocal(requestedId) : writeLocal();
     }
