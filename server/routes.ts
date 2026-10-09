@@ -1309,13 +1309,14 @@ export async function registerRoutes(
     let productId: number | null = null;
     let batchId: number | null = null;
     let registerId: number | null = null;
+    let registerOpenedAt: Date | null = null;
     let saleId: number | null = null;
     let secondSaleId: number | null = null;
     let step = "init";
 
     const cleanup = async () => {
-      // Resolve marker-scoped sale IDs separately in each database so divergent IDs
-      // can never cause cleanup to delete an unrelated production sale.
+      // Resolve test artifacts by their unique marker in each database. Never reuse
+      // an ID from Turso to delete a potentially unrelated row in local SQLite.
       for (const database of getAllDatabases()) {
         try {
           const markedSales: any[] = await database.select({ id: sales.id })
@@ -1335,19 +1336,39 @@ export async function registerRoutes(
             );
           }
 
-          if (registerId) {
-            await database.delete(cashRegisters).where(eq(cashRegisters.id, registerId));
-            await database.delete(transactions).where(
-              eq(transactions.description, `Fechamento de Caixa #${registerId} - Valor em Gaveta`),
-            );
+          if (registerOpenedAt) {
+            const localRegisters: any[] = await database.select({ id: cashRegisters.id })
+              .from(cashRegisters)
+              .where(and(
+                eq(cashRegisters.userId, testUserId),
+                eq(cashRegisters.openedAt, registerOpenedAt),
+              ));
+            for (const localRegister of localRegisters) {
+              await database.delete(cashRegisters).where(eq(cashRegisters.id, Number(localRegister.id)));
+              await database.delete(transactions).where(
+                eq(transactions.description, `Fechamento de Caixa #${localRegister.id} - Valor em Gaveta`),
+              );
+            }
           }
-          if (batchId) {
-            await database.delete(batchLogs).where(eq(batchLogs.batchId, batchId));
-            await database.delete(batches).where(eq(batches.id, batchId));
+
+          const localBatches: any[] = await database.select({ id: batches.id })
+            .from(batches)
+            .where(eq(batches.batchNumber, marker));
+          for (const localBatch of localBatches) {
+            await database.delete(batchLogs).where(eq(batchLogs.batchId, Number(localBatch.id)));
+            await database.delete(batches).where(eq(batches.id, Number(localBatch.id)));
           }
-          if (productId) await database.delete(products).where(eq(products.id, productId));
+
           await database.delete(products).where(eq(products.codigoProduto, marker));
-          await database.delete(sales).where(eq(sales.customerName, marker));
+          await database.delete(products).where(eq(products.name, marker));
+          if (registerId) {
+            // Fallback is constrained to the test user's register created in this run.
+            await database.delete(cashRegisters).where(and(
+              eq(cashRegisters.id, registerId),
+              eq(cashRegisters.userId, testUserId),
+              eq(cashRegisters.openedAt, registerOpenedAt as any),
+            ));
+          }
         } catch (cleanupError) {
           console.error("[AURA E2E] cleanup failed:", cleanupError);
         }
@@ -1389,11 +1410,12 @@ export async function registerRoutes(
       batchId = batch.id;
 
       step = "openCashRegister";
+      registerOpenedAt = new Date();
       const opened = await storage.openCashRegister({
         userId: testUserId,
         openingAmount: 0,
         status: "open",
-        openedAt: new Date(),
+        openedAt: registerOpenedAt,
       } as any);
       registerId = opened.id;
 
