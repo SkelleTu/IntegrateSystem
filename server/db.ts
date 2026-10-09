@@ -33,16 +33,17 @@ export const dbLocal = drizzle(localSqlite, { schema });
 
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
 export let dbRemote: any = null;
+export let tursoClient: any = null;
 
 if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const { createClient } = await import("@libsql/client");
     const { drizzle: drizzleLibsql } = await import("drizzle-orm/libsql");
-    const client = createClient({
+    tursoClient = createClient({
       url: process.env.TURSO_DATABASE_URL,
       authToken: process.env.TURSO_AUTH_TOKEN,
     });
-    dbRemote = drizzleLibsql(client, { schema });
+    dbRemote = drizzleLibsql(tursoClient, { schema });
     console.log("✅ Turso conectado com sucesso (banco remoto ativo).");
   } catch (e) {
     console.error("⚠️  Falha ao conectar ao Turso:", e);
@@ -530,7 +531,7 @@ export async function setupDatabase() {
   }
 
   // ── Turso (remoto): migrações incrementais ────────────────────────────────
-  if (isRemoteEnabled && dbRemote) {
+  if (isRemoteEnabled && dbRemote && tursoClient) {
     const remoteMigrations = [...TABLE_DEFINITIONS,
       "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
       "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
@@ -626,10 +627,7 @@ export async function setupDatabase() {
 
     for (const migration of remoteMigrations) {
       try {
-        const client = (dbRemote as any).$client ?? (dbRemote as any).client;
-        if (client && typeof client.execute === "function") {
-          await client.execute(migration);
-        }
+        await tursoClient.execute(migration);
       } catch (e: any) {
         if (!e.message?.includes("duplicate column") && !e.message?.includes("already exists")) {
           console.warn(`[DB] Migração remota avisou: ${e.message}`);
@@ -637,6 +635,9 @@ export async function setupDatabase() {
       }
     }
   }
+
+  // Ensure local sql.js changes made with prepare().run() are persisted.
+  fs.writeFileSync(sqliteFile, sqlJsDb.export());
 }
 
 // Pool compatibility shim
