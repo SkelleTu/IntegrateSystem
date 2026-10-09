@@ -213,11 +213,10 @@ let runtimeTableReady: Promise<void> | null = null;
 async function ensureRuntimeEventTable() {
   if (!runtimeTableReady) {
     runtimeTableReady = (async () => {
-      const [{ localSqlite, dbRemote }] = await Promise.all([import("./db")]);
+      const [{ localSqlite, tursoClient }] = await Promise.all([import("./db")]);
       localSqlite.exec(RUNTIME_EVENT_TABLE_SQL);
-      const client = (dbRemote as any)?.$client ?? (dbRemote as any)?.client;
-      if (client && typeof client.execute === "function") {
-        await client.execute(RUNTIME_EVENT_TABLE_SQL);
+      if (tursoClient && typeof tursoClient.execute === "function") {
+        await tursoClient.execute(RUNTIME_EVENT_TABLE_SQL);
       }
     })().catch((error) => {
       runtimeTableReady = null;
@@ -238,27 +237,29 @@ async function persistRuntimeEvent(record: {
   data: Record<string, unknown>;
 }) {
   try {
-    const [{ db }, { runtimeEvents }] = await Promise.all([
+    const [{ multiWrite }, { runtimeEvents }] = await Promise.all([
       import("./db"),
       import("../shared/schema"),
     ]);
     await ensureRuntimeEventTable();
     const context = record.data;
     const redactedData = redact(context);
-    await db.insert(runtimeEvents).values({
-      sequence: record.sequence,
-      sessionId: record.sessionId,
-      timestamp: new Date(record.timestamp),
-      process: record.process,
-      pid: record.pid,
-      event: record.event,
-      message: record.message,
-      traceId: typeof context.traceId === "string" ? context.traceId : null,
-      requestId: typeof context.requestId === "string" ? context.requestId : null,
-      source: typeof context.source === "string" ? context.source : "server",
-      severity: record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
-      data: JSON.stringify(redactedData),
-    } as any);
+    await multiWrite(async (database: any) => {
+      await database.insert(runtimeEvents).values({
+        sequence: record.sequence,
+        sessionId: record.sessionId,
+        timestamp: new Date(record.timestamp),
+        process: record.process,
+        pid: record.pid,
+        event: record.event,
+        message: record.message,
+        traceId: typeof context.traceId === "string" ? context.traceId : null,
+        requestId: typeof context.requestId === "string" ? context.requestId : null,
+        source: typeof context.source === "string" ? context.source : "server",
+        severity: record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
+        data: JSON.stringify(redactedData),
+      } as any);
+    });
   } catch (error) {
     try {
       originalConsole.error("[RUNTIME OBSERVABILITY] durable event persistence failed:", error);
