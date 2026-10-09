@@ -543,8 +543,8 @@ export async function setupDatabase() {
 
   // ── Turso: bootstrap em lote e migrações incrementais apenas quando faltam ──
   if (isRemoteEnabled && dbRemote && tursoClient) {
-    // Um único batch cria todas as tabelas idempotentes, evitando dezenas de round-trips.
-    await tursoClient.batch(TABLE_DEFINITIONS, "write");
+    // Executa o script DDL em uma única chamada sem manter um batch transacional aberto.
+    await tursoClient.executeMultiple(TABLE_DEFINITIONS.join(";\n") + ";");
 
     const migrationColumns = localMigrations.map((migration) => {
       const match = migration.match(/^ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/i);
@@ -564,8 +564,8 @@ export async function setupDatabase() {
       .filter(({ table, column }) => !tableColumns.get(table)?.has(column))
       .map(({ migration }) => migration);
 
-    if (missingMigrations.length > 0) {
-      await tursoClient.batch(missingMigrations, "write");
+    for (const migration of missingMigrations) {
+      await tursoClient.execute(migration);
     }
 
     console.log(
