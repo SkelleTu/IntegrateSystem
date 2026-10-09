@@ -574,6 +574,61 @@ export async function setupDatabase() {
   fs.writeFileSync(sqliteFile, sqlJsDb.export());
 }
 
+export async function auditDatabaseParity() {
+  if (!tursoClient) {
+    return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
+  }
+
+  const tableNames = TABLE_DEFINITIONS
+    .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+    .filter((table): table is string => Boolean(table));
+  const mismatches: Array<Record<string, unknown>> = [];
+  const tables: Array<Record<string, unknown>> = [];
+
+  for (const table of tableNames) {
+    try {
+      const localInfo = localSqlite.exec(`PRAGMA table_info("${table}")`);
+      const localColumns = (localInfo[0]?.values ?? []).map((row: any[]) => String(row[1])).sort();
+      const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
+      const remoteColumns = remoteInfo.rows.map((row: any) => String(row.name)).sort();
+      const localCountResult = localSqlite.exec(`SELECT COUNT(*) AS count FROM "${table}"`);
+      const localRows = Number(localCountResult[0]?.values?.[0]?.[0] ?? 0);
+      const remoteCountResult = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${table}"`);
+      const remoteRows = Number(remoteCountResult.rows[0]?.count ?? 0);
+      const missingLocal = remoteColumns.filter((column) => !localColumns.includes(column));
+      const missingRemote = localColumns.filter((column) => !remoteColumns.includes(column));
+      const countCompared = table !== "runtime_events";
+      const entry = {
+        table,
+        localColumns: localColumns.length,
+        remoteColumns: remoteColumns.length,
+        missingLocalColumns: missingLocal,
+        missingRemoteColumns: missingRemote,
+        localRows,
+        remoteRows,
+        rowCountsMatch: !countCompared || localRows === remoteRows,
+      };
+      tables.push(entry);
+      if (missingLocal.length || missingRemote.length || (countCompared && localRows !== remoteRows)) {
+        mismatches.push(entry);
+      }
+    } catch (error: any) {
+      const entry = { table, error: error?.message || String(error) };
+      tables.push(entry);
+      mismatches.push(entry);
+    }
+  }
+
+  return {
+    ok: mismatches.length === 0,
+    remoteEnabled: true,
+    tablesChecked: tables.length,
+    rowCountsCompared: tables.filter((table: any) => table.table !== "runtime_events").length,
+    mismatches,
+    tables,
+  };
+}
+
 // Pool compatibility shim
 export const pool = {
   connect: () => ({ release: () => {} }),
