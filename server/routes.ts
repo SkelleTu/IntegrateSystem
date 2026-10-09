@@ -54,7 +54,7 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db, localSqlite, getAllDatabases } from "./db";
+import { db, localSqlite, getAllDatabases, auditDatabaseParity } from "./db";
 import {
   tickets, users, fiscalSettings, insertFiscalSettingsSchema,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
@@ -216,6 +216,14 @@ export async function registerRoutes(
     } catch (err) {
       done(err);
     }
+  });
+
+  app.get("/api/audit/db-parity", async (req, res) => {
+    if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
+      return res.status(403).json({ ok: false, message: "Authenticated Aura MCP execution required" });
+    }
+    const report = await auditDatabaseParity();
+    return res.status(report.ok ? 200 : 503).json(report);
   });
 
   app.get("/api/db/status", (req, res) => {
