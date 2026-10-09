@@ -57,14 +57,25 @@ const primaryDatabase: any = dbRemote ?? dbLocal;
 const mirrorDatabase: any = dbRemote ? dbLocal : null;
 
 function isPromiseLike(value: any): boolean {
-  return !!value && typeof value.then === "function";
+  if (!value) return false;
+  try {
+    return typeof value.then === "function";
+  } catch {
+    return false;
+  }
 }
 
 function isQueryBuilder(value: any): boolean {
-  return isPromiseLike(value) &&
-    ["values", "set", "where", "returning", "execute", "run"].some(
-      (method) => typeof value[method] === "function"
-    );
+  if (!value || (typeof value !== "object" && typeof value !== "function")) return false;
+  // Drizzle builders can expose chain methods before they become awaitable.
+  // Do not inspect .then here: some builders throw until values()/set() is called.
+  return ["values", "set", "where", "returning", "execute", "run"].some((method) => {
+    try {
+      return typeof value[method] === "function";
+    } catch {
+      return false;
+    }
+  });
 }
 
 function createMirroredQuery(primaryQuery: any, mirrorQuery: any): any {
