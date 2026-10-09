@@ -580,8 +580,11 @@ export async function auditDatabaseParity() {
   }
 
   const tableNames = TABLE_DEFINITIONS
-    .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+    .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
     .filter((table): table is string => Boolean(table));
+  if (tableNames.length === 0) {
+    return { ok: false, remoteEnabled: true, error: "No table definitions found", tablesChecked: 0, mismatches: [] };
+  }
   const mismatches: Array<Record<string, unknown>> = [];
   const tables: Array<Record<string, unknown>> = [];
 
