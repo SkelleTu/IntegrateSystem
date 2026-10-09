@@ -190,42 +190,6 @@ export function runtimeEvent(
   });
 }
 
-const RUNTIME_EVENT_TABLE_SQL = `
-  CREATE TABLE IF NOT EXISTS runtime_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sequence INTEGER NOT NULL,
-    session_id TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    process TEXT NOT NULL DEFAULT 'server',
-    pid INTEGER,
-    event TEXT NOT NULL,
-    message TEXT NOT NULL,
-    trace_id TEXT,
-    request_id TEXT,
-    source TEXT,
-    severity TEXT NOT NULL DEFAULT 'info',
-    data TEXT
-  )
-`;
-
-let runtimeTableReady: Promise<void> | null = null;
-
-async function ensureRuntimeEventTable() {
-  if (!runtimeTableReady) {
-    runtimeTableReady = (async () => {
-      const [{ localSqlite, tursoClient }] = await Promise.all([import("./db")]);
-      localSqlite.exec(RUNTIME_EVENT_TABLE_SQL);
-      if (tursoClient && typeof tursoClient.execute === "function") {
-        await tursoClient.execute(RUNTIME_EVENT_TABLE_SQL);
-      }
-    })().catch((error) => {
-      runtimeTableReady = null;
-      throw error;
-    });
-  }
-  await runtimeTableReady;
-}
-
 let durablePersistenceReady = false;
 const pendingDurableEvents: Array<Parameters<typeof persistRuntimeEvent>[0]> = [];
 
@@ -258,29 +222,61 @@ async function persistRuntimeEvent(record: {
   data: Record<string, unknown>;
 }) {
   try {
-    const [{ multiWrite }, { runtimeEvents }] = await Promise.all([
-      import("./db"),
-      import("../shared/schema"),
-    ]);
-    await ensureRuntimeEventTable();
+    const [{ localSqlite, tursoClient, persistLocalSqlite }] = await Promise.all([import("./db")]);
     const context = record.data;
     const redactedData = redact(context);
-    await multiWrite(async (database: any) => {
-      await database.insert(runtimeEvents).values({
-        sequence: record.sequence,
-        sessionId: record.sessionId,
-        timestamp: new Date(record.timestamp),
-        process: record.process,
-        pid: record.pid,
-        event: record.event,
-        message: record.message,
-        traceId: typeof context.traceId === "string" ? context.traceId : null,
-        requestId: typeof context.requestId === "string" ? context.requestId : null,
-        source: typeof context.source === "string" ? context.source : "server",
-        severity: record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
-        data: JSON.stringify(redactedData),
-      } as any);
-    });
+    const statement = `INSERT INTO runtime_events
+      (sequence, session_id, timestamp, process, pid, event, message, trace_id, request_id, source, severity, data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    const args = [
+      record.sequence,
+      record.sessionId,
+      Date.parse(record.timestamp),
+      record.process,
+      record.pid,
+      record.event,
+      record.message,
+      typeof context.traceId === "string" ? context.traceId : null,
+      typeof context.requestId === "string" ? context.requestId : null,
+      typeof context.source === "string" ? context.source : "server",
+      record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
+      JSON.stringify(redactedData),
+    ];
+
+    const localWrite = () => {
+      const statementHandle = localSqlite.prepare(statement);
+      try {
+        statementHandle.run(args);
+      } finally {
+        statementHandle.free();
+      }
+      persistLocalSqlite();
+    };
+    const remoteWrite = () => tursoClient
+      ? tursoClient.execute({ sql: statement, args })
+      : Promise.resolve();
+
+    const [localResult, remoteResult] = await Promise.allSettled([
+      Promise.resolve().then(localWrite),
+      Promise.resolve().then(remoteWrite),
+    ]);
+
+    if (localResult.status === "rejected" || remoteResult.status === "rejected") {
+      // Best-effort compensation avoids leaving a one-sided event behind.
+      if (localResult.status === "fulfilled" && remoteResult.status === "rejected") {
+        const cleanup = localSqlite.prepare("DELETE FROM runtime_events WHERE session_id = ? AND sequence = ?");
+        try { cleanup.run([record.sessionId, record.sequence]); } finally { cleanup.free(); }
+        persistLocalSqlite();
+      } else if (localResult.status === "rejected" && remoteResult.status === "fulfilled" && tursoClient) {
+        await tursoClient.execute({
+          sql: "DELETE FROM runtime_events WHERE session_id = ? AND sequence = ?",
+          args: [record.sessionId, record.sequence],
+        }).catch(() => undefined);
+      }
+      const localError = localResult.status === "rejected" ? String(localResult.reason) : "";
+      const remoteError = remoteResult.status === "rejected" ? String(remoteResult.reason) : "";
+      throw new Error(`Runtime event dual-write failed. SQLite: ${localError || "ok"}; Turso: ${remoteError || "ok"}`);
+    }
   } catch (error) {
     try {
       originalConsole.error("[RUNTIME OBSERVABILITY] durable event persistence failed:", error);
