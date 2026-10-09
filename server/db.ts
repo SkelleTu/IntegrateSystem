@@ -612,9 +612,9 @@ export async function auditDatabaseParity() {
   for (const table of tableNames) {
     try {
       const localInfo = readLocal(`PRAGMA table_info("${table}")`);
-      const localColumns = localInfo.map((row: any) => String(row.name)).sort();
+      const localColumns: string[] = localInfo.map((row: any) => String(row.name)).sort();
       const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const remoteColumns = remoteInfo.rows.map((row: any) => String(row.name)).sort();
+      const remoteColumns: string[] = remoteInfo.rows.map((row: any) => String(row.name)).sort();
       const missingLocal = remoteColumns.filter((column) => !localColumns.includes(column));
       const missingRemote = localColumns.filter((column) => !remoteColumns.includes(column));
 
