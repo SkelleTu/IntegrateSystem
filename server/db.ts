@@ -527,110 +527,36 @@ export async function setupDatabase() {
     }
   }
 
-  // ── Turso (remoto): migrações incrementais ────────────────────────────────
+  // ── Turso: bootstrap em lote e migrações incrementais apenas quando faltam ──
   if (isRemoteEnabled && dbRemote && tursoClient) {
-    const remoteMigrations = [...TABLE_DEFINITIONS,
-      "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
-      "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
-      "ALTER TABLE enterprises ADD COLUMN city TEXT",
-      "ALTER TABLE enterprises ADD COLUMN state TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
-      "ALTER TABLE fiscal_settings ADD COLUMN simulacao_real INTEGER DEFAULT 0",
-      "ALTER TABLE fiscal_settings ADD COLUMN regime_tributario TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN csc_token TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN csc_id TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN certificado_a1 TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN certificado_senha TEXT",
-      "ALTER TABLE fiscal_settings ADD COLUMN serie_nfce INTEGER DEFAULT 1",
-      "ALTER TABLE menu_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
-      "ALTER TABLE menu_items ADD COLUMN rotation INTEGER DEFAULT 0",
-      "ALTER TABLE menu_items ADD COLUMN image_scale INTEGER DEFAULT 100",
-      "ALTER TABLE menu_items ADD COLUMN codigo_produto TEXT",
-      "ALTER TABLE products ADD COLUMN codigo_produto TEXT",
-      "ALTER TABLE inventory ADD COLUMN codigo_balanca TEXT",
-      "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
-      "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
-      "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
-      `CREATE TABLE IF NOT EXISTS products (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        brand TEXT,
-        category TEXT,
-        flavor TEXT,
-        unit TEXT NOT NULL DEFAULT 'Unidade',
-        weight TEXT,
-        description TEXT,
-        image_url TEXT,
-        min_stock INTEGER NOT NULL DEFAULT 5,
-        sale_price INTEGER,
-        em_liquidacao INTEGER NOT NULL DEFAULT 0,
-        ncm TEXT,
-        cfop TEXT,
-        codigo_balanca TEXT,
-        codigo_produto TEXT,
-        created_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL
-      )`,
-      "ALTER TABLE products ADD COLUMN em_liquidacao INTEGER NOT NULL DEFAULT 0",
-      // ── Novas colunas de variante por lote (sistema ERP/PDV) ────────────────
-      "ALTER TABLE batches ADD COLUMN sku TEXT",
-      "ALTER TABLE batches ADD COLUMN variant_name TEXT",
-      "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
-      `CREATE TABLE IF NOT EXISTS batches (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id INTEGER NOT NULL,
-        sku TEXT,
-        variant_name TEXT,
-        barcode TEXT,
-        batch_number TEXT,
-        supplier_code TEXT,
-        supplier TEXT,
-        manufacture_date INTEGER,
-        expiry_date INTEGER,
-        entry_date INTEGER NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 0,
-        cost_price INTEGER NOT NULL DEFAULT 0,
-        sale_price INTEGER,
-        created_at INTEGER NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS batch_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        product_id INTEGER NOT NULL,
-        batch_id INTEGER,
-        type TEXT NOT NULL,
-        quantity INTEGER NOT NULL,
-        reason TEXT,
-        user_id INTEGER NOT NULL,
-        created_at INTEGER NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS data_backups (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        created_at INTEGER NOT NULL,
-        size INTEGER NOT NULL,
-        tables_count INTEGER NOT NULL,
-        rows_count INTEGER NOT NULL,
-        filepath TEXT NOT NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS stock_snapshots (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        created_at INTEGER NOT NULL,
-        created_by TEXT NOT NULL,
-        products_json TEXT NOT NULL,
-        batches_json TEXT NOT NULL,
-        product_count INTEGER NOT NULL
-      )`,
-    ];
+    // Um único batch cria todas as tabelas idempotentes, evitando dezenas de round-trips.
+    await tursoClient.batch(TABLE_DEFINITIONS, "write");
 
-    for (const migration of remoteMigrations) {
-      try {
-        await tursoClient.execute(migration);
-      } catch (e: any) {
-        if (!/duplicate column|already exists/i.test(String(e.message))) {
-          throw new Error(`[DB] Migração Turso falhou: ${migration}: ${e.message}`, { cause: e });
-        }
-      }
+    const migrationColumns = localMigrations.map((migration) => {
+      const match = migration.match(/^ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/i);
+      if (!match) throw new Error(`[DB] Migração remota inválida: ${migration}`);
+      return { migration, table: match[1], column: match[2] };
+    });
+
+    const tablesToInspect = [...new Set(migrationColumns.map((entry) => entry.table))];
+    const tableColumns = new Map<string, Set<string>>(
+      await Promise.all(tablesToInspect.map(async (table) => {
+        const result = await tursoClient.execute(`PRAGMA table_info("${table}")`);
+        return [table, new Set(result.rows.map((row: any) => String(row.name)))] as [string, Set<string>];
+      })),
+    );
+
+    const missingMigrations = migrationColumns
+      .filter(({ table, column }) => !tableColumns.get(table)?.has(column))
+      .map(({ migration }) => migration);
+
+    if (missingMigrations.length > 0) {
+      await tursoClient.batch(missingMigrations, "write");
     }
+
+    console.log(
+      `[DB] Turso schema verified: ${TABLE_DEFINITIONS.length} table definitions; ${missingMigrations.length} missing-column migrations applied.`,
+    );
   }
 
   // Ensure local sql.js changes made with prepare().run() are persisted.
