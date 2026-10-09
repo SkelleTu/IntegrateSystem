@@ -1310,43 +1310,44 @@ export async function registerRoutes(
     let batchId: number | null = null;
     let registerId: number | null = null;
     let saleId: number | null = null;
+    let secondSaleId: number | null = null;
     let step = "init";
 
     const cleanup = async () => {
-      // Cleanup is deliberately ID-scoped and runs in reverse dependency order.
-      // If a step fails halfway through, no test artifact is intentionally left behind.
+      // Resolve marker-scoped sale IDs separately in each database so divergent IDs
+      // can never cause cleanup to delete an unrelated production sale.
       for (const database of getAllDatabases()) {
         try {
-          if (saleId) {
-            await database.delete(payments).where(eq(payments.saleId, saleId));
-            await database.delete(saleItems).where(eq(saleItems.saleId, saleId));
-            await database.delete(sales).where(eq(sales.id, saleId));
+          const markedSales: any[] = await database.select({ id: sales.id })
+            .from(sales)
+            .where(eq(sales.customerName, marker));
+          const localSaleIds = [...new Set(markedSales.map((row) => Number(row.id)).filter((id) => Number.isFinite(id) && id > 0))];
+
+          for (const localSaleId of localSaleIds) {
+            await database.delete(payments).where(eq(payments.saleId, localSaleId));
+            await database.delete(saleItems).where(eq(saleItems.saleId, localSaleId));
+            await database.delete(sales).where(eq(sales.id, localSaleId));
+            await database.delete(transactions).where(
+              or(
+                eq(transactions.description, `Venda PDV #${localSaleId}`),
+                eq(transactions.description, `ESTORNO: Venda PDV #${localSaleId} CANCELADA`),
+              ),
+            );
           }
+
           if (registerId) {
             await database.delete(cashRegisters).where(eq(cashRegisters.id, registerId));
+            await database.delete(transactions).where(
+              eq(transactions.description, `Fechamento de Caixa #${registerId} - Valor em Gaveta`),
+            );
           }
           if (batchId) {
             await database.delete(batchLogs).where(eq(batchLogs.batchId, batchId));
             await database.delete(batches).where(eq(batches.id, batchId));
           }
-          if (productId) {
-            await database.delete(products).where(eq(products.id, productId));
-          }
+          if (productId) await database.delete(products).where(eq(products.id, productId));
           await database.delete(products).where(eq(products.codigoProduto, marker));
-          if (saleId) {
-            await database.delete(transactions).where(
-              or(
-                eq(transactions.description, `Venda PDV #${saleId}`),
-                eq(transactions.description, `ESTORNO: Venda PDV #${saleId} CANCELADA`),
-              ),
-            );
-          }
           await database.delete(sales).where(eq(sales.customerName, marker));
-          if (registerId) {
-            await database.delete(transactions).where(
-              eq(transactions.description, `Fechamento de Caixa #${registerId} - Valor em Gaveta`),
-            );
-          }
         } catch (cleanupError) {
           console.error("[AURA E2E] cleanup failed:", cleanupError);
         }
@@ -1424,6 +1425,11 @@ export async function registerRoutes(
       );
       saleId = createdSale.id;
 
+      const cashPayments: any[] = await storage.getPayments(saleId);
+      if (!cashPayments.some((payment: any) => payment.method === "cash" && Number(payment.amount) === 3750)) {
+        throw new Error("E2E cash payment persistence failed");
+      }
+
       const stockAfterSale = await storage.getProductBatches(productId);
       if (Number(stockAfterSale.find((b: any) => b.id === batchId)?.quantity) !== 1) {
         throw new Error("E2E stock deduction failed: expected 2 -> 1");
@@ -1442,6 +1448,75 @@ export async function registerRoutes(
         Number(t.amount) === 3750
       )) {
         throw new Error("E2E financial income transaction missing");
+      }
+
+      step = "createSecondSale";
+      const pixCpf = "52998224725";
+      const secondSale = await storage.createSale(
+        {
+          cashRegisterId: registerId,
+          userId: testUserId,
+          totalAmount: 3750,
+          customerTaxId: pixCpf,
+          customerName: marker,
+          fiscalStatus: "none",
+          fiscalType: "NFCe",
+          status: "completed",
+        } as any,
+        [{
+          itemType: "product",
+          itemId: 500000 + batchId,
+          quantity: 1,
+          unitPrice: 3750,
+          totalPrice: 3750,
+          unitType: "unit",
+        }] as any,
+        [{
+          method: "pix",
+          amount: 3750,
+          createdAt: new Date(),
+        }] as any,
+      );
+      secondSaleId = secondSale.id;
+
+      const pixPayments: any[] = await storage.getPayments(secondSaleId);
+      if (!pixPayments.some((payment: any) => payment.method === "pix" && Number(payment.amount) === 3750)) {
+        throw new Error("E2E PIX payment persistence failed");
+      }
+      const salesWithSecond: any[] = await storage.getSales({});
+      const persistedSecondSale = salesWithSecond.find((sale: any) => sale.id === secondSaleId);
+      if (!persistedSecondSale || persistedSecondSale.customerTaxId !== pixCpf || persistedSecondSale.status !== "completed") {
+        throw new Error("E2E PIX sale/CPF persistence failed");
+      }
+      const stockAfterSecondSale = await storage.getProductBatches(productId);
+      if (Number(stockAfterSecondSale.find((batch: any) => batch.id === batchId)?.quantity) !== 0) {
+        throw new Error("E2E second sale stock deduction failed: expected 1 -> 0");
+      }
+      const secondSaleTransactions: any[] = await storage.getTransactions({});
+      if (!secondSaleTransactions.some((transaction: any) =>
+        transaction.description === `Venda PDV #${secondSaleId}` &&
+        transaction.type === "income" &&
+        Number(transaction.amount) === 3750
+      )) {
+        throw new Error("E2E PIX financial income transaction missing");
+      }
+
+      step = "cancelSecondSale";
+      const cancelledSecond = await storage.cancelSale(secondSaleId);
+      if (cancelledSecond.status !== "cancelled") {
+        throw new Error("E2E PIX sale cancellation failed");
+      }
+      const stockAfterCancelSecond = await storage.getProductBatches(productId);
+      if (Number(stockAfterCancelSecond.find((batch: any) => batch.id === batchId)?.quantity) !== 1) {
+        throw new Error("E2E second sale stock reversal failed: expected 0 -> 1");
+      }
+      const secondSaleReversal: any[] = await storage.getTransactions({});
+      if (!secondSaleReversal.some((transaction: any) =>
+        transaction.description === `ESTORNO: Venda PDV #${secondSaleId} CANCELADA` &&
+        transaction.type === "expense" &&
+        Number(transaction.amount) === 3750
+      )) {
+        throw new Error("E2E PIX financial reversal transaction missing");
       }
 
       step = "cancelSale";
@@ -1474,8 +1549,10 @@ export async function registerRoutes(
       const historicalRegister = history.find((r: any) => r.id === registerId);
       const historicalSales = await storage.getSalesByRegisterId(registerId);
       const historicalSale = historicalSales.find((s: any) => s.id === saleId);
-      if (!historicalRegister || !historicalSale || historicalSale.status !== "cancelled") {
-        throw new Error("E2E cash history verification failed");
+      const historicalSecondSale = historicalSales.find((s: any) => s.id === secondSaleId);
+      if (!historicalRegister || !historicalSale || historicalSale.status !== "cancelled" ||
+          !historicalSecondSale || historicalSecondSale.status !== "cancelled") {
+        throw new Error("E2E cash history verification failed for both payment methods");
       }
 
       responsePayload = {
@@ -1485,12 +1562,13 @@ export async function registerRoutes(
           "test operator",
           "cash open",
           "product + batch",
-          "sale + CPF + cash payment",
-          "stock 2 -> 1",
-          "financial income",
-          "sale cancellation",
-          "stock 1 -> 2",
-          "financial reversal",
+          "sale 1 + CPF + cash payment",
+          "sale 2 + valid CPF + PIX payment",
+          "stock 2 -> 1 -> 0",
+          "financial income for both sales",
+          "cancel both sales",
+          "stock 0 -> 1 -> 2",
+          "financial reversal for both sales",
           "cash close",
           "cash history",
         ],
