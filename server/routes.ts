@@ -2016,17 +2016,27 @@ export async function registerRoutes(
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
     res.json(ticket);
   });
-  // Seed only the admin user if it doesn't exist — no demo data
-  const adminUser = await storage.getUserByUsername("SkelleTu");
-  if (!adminUser) {
-    const hashed = await hashPassword("Victor.!.1999");
-    await storage.createUser({
-      username: "SkelleTu",
-      password: hashed,
-      role: "admin"
-    });
-    console.log("Admin user seeded");
-  }
+  // Admin bootstrap is optional and non-blocking: it must never prevent the HTTP port from opening.
+  // Never ship a default admin password in source code.
+  void (async () => {
+    try {
+      const adminUser = await storage.getUserByUsername("SkelleTu");
+      const bootstrapPassword = process.env.AURA_BOOTSTRAP_ADMIN_PASSWORD;
+      if (!adminUser && bootstrapPassword) {
+        const hashed = await hashPassword(bootstrapPassword);
+        await storage.createUser({
+          username: "SkelleTu",
+          password: hashed,
+          role: "admin"
+        });
+        console.log("Admin user seeded from configured bootstrap secret");
+      } else if (!adminUser) {
+        console.warn("[BOOT] Admin bootstrap skipped: AURA_BOOTSTRAP_ADMIN_PASSWORD is not configured.");
+      }
+    } catch (error) {
+      console.error("[BOOT] Non-blocking admin bootstrap failed:", error);
+    }
+  })();
 
   // ─── BACKUP / SAVE / LOAD ROUTES ────────────────────────────────────────────
   const {
