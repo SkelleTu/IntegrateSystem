@@ -2,6 +2,7 @@ import express, { type Express, Request, Response, NextFunction } from "express"
 import { randomUUID } from "node:crypto";
 import { runWithAuraContext } from "./aura-request-context";
 import { registerRoutes } from "./routes";
+import { storage } from "./storage";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import path from "path";
@@ -204,6 +205,28 @@ export async function initApp() {
 
     const { setupDatabase } = await import("./db");
     await setupDatabase();
+
+    // Explicitly authorized, narrowly scoped bootstrap for the named MCP operator.
+    // Never promotes arbitrary users: the exact username must be configured in Render.
+    const promoteAdminUsername = String(process.env.AURA_PROMOTE_ADMIN_USERNAME || "").trim();
+    if (promoteAdminUsername) {
+      const operator = await storage.getUserByUsername(promoteAdminUsername);
+      if (!operator) {
+        throw new Error("Authorized MCP operator account was not found; refusing to continue bootstrap.");
+      }
+      const currentRole = String((operator as any).role || "").trim().toLowerCase();
+      if (!["admin", "owner"].includes(currentRole)) {
+        await storage.updateUser(operator.id, { role: "admin" } as any);
+        runtimeEvent("mcp-operator-role-promoted", "Conta de operador MCP autorizada promovida a admin", {
+          phase: "security", username: promoteAdminUsername,
+          previousRole: currentRole || "unset", role: "admin",
+        });
+        console.log("[SECURITY] Authorized MCP operator promoted to admin.");
+      } else {
+        console.log("[SECURITY] Authorized MCP operator already has a privileged role.");
+      }
+    }
+
     await enableDurableRuntimePersistence();
 
     runtimeEvent("database-ready", "Banco de dados inicializado", {
