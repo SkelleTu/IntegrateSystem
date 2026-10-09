@@ -530,6 +530,12 @@ export async function setupDatabase() {
     "ALTER TABLE batches ADD COLUMN sku TEXT",
     "ALTER TABLE batches ADD COLUMN variant_name TEXT",
     "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
+    // Legacy Turso databases may have a users table created before auth columns existed.
+    "ALTER TABLE users ADD COLUMN username TEXT",
+    "ALTER TABLE users ADD COLUMN password TEXT",
+    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'barber'",
+    "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
+    "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
   ];
   for (const migration of localMigrations) {
     try {
@@ -539,6 +545,18 @@ export async function setupDatabase() {
         throw new Error(`[DB] Migração local falhou: ${migration}: ${e.message}`, { cause: e });
       }
     }
+  }
+
+  // Recover legacy auth columns without overwriting populated credentials or roles.
+  // Rows that cannot be recovered receive a unique disabled placeholder username/password,
+  // so they remain visible for an explicit admin reconciliation instead of breaking all queries.
+  const localUsersInfo = localSqlite.exec('PRAGMA table_info("users")')[0]?.values ?? [];
+  const localUserColumns = new Set(localUsersInfo.map((row: any[]) => String(row[1])));
+  if (localUserColumns.has("username")) {
+    localSqlite.prepare("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR TRIM(username) = ''").run();
+  }
+  if (localUserColumns.has("password")) {
+    localSqlite.prepare("UPDATE users SET password = '' WHERE password IS NULL").run();
   }
 
   // ── Turso: bootstrap em lote e migrações incrementais apenas quando faltam ──
@@ -567,6 +585,43 @@ export async function setupDatabase() {
     for (const migration of missingMigrations) {
       await tursoClient.execute(migration);
     }
+
+    // Fill only blank remote auth fields from the local row with the same stable ID.
+    // Existing remote usernames, password hashes, roles, and enterprise assignments are never overwritten.
+    const localUserRows = localSqlite.exec('SELECT id, username, password, role, fingerprint_id, enterprise_id FROM users')[0]?.values ?? [];
+    for (const row of localUserRows) {
+      const [id, username, password, role, fingerprintId, enterpriseId] = row;
+      const remoteUser = await tursoClient.execute({
+        sql: 'SELECT id, username, password, role, fingerprint_id, enterprise_id FROM users WHERE id = ?',
+        args: [id as any],
+      });
+      if (!remoteUser.rows.length) continue;
+      const remote = remoteUser.rows[0] as any;
+      const updates: string[] = [];
+      const args: any[] = [];
+      const copyIfBlank = (column: string, remoteValue: any, localValue: any) => {
+        const blank = remoteValue === null || remoteValue === undefined || String(remoteValue).trim() === '';
+        if (blank && localValue !== null && localValue !== undefined && String(localValue).trim() !== '') {
+          updates.push('"' + column + '" = ?');
+          args.push(localValue);
+        }
+      };
+      copyIfBlank('username', remote.username, username);
+      copyIfBlank('password', remote.password, password);
+      copyIfBlank('role', remote.role, role);
+      copyIfBlank('fingerprint_id', remote.fingerprint_id, fingerprintId);
+      if ((remote.enterprise_id === null || remote.enterprise_id === undefined) && enterpriseId !== null && enterpriseId !== undefined) {
+        updates.push('enterprise_id = ?');
+        args.push(enterpriseId);
+      }
+      if (updates.length) {
+        args.push(id);
+        await tursoClient.execute({ sql: 'UPDATE users SET ' + updates.join(', ') + ' WHERE id = ?', args });
+      }
+    }
+
+    await tursoClient.execute("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR TRIM(username) = ''");
+    await tursoClient.execute("UPDATE users SET password = '' WHERE password IS NULL");
 
     console.log(
       `[DB] Turso schema verified: ${TABLE_DEFINITIONS.length} table definitions; ${missingMigrations.length} missing-column migrations applied.`,
