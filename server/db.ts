@@ -531,7 +531,7 @@ export async function setupDatabase() {
 
   // ── Turso (remoto): migrações incrementais ────────────────────────────────
   if (isRemoteEnabled && dbRemote) {
-    const remoteMigrations = [
+    const remoteMigrations = [...TABLE_DEFINITIONS,
       "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
       "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
       "ALTER TABLE enterprises ADD COLUMN city TEXT",
