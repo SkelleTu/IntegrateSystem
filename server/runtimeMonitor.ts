@@ -241,7 +241,10 @@ function queueRuntimeEventPersistence(record: Parameters<typeof persistRuntimeEv
 export async function enableDurableRuntimePersistence() {
   durablePersistenceReady = true;
   const pending = pendingDurableEvents.splice(0, pendingDurableEvents.length);
-  await Promise.all(pending.map((record) => persistRuntimeEvent(record)));
+  // Keep startup flush sequential to preserve event order and avoid SQLite write contention.
+  for (const record of pending) {
+    await persistRuntimeEvent(record);
+  }
 }
 
 async function persistRuntimeEvent(record: {
