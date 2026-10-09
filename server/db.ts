@@ -29,6 +29,9 @@ sqlJsDb.exec = function(...args: any[]) {
 };
 
 export const localSqlite = sqlJsDb;
+export function persistLocalSqlite() {
+  fs.writeFileSync(sqliteFile, sqlJsDb.export());
+}
 export const dbLocal = drizzle(localSqlite, { schema });
 
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
@@ -571,7 +574,7 @@ export async function setupDatabase() {
   }
 
   // Ensure local sql.js changes made with prepare().run() are persisted.
-  fs.writeFileSync(sqliteFile, sqlJsDb.export());
+  persistLocalSqlite();
 }
 
 export async function auditDatabaseParity() {
