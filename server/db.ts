@@ -582,27 +582,80 @@ export async function auditDatabaseParity() {
     return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
   }
 
-  const tableNames = TABLE_DEFINITIONS
+  const tableNames = [...new Set(TABLE_DEFINITIONS
     .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
-    .filter((table): table is string => Boolean(table));
+    .filter((table): table is string => Boolean(table)))];
   if (tableNames.length === 0) {
     return { ok: false, remoteEnabled: true, error: "No table definitions found", tablesChecked: 0, mismatches: [] };
   }
+
   const mismatches: Array<Record<string, unknown>> = [];
   const tables: Array<Record<string, unknown>> = [];
+  const normalize = (value: any): unknown => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === "bigint") return value.toString();
+    if (value instanceof Uint8Array) return Array.from(value);
+    if (value instanceof Date) return value.toISOString();
+    return value;
+  };
+  const readLocal = (statement: string) => {
+    const handle = localSqlite.prepare(statement);
+    const rows: Array<Record<string, unknown>> = [];
+    try {
+      while (handle.step()) rows.push(handle.getAsObject() as Record<string, unknown>);
+    } finally {
+      handle.free();
+    }
+    return rows;
+  };
 
   for (const table of tableNames) {
     try {
-      const localInfo = localSqlite.exec(`PRAGMA table_info("${table}")`);
-      const localColumns: string[] = (localInfo[0]?.values ?? []).map((row: any[]) => String(row[1])).sort();
+      const localInfo = readLocal(`PRAGMA table_info("${table}")`);
+      const localColumns = localInfo.map((row: any) => String(row.name)).sort();
       const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const remoteColumns: string[] = remoteInfo.rows.map((row: any) => String(row.name)).sort();
-      const localCountResult = localSqlite.exec(`SELECT COUNT(*) AS count FROM "${table}"`);
-      const localRows = Number(localCountResult[0]?.values?.[0]?.[0] ?? 0);
-      const remoteCountResult = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${table}"`);
-      const remoteRows = Number(remoteCountResult.rows[0]?.count ?? 0);
+      const remoteColumns = remoteInfo.rows.map((row: any) => String(row.name)).sort();
       const missingLocal = remoteColumns.filter((column) => !localColumns.includes(column));
       const missingRemote = localColumns.filter((column) => !remoteColumns.includes(column));
+
+      let localRows = 0;
+      let remoteRows = 0;
+      let rowCountsMatch = true;
+      let rowContentsMatch = true;
+      const mismatchedRowIds: string[] = [];
+      const mismatchedColumns = new Set<string>();
+
+      // Runtime events are written asynchronously by multiple processes; compare their schema,
+      // but do not treat their momentary row-count/content drift as business-data divergence.
+      if (table !== "runtime_events") {
+        const localData = readLocal(`SELECT * FROM "${table}" ORDER BY id`);
+        const remoteData = await tursoClient.execute(`SELECT * FROM "${table}" ORDER BY id`);
+        const remoteDataRows = remoteData.rows as any[];
+        localRows = localData.length;
+        remoteRows = remoteDataRows.length;
+        rowCountsMatch = localRows === remoteRows;
+
+        const localById = new Map(localData.map((row: any, index) => [String(row.id ?? index), row]));
+        const remoteById = new Map(remoteDataRows.map((row: any, index) => [String(row.id ?? index), row]));
+        const allIds = new Set([...localById.keys(), ...remoteById.keys()]);
+        for (const id of allIds) {
+          const localRow = localById.get(id) as Record<string, unknown> | undefined;
+          const remoteRow = remoteById.get(id) as Record<string, unknown> | undefined;
+          if (!localRow || !remoteRow) {
+            rowContentsMatch = false;
+            if (mismatchedRowIds.length < 10) mismatchedRowIds.push(id);
+            continue;
+          }
+          for (const column of new Set([...localColumns, ...remoteColumns])) {
+            if (JSON.stringify(normalize(localRow[column])) !== JSON.stringify(normalize(remoteRow[column]))) {
+              rowContentsMatch = false;
+              mismatchedColumns.add(column);
+              if (mismatchedRowIds.length < 10 && !mismatchedRowIds.includes(id)) mismatchedRowIds.push(id);
+            }
+          }
+        }
+      }
+
       const countCompared = table !== "runtime_events";
       const entry = {
         table,
@@ -612,10 +665,17 @@ export async function auditDatabaseParity() {
         missingRemoteColumns: missingRemote,
         localRows,
         remoteRows,
-        rowCountsMatch: !countCompared || localRows === remoteRows,
+        rowCountsMatch: !countCompared || rowCountsMatch,
+        rowContentsMatch: !countCompared || rowContentsMatch,
+        mismatchedRowIds,
+        mismatchedColumns: [...mismatchedColumns],
       };
       tables.push(entry);
-      if (missingLocal.length || missingRemote.length || (countCompared && localRows !== remoteRows)) {
+      if (
+        missingLocal.length ||
+        missingRemote.length ||
+        (countCompared && (!rowCountsMatch || !rowContentsMatch))
+      ) {
         mismatches.push(entry);
       }
     } catch (error: any) {
@@ -630,6 +690,7 @@ export async function auditDatabaseParity() {
     remoteEnabled: true,
     tablesChecked: tables.length,
     rowCountsCompared: tables.filter((table: any) => table.table !== "runtime_events").length,
+    rowContentsCompared: tables.filter((table: any) => table.table !== "runtime_events").length,
     mismatches,
     tables,
   };
