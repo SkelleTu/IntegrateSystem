@@ -38,9 +38,9 @@ for (const [table, columns] of expected) {
   }
 }
 
-if (!db.includes("throw new Error(`[DB] Migração Turso falhou:") ||
-    !db.includes("throw new Error(`[DB] Migração local falhou:")) {
-  errors.push("Unexpected migration errors must fail startup visibly.");
+if (!db.includes("throw new Error(`[DB] Migração local falhou:") ||
+    !db.includes('await tursoClient.batch(missingMigrations, "write")')) {
+  errors.push("Unexpected migration errors must fail startup visibly on both databases.");
 }
 if (db.includes("Migração remota avisou:") || db.includes("Migração local avisou:")) {
   errors.push("Migration failures are still being swallowed/logged as warnings.");
