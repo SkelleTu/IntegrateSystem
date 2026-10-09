@@ -13,6 +13,7 @@ import {
   runtimeEvent,
   startRuntimeMonitor,
   installConsoleCapture,
+  enableDurableRuntimePersistence,
 } from "./runtimeMonitor";
 import { supremeOperatorMiddleware } from "./supreme-operator";
 import { registerMcpOAuth } from "./mcp-oauth";
@@ -203,6 +204,7 @@ export async function initApp() {
 
     const { setupDatabase } = await import("./db");
     await setupDatabase();
+    await enableDurableRuntimePersistence();
 
     runtimeEvent("database-ready", "Banco de dados inicializado", {
       phase: "initialization",
