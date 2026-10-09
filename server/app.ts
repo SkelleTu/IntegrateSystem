@@ -208,7 +208,7 @@ export async function initApp() {
 
     // Explicitly authorized, narrowly scoped bootstrap for the named MCP operator.
     // Never promotes arbitrary users: the exact username must be configured in Render.
-    const promoteAdminUsername = String(process.env.AURA_PROMOTE_ADMIN_USERNAME || "").trim();
+    const promoteAdminUsername = String(process.env.AURA_PROMOTE_ADMIN_USERNAME || process.env.MCP_MASTER_USERNAME || process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
     if (promoteAdminUsername) {
       const operator = await storage.getUserByUsername(promoteAdminUsername);
       if (!operator) {
