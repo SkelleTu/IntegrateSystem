@@ -1,7 +1,7 @@
 import fs from "node:fs";
 
 const required = [
-  ["server/runtimeMonitor.ts", ["persistRuntimeEvent", "runtimeEvents", "getAuraContext"]],
+  ["server/runtimeMonitor.ts", ["persistRuntimeEvent", "INSERT INTO runtime_events", "getAuraContext"]],
   ["server/runtime-observability.ts", ["aura-runtime-ledger", "nextSequence", "limit + 1"]],
   ["server/aura-request-context.ts", ["AsyncLocalStorage", "traceId", "requestId"]],
   ["server/app.ts", ["runWithAuraContext", "await getRuntimeObservability"]],
@@ -20,7 +20,7 @@ for (const [file, needles] of required) {
 }
 
 const monitor = fs.readFileSync("server/runtimeMonitor.ts", "utf8");
-if (!monitor.includes('void persistRuntimeEvent(record)')) {
+if (!monitor.includes('queueRuntimeEventPersistence(record)')) {
   throw new Error("Runtime events are not durably persisted.");
 }
 
