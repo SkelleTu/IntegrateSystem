@@ -182,7 +182,7 @@ export function runtimeEvent(
   };
 
   fs.appendFileSync(eventsFile, JSON.stringify(record) + os.EOL, "utf8");
-  void persistRuntimeEvent(record);
+  queueRuntimeEventPersistence(record);
   writeStatus({
     lastEvent: event,
     lastEventAt: record.timestamp,
@@ -224,6 +224,24 @@ async function ensureRuntimeEventTable() {
     });
   }
   await runtimeTableReady;
+}
+
+let durablePersistenceReady = false;
+const pendingDurableEvents: Array<Parameters<typeof persistRuntimeEvent>[0]> = [];
+
+function queueRuntimeEventPersistence(record: Parameters<typeof persistRuntimeEvent>[0]) {
+  if (!durablePersistenceReady) {
+    // Prevent a circular import while db.ts is still initializing. Keep boot events for a later flush.
+    if (pendingDurableEvents.length < 1000) pendingDurableEvents.push(record);
+    return;
+  }
+  void persistRuntimeEvent(record);
+}
+
+export async function enableDurableRuntimePersistence() {
+  durablePersistenceReady = true;
+  const pending = pendingDurableEvents.splice(0, pendingDurableEvents.length);
+  await Promise.all(pending.map((record) => persistRuntimeEvent(record)));
 }
 
 async function persistRuntimeEvent(record: {
