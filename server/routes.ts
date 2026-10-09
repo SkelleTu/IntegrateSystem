@@ -1304,7 +1304,7 @@ export async function registerRoutes(
     }
 
     const marker = "__AURA_E2E_CASH__" + Date.now().toString(36) + "_" + Math.random().toString(16).slice(2);
-    const cpf = "12345678909";
+    const cpf = "52998224725";
     const testUserId = 1;
     let productId: number | null = null;
     let batchId: number | null = null;
@@ -1473,7 +1473,7 @@ export async function registerRoutes(
       }
 
       step = "createSecondSale";
-      const pixCpf = "52998224725";
+      const pixCpf = "11144477735";
       const secondSale = await storage.createSale(
         {
           cashRegisterId: registerId,
