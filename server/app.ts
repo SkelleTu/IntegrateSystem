@@ -61,6 +61,21 @@ app.use(
 app.use(express.urlencoded({ extended: false }));
 app.set("trust proxy", 1);
 
+// Stable JSON liveness probes must be registered before the SPA/static fallback.
+// Render and external monitors must never receive index.html from /health.
+const healthPayload = () => ({
+  status: "ok",
+  service: "integrated-system",
+  timestamp: new Date().toISOString(),
+  uptimeSeconds: Math.floor(process.uptime()),
+});
+app.get("/health", (_req: Request, res: Response) => {
+  res.status(200).type("application/json").json(healthPayload());
+});
+app.get("/api/health", (_req: Request, res: Response) => {
+  res.status(200).type("application/json").json(healthPayload());
+});
+
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
