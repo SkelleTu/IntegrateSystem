@@ -225,20 +225,31 @@ export async function initApp() {
     // Never promotes arbitrary users: the exact username must be configured in Render.
     const promoteAdminUsername = String(process.env.AURA_PROMOTE_ADMIN_USERNAME || process.env.MCP_MASTER_USERNAME || process.env.AURA_AGENT_OPERATOR_USERNAME || "").trim();
     if (promoteAdminUsername) {
-      const operator = await storage.getUserByUsername(promoteAdminUsername);
-      if (!operator) {
-        throw new Error("Authorized MCP operator account was not found; refusing to continue bootstrap.");
-      }
-      const currentRole = String((operator as any).role || "").trim().toLowerCase();
-      if (!["admin", "owner"].includes(currentRole)) {
-        await storage.updateUser(operator.id, { role: "admin" } as any);
-        runtimeEvent("mcp-operator-role-promoted", "Conta de operador MCP autorizada promovida a admin", {
+      try {
+        const operator = await storage.getUserByUsername(promoteAdminUsername);
+        if (!operator) {
+          runtimeEvent("mcp-operator-bootstrap-skipped", "Conta de operador MCP configurada não encontrada; promoção ignorada", {
+            phase: "security", username: promoteAdminUsername, reason: "operator-not-found",
+          });
+          console.error("[SECURITY] Configured MCP operator account not found; privilege promotion skipped.");
+        } else {
+          const currentRole = String((operator as any).role || "").trim().toLowerCase();
+          if (!["admin", "owner"].includes(currentRole)) {
+            await storage.updateUser(operator.id, { role: "admin" } as any);
+            runtimeEvent("mcp-operator-role-promoted", "Conta de operador MCP autorizada promovida a admin", {
+              phase: "security", username: promoteAdminUsername,
+              previousRole: currentRole || "unset", role: "admin",
+            });
+            console.log("[SECURITY] Authorized MCP operator promoted to admin.");
+          } else {
+            console.log("[SECURITY] Authorized MCP operator already has a privileged role.");
+          }
+        }
+      } catch (bootstrapError) {
+        runtimeError(bootstrapError, "Falha no bootstrap de privilégio MCP; servidor continuará sem elevar privilégios", {
           phase: "security", username: promoteAdminUsername,
-          previousRole: currentRole || "unset", role: "admin",
         });
-        console.log("[SECURITY] Authorized MCP operator promoted to admin.");
-      } else {
-        console.log("[SECURITY] Authorized MCP operator already has a privileged role.");
+        console.error("[SECURITY] MCP operator bootstrap failed; server will continue without privilege elevation.");
       }
     }
 
