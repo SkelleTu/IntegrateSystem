@@ -51,6 +51,17 @@ try {
     "withdrawal above available cash must be rejected",
   );
 
+  const concurrentWithdrawals = await Promise.allSettled([
+    storage.createCashRegisterMovement(registerId, userId, "withdrawal", 1000, "Teste automatizado: sangria concorrente A"),
+    storage.createCashRegisterMovement(registerId, userId, "withdrawal", 1000, "Teste automatizado: sangria concorrente B"),
+  ]);
+  assert.equal(concurrentWithdrawals.filter((result) => result.status === "fulfilled").length, 1,
+    "only one concurrent withdrawal may spend the same available cash");
+  assert.equal(concurrentWithdrawals.filter((result) => result.status === "rejected").length, 1,
+    "the competing withdrawal must be rejected when funds are no longer available");
+  summary = await storage.getCashRegisterSummary(registerId);
+  assert.equal(summary.expectedAmount, 400, "concurrent withdrawals must not drive the expected cash below zero");
+
   const sale = await storage.createSale(
     {
       cashRegisterId: registerId,
@@ -78,12 +89,12 @@ try {
 
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 2000, "cash payment should increase cash sales");
-  assert.equal(summary.expectedAmount, 3400, "sale must reconcile with opening and manual movements");
+  assert.equal(summary.expectedAmount, 2400, "sale must reconcile with opening and manual movements");
 
   await storage.cancelSale(saleId);
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 0, "cancelled sale must no longer count as cash income");
-  assert.equal(summary.expectedAmount, 1400, "cancelling a cash sale must reverse the expected register balance");
+  assert.equal(summary.expectedAmount, 400, "cancelling a cash sale must reverse the expected register balance");
 
   const transactionsBeforeRepeat = await storage.getTransactions({});
   const reversalCountBeforeRepeat = transactionsBeforeRepeat.filter((t: any) =>
@@ -97,8 +108,8 @@ try {
   assert.equal(reversalCountAfterRepeat, reversalCountBeforeRepeat, "repeated cancellation must not duplicate financial reversal");
 
   const concurrentCloses = await Promise.allSettled([
-    storage.closeCashRegister(registerId, 1400),
-    storage.closeCashRegister(registerId, 1400),
+    storage.closeCashRegister(registerId, 400),
+    storage.closeCashRegister(registerId, 400),
   ]);
   assert.equal(concurrentCloses.filter((result) => result.status === "fulfilled").length, 1,
     "exactly one concurrent close should succeed");
@@ -108,7 +119,7 @@ try {
   assert.equal(closed.status, "closed", "register should close");
   assert.equal(closed.difference, 0, "closing against expected balance should have zero difference");
 
-  console.log("CASH REGISTER INTEGRATION: PASS (concurrent open, replenishment, withdrawal, adjustment, cash sale, cancellation, idempotency, concurrent close)");
+  console.log("CASH REGISTER INTEGRATION: PASS (concurrent open/withdrawal, replenishment, adjustment, cash sale, cancellation, idempotency, concurrent close)");
 } catch (error) {
   console.error("CASH REGISTER INTEGRATION: FAIL", error);
   process.exitCode = 1;
