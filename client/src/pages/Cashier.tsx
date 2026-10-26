@@ -735,6 +735,8 @@ export default function Cashier() {
       setWeightInputValue={setWeightInputValue}
       activeItemForWeight={activeItemForWeight}
       handleWeightSubmit={handleWeightSubmit}
+      cashMovementMutation={cashMovementMutation}
+      handleCashMovement={handleCashMovement}
     />
   );
 }
