@@ -149,7 +149,7 @@ export default function CashierClose() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Vendas (Cash)</span>
               </div>
               <div>
-                <p className="text-3xl font-black italic tracking-tighter text-primary">R$ {(totalCashSales / 100).toFixed(2)}</p>
+                <p className="text-3xl font-black italic tracking-tighter text-primary">R$ {((summary?.cashSales ?? 0) / 100).toFixed(2)}</p>
                 <p className="text-[10px] text-zinc-600 uppercase font-bold tracking-widest mt-1">Transações concluídas em dinheiro</p>
               </div>
             </CardContent>
