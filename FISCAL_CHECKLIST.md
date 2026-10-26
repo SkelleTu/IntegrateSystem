@@ -38,8 +38,8 @@
 - [x] Exigir motivo nos ajustes e nas movimentações; validar valores e sangria contra saldo disponível.
 - [x] Disponibilizar API de resumo e movimentações e usá-la no fechamento da interface.
 - [x] Adicionar controles de reposição e sangria ao PDV.
-- [ ] Build TypeScript e build de produção na branch.
+- [x] Build TypeScript e build de produção na branch (GitHub Actions, execução 52: sucesso).
 - [ ] Testes de integração para abertura, venda em dinheiro, sangria, reposição, ajuste e fechamento.
-- [ ] Validar compatibilidade e paridade entre SQLite e Turso.
+- [x] Verificação estática de paridade do esquema SQLite/Turso (script `verify-db-schema.mjs`, execução 52: sucesso). Pendentes testes de execução contra ambos os bancos.
 - [ ] Revisar cancelamento de venda e seus efeitos sobre caixa/estoque/financeiro.
-- [ ] Revisar fechamento concorrente e atomicidade entre os bancos.
+- [ ] Revisar fechamento concorrente e atomicidade entre os bancos (bloqueador identificado: `multiWrite` executa operações independentes em paralelo e não garante transação distribuída/rollback entre SQLite e Turso).
