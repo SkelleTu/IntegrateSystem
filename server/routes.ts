@@ -1846,6 +1846,13 @@ export async function registerRoutes(
         return res.status(400).json({ message: "ID de venda inválido" });
       }
 
+      const user = req.user as any;
+      const sale = await storage.getSale(id);
+      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      if (user.role !== "admin" && sale.userId !== user.id) {
+        return res.status(403).json({ message: "Sem permissão para cancelar esta venda" });
+      }
+
       const cancelledSale = await storage.cancelSale(id);
       res.json(cancelledSale);
     } catch (err: any) {
