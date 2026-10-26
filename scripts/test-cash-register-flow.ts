@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { eq, or } from "drizzle-orm";
 import { setupDatabase, dbRemote, dbLocal } from "../server/db.js";
 import { storage } from "../server/storage.js";
-import { cashRegisterMovements, cashRegisters, payments, saleItems, sales, transactions } from "../shared/schema.js";
+import { cashRegisterMovements, cashRegisters, inventory, inventoryLogs, payments, saleItems, sales, transactions } from "../shared/schema.js";
 
 if (dbRemote) {
   throw new Error("Este teste usa SQLite local isolado e se recusa a executar contra uma conexão Turso configurada.");
@@ -12,6 +12,7 @@ await setupDatabase();
 const userId = 8_000_000 + Math.floor(Math.random() * 1_000_000);
 let registerId: number | undefined;
 let saleId: number | undefined;
+let inventoryId: number | undefined;
 
 try {
   const concurrentOpens = await Promise.allSettled([
@@ -62,6 +63,18 @@ try {
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.expectedAmount, 400, "concurrent withdrawals must not drive the expected cash below zero");
 
+  const [testInventory] = await dbLocal.insert(inventory).values({
+    itemId: 987654321,
+    itemType: "product",
+    quantity: 2,
+    unit: "unit",
+    itemsPerUnit: 1,
+    costPrice: 500,
+    salePrice: 2000,
+    updatedAt: new Date(),
+  }).returning();
+  inventoryId = testInventory.id;
+
   const sale = await storage.createSale(
     {
       cashRegisterId: registerId,
@@ -72,8 +85,8 @@ try {
       createdAt: new Date(),
     } as any,
     [{
-      itemType: "service",
-      itemId: 987654321,
+      itemType: "product",
+      itemId: 10000 + inventoryId,
       quantity: 1,
       unitPrice: 2000,
       totalPrice: 2000,
@@ -90,11 +103,15 @@ try {
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 2000, "cash payment should increase cash sales");
   assert.equal(summary.expectedAmount, 2400, "sale must reconcile with opening and manual movements");
+  const [stockAfterSale] = await dbLocal.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
+  assert.equal(stockAfterSale.quantity, 1, "sale must deduct one unit from inventory");
 
   await storage.cancelSale(saleId);
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 0, "cancelled sale must no longer count as cash income");
   assert.equal(summary.expectedAmount, 400, "cancelling a cash sale must reverse the expected register balance");
+  const [stockAfterCancellation] = await dbLocal.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
+  assert.equal(stockAfterCancellation.quantity, 2, "cancelling a sale must restore inventory");
 
   const transactionsBeforeRepeat = await storage.getTransactions({});
   const reversalCountBeforeRepeat = transactionsBeforeRepeat.filter((t: any) =>
@@ -119,11 +136,15 @@ try {
   assert.equal(closed.status, "closed", "register should close");
   assert.equal(closed.difference, 0, "closing against expected balance should have zero difference");
 
-  console.log("CASH REGISTER INTEGRATION: PASS (concurrent open/withdrawal, replenishment, adjustment, cash sale, cancellation, idempotency, concurrent close)");
+  console.log("CASH REGISTER INTEGRATION: PASS (concurrent open/withdrawal, replenishment, adjustment, cash sale, stock deduction/restoration, cancellation, idempotency, concurrent close)");
 } catch (error) {
   console.error("CASH REGISTER INTEGRATION: FAIL", error);
   process.exitCode = 1;
 } finally {
+  if (inventoryId !== undefined) {
+    await dbLocal.delete(inventoryLogs).where(eq(inventoryLogs.inventoryId, inventoryId));
+    await dbLocal.delete(inventory).where(eq(inventory.id, inventoryId));
+  }
   if (saleId !== undefined) {
     await dbLocal.delete(transactions).where(or(
       eq(transactions.description, `Venda PDV #${saleId}`),
