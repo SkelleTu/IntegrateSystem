@@ -503,21 +503,54 @@ export default function Cashier() {
   const isAdmin = (register?.userId === 1) || true;
 
   const adjustMutation = useMutation({
-    mutationFn: async (amount: number) => {
-      const res = await apiRequest("POST", "/api/cash-register/adjust", { id: register?.id, amount });
+    mutationFn: async (input: { amount: number; reason: string }) => {
+      const res = await apiRequest("POST", "/api/cash-register/adjust", { id: register?.id, amount: input.amount, reason: input.reason });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/summary"] });
       setAdjustModalOpen(false);
       setNewOpeningAmount("");
-      toast({ title: "Valor em gaveta ajustado com sucesso!" });
+      toast({ title: "Ajuste de caixa registrado na auditoria." });
     },
   });
 
+  const cashMovementMutation = useMutation({
+    mutationFn: async (input: { type: "withdrawal" | "replenishment"; amount: number; reason: string }) => {
+      const res = await apiRequest("POST", "/api/cash-register/movement", input);
+      return res.json();
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/summary"] });
+      toast({ title: variables.type === "withdrawal" ? "Sangria registrada" : "Reposição registrada" });
+    },
+  });
+
+  const handleCashMovement = (type: "withdrawal" | "replenishment") => {
+    const raw = window.prompt(type === "withdrawal" ? "Valor da sangria em reais:" : "Valor da reposição em reais:");
+    if (raw === null) return;
+    const amount = Number(raw.trim().replace(",", "."));
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: "Valor inválido", variant: "destructive" });
+      return;
+    }
+    const reason = window.prompt("Motivo obrigatório da movimentação:");
+    if (!reason?.trim()) {
+      toast({ title: "Movimentação cancelada: informe um motivo.", variant: "destructive" });
+      return;
+    }
+    cashMovementMutation.mutate({ type, amount, reason: reason.trim() });
+  };
+
   const handleAdjustAmount = (reset: boolean = false) => {
-    const amount = reset ? 0 : Number(newOpeningAmount.replace(",", ".")) * 100;
-    adjustMutation.mutate(amount);
+    const amount = reset ? 0 : Math.round(Number(newOpeningAmount.replace(",", ".")) * 100);
+    const reason = window.prompt("Motivo obrigatório para auditoria do ajuste:");
+    if (!reason?.trim()) {
+      toast({ title: "Ajuste cancelado: informe um motivo.", variant: "destructive" });
+      return;
+    }
+    adjustMutation.mutate({ amount, reason: reason.trim() });
   };
 
   const handleFiscalToggle = (e: React.MouseEvent) => {
@@ -852,6 +885,11 @@ function CashierContent({
             >
               <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
             </Button>
+
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled={cashMovementMutation.isPending} onClick={() => handleCashMovement("withdrawal")}>Sangria</Button>
+              <Button variant="outline" size="sm" disabled={cashMovementMutation.isPending} onClick={() => handleCashMovement("replenishment")}>Reposição</Button>
+            </div>
 
             {/* Toggle cards / lista */}
             <button
