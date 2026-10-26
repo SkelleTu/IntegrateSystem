@@ -443,7 +443,12 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
     const [register] = await db.select()
       .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+      .where(and(
+        eq(cashRegisters.userId, userId),
+        eq(cashRegisters.status, "open"),
+        isNull(cashRegisters.closedAt),
+      ))
+      .limit(1);
     return register;
   }
 
