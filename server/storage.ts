@@ -48,6 +48,20 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
   return result;
 }
 
+/**
+ * Execute multi-step mutations transactionally inside each configured database.
+ * SQLite and Turso do not share a distributed transaction, so this guarantees
+ * per-database rollback but does not claim cross-database atomic commit.
+ */
+async function dualWriteAtomic(operation: (database: any) => Promise<any>) {
+  return dualWrite(async (database: any) => {
+    if (typeof database.transaction !== "function") {
+      throw new Error("O banco configurado não oferece transações; operação cancelada por segurança");
+    }
+    return database.transaction(async (transaction: any) => operation(transaction));
+  });
+}
+
 export interface IStorage {
   // Enterprise
   getEnterprises(): Promise<Enterprise[]>;
@@ -482,7 +496,7 @@ export class DatabaseStorage implements IStorage {
     const summary = await this.calculateCashRegisterSummary(db, register);
     if (type === "withdrawal" && amount > summary.expectedAmount) throw new Error("Sangria excede o saldo disponível");
     if (type === "adjustment" && summary.expectedAmount + amount < 0) throw new Error("Ajuste não pode deixar o saldo negativo");
-    return await dualWrite(async (database: any) => {
+    return await dualWriteAtomic(async (database: any) => {
       const [current] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
       if (!current || current.status !== "open" || current.closedAt) throw new Error("Caixa não está aberto");
       const [movement] = await database.insert(cashRegisterMovements).values({
@@ -501,7 +515,7 @@ export class DatabaseStorage implements IStorage {
     if (!Number.isSafeInteger(Number(register.openingAmount)) || Number(register.openingAmount) < 0) {
       throw new Error("Saldo inicial inválido");
     }
-    return await dualWrite(async (database: any) => {
+    return await dualWriteAtomic(async (database: any) => {
       const [existing] = await database.select().from(cashRegisters)
         .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
         .limit(1);
@@ -523,7 +537,7 @@ export class DatabaseStorage implements IStorage {
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
     if (!Number.isSafeInteger(closingAmount) || closingAmount < 0) throw new Error("Valor contado inválido");
-    return await dualWrite(async (database: any) => {
+    return await dualWriteAtomic(async (database: any) => {
       const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
       if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não encontrado ou já fechado");
       const summary = await this.calculateCashRegisterSummary(database, register);
@@ -547,7 +561,7 @@ export class DatabaseStorage implements IStorage {
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteAtomic(async (database) => {
       const [insertedSale]: any[] = await database.insert(sales).values(sale).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
@@ -687,7 +701,7 @@ export class DatabaseStorage implements IStorage {
 
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteAtomic(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
       const transaction = database;
