@@ -272,6 +272,15 @@ const TABLE_DEFINITIONS = [
     difference INTEGER,
     status TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS cash_register_movements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cash_register_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    type TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS sales (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cash_register_id INTEGER,
