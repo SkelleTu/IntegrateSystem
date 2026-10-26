@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
-import { setupDatabase } from "../server/db.js";
+import { eq, or } from "drizzle-orm";
+import { setupDatabase, dbRemote, dbLocal } from "../server/db.js";
 import { storage } from "../server/storage.js";
+import { cashRegisterMovements, cashRegisters, payments, saleItems, sales, transactions } from "../shared/schema.js";
 
+if (dbRemote) {
+  throw new Error("Este teste usa SQLite local isolado e se recusa a executar contra uma conexão Turso configurada.");
+}
 await setupDatabase();
 
 const userId = 8_000_000 + Math.floor(Math.random() * 1_000_000);
@@ -78,15 +83,34 @@ try {
   ).length;
   assert.equal(reversalCountAfterRepeat, reversalCountBeforeRepeat, "repeated cancellation must not duplicate financial reversal");
 
-  const closed = await storage.closeCashRegister(registerId, 1400);
+  const concurrentCloses = await Promise.allSettled([
+    storage.closeCashRegister(registerId, 1400),
+    storage.closeCashRegister(registerId, 1400),
+  ]);
+  assert.equal(concurrentCloses.filter((result) => result.status === "fulfilled").length, 1,
+    "exactly one concurrent close should succeed");
+  assert.equal(concurrentCloses.filter((result) => result.status === "rejected").length, 1,
+    "the competing concurrent close must be rejected");
+  const closed = concurrentCloses.find((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")!.value;
   assert.equal(closed.status, "closed", "register should close");
   assert.equal(closed.difference, 0, "closing against expected balance should have zero difference");
-  await assert.rejects(storage.closeCashRegister(registerId!, 1400), /fechado/i, "a closed register cannot close twice");
 
-  console.log("CASH REGISTER INTEGRATION: PASS (open, replenishment, withdrawal, adjustment, cash sale, cancellation, idempotency, close)");
+  console.log("CASH REGISTER INTEGRATION: PASS (open, replenishment, withdrawal, adjustment, cash sale, cancellation, idempotency, concurrent close)");
 } catch (error) {
   console.error("CASH REGISTER INTEGRATION: FAIL", error);
   process.exitCode = 1;
 } finally {
-  // Keep the test data isolated by using a unique synthetic operator ID.
+  if (saleId !== undefined) {
+    await dbLocal.delete(transactions).where(or(
+      eq(transactions.description, `Venda PDV #${saleId}`),
+      eq(transactions.description, `ESTORNO: Venda PDV #${saleId} CANCELADA`),
+    ));
+    await dbLocal.delete(payments).where(eq(payments.saleId, saleId));
+    await dbLocal.delete(saleItems).where(eq(saleItems.saleId, saleId));
+    await dbLocal.delete(sales).where(eq(sales.id, saleId));
+  }
+  if (registerId !== undefined) {
+    await dbLocal.delete(cashRegisterMovements).where(eq(cashRegisterMovements.cashRegisterId, registerId));
+    await dbLocal.delete(cashRegisters).where(eq(cashRegisters.id, registerId));
+  }
 }
