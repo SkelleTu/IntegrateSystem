@@ -14,12 +14,25 @@ let registerId: number | undefined;
 let saleId: number | undefined;
 
 try {
-  const register = await storage.openCashRegister({
-    userId,
-    openingAmount: 1000,
-    status: "open",
-    openedAt: new Date(),
-  } as any);
+  const concurrentOpens = await Promise.allSettled([
+    storage.openCashRegister({
+      userId,
+      openingAmount: 1000,
+      status: "open",
+      openedAt: new Date(),
+    } as any),
+    storage.openCashRegister({
+      userId,
+      openingAmount: 1000,
+      status: "open",
+      openedAt: new Date(),
+    } as any),
+  ]);
+  assert.equal(concurrentOpens.filter((result) => result.status === "fulfilled").length, 1,
+    "exactly one concurrent opening should succeed for an operator");
+  assert.equal(concurrentOpens.filter((result) => result.status === "rejected").length, 1,
+    "the competing concurrent opening must be rejected");
+  const register = concurrentOpens.find((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")!.value;
   registerId = register.id;
   assert.ok(registerId, "register should be created");
 
@@ -95,7 +108,7 @@ try {
   assert.equal(closed.status, "closed", "register should close");
   assert.equal(closed.difference, 0, "closing against expected balance should have zero difference");
 
-  console.log("CASH REGISTER INTEGRATION: PASS (open, replenishment, withdrawal, adjustment, cash sale, cancellation, idempotency, concurrent close)");
+  console.log("CASH REGISTER INTEGRATION: PASS (concurrent open, replenishment, withdrawal, adjustment, cash sale, cancellation, idempotency, concurrent close)");
 } catch (error) {
   console.error("CASH REGISTER INTEGRATION: FAIL", error);
   process.exitCode = 1;
