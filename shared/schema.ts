@@ -97,6 +97,16 @@ export const cashRegisters = pgTable("cash_register", {
   status: text("status").notNull(), // "open", "closed"
 });
 
+export const cashRegisterMovements = pgTable("cash_register_movements", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  cashRegisterId: integer("cash_register_id").notNull(),
+  userId: integer("user_id").notNull(),
+  type: text("type").notNull(),
+  amount: integer("amount").notNull(), // cents; adjustments may be negative
+  reason: text("reason").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
 export const sales = pgTable("sales", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   cashRegisterId: integer("cash_register_id"),
@@ -363,8 +373,12 @@ export const insertTicketSchema = createInsertSchema(tickets);
 export const insertQueueStateSchema = createInsertSchema(queueState);
 export const insertCategorySchema = createInsertSchema(categories);
 export const insertCashRegisterSchema = createInsertSchema(cashRegisters, {
-  openingAmount: z.number().transform(v => Math.round(v * 100)),
-  closingAmount: z.number().transform(v => Math.round(v * 100)).optional(),
+  openingAmount: z.number().finite().nonnegative().transform(v => Math.round(v * 100)),
+  closingAmount: z.number().finite().nonnegative().transform(v => Math.round(v * 100)).optional(),
+});
+export const insertCashRegisterMovementSchema = createInsertSchema(cashRegisterMovements, {
+  amount: z.number().finite().int(),
+  reason: z.string().trim().min(1).max(500),
 });
 export const insertSaleSchema = createInsertSchema(sales);
 export const insertSaleItemSchema = createInsertSchema(saleItems).omit({ saleId: true });
@@ -397,6 +411,7 @@ export type QueueState = typeof queueState.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type MenuItem = typeof menuItems.$inferSelect;
 export type CashRegister = typeof cashRegisters.$inferSelect;
+export type CashRegisterMovement = typeof cashRegisterMovements.$inferSelect;
 export type Sale = typeof sales.$inferSelect;
 export type SaleItem = typeof saleItems.$inferSelect;
 export type Payment = typeof payments.$inferSelect;
