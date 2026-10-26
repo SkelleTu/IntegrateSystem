@@ -556,6 +556,17 @@ export async function setupDatabase() {
     }
   }
 
+  // Prevent two open cash registers for the same operator, even under concurrent requests.
+  const duplicateLocalRegisters = localSqlite.exec(
+    "SELECT user_id, COUNT(*) AS total FROM cash_register WHERE status = 'open' AND closed_at IS NULL GROUP BY user_id HAVING COUNT(*) > 1"
+  )[0]?.values ?? [];
+  if (duplicateLocalRegisters.length) {
+    throw new Error(`[DB] Existem caixas abertos duplicados por operador; reconcilie antes de iniciar: ${JSON.stringify(duplicateLocalRegisters)}`);
+  }
+  localSqlite.prepare(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_register_one_open_per_user ON cash_register(user_id) WHERE status = 'open' AND closed_at IS NULL"
+  ).run();
+
   // Recover legacy auth columns without overwriting populated credentials or roles.
   // Rows that cannot be recovered receive a unique disabled placeholder username/password,
   // so they remain visible for an explicit admin reconciliation instead of breaking all queries.
@@ -594,6 +605,18 @@ export async function setupDatabase() {
     for (const migration of missingMigrations) {
       await tursoClient.execute(migration);
     }
+
+    // Mirror the open-register invariant remotely. Existing duplicates fail visibly instead of
+    // allowing further cash corruption to accumulate silently.
+    const duplicateRemoteRegisters = await tursoClient.execute(
+      "SELECT user_id, COUNT(*) AS total FROM cash_register WHERE status = 'open' AND closed_at IS NULL GROUP BY user_id HAVING COUNT(*) > 1"
+    );
+    if (duplicateRemoteRegisters.rows.length) {
+      throw new Error(`[DB] Turso contém caixas abertos duplicados por operador; reconcilie antes de iniciar: ${JSON.stringify(duplicateRemoteRegisters.rows)}`);
+    }
+    await tursoClient.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_register_one_open_per_user ON cash_register(user_id) WHERE status = 'open' AND closed_at IS NULL"
+    );
 
     // Fill only blank remote auth fields from the local row with the same stable ID.
     // Existing remote usernames, password hashes, roles, and enterprise assignments are never overwritten.
