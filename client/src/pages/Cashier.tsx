@@ -751,7 +751,7 @@ function CashierContent({
   setSelectedProductForAdjust, setAdjustProductModalOpen,
   updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen,
   weightModalOpen, setWeightModalOpen, weightInputValue, setWeightInputValue,
-  activeItemForWeight, handleWeightSubmit
+  activeItemForWeight, handleWeightSubmit, cashMovementMutation, handleCashMovement
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
