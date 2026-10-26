@@ -53,13 +53,20 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
  * SQLite and Turso do not share a distributed transaction, so this guarantees
  * per-database rollback but does not claim cross-database atomic commit.
  */
+// sql.js uses one connection per process. Serialize critical multi-step writes so
+// concurrent requests cannot interleave BEGIN/COMMIT or validate against stale cash.
+let atomicWriteQueue: Promise<unknown> = Promise.resolve();
+
 async function dualWriteAtomic(operation: (database: any) => Promise<any>) {
-  return dualWrite(async (database: any) => {
+  const execute = () => dualWrite(async (database: any) => {
     if (typeof database.transaction !== "function") {
       throw new Error("O banco configurado não oferece transações; operação cancelada por segurança");
     }
     return database.transaction(async (transaction: any) => operation(transaction));
   });
+  const pending = atomicWriteQueue.then(execute, execute);
+  atomicWriteQueue = pending.then(() => undefined, () => undefined);
+  return pending;
 }
 
 export interface IStorage {
