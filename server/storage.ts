@@ -504,6 +504,15 @@ export class DatabaseStorage implements IStorage {
     return await dualWriteAtomic(async (database: any) => {
       const [current] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
       if (!current || current.status !== "open" || current.closedAt) throw new Error("Caixa não está aberto");
+      // Recompute inside the transaction so concurrent withdrawals cannot spend the
+      // same cash balance based on stale pre-transaction summaries.
+      const currentSummary = await this.calculateCashRegisterSummary(database, current);
+      if (type === "withdrawal" && amount > currentSummary.expectedAmount) {
+        throw new Error("Sangria excede o saldo disponível");
+      }
+      if (type === "adjustment" && currentSummary.expectedAmount + amount < 0) {
+        throw new Error("Ajuste não pode deixar o saldo negativo");
+      }
       const [movement] = await database.insert(cashRegisterMovements).values({
         cashRegisterId: registerId, userId, type, amount, reason: reason.trim(), createdAt: new Date(),
       }).returning();
