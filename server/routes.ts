@@ -1643,42 +1643,104 @@ export async function registerRoutes(
     res.json(register);
   });
 
+  app.get("/api/cash-register/summary", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(404).json({ message: "Nenhum caixa aberto" });
+      res.json(await storage.getCashRegisterSummary(register.id));
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Falha ao calcular saldo" });
+    }
+  });
+
+  app.get("/api/cash-register/:id/movements", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID inválido" });
+      const registers = await storage.getCashRegisters({});
+      if (!registers.some((item) => item.id === id && item.userId === user.id)) {
+        return res.status(404).json({ message: "Caixa não encontrado" });
+      }
+      res.json(await storage.getCashRegisterMovements(id));
+    } catch (error: any) {
+      res.status(500).json({ message: error?.message || "Falha ao consultar movimentações" });
+    }
+  });
+
   app.post("/api/cash-register/open", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const existing = await storage.getOpenCashRegister(user.id);
-    if (existing) return res.status(400).json({ message: "Register already open" });
-    
-    const data = insertCashRegisterSchema.parse({
-      ...req.body,
-      userId: user.id,
-      status: "open",
-      openedAt: new Date()
-    });
-    const register = await storage.openCashRegister(data);
-    res.json(register);
+    try {
+      const user = req.user as any;
+      const existing = await storage.getOpenCashRegister(user.id);
+      if (existing) return res.status(400).json({ message: "Register already open" });
+      const data = insertCashRegisterSchema.parse({
+        ...req.body, userId: user.id, status: "open", openedAt: new Date()
+      });
+      res.status(201).json(await storage.openCashRegister(data));
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Falha ao abrir caixa" });
+    }
+  });
+
+  app.post("/api/cash-register/movement", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(400).json({ message: "Abra o caixa antes de movimentar" });
+      const { type, amount, reason } = req.body || {};
+      if (type !== "withdrawal" && type !== "replenishment") {
+        return res.status(400).json({ message: "Tipo inválido" });
+      }
+      const reais = Number(amount);
+      if (!Number.isFinite(reais) || reais <= 0 || typeof reason !== "string" || !reason.trim()) {
+        return res.status(400).json({ message: "Valor positivo e motivo são obrigatórios" });
+      }
+      const movement = await storage.createCashRegisterMovement(register.id, user.id, type, Math.round(reais * 100), reason);
+      res.status(201).json({ movement, summary: await storage.getCashRegisterSummary(register.id) });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Falha ao registrar movimentação" });
+    }
   });
 
   app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    if (user.role !== "admin" && user.username !== "SkelleTu") {
-      return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    try {
+      const user = req.user as any;
+      if (user.role !== "admin" && user.username !== "SkelleTu") {
+        return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+      }
+      const id = Number(req.body?.id);
+      const targetAmount = Number(req.body?.amount);
+      const reason = String(req.body?.reason || "").trim();
+      if (!Number.isInteger(id) || id <= 0 || !Number.isSafeInteger(targetAmount) || !reason) {
+        return res.status(400).json({ message: "Caixa, saldo em centavos e motivo são obrigatórios" });
+      }
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register || register.id !== id) return res.status(404).json({ message: "Caixa aberto não encontrado" });
+      const summary = await storage.getCashRegisterSummary(id);
+      const delta = targetAmount - summary.expectedAmount;
+      if (delta === 0) return res.status(400).json({ message: "Saldo já corresponde ao esperado" });
+      const movement = await storage.createCashRegisterMovement(id, user.id, "adjustment", delta, reason);
+      res.json({ movement, summary: await storage.getCashRegisterSummary(id) });
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Falha ao ajustar caixa" });
     }
-    const { id, amount } = req.body;
-    const updated = await storage.updateCashRegisterOpeningAmount(id, amount);
-    res.json(updated);
   });
 
   app.post("/api/cash-register/close", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const register = await storage.getOpenCashRegister(user.id);
-    if (!register) return res.status(404).json({ message: "No open register" });
-    
-    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
-    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
-    const updated = await storage.closeCashRegister(register.id, closingAmount);
-    res.json(updated);
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(404).json({ message: "No open register" });
+      const reais = Number(req.body?.closingAmount);
+      if (!Number.isFinite(reais) || reais < 0) return res.status(400).json({ message: "Valor contado inválido" });
+      const updated = await storage.closeCashRegister(register.id, Math.round(reais * 100));
+      res.json(updated);
+    } catch (error: any) {
+      res.status(400).json({ message: error?.message || "Falha ao fechar caixa" });
+    }
   });
 
   app.post("/api/sales", async (req, res) => {
