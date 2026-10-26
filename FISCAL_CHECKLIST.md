@@ -29,3 +29,17 @@
 - [ ] Implementar cancelamento de nota fiscal dentro do prazo legal.
 - [ ] Implementar Carta de Correção Eletrônica (CC-e) - apenas para NF-e.
 - [ ] Relatório de notas emitidas para contabilidade.
+
+
+## Caixa — implementação em branch de correção
+- [x] Adicionar tabela de movimentos auditáveis para abertura, reposição, sangria, ajuste e fechamento.
+- [x] Calcular saldo esperado no servidor em centavos: abertura + dinheiro recebido + reposições − sangrias + ajustes.
+- [x] Registrar abertura/fechamento no livro de caixa, sem lançar abertura como receita financeira.
+- [x] Exigir motivo nos ajustes e nas movimentações; validar valores e sangria contra saldo disponível.
+- [x] Disponibilizar API de resumo e movimentações e usá-la no fechamento da interface.
+- [x] Adicionar controles de reposição e sangria ao PDV.
+- [ ] Build TypeScript e build de produção na branch.
+- [ ] Testes de integração para abertura, venda em dinheiro, sangria, reposição, ajuste e fechamento.
+- [ ] Validar compatibilidade e paridade entre SQLite e Turso.
+- [ ] Revisar cancelamento de venda e seus efeitos sobre caixa/estoque/financeiro.
+- [ ] Revisar fechamento concorrente e atomicidade entre os bancos.
