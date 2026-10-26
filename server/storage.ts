@@ -2,7 +2,7 @@ import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
-  cashRegisters, sales, saleItems, payments, transactions,
+  cashRegisters, cashRegisterMovements, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
   products, batches, batchLogs,
@@ -13,6 +13,7 @@ import {
   type Category, type InsertCategory,
   type MenuItem, type InsertMenuItem,
   type CashRegister, type InsertCashRegister,
+  type CashRegisterMovement,
   type Sale, type InsertSale,
   type SaleItem, type InsertSaleItem,
   type Payment, type InsertPayment,
@@ -88,417 +89,128 @@ export interface IStorage {
   getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]>;
   createMenuItem(item: InsertMenuItem): Promise<MenuItem>;
 
-  // Cashier
-  getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
-  openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
-  closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
-  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
-  getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
-  cancelSale(id: number): Promise<Sale>;
-
-  // Financial Transactions
-  getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]>;
-  createTransaction(transaction: any): Promise<Transaction>;
-  deleteTransaction(id: number): Promise<void>;
-  
-  // Inventory
-  getInventory(): Promise<Inventory[]>;
-  getInventoryItem(id: number): Promise<Inventory | undefined>;
-  getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined>;
-  updateInventory(id: number, quantity: number): Promise<Inventory>;
-  deleteInventoryItem(id: number): Promise<void>;
-  upsertInventory(data: any): Promise<Inventory>;
-  createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog>;
-  updateTicketItems(id: number, items: string[]): Promise<Ticket>;
-
-  // Time Clock
-  getTimeClockHistory(userId: number): Promise<TimeClock[]>;
-  getLatestTimeClock(userId: number): Promise<TimeClock | undefined>;
-  createTimeClock(data: InsertTimeClock): Promise<TimeClock>;
-  updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock>;
-
-  // Settings
-  getSettings(enterpriseId?: number): Promise<Settings>;
-  updateSettings(update: Partial<Settings>): Promise<Settings>;
-  
-  // User Sessions
-  logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession>;
-  getAdminMonitoringData(): Promise<{ 
-    sessions: (UserSession & { username: string })[], 
-    enterprises: Enterprise[] 
-  }>;
-
-  // Fiscal
-  getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined>;
-  upsertFiscalSettings(settings: InsertFiscalSettings): Promise<FiscalSettings>;
-  getLogsFiscais(enterpriseId: number): Promise<any[]>;
-  updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale>;
-  getSale(id: number): Promise<Sale | undefined>;
-  getSaleItems(saleId: number): Promise<SaleItem[]>;
-  getPayments(saleId: number): Promise<Payment[]>;
-  getNextNfceNumber(enterpriseId: number): Promise<number>;
-  createNfce(data: InsertNfce): Promise<Nfce>;
-  getNfceHistory(enterpriseId: number): Promise<Nfce[]>;
-  getNfce(id: number): Promise<Nfce | undefined>;
-  
-  // New Methods for Reports
-  getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]>;
-  getSalesByRegisterId(registerId: number): Promise<Sale[]>;
-  
-  getAllInventoryRestocks(): Promise<InventoryRestock[]>;
-  getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]>;
-  restockInventory(id: number, data: any): Promise<Inventory>;
-  updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem>;
-  getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined>;
-  getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined>;
-
-  // Produto → Lotes
-  getProducts(): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null })[]>;
-  getProduct(id: number): Promise<Product | undefined>;
-  findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined>;
-  createProduct(data: InsertProduct): Promise<Product>;
-  updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product>;
-  deleteProduct(id: number): Promise<void>;
-  clearAllProducts(clearedBy: string): Promise<void>;
-  zeroAllBatchQuantities(zeroedBy: string): Promise<number>;
-  getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null>;
-  restoreStockSnapshot(): Promise<{ productsRestored: number }>;
-  getProductBatches(productId: number): Promise<Batch[]>;
-  createBatch(data: InsertBatch): Promise<Batch>;
-  updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch>;
-  deleteBatch(id: number): Promise<void>;
-  searchProducts(q: string): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null })[]>;
-  deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void>;
-  getBatchLogs(productId: number): Promise<BatchLog[]>;
-  createBatchLog(data: InsertBatchLog): Promise<BatchLog>;
-  findProductByVariantSku(sku: string): Promise<(Product & { totalQuantity: number; nearestExpiry: Date | null; matchedBatch?: Batch }) | null>;
-}
-
-export class DatabaseStorage implements IStorage {
-  private lastAction: string = "Sistema iniciado";
-
-  private logAction(action: string) {
-    this.lastAction = `${action} em ${new Date().toLocaleTimeString('pt-BR')}`;
-    console.log(`[DB ACTION]: ${this.lastAction}`);
-    runtimeEvent("db-action", action, { phase: "database", operation: action });
-  }
-
-  getLastAction(): string {
-    return this.lastAction;
-  }
-
-  async getEnterprises(): Promise<Enterprise[]> {
-    this.logAction("Consulta de instituições");
-    return await db.select().from(enterprises);
-  }
-
-  async getEnterprise(id: number): Promise<Enterprise | undefined> {
-    this.logAction(`Consulta instituição ID:${id}`);
-    const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.id, id));
-    return enterprise;
-  }
-
-  async getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined> {
-    this.logAction(`Busca instituição por slug: ${slug}`);
-    const [enterprise] = await db.select().from(enterprises).where(eq(enterprises.slug, slug));
-    return enterprise;
-  }
-
-  async getEnterprisesByOwner(ownerId: number): Promise<Enterprise[]> {
-    this.logAction(`Busca estabelecimentos do usuário ID:${ownerId}`);
-    return await db.select().from(enterprises).where(eq(enterprises.ownerId, ownerId));
-  }
-
-  async updateUser(id: number, update: Partial<User>): Promise<User> {
-    this.logAction(`Atualização usuário ID:${id}`);
-    const [updated] = await dualWrite(async (database: any) => {
-      await database.update(users).set(update).where(eq(users.id, id));
-      const [rec] = await database.select().from(users).where(eq(users.id, id));
-      return rec;
-    });
-    return updated;
-  }
-
-  async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
-    this.logAction(`Criação de instituição: ${enterprise.name}`);
-    const insertResultenterprises: any = await db.insert(enterprises).values(enterprise);
-      const identerprises = insertResultenterprises.lastInsertRowid;
-      const [newEnterprise] = await db.select().from(enterprises).where(eq(enterprises.id, identerprises));
-    // Initialize settings for new enterprise
-    await db.insert(settings).values({ enterpriseId: newEnterprise.id });
-    
-    if (adminData) {
-      await db.insert(users).values({
-        ...adminData,
-        enterpriseId: newEnterprise.id,
-        role: "admin"
-      });
-    }
-    
-    return newEnterprise;
-  }
-
-  async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
-    this.logAction(`Atualização instituição ID:${id}`);
-    await db.update(enterprises).set(update).where(eq(enterprises.id, id));
-      const [updated] = await db.select().from(enterprises).where(eq(enterprises.id, id));
-    return updated;
-  }
-
-  async deleteEnterprise(id: number): Promise<void> {
-    this.logAction(`Exclusão instituição ID:${id}`);
-    await db.delete(settings).where(eq(settings.enterpriseId, id));
-    await db.delete(enterprises).where(eq(enterprises.id, id));
-  }
-
-  async getUser(id: number): Promise<User | undefined> {
-    this.logAction(`Consulta usuário ID:${id}`);
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    this.logAction(`Login/Busca usuário: ${username}`);
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
-  async createUser(user: InsertUser): Promise<User> {
-    this.logAction(`Novo usuário cadastrado: ${user.username}`);
-    return await dualWrite(async (database) => {
-      const insertResultusers: any = await database.insert(users).values(user);
-      const idusers = insertResultusers.lastInsertRowid;
-      const [newUser] = await database.select().from(users).where(eq(users.id, idusers));
-      return newUser;
-    });
-  }
-
-  async getServices(): Promise<Service[]> {
-    this.logAction("Consulta lista de serviços");
-    return await db.select().from(services).where(eq(services.isActive, true));
-  }
-
-  async getService(id: number): Promise<Service | undefined> {
-    this.logAction(`Consulta serviço ID:${id}`);
-    const [service] = await db.select().from(services).where(eq(services.id, id));
-    return service;
-  }
-
-  async createService(service: InsertService): Promise<Service> {
-    this.logAction(`Criação de serviço: ${service.name}`);
-    return await dualWrite(async (database) => {
-      const insertResultservices: any = await database.insert(services).values(service);
-      const idservices = insertResultservices.lastInsertRowid;
-      const [newService] = await database.select().from(services).where(eq(services.id, idservices));
-      return newService;
-    });
-  }
-
-  async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
-    this.logAction(`Atualização serviço ID:${id}`);
-    return await dualWrite(async (database) => {
-      await database.update(services).set(update).where(eq(services.id, id));
-      const [updated] = await database.select().from(services).where(eq(services.id, id));
-      return updated;
-    });
-  }
-
-  async deleteService(id: number): Promise<void> {
-    this.logAction(`Desativação serviço ID:${id}`);
-    await dualWrite(async (database) => {
-      await database.update(services).set({ isActive: false }).where(eq(services.id, id));
-    });
-  }
-
-  async getUsers(): Promise<User[]> {
-    this.logAction("Consulta lista de usuários");
-    return await db.select().from(users);
-  }
-
-  async deleteUser(id: number): Promise<void> {
-    this.logAction(`Exclusão usuário ID:${id}`);
-    await db.delete(users).where(eq(users.id, id));
-  }
-  async getQueueState(): Promise<QueueState> {
-    this.logAction("Consulta estado da fila");
-    let [state] = await db.select().from(queueState);
-    if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
-    }
-    return state;
-  }
-
-  async updateQueueState(update: Partial<QueueState>): Promise<QueueState> {
-    this.logAction("Atualização da fila");
-    let [state] = await db.select().from(queueState);
-    if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
-    }
-    await db.update(queueState)
-      .set(update)
-      .where(eq(queueState.id, state.id));
-    const [updated] = await db.select().from(queueState).where(eq(queueState.id, state.id));
-    return updated;
-  }
-
-  async createTicket(ticket: InsertTicket): Promise<Ticket> {
-    this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
-    return await dualWrite(async (database) => {
-      const insertResulttickets: any = await database.insert(tickets).values(ticket);
-      const idtickets = insertResulttickets.lastInsertRowid;
-      const [newTicket] = await database.select().from(tickets).where(eq(tickets.id, idtickets));
-      return newTicket;
-    });
-  }
-
-  async getTicketByNumber(number: number): Promise<Ticket | undefined> {
-    this.logAction(`Busca ticket #${number}`);
-    const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
-    if (ticket && typeof ticket.items === 'string') {
-      try {
-        (ticket as any).items = JSON.parse(ticket.items);
-      } catch (e) {
-        (ticket as any).items = [];
-      }
-    } else if (ticket && !ticket.items) {
-      (ticket as any).items = [];
-    }
-    return ticket;
-  }
-
-  async getLatestTicket(): Promise<Ticket | undefined> {
-    this.logAction("Consulta último ticket");
-    const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
-    if (ticket && typeof ticket.items === 'string') {
-      try {
-        (ticket as any).items = JSON.parse(ticket.items);
-      } catch (e) {
-        (ticket as any).items = [];
-      }
-    } else if (ticket && !ticket.items) {
-      (ticket as any).items = [];
-    }
-    return ticket;
-  }
-
-  async getCategories(): Promise<Category[]> {
-    this.logAction("Consulta categorias menu");
-    return await db.select().from(categories).orderBy(asc(categories.order));
-  }
-
-  async createCategory(category: InsertCategory): Promise<Category> {
-    this.logAction(`Nova categoria: ${category.name}`);
-    return await dualWrite(async (database) => {
-      const insertResultcategories: any = await database.insert(categories).values(category);
-      const idcategories = insertResultcategories.lastInsertRowid;
-      const [newCategory] = await database.select().from(categories).where(eq(categories.id, idcategories));
-      return newCategory;
-    });
-  }
-
-  async getMenuItems(): Promise<MenuItem[]> {
-    this.logAction("Consulta itens menu");
-    const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
-    return items;
-  }
-
-  async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {
-    this.logAction(`Busca itens categoria ID:${categoryId}`);
-    return await db.select().from(menuItems).where(eq(menuItems.categoryId, categoryId));
-  }
-
-  async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
-    this.logAction(`Novo item menu: ${item.name}`);
-    const itemToInsert = {
-      ...item,
-      tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
-    };
-    const insertResultmenuItems: any = await db.insert(menuItems).values(itemToInsert);
-      const idmenuItems = insertResultmenuItems.lastInsertRowid;
-      const [newItem] = await db.select().from(menuItems).where(eq(menuItems.id, idmenuItems));
-    return newItem;
-  }
-
-  // Cashier
+  // Cashier: o saldo esperado é calculado no servidor, nunca na interface.
   async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
-    const [register] = await db.select()
-      .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+    const [register] = await db.select().from(cashRegisters)
+      .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+      .limit(1);
     return register;
+  }
+
+  private async calculateCashRegisterSummary(database: any, register: CashRegister) {
+    const registerSales = await database.select().from(sales).where(eq(sales.cashRegisterId, register.id));
+    let cashSales = 0;
+    for (const sale of registerSales as any[]) {
+      if (sale.status !== "completed") continue;
+      const salePayments = await database.select().from(payments)
+        .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+      cashSales += salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+    }
+    const movements = await database.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, register.id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+    const replenishments = movements.filter((m: any) => m.type === "replenishment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const withdrawals = movements.filter((m: any) => m.type === "withdrawal").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const adjustments = movements.filter((m: any) => m.type === "adjustment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    return {
+      cashRegisterId: register.id,
+      openingAmount: Number(register.openingAmount || 0),
+      cashSales,
+      replenishments,
+      withdrawals,
+      adjustments,
+      expectedAmount: Number(register.openingAmount || 0) + cashSales + replenishments - withdrawals + adjustments,
+      movements,
+    };
+  }
+
+  async getCashRegisterSummary(id: number) {
+    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+    if (!register) throw new Error("Caixa não encontrado");
+    return this.calculateCashRegisterSummary(db, register);
+  }
+
+  async getCashRegisterMovements(id: number): Promise<CashRegisterMovement[]> {
+    return await db.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+  }
+
+  async createCashRegisterMovement(
+    registerId: number,
+    userId: number,
+    type: "replenishment" | "withdrawal" | "adjustment",
+    amount: number,
+    reason: string,
+  ): Promise<CashRegisterMovement> {
+    if (!Number.isSafeInteger(amount) || !Number.isFinite(amount)) throw new Error("Valor inválido");
+    if (type !== "adjustment" && amount <= 0) throw new Error("O valor deve ser maior que zero");
+    if (type === "adjustment" && amount === 0) throw new Error("O ajuste não pode ser zero");
+    if (!reason?.trim()) throw new Error("O motivo é obrigatório");
+    const [currentRegister] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+    if (!currentRegister || currentRegister.status !== "open" || currentRegister.closedAt) throw new Error("O caixa não está aberto");
+    const summary = await this.calculateCashRegisterSummary(db, currentRegister);
+    if (type === "withdrawal" && amount > summary.expectedAmount) throw new Error("A sangria excede o saldo disponível em caixa");
+    if (type === "adjustment" && summary.expectedAmount + amount < 0) throw new Error("O ajuste não pode deixar o saldo esperado negativo");
+
+    return await dualWrite(async (database) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+      if (!register || register.status !== "open" || register.closedAt) throw new Error("O caixa não está aberto");
+      const [movement] = await database.insert(cashRegisterMovements).values({
+        cashRegisterId: registerId, userId, type, amount, reason: reason.trim(), createdAt: new Date(),
+      }).returning();
+      if (!movement) throw new Error("Não foi possível registrar a movimentação de caixa");
+      runtimeEvent("cash-register-movement", `Movimentação ${type} no caixa #${registerId}`, {
+        phase: "cash", cashRegisterId: registerId, userId, type, amount, reason: reason.trim(),
+      });
+      return movement;
+    });
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
+    if (!Number.isSafeInteger(Number(register.openingAmount)) || Number(register.openingAmount) < 0) {
+      throw new Error("O saldo inicial deve ser um valor válido e não negativo");
+    }
     return await dualWrite(async (database) => {
+      const [existing] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .limit(1);
+      if (existing) throw new Error("Já existe um caixa aberto para este operador");
       const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: newRegister.id, userId: register.userId, type: "opening",
+        amount: Number(newRegister.openingAmount || 0), reason: "Abertura de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
         openingAmount: newRegister.openingAmount ?? 0,
       });
-      
-      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
-        await database.insert(transactions).values({
-          businessType: "padaria",
-          type: "income",
-          category: "caixa",
-          description: `Abertura de Caixa #${newRegister.id}`,
-          amount: newRegister.openingAmount,
-          createdAt: new Date()
-        } as any);
-      }
-      
       return newRegister;
     });
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
+    if (!Number.isSafeInteger(closingAmount) || closingAmount < 0) throw new Error("O valor contado deve ser não negativo em centavos");
     return await dualWrite(async (database) => {
-      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
-      if (!register) throw new Error("Caixa não encontrado");
-
-      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
-      const completedSales = salesList.filter((s: any) => s.status === "completed");
-      const cashPayments = await Promise.all(
-        completedSales.map(async (sale: any) => {
-          const salePayments = await database
-            .select()
-            .from(payments)
-            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
-          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
-        })
-      );
-      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
-      const expectedAmount = (register.openingAmount || 0) + totalCashSales;
-      const difference = closingAmount - expectedAmount;
-
-      await database.update(cashRegisters)
-        .set({ 
-          closingAmount, 
-          difference,
-          closedAt: new Date(),
-          status: "closed"
-        })
-        .where(eq(cashRegisters.id, id));
-      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
-
-      await database.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
-        amount: closingAmount,
-        createdAt: new Date()
-      } as any);
-
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+      if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não encontrado ou já fechado");
+      const summary = await this.calculateCashRegisterSummary(database, register);
+      const difference = closingAmount - summary.expectedAmount;
+      const [updated] = await database.update(cashRegisters)
+        .set({ closingAmount, difference, closedAt: new Date(), status: "closed" })
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .returning();
+      if (!updated) throw new Error("O caixa já foi fechado por outra operação");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: id, userId: register.userId, type: "closing", amount: closingAmount,
+        reason: "Fechamento físico de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
-        phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
+        phase: "cash", cashRegisterId: id, closingAmount, expectedAmount: summary.expectedAmount, difference,
       });
       return updated;
     });
@@ -527,6 +239,7 @@ export class DatabaseStorage implements IStorage {
         paymentTotal: paymentsWithSaleId.reduce((sum, payment) => sum + Number(payment.amount || 0), 0),
       });
 
+      if (insertedSale.status !== "simulation") {
       for (const item of items) {
         // Itens vindos do catálogo Produto → Lote usam um ID virtual
         // (500000 + batch.id) no PDV. A tabela antiga `inventory` não
@@ -624,6 +337,7 @@ export class DatabaseStorage implements IStorage {
       runtimeEvent("sale-financial-transaction", `Receita financeira da venda #${insertedSale.id} gravada`, {
         phase: "finance", saleId: insertedSale.id, amount: insertedSale.totalAmount, category: "vendas",
       });
+      }
       runtimeEvent("sale-completed", `Fluxo da venda #${insertedSale.id} concluído`, {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
         totalAmount: insertedSale.totalAmount,
