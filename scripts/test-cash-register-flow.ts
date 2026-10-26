@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
+import { setupDatabase } from "../server/db.js";
 import { storage } from "../server/storage.js";
+
+await setupDatabase();
 
 const userId = 8_000_000 + Math.floor(Math.random() * 1_000_000);
 let registerId: number | undefined;
