@@ -2,7 +2,7 @@ import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
-  cashRegisters, sales, saleItems, payments, transactions,
+  cashRegisters, cashRegisterMovements, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
   products, batches, batchLogs,
@@ -13,6 +13,7 @@ import {
   type Category, type InsertCategory,
   type MenuItem, type InsertMenuItem,
   type CashRegister, type InsertCashRegister,
+  type CashRegisterMovement,
   type Sale, type InsertSale,
   type SaleItem, type InsertSaleItem,
   type Payment, type InsertPayment,
@@ -432,73 +433,113 @@ export class DatabaseStorage implements IStorage {
     return register;
   }
 
+  private async calculateCashRegisterSummary(database: any, register: CashRegister) {
+    const registerSales = await database.select().from(sales).where(eq(sales.cashRegisterId, register.id));
+    let cashSales = 0;
+    for (const sale of registerSales as any[]) {
+      if (sale.status !== "completed") continue;
+      const salePayments = await database.select().from(payments)
+        .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+      cashSales += salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+    }
+    const movements = await database.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, register.id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+    const replenishments = movements.filter((m: any) => m.type === "replenishment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const withdrawals = movements.filter((m: any) => m.type === "withdrawal").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const adjustments = movements.filter((m: any) => m.type === "adjustment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    return {
+      cashRegisterId: register.id, openingAmount: Number(register.openingAmount || 0),
+      cashSales, replenishments, withdrawals, adjustments,
+      expectedAmount: Number(register.openingAmount || 0) + cashSales + replenishments - withdrawals + adjustments,
+      movements,
+    };
+  }
+
+  async getCashRegisterSummary(id: number) {
+    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+    if (!register) throw new Error("Caixa não encontrado");
+    return this.calculateCashRegisterSummary(db, register);
+  }
+
+  async getCashRegisterMovements(id: number): Promise<CashRegisterMovement[]> {
+    return await db.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+  }
+
+  async createCashRegisterMovement(
+    registerId: number, userId: number,
+    type: "replenishment" | "withdrawal" | "adjustment",
+    amount: number, reason: string,
+  ): Promise<CashRegisterMovement> {
+    if (!Number.isSafeInteger(amount) || !Number.isFinite(amount)) throw new Error("Valor inválido");
+    if (type !== "adjustment" && amount <= 0) throw new Error("O valor deve ser maior que zero");
+    if (type === "adjustment" && amount === 0) throw new Error("O ajuste não pode ser zero");
+    if (!reason?.trim() || reason.trim().length > 500) throw new Error("Motivo obrigatório (máximo 500 caracteres)");
+    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+    if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não está aberto");
+    const summary = await this.calculateCashRegisterSummary(db, register);
+    if (type === "withdrawal" && amount > summary.expectedAmount) throw new Error("Sangria excede o saldo disponível");
+    if (type === "adjustment" && summary.expectedAmount + amount < 0) throw new Error("Ajuste não pode deixar o saldo negativo");
+    return await dualWrite(async (database: any) => {
+      const [current] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+      if (!current || current.status !== "open" || current.closedAt) throw new Error("Caixa não está aberto");
+      const [movement] = await database.insert(cashRegisterMovements).values({
+        cashRegisterId: registerId, userId, type, amount, reason: reason.trim(), createdAt: new Date(),
+      }).returning();
+      if (!movement) throw new Error("Falha ao registrar movimentação");
+      runtimeEvent("cash-register-movement", `Movimentação ${type} no caixa #${registerId}`, {
+        phase: "cash", cashRegisterId: registerId, userId, type, amount, reason: reason.trim(),
+      });
+      return movement;
+    });
+  }
+
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
-    return await dualWrite(async (database) => {
-      const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
-      if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
+    if (!Number.isSafeInteger(Number(register.openingAmount)) || Number(register.openingAmount) < 0) {
+      throw new Error("Saldo inicial inválido");
+    }
+    return await dualWrite(async (database: any) => {
+      const [existing] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .limit(1);
+      if (existing) throw new Error("Já existe um caixa aberto para este operador");
+      const [newRegister] = await database.insert(cashRegisters).values(register).returning();
+      if (!newRegister) throw new Error("Não foi possível abrir o caixa");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: newRegister.id, userId: register.userId, type: "opening",
+        amount: Number(newRegister.openingAmount || 0), reason: "Abertura de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
         openingAmount: newRegister.openingAmount ?? 0,
       });
-      
-      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
-        await database.insert(transactions).values({
-          businessType: "padaria",
-          type: "income",
-          category: "caixa",
-          description: `Abertura de Caixa #${newRegister.id}`,
-          amount: newRegister.openingAmount,
-          createdAt: new Date()
-        } as any);
-      }
-      
       return newRegister;
     });
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
-    return await dualWrite(async (database) => {
-      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
-      if (!register) throw new Error("Caixa não encontrado");
-
-      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
-      const completedSales = salesList.filter((s: any) => s.status === "completed");
-      const cashPayments = await Promise.all(
-        completedSales.map(async (sale: any) => {
-          const salePayments = await database
-            .select()
-            .from(payments)
-            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
-          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
-        })
-      );
-      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
-      const expectedAmount = (register.openingAmount || 0) + totalCashSales;
-      const difference = closingAmount - expectedAmount;
-
-      await database.update(cashRegisters)
-        .set({ 
-          closingAmount, 
-          difference,
-          closedAt: new Date(),
-          status: "closed"
-        })
-        .where(eq(cashRegisters.id, id));
-      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
-
-      await database.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
-        amount: closingAmount,
-        createdAt: new Date()
-      } as any);
-
+    if (!Number.isSafeInteger(closingAmount) || closingAmount < 0) throw new Error("Valor contado inválido");
+    return await dualWrite(async (database: any) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+      if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não encontrado ou já fechado");
+      const summary = await this.calculateCashRegisterSummary(database, register);
+      const difference = closingAmount - summary.expectedAmount;
+      const [updated] = await database.update(cashRegisters)
+        .set({ closingAmount, difference, closedAt: new Date(), status: "closed" })
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .returning();
+      if (!updated) throw new Error("Caixa já fechado por outra operação");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: id, userId: register.userId, type: "closing", amount: closingAmount,
+        reason: "Fechamento físico de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
-        phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
+        phase: "cash", cashRegisterId: id, closingAmount,
+        expectedAmount: summary.expectedAmount, difference,
       });
       return updated;
     });
