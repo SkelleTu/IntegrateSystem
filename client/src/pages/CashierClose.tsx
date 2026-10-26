@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -18,7 +18,7 @@ import {
   ChevronRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { CashRegister, Sale } from "@shared/schema";
+import type { CashRegister } from "@shared/schema";
 
 export default function CashierClose() {
   const [, setLocation] = useLocation();
@@ -29,28 +29,17 @@ export default function CashierClose() {
     queryKey: ["/api/cash-register/open"],
   });
 
-  const { data: registers = [] } = useQuery<(CashRegister & { sales?: (Sale & { payments?: { method: string; amount: number }[] })[] })[]>({
-    queryKey: ["/api/cash-registers/history"],
-    queryFn: async () => {
-      const res = await fetch("/api/cash-registers/history");
-      if (!res.ok) return [];
-      return res.json();
-    },
+  const { data: summary } = useQuery<{
+    openingAmount: number; cashSales: number; replenishments: number;
+    withdrawals: number; adjustments: number; expectedAmount: number;
+  }>({
+    queryKey: ["/api/cash-register/summary"],
     enabled: !!register,
+    refetchInterval: 15000,
   });
 
-  // O caixa físico recebe apenas pagamentos em dinheiro. Cartão e Pix
-  // permanecem na venda, mas não entram no valor esperado da gaveta.
-  const totalCashSales = useMemo(() => {
-    const registerSales = registers.find((item) => item.id === register?.id)?.sales ?? [];
-    return registerSales
-      .filter((sale) => sale.status === "completed")
-      .reduce((sum, sale) => sum + (sale.payments ?? [])
-        .filter((payment) => payment.method === "cash")
-        .reduce((paymentSum, payment) => paymentSum + Number(payment.amount || 0), 0), 0);
-  }, [registers, register?.id]);
-  
-  const expectedTotal = (register?.openingAmount || 0) + totalCashSales;
+  // O servidor calcula o saldo esperado em centavos usando o livro de caixa.
+  const expectedTotal = summary?.expectedAmount ?? Number(register?.openingAmount || 0);
 
   const closeMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -60,6 +49,7 @@ export default function CashierClose() {
     onSuccess: () => {
       queryClient.setQueryData(["/api/cash-register/open"], null);
       queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/summary"] });
       toast({ title: "Caixa encerrado com sucesso!" });
       setLocation("/caixa");
     },
@@ -89,7 +79,8 @@ export default function CashierClose() {
     );
   }
 
-  const actualAmount = Math.round(Number(closingAmount.replace(",", ".")) * 100) || 0;
+  const parsedClosingAmount = Number(closingAmount.replace(",", "."));
+  const actualAmount = Number.isFinite(parsedClosingAmount) ? Math.round(parsedClosingAmount * 100) : 0;
   const diff = actualAmount - expectedTotal;
   const isDiffAcceptable = Math.abs(diff) <= 300; // R$ 3,00 tolerance
 
@@ -200,6 +191,20 @@ export default function CashierClose() {
                 <span className="text-4xl md:text-6xl font-black italic">R$</span>
               </div>
             </div>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-left">
+              {[
+                ["Abertura", summary?.openingAmount ?? register.openingAmount ?? 0],
+                ["Vendas em dinheiro", summary?.cashSales ?? 0],
+                ["Reposições", summary?.replenishments ?? 0],
+                ["Sangrias", -(summary?.withdrawals ?? 0)],
+                ["Ajustes", summary?.adjustments ?? 0],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{label}</p>
+                  <p className="mt-1 text-sm font-bold text-white">R$ {(Number(value) / 100).toFixed(2)}</p>
+                </div>
+              ))}
+            </div>
             <div className="flex items-center justify-center gap-6 pt-4">
               <div className="flex items-center gap-2">
                 <div className={`h-2 w-2 rounded-full ${isDiffAcceptable ? 'bg-primary' : 'bg-red-500'} animate-pulse`} />
@@ -246,7 +251,7 @@ export default function CashierClose() {
             <Button
               size="lg"
               onClick={handleClose}
-              disabled={closeMutation.isPending || !closingAmount}
+              disabled={closeMutation.isPending || !closingAmount || !Number.isFinite(Number(closingAmount.replace(",", "."))) || Number(closingAmount.replace(",", ".")) < 0}
               className="h-20 bg-red-600 hover:bg-white text-white hover:text-black font-black uppercase italic text-2xl rounded-2xl shadow-[0_20px_40px_rgba(220,38,38,0.2)] hover:shadow-none transition-all group"
             >
               {closeMutation.isPending ? (
