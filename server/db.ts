@@ -561,8 +561,35 @@ export async function setupDatabase() {
 
   // ── Turso: bootstrap em lote e migrações incrementais apenas quando faltam ──
   if (isRemoteEnabled && dbRemote && tursoClient) {
-    // Executa o script DDL em uma única chamada sem manter um batch transacional aberto.
+    // Executa o DDL inicial em lote, mas não confia apenas no retorno do driver:
+    // bancos legados podem conter tabelas incompletas ou uma execução parcial.
     await tursoClient.executeMultiple(TABLE_DEFINITIONS.join(";\n") + ";");
+
+    const expectedTables = [...new Set(TABLE_DEFINITIONS
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+      .filter((table): table is string => Boolean(table)))];
+    const tableExists = async (table: string) => {
+      const result = await tursoClient.execute({
+        sql: "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        args: [table],
+      });
+      return result.rows.length > 0;
+    };
+
+    // Recupera DDL que não foi aplicado pelo lote. Cada falha é fatal e explícita:
+    // nunca continuar o boot fingindo que a estrutura remota está pronta.
+    for (const table of expectedTables) {
+      if (await tableExists(table)) continue;
+      const ddl = TABLE_DEFINITIONS.find((statement) =>
+        new RegExp("^\\\\s*CREATE TABLE IF NOT EXISTS\\\\s+" + table + "\\\\b", "i").test(statement)
+      );
+      if (!ddl) throw new Error(`[DB] DDL ausente para tabela obrigatória: ${table}`);
+      await tursoClient.execute(ddl);
+      if (!(await tableExists(table))) {
+        throw new Error(`[DB] Tabela obrigatória ${table} continua ausente no Turso após aplicar o DDL.`);
+      }
+      console.warn(`[DB] DDL remoto recuperado individualmente para tabela ausente: ${table}`);
+    }
 
     const migrationColumns = localMigrations.map((migration) => {
       const match = migration.match(/^ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?/i);
