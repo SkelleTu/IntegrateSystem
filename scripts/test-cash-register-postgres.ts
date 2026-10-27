@@ -64,7 +64,7 @@ try {
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.expectedAmount, 400, "concurrent withdrawals must not drive the expected cash below zero");
 
-  const [testInventory] = await dbLocal.insert(inventory).values({
+  const [testInventory] = await db.insert(inventory).values({
     itemId: 987654321,
     itemType: "product",
     quantity: 2,
@@ -104,14 +104,14 @@ try {
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 2000, "cash payment should increase cash sales");
   assert.equal(summary.expectedAmount, 2400, "sale must reconcile with opening and manual movements");
-  const [stockAfterSale] = await dbLocal.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
+  const [stockAfterSale] = await db.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
   assert.equal(stockAfterSale.quantity, 1, "sale must deduct one unit from inventory");
 
   await storage.cancelSale(saleId);
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 0, "cancelled sale must no longer count as cash income");
   assert.equal(summary.expectedAmount, 400, "cancelling a cash sale must reverse the expected register balance");
-  const [stockAfterCancellation] = await dbLocal.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
+  const [stockAfterCancellation] = await db.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
   assert.equal(stockAfterCancellation.quantity, 2, "cancelling a sale must restore inventory");
 
   const transactionsBeforeRepeat = await storage.getTransactions({});
