@@ -6,7 +6,7 @@ import fs from "fs";
 import { sql } from "drizzle-orm";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
-const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
+const sqliteFile = process.env.SQLITE_DB_PATH || (process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db"));
 console.log("[DB] sqliteFile=", sqliteFile, "exists=", fs.existsSync(sqliteFile), "size=", fs.existsSync(sqliteFile) ? fs.statSync(sqliteFile).size : 0);
 
 // Initialize sql.js database
