@@ -344,7 +344,7 @@ export async function registerRoutes(
         password: hashed,
         role: "barber"
       });
-      res.status(201).json(newUser);
+      res.status(201).json(toPublicUser(newUser));
     } catch (err) {
       res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
     }
