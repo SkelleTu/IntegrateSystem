@@ -38,4 +38,4 @@ jobs:
       - name: SQLite/Turso schema parity
         run: node scripts/verify-db-schema.mjs
       - name: Cash register integration flow
-        run: npm run test:cash-register
+        run: SQLITE_DB_PATH="/tmp/integratesystem-cash-register-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.db" npm run test:cash-register
