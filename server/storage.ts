@@ -924,6 +924,7 @@ export class DatabaseStorage implements IStorage {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
             .where(eq(inventory.id, id))
+            .returning()
           return updated;
         }
       }
@@ -939,12 +940,14 @@ export class DatabaseStorage implements IStorage {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
             .where(eq(inventory.id, existing.id))
+            .returning()
           return updated;
         }
       }
 
       const [inserted] = await database.insert(inventory)
         .values(itemToUpsert)
+        .returning()
       return inserted;
     });
   }
@@ -981,6 +984,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(inventory.id, id))
+        .returning()
 
       await database.insert(inventoryRestocks).values({
         inventoryId: id,
