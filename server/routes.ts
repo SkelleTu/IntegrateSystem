@@ -40,6 +40,17 @@ const upload = multer({
 
 const scryptAsync = promisify(scrypt);
 
+function toPublicUser(user: any) {
+  if (!user || typeof user !== "object") return user;
+  const safe = { ...user };
+  for (const key of Object.keys(safe)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
+      delete safe[key];
+    }
+  }
+  return safe;
+}
+
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
@@ -278,7 +289,7 @@ export async function registerRoutes(
           ipAddress: req.ip,
           userAgent: req.get("user-agent")
         });
-        res.json(user);
+        res.json(toPublicUser(user));
       });
     })(req, res, next);
   });
@@ -301,7 +312,7 @@ export async function registerRoutes(
 
   app.get(api.auth.me.path, (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    res.json(req.user);
+    res.json(toPublicUser(req.user));
   });
 
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
@@ -333,7 +344,7 @@ export async function registerRoutes(
         password: hashed,
         role: "barber"
       });
-      res.status(201).json(newUser);
+      res.status(201).json(toPublicUser(newUser));
     } catch (err) {
       res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
     }
@@ -1645,18 +1656,26 @@ export async function registerRoutes(
 
   app.post("/api/cash-register/open", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const existing = await storage.getOpenCashRegister(user.id);
-    if (existing) return res.status(400).json({ message: "Register already open" });
-    
-    const data = insertCashRegisterSchema.parse({
-      ...req.body,
-      userId: user.id,
-      status: "open",
-      openedAt: new Date()
-    });
-    const register = await storage.openCashRegister(data);
-    res.json(register);
+    try {
+      const user = req.user as any;
+      const existing = await storage.getOpenCashRegister(user.id);
+      if (existing) return res.status(400).json({ message: "Register already open" });
+
+      const data = insertCashRegisterSchema.parse({
+        ...req.body,
+        userId: user.id,
+        status: "open",
+        openedAt: new Date()
+      });
+      const register = await storage.openCashRegister(data);
+      return res.json(register);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_OPEN] Falha ao abrir caixa:", err);
+      return res.status(500).json({
+        message: "Não foi possível abrir o caixa. A operação não foi confirmada.",
+        code: "CASH_REGISTER_OPEN_FAILED"
+      });
+    }
   });
 
   app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
@@ -1671,24 +1690,72 @@ export async function registerRoutes(
 
   app.post("/api/cash-register/close", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const register = await storage.getOpenCashRegister(user.id);
-    if (!register) return res.status(404).json({ message: "No open register" });
-    
-    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
-    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
-    const updated = await storage.closeCashRegister(register.id, closingAmount);
-    res.json(updated);
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(404).json({ message: "No open register" });
+
+      const rawClosingAmount = Number(req.body.closingAmount);
+      if (!Number.isFinite(rawClosingAmount) || rawClosingAmount < 0) {
+        return res.status(400).json({ message: "Informe um valor de fechamento válido em reais." });
+      }
+      const closingAmount = Math.round(rawClosingAmount * 100);
+      const updated = await storage.closeCashRegister(register.id, closingAmount);
+      return res.json(updated);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_CLOSE] Falha ao fechar caixa:", err);
+      return res.status(500).json({
+        message: "Não foi possível fechar o caixa. Confira o histórico antes de tentar novamente.",
+        code: "CASH_REGISTER_CLOSE_FAILED"
+      });
+    }
   });
 
   app.post("/api/sales", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
 
     const { sale, items, payments, ticketId } = req.body;
-    
+
+    // Fail closed before any database write: malformed lines or payment totals must
+    // never create a sale that cannot be reconciled against stock and the cash register.
+    if (!sale || !Array.isArray(items) || items.length === 0 || !Array.isArray(payments) || payments.length === 0) {
+      return res.status(400).json({ message: "Venda exige dados, ao menos um item e ao menos um pagamento." });
+    }
+    const totalAmount = Number(sale.totalAmount);
+    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
+      return res.status(400).json({ message: "Total da venda deve ser um valor positivo em centavos." });
+    }
+    for (const [index, item] of items.entries()) {
+      const quantity = Number(item?.quantity);
+      const unitPrice = Number(item?.unitPrice);
+      const totalPrice = Number(item?.totalPrice);
+      if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
+          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
+          !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
+          totalPrice !== quantity * unitPrice) {
+        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+      }
+    }
+    const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
+    if (!Number.isSafeInteger(itemsTotal) || itemsTotal !== totalAmount) {
+      return res.status(400).json({ message: "A soma dos itens deve corresponder ao total da venda." });
+    }
+    const validPaymentMethods = new Set(["cash", "card", "pix"]);
+    for (const [index, payment] of payments.entries()) {
+      const amount = Number(payment?.amount);
+      if (!validPaymentMethods.has(String(payment?.method)) || !Number.isSafeInteger(amount) || amount <= 0) {
+        return res.status(400).json({ message: `Pagamento ${index + 1} inválido: método ou valor não permitido.` });
+      }
+    }
+    const paymentsTotal = payments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
+    if (!Number.isSafeInteger(paymentsTotal) || paymentsTotal !== totalAmount) {
+      return res.status(400).json({ message: "A soma dos pagamentos deve corresponder exatamente ao total da venda." });
+    }
+
     const parsedSale = insertSaleSchema.parse({ 
       ...sale, 
       cashRegisterId: register.id, 
@@ -1724,7 +1791,14 @@ export async function registerRoutes(
       }).catch(err => console.error("Erro ao enviar notificação:", err));
     }
 
-    res.json(newSale);
+    return res.json(newSale);
+    } catch (err: any) {
+      console.error("[SALE_CREATE] Falha ao registrar venda:", err);
+      return res.status(500).json({
+        message: "Não foi possível concluir a venda. Consulte vendas, estoque e financeiro antes de repetir a operação.",
+        code: "SALE_CREATE_FAILED"
+      });
+    }
   });
 
   app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
