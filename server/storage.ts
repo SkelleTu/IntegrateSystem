@@ -1135,9 +1135,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
-    await db.update(sales).set(update).where(eq(sales.id, id));
-      const [updated] = await db.select().from(sales).where(eq(sales.id, id));
-    return updated;
+    return await dualWrite(async (database) => {
+      const [updated] = await database.update(sales).set(update)
+        .where(eq(sales.id, id)).returning();
+      if (!updated) throw new Error(`Venda ${id} não encontrada ao atualizar o estado fiscal.`);
+      return updated;
+    });
   }
 
   async getSale(id: number): Promise<Sale | undefined> {
@@ -1217,10 +1220,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNfce(data: InsertNfce): Promise<Nfce> {
-    const insertResultnfce: any = await db.insert(nfce).values(data);
-      const idnfce = insertResultnfce.lastInsertRowid;
-      const [inserted] = await db.select().from(nfce).where(eq(nfce.id, idnfce));
-    return inserted;
+    return await dualWrite(async (database) => {
+      const [inserted] = await database.insert(nfce).values(data).returning();
+      if (!inserted) throw new Error("Não foi possível obter o documento fiscal recém-criado.");
+      return inserted;
+    });
   }
 
   async getNfceHistory(enterpriseId: number): Promise<Nfce[]> {
