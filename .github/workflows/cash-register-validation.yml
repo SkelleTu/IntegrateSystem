@@ -22,6 +22,8 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,11 +43,11 @@ jobs:
       - name: Cash register integration flow (SQLite)
         run: SQLITE_DB_PATH="/tmp/integratesystem-cash-register-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.db" npm run test:cash-register
       - name: PostgreSQL/Neon runtime integration (when secret is configured)
-        if: ${{ secrets.NEON_DATABASE_URL != '' }}
+        if: ${{ env.NEON_DATABASE_URL != '' }}
         env:
-          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          DATABASE_URL: ${{ env.NEON_DATABASE_URL }}
           SQLITE_DB_PATH: /tmp/integratesystem-postgres-test-local.db
         run: npm run test:cash-register:postgres
       - name: PostgreSQL integration test configuration warning
-        if: ${{ secrets.NEON_DATABASE_URL == '' }}
+        if: ${{ env.NEON_DATABASE_URL == '' }}
         run: echo "::warning::NEON_DATABASE_URL is not configured; PostgreSQL runtime integration was not executed."
