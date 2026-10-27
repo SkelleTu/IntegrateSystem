@@ -566,7 +566,7 @@ export async function setupDatabase() {
     await tursoClient.executeMultiple(TABLE_DEFINITIONS.join(";\n") + ";");
 
     const expectedTables = [...new Set(TABLE_DEFINITIONS
-      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
       .filter((table): table is string => Boolean(table)))];
     const tableExists = async (table: string) => {
       const result = await tursoClient.execute({
@@ -581,7 +581,7 @@ export async function setupDatabase() {
     for (const table of expectedTables) {
       if (await tableExists(table)) continue;
       const ddl = TABLE_DEFINITIONS.find((statement) =>
-        new RegExp("^\\\\s*CREATE TABLE IF NOT EXISTS\\\\s+" + table + "\\\\b", "i").test(statement)
+        new RegExp("^\\s*CREATE TABLE IF NOT EXISTS\\s+" + table + "\\b", "i").test(statement)
       );
       if (!ddl) throw new Error(`[DB] DDL ausente para tabela obrigatória: ${table}`);
       await tursoClient.execute(ddl);
