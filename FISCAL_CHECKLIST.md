@@ -39,7 +39,7 @@
 - [x] Disponibilizar API de resumo e movimentações e usá-la no fechamento da interface.
 - [x] Adicionar controles de reposição e sangria ao PDV.
 - [x] Build TypeScript e build de produção na branch (GitHub Actions, execução 3 de Cash Register Forensic Validation: sucesso).
-- [x] Testes de integração SQLite para abertura concorrente, sangria concorrente, venda em dinheiro, reposição, ajuste, baixa/estorno de estoque, cancelamento, idempotência e fechamento concorrente (`scripts/test-cash-register-flow.ts`; GitHub Actions execução 13: sucesso).
+- [x] Testes de integração SQLite isolados por execução no GitHub Actions (arquivo temporário em `/tmp`, sem reutilizar `sqlite.db` do repositório), cobrindo abertura concorrente, sangria concorrente, venda em dinheiro, reposição, ajuste, baixa/estorno de estoque, cancelamento, idempotência e fechamento concorrente (`scripts/test-cash-register-flow.ts`; execução 16: sucesso).
 - [x] Verificação estática de paridade do esquema SQLite/Turso (script `verify-db-schema.mjs`, execução 52: sucesso). Pendentes testes de execução contra ambos os bancos.
 - [x] Revisar cancelamento de venda: vendas canceladas deixam de compor o saldo em dinheiro, o estoque é estornado e o financeiro recebe estorno; teste de idempotência confirma que cancelar duas vezes não duplica o estorno.
 - [x] Abertura única por operador reforçada por índice único parcial em SQLite e Turso; a inicialização falha de forma explícita se detectar caixas abertos duplicados para reconciliação.
