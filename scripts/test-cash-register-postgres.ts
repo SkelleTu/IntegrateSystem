@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { eq, or } from "drizzle-orm";
 import { setupDatabase, db, isPostgresEnabled } from "../server/db.js";
 import { storage } from "../server/storage.js";
-import { cashRegisterMovements, cashRegisters, inventory, inventoryLogs, payments, saleItems, sales, transactions } from "../shared/schema.js";
+import { cashRegisterMovements, cashRegisters, inventory, inventoryLogs, inventoryRestocks, payments, saleItems, sales, transactions } from "../shared/schema.js";
 
 if (!isPostgresEnabled) {
   throw new Error("Este teste exige DATABASE_URL e deve rodar somente contra um banco PostgreSQL/Neon de teste isolado.");
@@ -64,17 +64,27 @@ try {
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.expectedAmount, 400, "concurrent withdrawals must not drive the expected cash below zero");
 
-  const [testInventory] = await db.insert(inventory).values({
+  const testInventory = await storage.upsertInventory({
     itemId: 987654321,
     itemType: "product",
+    customName: "CASH-STOCK-INTEGRATION-TEST",
     quantity: 2,
     unit: "unit",
     itemsPerUnit: 1,
     costPrice: 500,
     salePrice: 2000,
-    updatedAt: new Date(),
-  }).returning();
+  });
   inventoryId = testInventory.id;
+
+  const restockedInventory = await storage.restockInventory(inventoryId, {
+    quantity: 3,
+    unit: "unit",
+    itemsPerUnit: 1,
+    costPrice: 500,
+  });
+  assert.equal(restockedInventory.quantity, 5, "restock operation must increase inventory from 2 to 5");
+  const [restockHistory] = await db.select().from(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId)).limit(1);
+  assert.equal(restockHistory.quantity, 3, "restock must create an auditable history entry");
 
   const sale = await storage.createSale(
     {
@@ -105,14 +115,14 @@ try {
   assert.equal(summary.cashSales, 2000, "cash payment should increase cash sales");
   assert.equal(summary.expectedAmount, 2400, "sale must reconcile with opening and manual movements");
   const [stockAfterSale] = await db.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
-  assert.equal(stockAfterSale.quantity, 1, "sale must deduct one unit from inventory");
+  assert.equal(stockAfterSale.quantity, 4, "sale must deduct one unit from restocked inventory");
 
   await storage.cancelSale(saleId);
   summary = await storage.getCashRegisterSummary(registerId);
   assert.equal(summary.cashSales, 0, "cancelled sale must no longer count as cash income");
   assert.equal(summary.expectedAmount, 400, "cancelling a cash sale must reverse the expected register balance");
   const [stockAfterCancellation] = await db.select().from(inventory).where(eq(inventory.id, inventoryId)).limit(1);
-  assert.equal(stockAfterCancellation.quantity, 2, "cancelling a sale must restore inventory");
+  assert.equal(stockAfterCancellation.quantity, 5, "cancelling a sale must restore inventory to the restocked quantity");
 
   const transactionsBeforeRepeat = await storage.getTransactions({});
   const reversalCountBeforeRepeat = transactionsBeforeRepeat.filter((t: any) =>
@@ -144,6 +154,7 @@ try {
 } finally {
   if (inventoryId !== undefined) {
     await db.delete(inventoryLogs).where(eq(inventoryLogs.inventoryId, inventoryId));
+    await db.delete(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId));
     await db.delete(inventory).where(eq(inventory.id, inventoryId));
   }
   if (saleId !== undefined) {
