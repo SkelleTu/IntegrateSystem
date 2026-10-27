@@ -1699,7 +1699,43 @@ export async function registerRoutes(
     if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
 
     const { sale, items, payments, ticketId } = req.body;
-    
+
+    // Fail closed before any database write: malformed lines or payment totals must
+    // never create a sale that cannot be reconciled against stock and the cash register.
+    if (!sale || !Array.isArray(items) || items.length === 0 || !Array.isArray(payments) || payments.length === 0) {
+      return res.status(400).json({ message: "Venda exige dados, ao menos um item e ao menos um pagamento." });
+    }
+    const totalAmount = Number(sale.totalAmount);
+    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
+      return res.status(400).json({ message: "Total da venda deve ser um valor positivo em centavos." });
+    }
+    for (const [index, item] of items.entries()) {
+      const quantity = Number(item?.quantity);
+      const unitPrice = Number(item?.unitPrice);
+      const totalPrice = Number(item?.totalPrice);
+      if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
+          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
+          !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
+          totalPrice !== quantity * unitPrice) {
+        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+      }
+    }
+    const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
+    if (!Number.isSafeInteger(itemsTotal) || itemsTotal !== totalAmount) {
+      return res.status(400).json({ message: "A soma dos itens deve corresponder ao total da venda." });
+    }
+    const validPaymentMethods = new Set(["cash", "card", "pix"]);
+    for (const [index, payment] of payments.entries()) {
+      const amount = Number(payment?.amount);
+      if (!validPaymentMethods.has(String(payment?.method)) || !Number.isSafeInteger(amount) || amount <= 0) {
+        return res.status(400).json({ message: `Pagamento ${index + 1} inválido: método ou valor não permitido.` });
+      }
+    }
+    const paymentsTotal = payments.reduce((sum: number, payment: any) => sum + Number(payment.amount), 0);
+    if (!Number.isSafeInteger(paymentsTotal) || paymentsTotal !== totalAmount) {
+      return res.status(400).json({ message: "A soma dos pagamentos deve corresponder exatamente ao total da venda." });
+    }
+
     const parsedSale = insertSaleSchema.parse({ 
       ...sale, 
       cashRegisterId: register.id, 
