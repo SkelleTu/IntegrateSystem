@@ -1,11 +1,11 @@
-import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
+import { db, dbRemote, dbLocal, multiWrite, localSqlite, isPostgresEnabled } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
-  cashRegisters, sales, saleItems, payments, transactions,
+  cashRegisters, cashRegisterMovements, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
-  products, batches, batchLogs,
+  products, batches, batchLogs, stockSnapshots,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -13,6 +13,7 @@ import {
   type Category, type InsertCategory,
   type MenuItem, type InsertMenuItem,
   type CashRegister, type InsertCashRegister,
+  type CashRegisterMovement,
   type Sale, type InsertSale,
   type SaleItem, type InsertSaleItem,
   type Payment, type InsertPayment,
@@ -45,6 +46,27 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
   const result = await multiWrite(operation);
   scheduleAutoBackup(); // salva snapshot JSON automaticamente
   return result;
+}
+
+/**
+ * Execute multi-step mutations transactionally inside each configured database.
+ * SQLite and Turso do not share a distributed transaction, so this guarantees
+ * per-database rollback but does not claim cross-database atomic commit.
+ */
+// sql.js uses one connection per process. Serialize critical multi-step writes so
+// concurrent requests cannot interleave BEGIN/COMMIT or validate against stale cash.
+let atomicWriteQueue: Promise<unknown> = Promise.resolve();
+
+async function dualWriteAtomic(operation: (database: any) => Promise<any>) {
+  const execute = () => dualWrite(async (database: any) => {
+    if (typeof database.transaction !== "function") {
+      throw new Error("O banco configurado não oferece transações; operação cancelada por segurança");
+    }
+    return database.transaction(async (transaction: any) => operation(transaction));
+  });
+  const pending = atomicWriteQueue.then(execute, execute);
+  atomicWriteQueue = pending.then(() => undefined, () => undefined);
+  return pending;
 }
 
 export interface IStorage {
@@ -428,77 +450,131 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
     const [register] = await db.select()
       .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+      .where(and(
+        eq(cashRegisters.userId, userId),
+        eq(cashRegisters.status, "open"),
+        isNull(cashRegisters.closedAt),
+      ))
+      .limit(1);
     return register;
+  }
+
+  private async calculateCashRegisterSummary(database: any, register: CashRegister) {
+    const registerSales = await database.select().from(sales).where(eq(sales.cashRegisterId, register.id));
+    let cashSales = 0;
+    for (const sale of registerSales as any[]) {
+      if (sale.status !== "completed") continue;
+      const salePayments = await database.select().from(payments)
+        .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+      cashSales += salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+    }
+    const movements = await database.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, register.id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+    const replenishments = movements.filter((m: any) => m.type === "replenishment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const withdrawals = movements.filter((m: any) => m.type === "withdrawal").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    const adjustments = movements.filter((m: any) => m.type === "adjustment").reduce((sum: number, m: any) => sum + Number(m.amount || 0), 0);
+    return {
+      cashRegisterId: register.id, openingAmount: Number(register.openingAmount || 0),
+      cashSales, replenishments, withdrawals, adjustments,
+      expectedAmount: Number(register.openingAmount || 0) + cashSales + replenishments - withdrawals + adjustments,
+      movements,
+    };
+  }
+
+  async getCashRegisterSummary(id: number) {
+    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+    if (!register) throw new Error("Caixa não encontrado");
+    return this.calculateCashRegisterSummary(db, register);
+  }
+
+  async getCashRegisterMovements(id: number): Promise<CashRegisterMovement[]> {
+    return await db.select().from(cashRegisterMovements)
+      .where(eq(cashRegisterMovements.cashRegisterId, id))
+      .orderBy(asc(cashRegisterMovements.createdAt), asc(cashRegisterMovements.id));
+  }
+
+  async createCashRegisterMovement(
+    registerId: number, userId: number,
+    type: "replenishment" | "withdrawal" | "adjustment",
+    amount: number, reason: string,
+  ): Promise<CashRegisterMovement> {
+    if (!Number.isSafeInteger(amount) || !Number.isFinite(amount)) throw new Error("Valor inválido");
+    if (type !== "adjustment" && amount <= 0) throw new Error("O valor deve ser maior que zero");
+    if (type === "adjustment" && amount === 0) throw new Error("O ajuste não pode ser zero");
+    if (!reason?.trim() || reason.trim().length > 500) throw new Error("Motivo obrigatório (máximo 500 caracteres)");
+    const [register] = await db.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+    if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não está aberto");
+    const summary = await this.calculateCashRegisterSummary(db, register);
+    if (type === "withdrawal" && amount > summary.expectedAmount) throw new Error("Sangria excede o saldo disponível");
+    if (type === "adjustment" && summary.expectedAmount + amount < 0) throw new Error("Ajuste não pode deixar o saldo negativo");
+    return await dualWriteAtomic(async (database: any) => {
+      const [current] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, registerId)).limit(1);
+      if (!current || current.status !== "open" || current.closedAt) throw new Error("Caixa não está aberto");
+      // Recompute inside the transaction so concurrent withdrawals cannot spend the
+      // same cash balance based on stale pre-transaction summaries.
+      const currentSummary = await this.calculateCashRegisterSummary(database, current);
+      if (type === "withdrawal" && amount > currentSummary.expectedAmount) {
+        throw new Error("Sangria excede o saldo disponível");
+      }
+      if (type === "adjustment" && currentSummary.expectedAmount + amount < 0) {
+        throw new Error("Ajuste não pode deixar o saldo negativo");
+      }
+      const [movement] = await database.insert(cashRegisterMovements).values({
+        cashRegisterId: registerId, userId, type, amount, reason: reason.trim(), createdAt: new Date(),
+      }).returning();
+      if (!movement) throw new Error("Falha ao registrar movimentação");
+      runtimeEvent("cash-register-movement", `Movimentação ${type} no caixa #${registerId}`, {
+        phase: "cash", cashRegisterId: registerId, userId, type, amount, reason: reason.trim(),
+      });
+      return movement;
+    });
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
-    return await dualWrite(async (database) => {
-      const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
-      if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
+    if (!Number.isSafeInteger(Number(register.openingAmount)) || Number(register.openingAmount) < 0) {
+      throw new Error("Saldo inicial inválido");
+    }
+    return await dualWriteAtomic(async (database: any) => {
+      const [existing] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .limit(1);
+      if (existing) throw new Error("Já existe um caixa aberto para este operador");
+      const [newRegister] = await database.insert(cashRegisters).values(register).returning();
+      if (!newRegister) throw new Error("Não foi possível abrir o caixa");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: newRegister.id, userId: register.userId, type: "opening",
+        amount: Number(newRegister.openingAmount || 0), reason: "Abertura de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
         openingAmount: newRegister.openingAmount ?? 0,
       });
-      
-      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
-        await database.insert(transactions).values({
-          businessType: "padaria",
-          type: "income",
-          category: "caixa",
-          description: `Abertura de Caixa #${newRegister.id}`,
-          amount: newRegister.openingAmount,
-          createdAt: new Date()
-        } as any);
-      }
-      
       return newRegister;
     });
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
-    return await dualWrite(async (database) => {
-      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
-      if (!register) throw new Error("Caixa não encontrado");
-
-      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
-      const completedSales = salesList.filter((s: any) => s.status === "completed");
-      const cashPayments = await Promise.all(
-        completedSales.map(async (sale: any) => {
-          const salePayments = await database
-            .select()
-            .from(payments)
-            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
-          return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
-        })
-      );
-      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
-      const expectedAmount = (register.openingAmount || 0) + totalCashSales;
-      const difference = closingAmount - expectedAmount;
-
-      await database.update(cashRegisters)
-        .set({ 
-          closingAmount, 
-          difference,
-          closedAt: new Date(),
-          status: "closed"
-        })
-        .where(eq(cashRegisters.id, id));
-      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
-
-      await database.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
-        amount: closingAmount,
-        createdAt: new Date()
-      } as any);
-
+    if (!Number.isSafeInteger(closingAmount) || closingAmount < 0) throw new Error("Valor contado inválido");
+    return await dualWriteAtomic(async (database: any) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+      if (!register || register.status !== "open" || register.closedAt) throw new Error("Caixa não encontrado ou já fechado");
+      const summary = await this.calculateCashRegisterSummary(database, register);
+      const difference = closingAmount - summary.expectedAmount;
+      const [updated] = await database.update(cashRegisters)
+        .set({ closingAmount, difference, closedAt: new Date(), status: "closed" })
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)))
+        .returning();
+      if (!updated) throw new Error("Caixa já fechado por outra operação");
+      await database.insert(cashRegisterMovements).values({
+        cashRegisterId: id, userId: register.userId, type: "closing", amount: closingAmount,
+        reason: "Fechamento físico de caixa", createdAt: new Date(),
+      });
       runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
-        phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
+        phase: "cash", cashRegisterId: id, closingAmount,
+        expectedAmount: summary.expectedAmount, difference,
       });
       return updated;
     });
@@ -506,7 +582,7 @@ export class DatabaseStorage implements IStorage {
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteAtomic(async (database) => {
       const [insertedSale]: any[] = await database.insert(sales).values(sale).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
@@ -646,7 +722,7 @@ export class DatabaseStorage implements IStorage {
 
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteAtomic(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
       const transaction = database;
@@ -848,6 +924,7 @@ export class DatabaseStorage implements IStorage {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
             .where(eq(inventory.id, id))
+            .returning()
           return updated;
         }
       }
@@ -863,12 +940,14 @@ export class DatabaseStorage implements IStorage {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
             .where(eq(inventory.id, existing.id))
+            .returning()
           return updated;
         }
       }
 
       const [inserted] = await database.insert(inventory)
         .values(itemToUpsert)
+        .returning()
       return inserted;
     });
   }
@@ -905,6 +984,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .where(eq(inventory.id, id))
+        .returning()
 
       await database.insert(inventoryRestocks).values({
         inventoryId: id,
@@ -1328,7 +1408,14 @@ export class DatabaseStorage implements IStorage {
 
     let productId: number;
     const requestedId = Number((data as any).id);
-    if (dbRemote) {
+    if (isPostgresEnabled) {
+      // Neon is the single source of truth; do not write this product to ephemeral SQLite.
+      const [remoteProduct]: any[] = await db.insert(products).values(clean as any).returning();
+      productId = Number(remoteProduct?.id ?? requestedId);
+      if (!Number.isFinite(productId) || productId <= 0) {
+        throw new Error("Neon não retornou o ID do produto recém-criado.");
+      }
+    } else if (dbRemote) {
       // Turso is written first so its generated ID can be mirrored exactly to sql.js.
       await dbRemote.insert(products).values(clean as any);
       if (Number.isFinite(requestedId) && requestedId > 0) {
@@ -1346,7 +1433,6 @@ export class DatabaseStorage implements IStorage {
       try {
         writeLocal(productId);
       } catch (localError) {
-        // Compensate the remote insert if local mirroring fails, preventing a silent split.
         try {
           await dbRemote.delete(products).where(eq(products.id, productId));
         } catch (rollbackError) {
@@ -1385,8 +1471,8 @@ export class DatabaseStorage implements IStorage {
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
     const result = await dualWrite(async (database) => {
-      const res: any = await database.update(batches).set({ quantity: 0 }).run();
-      return res.rowsAffected;
+      const res: any = await database.update(batches).set({ quantity: 0 });
+      return res.rowsAffected ?? res.rowCount ?? 0;
     });
     return result as number;
   }
@@ -1398,27 +1484,36 @@ export class DatabaseStorage implements IStorage {
     const allProducts = await db.select().from(products);
     const allBatches  = await db.select().from(batches);
 
-    const snapshotSql = `
-      INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-      VALUES (?, ?, ?, ?, ?)
-    `;
     const now = Math.floor(Date.now() / 1000);
-    (db as any).$client
-      ? await (db as any).$client.execute({
-          sql: snapshotSql,
-          args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
-        })
-      : db.run(sql`
-          INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-          VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
-        `);
+    if (isPostgresEnabled) {
+      await db.insert(stockSnapshots).values({
+        createdAt: new Date(now * 1000),
+        createdBy: clearedBy,
+        productsJson: JSON.stringify(allProducts),
+        batchesJson: JSON.stringify(allBatches),
+        productCount: allProducts.length,
+      });
+    } else {
+      const snapshotSql = `
+        INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      (db as any).$client
+        ? await (db as any).$client.execute({
+            sql: snapshotSql,
+            args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
+          })
+        : db.run(sql`
+            INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+            VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
+          `);
 
-    // Salvar também no SQLite local se o primário for remoto
-    try {
-      localSqlite.prepare(
-        `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
-      ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
-    } catch { /* ignora se já inserido ou tabela não existe */ }
+      try {
+        localSqlite.prepare(
+          `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
+        ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
+      } catch { /* ignora se já inserido ou tabela não existe */ }
+    }
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
@@ -1429,6 +1524,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
+    if (isPostgresEnabled) {
+      const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+      if (!row) return null;
+      return { id: row.id, createdAt: row.createdAt, createdBy: row.createdBy, productCount: row.productCount };
+    }
     const row = localSqlite.prepare(
       `SELECT id, created_at, created_by, product_count FROM stock_snapshots ORDER BY id DESC LIMIT 1`
     ).get() as any;
@@ -1442,9 +1542,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
-    const row = localSqlite.prepare(
-      `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
-    ).get() as any;
+    let row: any;
+    if (isPostgresEnabled) {
+      const [snapshot] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+      row = snapshot ? { products_json: snapshot.productsJson, batches_json: snapshot.batchesJson } : null;
+    } else {
+      row = localSqlite.prepare(
+        `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
+      ).get() as any;
+    }
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
 
     const savedProducts: any[] = JSON.parse(row.products_json);
