@@ -47,6 +47,16 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
   return result;
 }
 
+async function getBusinessTypeForUser(database: any, userId: number | null | undefined): Promise<string> {
+  if (!userId) return "outro";
+  const [user] = await database.select({ enterpriseId: users.enterpriseId })
+    .from(users).where(eq(users.id, userId)).limit(1);
+  if (!user?.enterpriseId) return "outro";
+  const [enterprise] = await database.select({ businessType: enterprises.businessType })
+    .from(enterprises).where(eq(enterprises.id, user.enterpriseId)).limit(1);
+  return String(enterprise?.businessType || "outro");
+}
+
 export interface IStorage {
   // Enterprise
   getEnterprises(): Promise<Enterprise[]>;
@@ -443,8 +453,9 @@ export class DatabaseStorage implements IStorage {
       });
       
       if (newRegister.openingAmount && newRegister.openingAmount > 0) {
+        const businessType = await getBusinessTypeForUser(database, register.userId);
         await database.insert(transactions).values({
-          businessType: "padaria",
+          businessType,
           type: "income",
           category: "caixa",
           description: `Abertura de Caixa #${newRegister.id}`,
@@ -613,8 +624,9 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
+      const businessType = await getBusinessTypeForUser(database, sale.userId);
       await database.insert(transactions).values({
-        businessType: "padaria",
+        businessType,
         type: "income",
         category: "vendas",
         description: `Venda PDV #${insertedSale.id}`,
@@ -1084,34 +1096,30 @@ export class DatabaseStorage implements IStorage {
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
     this.logAction(`Upsert configurações fiscais empresa ID:${settingsData.enterpriseId}`);
     const enterpriseId = settingsData.enterpriseId || 1;
-    
-    let existing = await this.getFiscalSettings(enterpriseId);
-
     const dataToSave = {
       ...settingsData,
       enterpriseId,
       simulacaoReal: !!settingsData.simulacaoReal
     };
 
-    try {
+    // Fiscal settings are operational configuration, not a local-only preference.
+    // Keep the remote database and local mirror on the same enterprise record.
+    return await dualWrite(async (database) => {
+      const [existing] = await database.select().from(fiscalSettings)
+        .where(eq(fiscalSettings.enterpriseId, enterpriseId)).limit(1);
       if (existing) {
-        const { id, ...updateData } = dataToSave as any;
-        const [updated] = await db.update(fiscalSettings)
+        const { id: _id, ...updateData } = dataToSave as any;
+        const [updated] = await database.update(fiscalSettings)
           .set(updateData)
           .where(eq(fiscalSettings.id, existing.id))
           .returning();
+        if (!updated) throw new Error(`Não foi possível atualizar configurações fiscais da empresa ${enterpriseId}.`);
         return updated;
-      } else {
-        const [inserted] = await db.insert(fiscalSettings)
-          .values(dataToSave)
-          .returning();
-        return inserted;
       }
-    } catch (e: any) {
-      console.error("Erro no upsertFiscalSettings:", e.message);
-      if (existing) return existing;
-      throw e;
-    }
+      const [inserted] = await database.insert(fiscalSettings).values(dataToSave).returning();
+      if (!inserted) throw new Error(`Não foi possível criar configurações fiscais da empresa ${enterpriseId}.`);
+      return inserted;
+    });
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {
