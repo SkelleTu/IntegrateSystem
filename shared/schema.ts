@@ -296,6 +296,15 @@ export const batchLogs = pgTable("batch_logs", {
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+export const stockSnapshots = pgTable("stock_snapshots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  createdBy: text("created_by").notNull(),
+  productsJson: text("products_json").notNull(),
+  batchesJson: text("batches_json").notNull(),
+  productCount: integer("product_count").notNull(),
+});
+
 export const insertProductSchema = createInsertSchema(products, {
   name: z.string().trim().min(1, "Nome do produto é obrigatório"),
   unit: z.string().trim().min(1, "Unidade é obrigatória"),
