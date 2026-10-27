@@ -1656,18 +1656,26 @@ export async function registerRoutes(
 
   app.post("/api/cash-register/open", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const existing = await storage.getOpenCashRegister(user.id);
-    if (existing) return res.status(400).json({ message: "Register already open" });
-    
-    const data = insertCashRegisterSchema.parse({
-      ...req.body,
-      userId: user.id,
-      status: "open",
-      openedAt: new Date()
-    });
-    const register = await storage.openCashRegister(data);
-    res.json(register);
+    try {
+      const user = req.user as any;
+      const existing = await storage.getOpenCashRegister(user.id);
+      if (existing) return res.status(400).json({ message: "Register already open" });
+
+      const data = insertCashRegisterSchema.parse({
+        ...req.body,
+        userId: user.id,
+        status: "open",
+        openedAt: new Date()
+      });
+      const register = await storage.openCashRegister(data);
+      return res.json(register);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_OPEN] Falha ao abrir caixa:", err);
+      return res.status(500).json({
+        message: "Não foi possível abrir o caixa. A operação não foi confirmada.",
+        code: "CASH_REGISTER_OPEN_FAILED"
+      });
+    }
   });
 
   app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
@@ -1682,18 +1690,30 @@ export async function registerRoutes(
 
   app.post("/api/cash-register/close", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    const user = req.user as any;
-    const register = await storage.getOpenCashRegister(user.id);
-    if (!register) return res.status(404).json({ message: "No open register" });
-    
-    // O valor vem do frontend em Reais, a schema faz a conversão para centavos
-    const closingAmount = Math.round(Number(req.body.closingAmount) * 100);
-    const updated = await storage.closeCashRegister(register.id, closingAmount);
-    res.json(updated);
+    try {
+      const user = req.user as any;
+      const register = await storage.getOpenCashRegister(user.id);
+      if (!register) return res.status(404).json({ message: "No open register" });
+
+      const rawClosingAmount = Number(req.body.closingAmount);
+      if (!Number.isFinite(rawClosingAmount) || rawClosingAmount < 0) {
+        return res.status(400).json({ message: "Informe um valor de fechamento válido em reais." });
+      }
+      const closingAmount = Math.round(rawClosingAmount * 100);
+      const updated = await storage.closeCashRegister(register.id, closingAmount);
+      return res.json(updated);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_CLOSE] Falha ao fechar caixa:", err);
+      return res.status(500).json({
+        message: "Não foi possível fechar o caixa. Confira o histórico antes de tentar novamente.",
+        code: "CASH_REGISTER_CLOSE_FAILED"
+      });
+    }
   });
 
   app.post("/api/sales", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
@@ -1771,7 +1791,14 @@ export async function registerRoutes(
       }).catch(err => console.error("Erro ao enviar notificação:", err));
     }
 
-    res.json(newSale);
+    return res.json(newSale);
+    } catch (err: any) {
+      console.error("[SALE_CREATE] Falha ao registrar venda:", err);
+      return res.status(500).json({
+        message: "Não foi possível concluir a venda. Consulte vendas, estoque e financeiro antes de repetir a operação.",
+        code: "SALE_CREATE_FAILED"
+      });
+    }
   });
 
   app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
