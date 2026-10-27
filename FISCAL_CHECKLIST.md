@@ -46,3 +46,16 @@
 - [x] Fechamento concorrente protegido por atualização condicional; operações críticas de caixa/venda/cancelamento são serializadas no processo e executadas em transação por banco. Testes concorrentes confirmam exatamente uma abertura, uma sangria permitida e um fechamento bem-sucedidos.
 - [x] Cancelamento de venda limitado ao próprio operador ou administrador.
 - [ ] Validar a execução com SQLite e Turso ativos simultaneamente e implementar/validar recuperação de divergência entre bancos. Limitação arquitetural remanescente: não existe transação distribuída com rollback atômico entre SQLite e Turso; o teste automatizado se recusa a executar contra uma conexão Turso configurada para evitar tocar em dados reais.
+
+## Neon PostgreSQL — validação de caixa e estoque
+
+- [x] Criar projeto isolado `IntegrateSystem` no Neon (PostgreSQL 17, região `aws-sa-east-1`, São Paulo), sem conectar nem modificar os projetos existentes UPcar/Invista PRO.
+- [x] Criar 27 tabelas e aplicar 30 migrações de colunas derivadas do DDL atual para preparar o ambiente de teste Neon.
+- [x] Executar smoke test SQL em PostgreSQL cobrindo abertura única, livro de movimentos, reposição/sangria/ajuste, saldo esperado, entrada de estoque, histórico de reposição, produto/lote/log de lote, venda em dinheiro, baixa de estoque, cancelamento, estorno financeiro idempotente e fechamento único.
+- [x] Confirmar após o teste que não restaram registros de teste nas tabelas de caixa, estoque ou produtos.
+- [x] Salvar o teste reproduzível em `scripts/test-neon-cash-register.sql`.
+- [ ] Integrar a aplicação ao Neon em runtime. O servidor atual ainda instancia Drizzle com `drizzle-orm/sql-js` e o esquema compartilhado usa `drizzle-orm/sqlite-core`; portanto, a criação das tabelas e o smoke test SQL **não significam que a aplicação já usa PostgreSQL**. É necessário adaptar o esquema/driver e os caminhos SQLite específicos, preservando os testes SQLite até a migração ser validada.
+- [ ] Executar testes de integração da camada `DatabaseStorage` diretamente contra Neon, incluindo concorrência real e rollback transacional, depois da adaptação do driver.
+- [ ] Executar teste operacional de interface com Kernel para abertura/fechamento de caixa, reposição/sangria/ajuste, venda, baixa e estorno de estoque. O preview Vercel atual redireciona para a tela de login da Vercel antes de carregar a aplicação; a validação visual permanece bloqueada por essa proteção de acesso.
+- [ ] Só considerar a validação completa quando os testes de runtime PostgreSQL, o teste operacional no navegador e os workflows de CI estiverem aprovados.
+
