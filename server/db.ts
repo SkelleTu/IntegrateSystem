@@ -37,8 +37,10 @@ export const dbLocal = drizzle(localSqlite, { schema });
 // ─── 2. Turso (remote) — opcional, liga se as credenciais existirem ──────────
 export let dbRemote: any = null;
 export let tursoClient: any = null;
+let postgresPool: any = null;
+export const isPostgresEnabled = Boolean(process.env.DATABASE_URL);
 
-if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+if (!process.env.DATABASE_URL && process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const { createClient } = await import("@libsql/client");
     const { drizzle: drizzleLibsql } = await import("drizzle-orm/libsql");
@@ -53,11 +55,31 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   }
 }
 
+if (process.env.DATABASE_URL) {
+  try {
+    const { Pool } = await import("pg");
+    const { drizzle: drizzlePostgres } = await import("drizzle-orm/node-postgres");
+    postgresPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: Number(process.env.PG_POOL_MAX || 5),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+      ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
+    });
+    dbRemote = drizzlePostgres(postgresPool, { schema });
+    await postgresPool.query("SELECT 1");
+    console.log("[DB] PostgreSQL/Neon conectado; gravações locais/espelhadas desativadas.");
+  } catch (error) {
+    console.error("[DB] Falha ao conectar ao PostgreSQL/Neon:", error);
+    throw error;
+  }
+}
+
 export const isRemoteEnabled = !!dbRemote;
 
-// ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
+// ─── 3. db principal: Neon/Turso remoto sem espelhamento local no modo PostgreSQL ─────
 const primaryDatabase: any = dbRemote ?? dbLocal;
-const mirrorDatabase: any = dbRemote ? dbLocal : null;
+const mirrorDatabase: any = dbRemote && !postgresPool ? dbLocal : null;
 
 function isPromiseLike(value: any): boolean {
   if (!value) return false;
@@ -148,9 +170,8 @@ export const db = (mirrorDatabase
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
-  if (dbRemote) {
-    return [dbRemote, dbLocal];
-  }
+  if (postgresPool && dbRemote) return [dbRemote];
+  if (dbRemote) return [dbRemote, dbLocal];
   return [dbLocal];
 }
 
@@ -556,6 +577,36 @@ export async function setupDatabase() {
     }
   }
 
+  // Neon/PostgreSQL is authoritative when DATABASE_URL is present. Do not mirror
+  // application writes to the ephemeral SQLite file in this mode.
+  if (postgresPool) {
+    const postgresDdl = (statement: string) => statement
+      .replace(/\bINTEGER\s+PRIMARY KEY\s+AUTOINCREMENT\b/gi, "BIGSERIAL PRIMARY KEY");
+    for (const statement of TABLE_DEFINITIONS) {
+      await postgresPool.query(postgresDdl(statement));
+    }
+    for (const migration of localMigrations) {
+      const safeMigration = postgresDdl(migration).replace(
+        /^(ALTER TABLE\s+\w+\s+ADD COLUMN)\s+/i,
+        "$1 IF NOT EXISTS ",
+      );
+      await postgresPool.query(safeMigration);
+    }
+    const duplicateRegisters = await postgresPool.query(
+      "SELECT user_id, COUNT(*)::int AS total FROM cash_register WHERE status = 'open' AND closed_at IS NULL GROUP BY user_id HAVING COUNT(*) > 1",
+    );
+    if (duplicateRegisters.rows.length) {
+      throw new Error(`[DB] Neon contém caixas abertos duplicados por operador; reconcilie antes de iniciar: ${JSON.stringify(duplicateRegisters.rows)}`);
+    }
+    await postgresPool.query(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_register_one_open_per_user ON cash_register(user_id) WHERE status = 'open' AND closed_at IS NULL",
+    );
+    await postgresPool.query("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR BTRIM(username) = ''");
+    await postgresPool.query("UPDATE users SET password = '' WHERE password IS NULL");
+    console.log(`[DB] Neon schema verified: ${TABLE_DEFINITIONS.length} tables; ${localMigrations.length} idempotent column migrations checked.`);
+    return;
+  }
+
   // Prevent two open cash registers for the same operator, even under concurrent requests.
   const duplicateLocalRegisters = localSqlite.exec(
     "SELECT user_id, COUNT(*) AS total FROM cash_register WHERE status = 'open' AND closed_at IS NULL GROUP BY user_id HAVING COUNT(*) > 1"
@@ -676,6 +727,18 @@ export async function setupDatabase() {
 }
 
 export async function auditDatabaseParity() {
+  if (postgresPool) {
+    const result = await postgresPool.query(
+      "SELECT COUNT(*)::int AS tables_checked FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'",
+    );
+    return {
+      ok: true,
+      remoteEnabled: true,
+      provider: "postgresql",
+      tablesChecked: Number(result.rows[0]?.tables_checked ?? 0),
+      mismatches: [],
+    };
+  }
   if (!tursoClient) {
     return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
   }
@@ -795,8 +858,8 @@ export async function auditDatabaseParity() {
 }
 
 // Pool compatibility shim
-export const pool = {
-  connect: () => ({ release: () => {} }),
-  query: () => ({ rows: [] }),
-  end: () => {},
-} as any;
+export const pool = (postgresPool ?? {
+  connect: async () => ({ release: () => {} }),
+  query: async () => ({ rows: [] }),
+  end: async () => {},
+}) as any;
