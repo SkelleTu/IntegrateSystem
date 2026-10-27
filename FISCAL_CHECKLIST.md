@@ -49,13 +49,19 @@
 
 ## Neon PostgreSQL — validação de caixa e estoque
 
-- [x] Criar projeto isolado `IntegrateSystem` no Neon (PostgreSQL 17, região `aws-sa-east-1`, São Paulo), sem conectar nem modificar os projetos existentes UPcar/Invista PRO.
-- [x] Criar 27 tabelas e aplicar 30 migrações de colunas derivadas do DDL atual para preparar o ambiente de teste Neon.
-- [x] Executar smoke test SQL em PostgreSQL cobrindo abertura única, livro de movimentos, reposição/sangria/ajuste, saldo esperado, entrada de estoque, histórico de reposição, produto/lote/log de lote, venda em dinheiro, baixa de estoque, cancelamento, estorno financeiro idempotente e fechamento único.
-- [x] Confirmar após o teste que não restaram registros de teste nas tabelas de caixa, estoque ou produtos.
-- [x] Salvar o teste reproduzível em `scripts/test-neon-cash-register.sql`.
-- [ ] Integrar a aplicação ao Neon em runtime. O servidor atual ainda instancia Drizzle com `drizzle-orm/sql-js` e o esquema compartilhado usa `drizzle-orm/sqlite-core`; portanto, a criação das tabelas e o smoke test SQL **não significam que a aplicação já usa PostgreSQL**. É necessário adaptar o esquema/driver e os caminhos SQLite específicos, preservando os testes SQLite até a migração ser validada.
-- [ ] Executar testes de integração da camada `DatabaseStorage` diretamente contra Neon, incluindo concorrência real e rollback transacional, depois da adaptação do driver.
-- [ ] Executar teste operacional de interface com Kernel para abertura/fechamento de caixa, reposição/sangria/ajuste, venda, baixa e estorno de estoque. O preview Vercel atual redireciona para a tela de login da Vercel antes de carregar a aplicação; a validação visual permanece bloqueada por essa proteção de acesso.
-- [ ] Só considerar a validação completa quando os testes de runtime PostgreSQL, o teste operacional no navegador e os workflows de CI estiverem aprovados.
+- [x] Criar projeto isolado `IntegrateSystem` no Neon (PostgreSQL 17, região `aws-sa-east-1`), sem alterar os projetos UPcar/Invista PRO.
+- [x] Preparar as 27 tabelas e aplicar 30 migrações aditivas no banco isolado.
+- [x] Executar smoke test SQL no PostgreSQL para abertura única, movimentos de caixa, reposição, sangria, ajuste, entrada de estoque, histórico, produto/lote/log, venda em dinheiro, baixa, cancelamento, restauração do estoque, estorno idempotente e fechamento.
+- [x] Confirmar limpeza dos registros de teste: zero registros remanescentes nas tabelas verificadas de caixa, estoque e produtos.
+- [x] Adicionar seleção de runtime por `DATABASE_URL`, conexão com `pg`/Drizzle Node Postgres e Neon como fonte única de escrita, sem espelhamento para SQLite efêmero nesse modo.
+- [x] Adicionar bootstrap idempotente das tabelas/migrações PostgreSQL e índice único parcial para impedir mais de um caixa aberto por operador.
+- [x] Adaptar compatibilidade de IDs gerados nas operações Drizzle legadas e caminhos de produto/snapshot que dependiam diretamente do SQLite local.
+- [x] Modelar `stock_snapshots` no schema compartilhado.
+- [x] Criar `scripts/test-cash-register-postgres.ts` para testar a camada real `DatabaseStorage` contra PostgreSQL, incluindo concorrência, caixa, venda, estoque e cancelamento.
+- [x] Adicionar execução condicional desse teste ao GitHub Actions via segredo `NEON_DATABASE_URL`.
+- [x] GitHub Actions, execução 27: TypeScript, build de produção, paridade estática do esquema e testes SQLite aprovados.
+- [ ] Executar o teste de runtime contra Neon. A execução CI foi pulada porque o segredo `NEON_DATABASE_URL` não está configurado no repositório; o smoke test SQL direto no Neon não substitui o teste do driver da aplicação.
+- [ ] Testar a interface via Kernel. O preview Vercel redireciona para a tela de login antes de carregar o app, então nenhuma operação real de interface foi reportada como concluída.
+- [ ] Configurar `DATABASE_URL` no ambiente de deploy que deve usar Neon e confirmar health check/consultas após a conexão. Não foi feito deploy de produção.
+- [ ] Fechar o checklist operacional apenas após os testes PostgreSQL de runtime e os fluxos completos de interface serem aprovados.
 
