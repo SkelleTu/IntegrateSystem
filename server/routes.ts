@@ -54,7 +54,7 @@ async function comparePassword(stored: string, supplied: string) {
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db, localSqlite, getAllDatabases, auditDatabaseParity } from "./db";
+import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
 import {
   tickets, users, fiscalSettings, insertFiscalSettingsSchema,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
@@ -2016,23 +2016,129 @@ export async function registerRoutes(
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
     res.json(ticket);
   });
-  // Admin bootstrap is optional and non-blocking: it must never prevent the HTTP port from opening.
-  // Never ship a default admin password in source code.
+  // Reconcile the owner account independently in each active database.
+  // Legacy Turso schemas may require an email column absent from the current ORM schema.
+  // A reset only occurs when AURA_BOOTSTRAP_ADMIN_RESET=true; never reset credentials on every restart.
   void (async () => {
     try {
-      const adminUser = await storage.getUserByUsername("SkelleTu");
-      const bootstrapPassword = process.env.AURA_BOOTSTRAP_ADMIN_PASSWORD;
-      if (!adminUser && bootstrapPassword) {
-        const hashed = await hashPassword(bootstrapPassword);
-        await storage.createUser({
-          username: "SkelleTu",
-          password: hashed,
-          role: "admin"
-        });
-        console.log("Admin user seeded from configured bootstrap secret");
-      } else if (!adminUser) {
-        console.warn("[BOOT] Admin bootstrap skipped: AURA_BOOTSTRAP_ADMIN_PASSWORD is not configured.");
+      const username = "SkelleTu";
+      const bootstrapPassword = String(process.env.AURA_BOOTSTRAP_ADMIN_PASSWORD || "");
+      const resetRequested = String(process.env.AURA_BOOTSTRAP_ADMIN_RESET || "").toLowerCase() === "true";
+      if (resetRequested && !bootstrapPassword) {
+        throw new Error("AURA_BOOTSTRAP_ADMIN_RESET requires AURA_BOOTSTRAP_ADMIN_PASSWORD");
       }
+
+      const localColumns = new Map<string, any>();
+      const localInfo = localSqlite.exec('PRAGMA table_info("users")')[0]?.values ?? [];
+      for (const row of localInfo) localColumns.set(String(row[1]), {
+        notNull: Number(row[3]) === 1,
+        defaultValue: row[4],
+      });
+      const localRows = localSqlite.exec("SELECT id, username, password, role FROM users WHERE username = 'SkelleTu'")[0]?.values ?? [];
+      const localAdmin = localRows.length ? {
+        id: localRows[0][0],
+        password: String(localRows[0][2] ?? ""),
+      } : null;
+
+      let remoteAdmin: { id: unknown; password: string } | null = null;
+      let remoteColumns = new Map<string, any>();
+      if (tursoClient) {
+        const info = await tursoClient.execute('PRAGMA table_info("users")');
+        for (const row of info.rows as any[]) remoteColumns.set(String(row.name), {
+          notNull: Number(row.notnull) === 1,
+          defaultValue: row.dflt_value,
+        });
+        const result = await tursoClient.execute({
+          sql: "SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1",
+          args: [username],
+        });
+        if (result.rows.length) {
+          const row = result.rows[0] as any;
+          remoteAdmin = { id: row.id, password: String(row.password ?? "") };
+        }
+      }
+
+      if (!localAdmin && !remoteAdmin && !bootstrapPassword) {
+        console.warn("[BOOT] Admin bootstrap skipped: no owner account or AURA_BOOTSTRAP_ADMIN_PASSWORD configured.");
+        return;
+      }
+
+      const desiredPasswordHash = resetRequested || (!localAdmin && !remoteAdmin)
+        ? await hashPassword(bootstrapPassword)
+        : (localAdmin?.password || remoteAdmin?.password || await hashPassword(bootstrapPassword));
+      const bootstrapEmail = String(process.env.AURA_BOOTSTRAP_ADMIN_EMAIL || "skelletu@localhost.invalid").trim();
+
+      const insertLocalAdmin = () => {
+        const columns = ["username", "password", "role"];
+        const values: any[] = [username, desiredPasswordHash, "admin"];
+        if (localColumns.has("email")) {
+          columns.push("email");
+          values.push(bootstrapEmail);
+        }
+        const requiredUnknown = [...localColumns.entries()].filter(([name, meta]) =>
+          meta.notNull && meta.defaultValue === null && !["id", ...columns].includes(name)
+        );
+        if (requiredUnknown.length) throw new Error("SQLite local users table has unsupported required columns: " + requiredUnknown.map(([name]) => name).join(", "));
+        const placeholders = columns.map(() => "?").join(", ");
+        localSqlite.prepare(`INSERT INTO users (${columns.map(c => '"' + c + '"').join(", ")}) VALUES (${placeholders})`).run(values);
+      };
+
+      if (localAdmin) {
+        if (resetRequested) {
+          localSqlite.prepare("UPDATE users SET password = ?, role = 'admin' WHERE username = ?").run([desiredPasswordHash, username]);
+        } else {
+          localSqlite.prepare("UPDATE users SET role = 'admin' WHERE username = ?").run([username]);
+        }
+      } else {
+        insertLocalAdmin();
+      }
+      persistLocalSqlite();
+
+      if (tursoClient) {
+        if (remoteAdmin) {
+          if (resetRequested) {
+            await tursoClient.execute({
+              sql: "UPDATE users SET password = ?, role = 'admin' WHERE username = ?",
+              args: [desiredPasswordHash, username],
+            });
+          } else {
+            await tursoClient.execute({
+              sql: "UPDATE users SET role = 'admin' WHERE username = ?",
+              args: [username],
+            });
+          }
+        } else {
+          const columns = ["username", "password", "role"];
+          const values: any[] = [username, desiredPasswordHash, "admin"];
+          if (remoteColumns.has("email")) {
+            columns.push("email");
+            values.push(bootstrapEmail);
+          }
+          const requiredUnknown = [...remoteColumns.entries()].filter(([name, meta]) =>
+            meta.notNull && (meta.defaultValue === null || meta.defaultValue === undefined) && !["id", ...columns].includes(name)
+          );
+          if (requiredUnknown.length) throw new Error("Turso users table has unsupported required columns: " + requiredUnknown.map(([name]) => name).join(", "));
+          const placeholders = columns.map(() => "?").join(", ");
+          await tursoClient.execute({
+            sql: `INSERT INTO users (${columns.map(c => '"' + c + '"').join(", ")}) VALUES (${placeholders})`,
+            args: values,
+          });
+        }
+      }
+
+      const verifyLocal = localSqlite.exec("SELECT id, username, password, role FROM users WHERE username = 'SkelleTu'")[0]?.values ?? [];
+      const verifyRemote = tursoClient
+        ? await tursoClient.execute({ sql: "SELECT id, username, password, role FROM users WHERE username = ? LIMIT 1", args: [username] })
+        : null;
+      if (!verifyLocal.length || (tursoClient && !verifyRemote?.rows.length)) {
+        throw new Error("Owner account reconciliation verification failed in one or more active databases");
+      }
+      if (resetRequested && tursoClient) {
+        const localHash = String(verifyLocal[0][2] ?? "");
+        const remoteHash = String((verifyRemote!.rows[0] as any).password ?? "");
+        if (localHash !== remoteHash) throw new Error("Owner password hashes differ between local SQLite and Turso after reset");
+      }
+      console.log("[BOOT] Owner account reconciled and verified across active databases.");
     } catch (error) {
       console.error("[BOOT] Non-blocking admin bootstrap failed:", error);
     }
