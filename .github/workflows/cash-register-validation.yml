@@ -11,6 +11,7 @@ on:
       - "client/src/pages/Cashier.tsx"
       - "client/src/pages/CashierClose.tsx"
       - "scripts/test-cash-register-flow.ts"
+      - "scripts/test-cash-register-postgres.ts"
       - "scripts/verify-db-schema.mjs"
       - "package.json"
       - "package-lock.json"
@@ -37,5 +38,14 @@ jobs:
         run: npm run build
       - name: SQLite/Turso schema parity
         run: node scripts/verify-db-schema.mjs
-      - name: Cash register integration flow
+      - name: Cash register integration flow (SQLite)
         run: SQLITE_DB_PATH="/tmp/integratesystem-cash-register-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.db" npm run test:cash-register
+      - name: PostgreSQL/Neon runtime integration (when secret is configured)
+        if: ${{ secrets.NEON_DATABASE_URL != '' }}
+        env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+          SQLITE_DB_PATH: /tmp/integratesystem-postgres-test-local.db
+        run: npm run test:cash-register:postgres
+      - name: PostgreSQL integration test configuration warning
+        if: ${{ secrets.NEON_DATABASE_URL == '' }}
+        run: echo "::warning::NEON_DATABASE_URL is not configured; PostgreSQL runtime integration was not executed."
