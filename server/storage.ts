@@ -1,11 +1,11 @@
-import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
+import { db, dbRemote, dbLocal, multiWrite, localSqlite, isPostgresEnabled } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, cashRegisterMovements, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
-  products, batches, batchLogs,
+  products, batches, batchLogs, stockSnapshots,
   type User, type InsertUser,
   type Service, type InsertService, type UpdateServiceRequest,
   type Ticket, type InsertTicket,
@@ -1404,7 +1404,14 @@ export class DatabaseStorage implements IStorage {
 
     let productId: number;
     const requestedId = Number((data as any).id);
-    if (dbRemote) {
+    if (isPostgresEnabled) {
+      // Neon is the single source of truth; do not write this product to ephemeral SQLite.
+      const [remoteProduct]: any[] = await db.insert(products).values(clean as any).returning();
+      productId = Number(remoteProduct?.id ?? requestedId);
+      if (!Number.isFinite(productId) || productId <= 0) {
+        throw new Error("Neon não retornou o ID do produto recém-criado.");
+      }
+    } else if (dbRemote) {
       // Turso is written first so its generated ID can be mirrored exactly to sql.js.
       await dbRemote.insert(products).values(clean as any);
       if (Number.isFinite(requestedId) && requestedId > 0) {
@@ -1422,7 +1429,6 @@ export class DatabaseStorage implements IStorage {
       try {
         writeLocal(productId);
       } catch (localError) {
-        // Compensate the remote insert if local mirroring fails, preventing a silent split.
         try {
           await dbRemote.delete(products).where(eq(products.id, productId));
         } catch (rollbackError) {
@@ -1461,8 +1467,8 @@ export class DatabaseStorage implements IStorage {
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
     const result = await dualWrite(async (database) => {
-      const res: any = await database.update(batches).set({ quantity: 0 }).run();
-      return res.rowsAffected;
+      const res: any = await database.update(batches).set({ quantity: 0 });
+      return res.rowsAffected ?? res.rowCount ?? 0;
     });
     return result as number;
   }
@@ -1474,27 +1480,36 @@ export class DatabaseStorage implements IStorage {
     const allProducts = await db.select().from(products);
     const allBatches  = await db.select().from(batches);
 
-    const snapshotSql = `
-      INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-      VALUES (?, ?, ?, ?, ?)
-    `;
     const now = Math.floor(Date.now() / 1000);
-    (db as any).$client
-      ? await (db as any).$client.execute({
-          sql: snapshotSql,
-          args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
-        })
-      : db.run(sql`
-          INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-          VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
-        `);
+    if (isPostgresEnabled) {
+      await db.insert(stockSnapshots).values({
+        createdAt: new Date(now * 1000),
+        createdBy: clearedBy,
+        productsJson: JSON.stringify(allProducts),
+        batchesJson: JSON.stringify(allBatches),
+        productCount: allProducts.length,
+      });
+    } else {
+      const snapshotSql = `
+        INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+        VALUES (?, ?, ?, ?, ?)
+      `;
+      (db as any).$client
+        ? await (db as any).$client.execute({
+            sql: snapshotSql,
+            args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
+          })
+        : db.run(sql`
+            INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
+            VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
+          `);
 
-    // Salvar também no SQLite local se o primário for remoto
-    try {
-      localSqlite.prepare(
-        `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
-      ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
-    } catch { /* ignora se já inserido ou tabela não existe */ }
+      try {
+        localSqlite.prepare(
+          `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
+        ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
+      } catch { /* ignora se já inserido ou tabela não existe */ }
+    }
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
@@ -1505,6 +1520,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
+    if (isPostgresEnabled) {
+      const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+      if (!row) return null;
+      return { id: row.id, createdAt: row.createdAt, createdBy: row.createdBy, productCount: row.productCount };
+    }
     const row = localSqlite.prepare(
       `SELECT id, created_at, created_by, product_count FROM stock_snapshots ORDER BY id DESC LIMIT 1`
     ).get() as any;
@@ -1518,9 +1538,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
-    const row = localSqlite.prepare(
-      `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
-    ).get() as any;
+    let row: any;
+    if (isPostgresEnabled) {
+      const [snapshot] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+      row = snapshot ? { products_json: snapshot.productsJson, batches_json: snapshot.batchesJson } : null;
+    } else {
+      row = localSqlite.prepare(
+        `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
+      ).get() as any;
+    }
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
 
     const savedProducts: any[] = JSON.parse(row.products_json);
