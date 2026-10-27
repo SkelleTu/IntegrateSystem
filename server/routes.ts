@@ -2066,7 +2066,7 @@ export async function registerRoutes(
       const desiredPasswordHash = resetRequested || (!localAdmin && !remoteAdmin)
         ? await hashPassword(bootstrapPassword)
         : (localAdmin?.password || remoteAdmin?.password || await hashPassword(bootstrapPassword));
-      const bootstrapEmail = String(process.env.AURA_BOOTSTRAP_ADMIN_EMAIL || "skelletu@localhost.invalid").trim();
+      const bootstrapEmail = String(process.env.AURA_BOOTSTRAP_ADMIN_EMAIL || `skelletu+bootstrap-${Date.now()}@localhost.invalid`).trim();
 
       const insertLocalAdmin = () => {
         const columns = ["username", "password", "role"];
@@ -2114,10 +2114,35 @@ export async function registerRoutes(
             columns.push("email");
             values.push(bootstrapEmail);
           }
-          const requiredUnknown = [...remoteColumns.entries()].filter(([name, meta]) =>
-            meta.notNull && (meta.defaultValue === null || meta.defaultValue === undefined) && !["id", ...columns].includes(name)
-          );
-          if (requiredUnknown.length) throw new Error("Turso users table has unsupported required columns: " + requiredUnknown.map(([name]) => name).join(", "));
+          // Legacy user tables from the previous Aura schema require profile fields
+          // that the current login model does not use. Supply explicit, clearly non-production
+          // placeholders only for mandatory legacy columns, so the admin can sign in and update them.
+          const legacyRequiredValues: Record<string, any> = {
+            password_hash: desiredPasswordHash,
+            nome_completo: "SkelleTu",
+            cpf: String(Date.now()).slice(-11).padStart(11, "0"),
+            telefone: String(Date.now()).slice(-11).padStart(11, "0"),
+            endereco: "Não informado",
+            cidade: "Não informado",
+            estado: "SP",
+            cep: "00000000",
+            chave_pix: bootstrapEmail,
+            tipo_chave_pix: "email",
+          };
+          const unsupportedRequired: string[] = [];
+          for (const [name, meta] of remoteColumns.entries()) {
+            const required = meta.notNull && (meta.defaultValue === null || meta.defaultValue === undefined);
+            if (!required || ["id", ...columns].includes(name)) continue;
+            if (!(name in legacyRequiredValues)) {
+              unsupportedRequired.push(name);
+              continue;
+            }
+            columns.push(name);
+            values.push(legacyRequiredValues[name]);
+          }
+          if (unsupportedRequired.length) {
+            throw new Error("Turso users table has unsupported required columns: " + unsupportedRequired.join(", "));
+          }
           const placeholders = columns.map(() => "?").join(", ");
           await tursoClient.execute({
             sql: `INSERT INTO users (${columns.map(c => '"' + c + '"').join(", ")}) VALUES (${placeholders})`,
