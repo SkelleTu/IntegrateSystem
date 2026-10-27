@@ -40,6 +40,66 @@ export let tursoClient: any = null;
 let postgresPool: any = null;
 export const isPostgresEnabled = Boolean(process.env.DATABASE_URL);
 
+// Legacy storage methods read SQLite's lastInsertRowid. Normalize that result for
+// PostgreSQL inserts without changing explicit .returning() callers.
+function withPostgresInsertCompatibility(database: any): any {
+  return new Proxy(database, {
+    get(target, property, receiver) {
+      if (property === "insert") {
+        return (table: any) => {
+          let explicitReturning = false;
+          const wrapBuilder = (builder: any): any => new Proxy(builder, {
+            get(current, member, builderReceiver) {
+              if (member === "returning") {
+                return (...args: any[]) => {
+                  explicitReturning = true;
+                  return wrapBuilder(current.returning(...args));
+                };
+              }
+              if (member === "then") {
+                const then = Reflect.get(current, member, current);
+                if (typeof then !== "function") return then;
+                return (onFulfilled?: any, onRejected?: any) => {
+                  const query = explicitReturning || !table?.id
+                    ? current
+                    : current.returning({ id: table.id });
+                  return query.then((result: any) => {
+                    if (explicitReturning || !table?.id) {
+                      return onFulfilled ? onFulfilled(result) : result;
+                    }
+                    const normalized = {
+                      rows: result,
+                      rowCount: Array.isArray(result) ? result.length : 0,
+                      lastInsertRowid: result?.[0]?.id,
+                    };
+                    return onFulfilled ? onFulfilled(normalized) : normalized;
+                  }, onRejected);
+                };
+              }
+              const value = Reflect.get(current, member, current);
+              if (typeof value !== "function") return value;
+              return (...args: any[]) => {
+                const next = value.apply(current, args);
+                return next && typeof next === "object" && (typeof next.then === "function" || typeof next.values === "function")
+                  ? wrapBuilder(next)
+                  : next;
+              };
+            },
+          });
+          return wrapBuilder(target.insert(table));
+        };
+      }
+      if (property === "transaction") {
+        return (callback: any, config?: any) => target.transaction(
+          (transaction: any) => callback(withPostgresInsertCompatibility(transaction)),
+          config,
+        );
+      }
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
+
 if (!process.env.DATABASE_URL && process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const { createClient } = await import("@libsql/client");
@@ -66,7 +126,7 @@ if (process.env.DATABASE_URL) {
       connectionTimeoutMillis: 10_000,
       ssl: process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false },
     });
-    dbRemote = drizzlePostgres(postgresPool, { schema });
+    dbRemote = withPostgresInsertCompatibility(drizzlePostgres(postgresPool, { schema }));
     await postgresPool.query("SELECT 1");
     console.log("[DB] PostgreSQL/Neon conectado; gravações locais/espelhadas desativadas.");
   } catch (error) {
