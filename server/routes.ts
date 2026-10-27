@@ -40,7 +40,18 @@ const upload = multer({
 
 const scryptAsync = promisify(scrypt);
 
-async function hashPassword(password: string) {
+async function toPublicUser(user: any) {
+  if (!user || typeof user !== "object") return user;
+  const safe = { ...user };
+  for (const key of Object.keys(safe)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
+      delete safe[key];
+    }
+  }
+  return safe;
+}
+
+function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
@@ -278,7 +289,7 @@ export async function registerRoutes(
           ipAddress: req.ip,
           userAgent: req.get("user-agent")
         });
-        res.json(user);
+        res.json(toPublicUser(user));
       });
     })(req, res, next);
   });
@@ -301,7 +312,7 @@ export async function registerRoutes(
 
   app.get(api.auth.me.path, (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    res.json(req.user);
+    res.json(toPublicUser(req.user));
   });
 
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
