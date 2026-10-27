@@ -40,7 +40,7 @@ const upload = multer({
 
 const scryptAsync = promisify(scrypt);
 
-async function toPublicUser(user: any) {
+function toPublicUser(user: any) {
   if (!user || typeof user !== "object") return user;
   const safe = { ...user };
   for (const key of Object.keys(safe)) {
@@ -51,7 +51,7 @@ async function toPublicUser(user: any) {
   return safe;
 }
 
-function hashPassword(password: string) {
+async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const buf = (await scryptAsync(password, salt, 64)) as Buffer;
   return `${buf.toString("hex")}.${salt}`;
