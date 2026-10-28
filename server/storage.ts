@@ -279,9 +279,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    this.logAction(`Login/Busca usuário: ${username}`);
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    const supplied = String(username ?? "").trim();
+    if (!supplied) return undefined;
+    this.logAction(`Login/Busca usuário: ${supplied}`);
+
+    // Turso is the primary database, but older deployments may have a valid operator
+    // account only in the local mirror. Prefer exact matches in the primary DB, then
+    // perform a case-insensitive trimmed lookup in each active DB without logging secrets.
+    const databases = getAllDatabases();
+    for (const database of databases) {
+      const [exact] = await database.select().from(users).where(eq(users.username, supplied)).limit(1);
+      if (exact) return exact;
+    }
+
+    const normalized = supplied.toLocaleLowerCase("en-US");
+    for (const database of databases) {
+      const [matched] = await database.select().from(users)
+        .where(sql`lower(trim(${users.username})) = ${normalized}`)
+        .limit(1);
+      if (matched) {
+        console.warn("[AUTH] Username matched after trimming/case normalization; verify database parity.");
+        return matched;
+      }
+    }
+
+    return undefined;
   }
 
   async createUser(user: InsertUser): Promise<User> {
