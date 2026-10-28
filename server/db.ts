@@ -666,6 +666,57 @@ export async function setupDatabase() {
     );
   }
 
+  // In Render, SQLite is an ephemeral mirror and Turso is the durable source of truth.
+  // Hydrate only when explicitly enabled; never overwrite a developer's local database by default.
+  if (isRemoteEnabled && tursoClient && process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true") {
+    const mirrorTables = [...new Set(TABLE_DEFINITIONS
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
+      .filter((table): table is string => Boolean(table)))];
+    const snapshot: Array<{ table: string; columns: string[]; rows: any[][] }> = [];
+
+    // Read and stage the complete remote snapshot before touching the local mirror.
+    for (const table of mirrorTables) {
+      if (table === "runtime_events") continue; // process-local telemetry is intentionally not mirrored
+      const info = await tursoClient.execute(`PRAGMA table_info("${table}")`);
+      const columns: string[] = info.rows.map((row: any) => String(row.name));
+      const result = await tursoClient.execute(`SELECT * FROM "${table}"`);
+      const rows = (result.rows as any[]).map((row) => columns.map((column) => {
+        const value = row[column];
+        if (value === null || value === undefined) return null;
+        if (typeof value === "bigint") return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
+        if (value instanceof Uint8Array) return value;
+        if (value instanceof Date) return value.toISOString();
+        return value;
+      }));
+      snapshot.push({ table, columns, rows });
+    }
+
+    // Remote data is authoritative in production. Replace the ephemeral local mirror
+    // atomically so IDs and business rows start from the same state after every cold boot.
+    localSqlite.exec("BEGIN TRANSACTION");
+    try {
+      for (const { table } of [...snapshot].reverse()) {
+        localSqlite.prepare(`DELETE FROM "${table}"`).run();
+      }
+      for (const { table, columns, rows } of snapshot) {
+        if (!columns.length || !rows.length) continue;
+        const quotedColumns = columns.map((column) => `"${column.replace(/"/g, '""')}"`).join(", ");
+        const placeholders = columns.map(() => "?").join(", ");
+        const insert = localSqlite.prepare(`INSERT INTO "${table}" (${quotedColumns}) VALUES (${placeholders})`);
+        try {
+          for (const values of rows) insert.run(values);
+        } finally {
+          insert.free();
+        }
+      }
+      localSqlite.exec("COMMIT");
+      console.log(`[DB] Local SQLite mirror hydrated from Turso: ${snapshot.length} tables.`);
+    } catch (error) {
+      try { localSqlite.exec("ROLLBACK"); } catch {}
+      throw new Error("[DB] Failed to hydrate the local SQLite mirror from Turso; startup aborted to prevent split-brain data.", { cause: error });
+    }
+  }
+
   // Ensure local sql.js changes made with prepare().run() are persisted.
   persistLocalSqlite();
 }
