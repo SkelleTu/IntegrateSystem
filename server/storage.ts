@@ -1,4 +1,4 @@
-import { db, dbRemote, dbLocal, multiWrite, localSqlite } from "./db.js";
+import { db, dbRemote, dbLocal, multiWrite, localSqlite, getAllDatabases } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
@@ -45,6 +45,17 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
   const result = await multiWrite(operation);
   scheduleAutoBackup(); // salva snapshot JSON automaticamente
   return result;
+}
+
+
+// Generate one identifier shared by all active databases before mirrored inserts.
+async function nextSharedId(table: any): Promise<number> {
+  const maxima = await Promise.all(getAllDatabases().map(async (database) => {
+    const rows = await database.select({ id: table.id }).from(table).orderBy(desc(table.id)).limit(1);
+    const value = Number(rows[0]?.id ?? 0);
+    return Number.isSafeInteger(value) && value > 0 ? value : 0;
+  }));
+  return Math.max(0, ...maxima) + 1;
 }
 
 async function getBusinessTypeForUser(database: any, userId: number | null | undefined): Promise<string> {
@@ -444,8 +455,9 @@ export class DatabaseStorage implements IStorage {
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
+    const sharedRegisterId = await nextSharedId(cashRegisters);
     return await dualWrite(async (database) => {
-      const [newRegister]: any[] = await database.insert(cashRegisters).values(register).returning();
+      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, id: sharedRegisterId } as any).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
@@ -517,8 +529,17 @@ export class DatabaseStorage implements IStorage {
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
+    const sharedSaleId = await nextSharedId(sales);
     return await dualWrite(async (database) => {
-      const [insertedSale]: any[] = await database.insert(sales).values(sale).returning();
+      for (const item of items) {
+        const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
+        if (batchId !== null) {
+          const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
+          if (!batch) throw new Error(`Lote ${batchId} não encontrado para a venda.`);
+          if (Number(batch.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`);
+        }
+      }
+      const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, id: sharedSaleId } as any).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
@@ -1535,9 +1556,10 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
       }
     }
+    const sharedBatchId = await nextSharedId(batches);
     return await dualWrite(async (database) => {
       const now = new Date();
-      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, createdAt: now }) as any).returning();
+      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, id: sharedBatchId, createdAt: now }) as any).returning();
       if (!b) throw new Error("Não foi possível obter o lote recém-criado.");
       // log entry
       await database.insert(batchLogs).values({

@@ -58,10 +58,20 @@ async function hashPassword(password: string) {
 }
 
 async function comparePassword(stored: string, supplied: string) {
-  const [hashed, salt] = stored.split(".");
-  const hashedBuf = Buffer.from(hashed, "hex");
-  const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
-  return timingSafeEqual(hashedBuf, suppliedBuf);
+  // Legacy or unreconciled accounts can have an empty/malformed password field.
+  // Treat those as invalid credentials instead of throwing from scrypt/timingSafeEqual.
+  if (typeof stored !== "string" || typeof supplied !== "string" || !stored || !supplied) return false;
+  const parts = stored.split(".");
+  if (parts.length !== 2) return false;
+  const [hashed, salt] = parts;
+  if (!/^[0-9a-f]{128}$/i.test(hashed) || !/^[0-9a-f]{32}$/i.test(salt)) return false;
+  try {
+    const hashedBuf = Buffer.from(hashed, "hex");
+    const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+    return hashedBuf.length === suppliedBuf.length && timingSafeEqual(hashedBuf, suppliedBuf);
+  } catch {
+    return false;
+  }
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
