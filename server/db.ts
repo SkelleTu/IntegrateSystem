@@ -668,7 +668,7 @@ export async function setupDatabase() {
 
   // In Render, SQLite is an ephemeral mirror and Turso is the durable source of truth.
   // Hydrate only when explicitly enabled; never overwrite a developer's local database by default.
-  if (isRemoteEnabled && tursoClient && process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true") {
+  if (isRemoteEnabled && tursoClient && (process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true" || Boolean(process.env.RENDER_SERVICE_ID))) {
     const mirrorTables = [...new Set(TABLE_DEFINITIONS
       .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
       .filter((table): table is string => Boolean(table)))];
