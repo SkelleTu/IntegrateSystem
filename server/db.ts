@@ -674,22 +674,26 @@ export async function setupDatabase() {
       .filter((table): table is string => Boolean(table)))];
     const snapshot: Array<{ table: string; columns: string[]; rows: any[][] }> = [];
 
-    // Read and stage the complete remote snapshot before touching the local mirror.
-    for (const table of mirrorTables) {
-      if (table === "runtime_events") continue; // process-local telemetry is intentionally not mirrored
-      const info = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const columns: string[] = info.rows.map((row: any) => String(row.name));
-      const result = await tursoClient.execute(`SELECT * FROM "${table}"`);
-      const rows = (result.rows as any[]).map((row) => columns.map((column) => {
-        const value = row[column];
-        if (value === null || value === undefined) return null;
-        if (typeof value === "bigint") return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
-        if (value instanceof Uint8Array) return value;
-        if (value instanceof Date) return value.toISOString();
-        return value;
+    // Stage table snapshots concurrently to avoid exceeding Render's startup port-scan window.
+    const stagedSnapshots = await Promise.all(mirrorTables
+      .filter((table) => table !== "runtime_events") // process-local telemetry is intentionally not mirrored
+      .map(async (table) => {
+        const [info, result] = await Promise.all([
+          tursoClient.execute(`PRAGMA table_info("${table}")`),
+          tursoClient.execute(`SELECT * FROM "${table}"`),
+        ]);
+        const columns: string[] = info.rows.map((row: any) => String(row.name));
+        const rows = (result.rows as any[]).map((row) => columns.map((column) => {
+          const value = row[column];
+          if (value === null || value === undefined) return null;
+          if (typeof value === "bigint") return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
+          if (value instanceof Uint8Array) return value;
+          if (value instanceof Date) return value.toISOString();
+          return value;
+        }));
+        return { table, columns, rows };
       }));
-      snapshot.push({ table, columns, rows });
-    }
+    snapshot.push(...stagedSnapshots);
 
     // Remote data is authoritative in production. Replace the ephemeral local mirror
     // atomically so IDs and business rows start from the same state after every cold boot.
