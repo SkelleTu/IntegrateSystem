@@ -279,9 +279,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    this.logAction(`Login/Busca usuário: ${username}`);
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    const supplied = String(username ?? "").trim();
+    if (!supplied) return undefined;
+    this.logAction(`Login/Busca usuário: ${supplied}`);
+
+    // Authenticate only against the configured primary database (Turso when enabled).
+    // A stale SQLite mirror must never resurrect an account missing from the primary.
+    const [exact] = await db.select().from(users).where(eq(users.username, supplied)).limit(1);
+    if (exact) return exact;
+
+    const normalized = supplied.toLocaleLowerCase("en-US");
+    const [matched] = await db.select().from(users)
+      .where(sql`lower(trim(${users.username})) = ${normalized}`)
+      .limit(1);
+    if (matched) {
+      console.warn("[AUTH] Username matched after trimming/case normalization.");
+      return matched;
+    }
+    return undefined;
   }
 
   async createUser(user: InsertUser): Promise<User> {
