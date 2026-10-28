@@ -678,7 +678,7 @@ export async function setupDatabase() {
     for (const table of mirrorTables) {
       if (table === "runtime_events") continue; // process-local telemetry is intentionally not mirrored
       const info = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const columns = info.rows.map((row: any) => String(row.name));
+      const columns: string[] = info.rows.map((row: any) => String(row.name));
       const result = await tursoClient.execute(`SELECT * FROM "${table}"`);
       const rows = (result.rows as any[]).map((row) => columns.map((column) => {
         const value = row[column];
