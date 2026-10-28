@@ -279,8 +279,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    this.logAction(`Login/Busca usuário: ${username}`);
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    // Normalize human-entered identifiers so trailing spaces or case differences
+    // cannot make a valid owner account appear missing during authentication.
+    const normalizedUsername = String(username ?? "").trim().toLocaleLowerCase("en-US");
+    this.logAction(`Login/Busca usuário: ${normalizedUsername ? "[normalized username]" : "[empty username]"}`);
+    if (!normalizedUsername) return undefined;
+    const [user] = await db.select().from(users)
+      .where(sql`LOWER(TRIM(${users.username})) = ${normalizedUsername}`)
+      .limit(1);
     return user;
   }
 
