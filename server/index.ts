@@ -1,3 +1,5 @@
+import type { Server } from "node:http";
+
 import {
   installConsoleCapture,
   runtimeError,
@@ -6,6 +8,20 @@ import {
 } from "./runtimeMonitor";
 
 installConsoleCapture();
+
+let activeHttpServer: Server | undefined;
+
+const shutdown = (signal: "SIGINT" | "SIGTERM") => {
+  runtimeEvent("signal", `Servidor recebeu ${signal}`, { phase: "shutdown" });
+  stopRuntimeMonitor(`Servidor encerrando por ${signal}`);
+  if (activeHttpServer?.listening) {
+    activeHttpServer.close(() => process.exit(0));
+    const forcedExit = setTimeout(() => process.exit(1), 10_000);
+    forcedExit.unref();
+  } else {
+    process.exit(0);
+  }
+};
 
 console.log("VERCEL_ENV:", process.env.VERCEL_ENV);
 
@@ -24,15 +40,8 @@ process.on("beforeExit", (code) => {
   stopRuntimeMonitor(`Servidor encerrando via beforeExit (code ${code})`);
 });
 
-process.once("SIGINT", () => {
-  runtimeEvent("signal", "Servidor recebeu SIGINT", { phase: "shutdown" });
-  stopRuntimeMonitor("Servidor encerrado por SIGINT");
-});
-
-process.once("SIGTERM", () => {
-  runtimeEvent("signal", "Servidor recebeu SIGTERM", { phase: "shutdown" });
-  stopRuntimeMonitor("Servidor encerrado por SIGTERM");
-});
+process.once("SIGINT", () => shutdown("SIGINT"));
+process.once("SIGTERM", () => shutdown("SIGTERM"));
 
 (async () => {
   try {
@@ -42,6 +51,7 @@ process.once("SIGTERM", () => {
     });
 
     const { initApp, log, httpServer } = await import("./app");
+    activeHttpServer = httpServer;
     const port = parseInt(process.env.PORT || "5010", 10);
 
     httpServer.on("error", (error) => {
@@ -81,6 +91,12 @@ process.once("SIGTERM", () => {
   } catch (error) {
     runtimeError(error, "Falha fatal ao iniciar o servidor");
     console.error("[BOOT] Fatal startup error:", error);
-    process.exitCode = 1;
+    if (activeHttpServer?.listening) {
+      activeHttpServer.close(() => process.exit(1));
+      const forcedExit = setTimeout(() => process.exit(1), 10_000);
+      forcedExit.unref();
+    } else {
+      process.exit(1);
+    }
   }
 })();
