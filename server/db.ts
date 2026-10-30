@@ -688,7 +688,7 @@ export async function setupDatabase() {
         const rawDefault = column.dflt_value === null || column.dflt_value === undefined
           ? ""
           : String(column.dflt_value).trim();
-        const safeDefault = /^(?:NULL|TRUE|FALSE|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|-?\d+(?:\.\d+)?|'(?:''|[^'])*'|\(.+\))$/i.test(rawDefault)
+        const safeDefault = /^(?:NULL|TRUE|FALSE|-?\d+(?:\.\d+)?|'(?:''|[^'])*')$/i.test(rawDefault)
           ? ` DEFAULT ${rawDefault}`
           : "";
         const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
