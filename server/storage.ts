@@ -293,10 +293,14 @@ export class DatabaseStorage implements IStorage {
 
   async createUser(user: InsertUser): Promise<User> {
     this.logAction(`Novo usuário cadastrado: ${user.username}`);
+    const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
-      const insertResultusers: any = await database.insert(users).values(user);
-      const idusers = insertResultusers.lastInsertRowid;
-      const [newUser] = await database.select().from(users).where(eq(users.id, idusers));
+      await database.insert(users).values({ ...user, id: sharedUserId } as any);
+      const [newUser] = await database.select().from(users)
+        .where(eq(users.id, sharedUserId)).limit(1);
+      if (!newUser) {
+        throw new Error(`Não foi possível verificar o usuário recém-criado: ${user.username}`);
+      }
       return newUser;
     });
   }
