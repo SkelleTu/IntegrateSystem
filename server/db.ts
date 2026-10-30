@@ -676,6 +676,10 @@ export async function setupDatabase() {
 
     for (const table of mirrorSchemaTables) {
       const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
+      const remoteIdInfo = (remoteInfo.rows as any[]).find((column) => String(column.name) === "id");
+      if (table === "users" && remoteIdInfo) {
+        console.log(`[DB] Turso users.id schema: type=${String(remoteIdInfo.type || "unknown")}, primaryKey=${Number(remoteIdInfo.pk || 0) > 0}`);
+      }
       const localInfo = localSqlite.exec(`PRAGMA table_info("${table}")`)[0]?.values ?? [];
       const localColumns = new Set(localInfo.map((row: any[]) => String(row[1])));
 
@@ -758,8 +762,13 @@ export async function setupDatabase() {
                 const type = value === null ? "null" : value instanceof Uint8Array ? "blob" : typeof value;
                 return `${columns[index]}:${type}`;
               });
+              const idIndex = columns.indexOf("id");
+              const idValue = idIndex >= 0 ? rows[rowIndex][idIndex] : undefined;
+              const idShape = typeof idValue === "string"
+                ? `string(length=${idValue.length},numeric=${idValue.trim() !== "" && Number.isSafeInteger(Number(idValue))})`
+                : `type=${idValue === null ? "null" : typeof idValue}`;
               throw new Error(
-                `SQLite hydration failed at ${table} row ${rowIndex}; values=[${valueTypes.join(", ")}]: ${error.message}`,
+                `SQLite hydration failed at ${table} row ${rowIndex}; idShape=${idShape}; values=[${valueTypes.join(", ")}]: ${error.message}`,
                 { cause: error },
               );
             }
