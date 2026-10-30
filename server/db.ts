@@ -726,8 +726,11 @@ export async function setupDatabase() {
           const value = row[column];
           if (value === null || value === undefined) return null;
           if (typeof value === "bigint") return Number.isSafeInteger(Number(value)) ? Number(value) : String(value);
+          if (typeof value === "boolean") return value ? 1 : 0;
+          if (typeof value === "number" && !Number.isFinite(value)) return null;
           if (value instanceof Uint8Array) return value;
           if (value instanceof Date) return value.toISOString();
+          if (typeof value === "object") return JSON.stringify(value);
           return value;
         }));
         return { table, columns, rows };
@@ -747,7 +750,20 @@ export async function setupDatabase() {
         const placeholders = columns.map(() => "?").join(", ");
         const insert = localSqlite.prepare(`INSERT INTO "${table}" (${quotedColumns}) VALUES (${placeholders})`);
         try {
-          for (const values of rows) insert.run(values);
+          for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+            try {
+              insert.run(rows[rowIndex]);
+            } catch (error: any) {
+              const valueTypes = rows[rowIndex].map((value: any, index: number) => {
+                const type = value === null ? "null" : value instanceof Uint8Array ? "blob" : typeof value;
+                return `${columns[index]}:${type}`;
+              });
+              throw new Error(
+                `SQLite hydration failed at ${table} row ${rowIndex}; values=[${valueTypes.join(", ")}]: ${error.message}`,
+                { cause: error },
+              );
+            }
+          }
         } finally {
           insert.free();
         }
