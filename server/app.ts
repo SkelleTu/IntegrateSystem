@@ -249,9 +249,9 @@ export async function initApp() {
       } else {
         const currentRole = String(existingMaster.role || "").trim().toLowerCase();
         if (currentRole !== "owner") {
-          await storage.updateUser(existingMaster.id, { role: "owner" } as any);
+          throw new Error("[SECURITY] The configured master username is already occupied by a non-owner account; no privilege or password changes were made.");
         }
-        console.log("[BOOT] Existing master account verified; password was not changed.");
+        console.log("[BOOT] Existing master owner account found; password was not changed.");
       }
       // Do not retain the plaintext secret in the running process.
       process.env.AURA_MASTER_PASSWORD = "";
