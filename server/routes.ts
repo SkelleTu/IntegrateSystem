@@ -423,45 +423,57 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
-  // Enterprise Routes
-  app.get("/api/admin/enterprises", async (req, res) => {
+  // Enterprise administration is restricted to an authenticated system owner.
+  // Public registration must never be able to create an administrator account.
+  const isSystemOwner = (user: any) =>
+    String(user?.role || "").trim().toLowerCase() === "owner" ||
+    String(user?.username || "").trim().toLowerCase() === "skelletu";
+
+  app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
+    if (!isSystemOwner(req.user)) {
+      return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    }
     const list = await storage.getEnterprises();
     res.json(list);
   });
 
-  app.post("/api/admin/enterprises", async (req, res) => {
+  app.post("/api/admin/enterprises", isAuthenticated, async (req, res) => {
+    if (!isSystemOwner(req.user)) {
+      return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    }
     try {
       const { name, slug, username, password } = req.body;
-      
-      console.log("Recebendo dados para registro de instituição:", { name, slug, username, hasPassword: !!password });
 
-      if (!password) {
-        return res.status(400).json({ message: "A senha é obrigatória." });
+      if (typeof name !== "string" || !name.trim() ||
+          typeof username !== "string" || !username.trim() ||
+          typeof password !== "string" || password.length < 12) {
+        return res.status(400).json({ message: "Nome, usuário e senha válida são obrigatórios." });
       }
-      
-      // Validação básica do slug se não for enviado
-      const finalSlug = slug || name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
-      
+
+      const finalSlug = (typeof slug === "string" && slug.trim())
+        ? slug.trim()
+        : name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+
       const existing = await storage.getEnterpriseBySlug(finalSlug);
       if (existing) {
         return res.status(400).json({ message: "Uma instituição com este nome ou slug já existe." });
       }
 
-      const existingUser = await storage.getUserByUsername(username);
+      const existingUser = await storage.getUserByUsername(username.trim());
       if (existingUser) {
         return res.status(400).json({ message: "Este nome de usuário já está em uso." });
       }
 
       const hashedPassword = await hashPassword(password);
-      
       const enterpriseData = { ...req.body };
       delete enterpriseData.username;
       delete enterpriseData.password;
+      enterpriseData.name = name.trim();
       enterpriseData.slug = finalSlug;
       enterpriseData.status = "pending";
 
       const adminData = {
-        username,
+        username: username.trim(),
         password: hashedPassword,
       };
 
