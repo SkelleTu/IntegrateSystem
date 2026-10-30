@@ -41,12 +41,12 @@ process.once("SIGTERM", () => {
       progress: 0,
     });
 
-    const { initApp, log } = await import("./app");
-    const { httpServer } = await initApp();
-
+    const { initApp, log, httpServer } = await import("./app");
     const port = parseInt(process.env.PORT || "5010", 10);
+
     httpServer.on("error", (error) => {
       runtimeError(error, "Erro no servidor HTTP", { phase: "server", port });
+      console.error("[SERVER] HTTP listener error:", error);
     });
 
     httpServer.on("close", () => {
@@ -56,23 +56,31 @@ process.once("SIGTERM", () => {
       });
     });
 
+    // Open the port immediately so Render can detect the service while the
+    // remote database is initializing. /health remains 503 until initApp finishes.
     httpServer.listen(
       { port, host: "0.0.0.0", reusePort: true },
       () => {
         log(`serving on port ${port}`);
         runtimeEvent("server-listening", `Servidor ouvindo na porta ${port}`, {
           phase: "server",
-          progress: 100,
+          progress: 20,
           port,
         });
-
-        void import("./mcp-compatibility-controller").then(
-          ({ startMcpCompatibilityLoop }) => startMcpCompatibilityLoop(),
-        );
       },
     );
+
+    await initApp();
+
+    void import("./mcp-compatibility-controller").then(
+      ({ startMcpCompatibilityLoop }) => startMcpCompatibilityLoop(),
+    ).catch((error) => {
+      runtimeError(error, "Falha ao iniciar o loop de compatibilidade MCP");
+      console.error("[MCP] Compatibility loop failed to start:", error);
+    });
   } catch (error) {
     runtimeError(error, "Falha fatal ao iniciar o servidor");
+    console.error("[BOOT] Fatal startup error:", error);
     process.exitCode = 1;
   }
 })();

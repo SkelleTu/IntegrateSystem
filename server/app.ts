@@ -26,7 +26,8 @@ import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./
 import { getRuntimeObservability } from "./runtime-observability";
 
 const app = express();
-const httpServer = createServer(app);
+export const httpServer = createServer(app);
+let appReady = false;
 
 process.env.TZ = "America/Sao_Paulo";
 
@@ -67,16 +68,16 @@ app.set("trust proxy", 1);
 // Stable JSON liveness probes must be registered before the SPA/static fallback.
 // Render and external monitors must never receive index.html from /health.
 const healthPayload = () => ({
-  status: "ok",
+  status: appReady ? "ok" : "starting",
   service: "integrated-system",
   timestamp: new Date().toISOString(),
   uptimeSeconds: Math.floor(process.uptime()),
 });
 app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).type("application/json").json(healthPayload());
+  res.status(appReady ? 200 : 503).type("application/json").json(healthPayload());
 });
 app.get("/api/health", (_req: Request, res: Response) => {
-  res.status(200).type("application/json").json(healthPayload());
+  res.status(appReady ? 200 : 503).type("application/json").json(healthPayload());
 });
 
 app.use((req, res, next) => {
@@ -406,6 +407,11 @@ export async function initApp() {
       }
     });
 
+    appReady = true;
+    runtimeEvent("server-ready", "Aplicação pronta após inicialização do banco e das rotas", {
+      phase: "server",
+      progress: 100,
+    });
     return { app, httpServer };
   } catch (error) {
     runtimeError(error, "Falha crítica durante a inicialização do servidor", {
