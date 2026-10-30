@@ -230,31 +230,33 @@ export async function initApp() {
     const masterPassword = String(process.env.AURA_MASTER_PASSWORD || "");
     if (masterPassword) {
       if (masterPassword.length < 24) {
-        throw new Error("[SECURITY] AURA_MASTER_PASSWORD must contain at least 24 characters.");
-      }
-      const existingMaster = await storage.getUserByUsername(masterUsername);
-      if (!existingMaster) {
-        const salt = randomBytes(16).toString("hex");
-        const hash = (await scryptAsync(masterPassword, salt, 64)) as Buffer;
-        await storage.createUser({
-          username: masterUsername,
-          password: `${hash.toString("hex")}.${salt}`,
-          role: "owner",
-        } as any);
-        const verifiedMaster = await storage.getUserByUsername(masterUsername);
-        if (!verifiedMaster || String(verifiedMaster.role).toLowerCase() !== "owner") {
-          throw new Error("[SECURITY] Master account creation could not be verified.");
-        }
-        console.log("[BOOT] Master owner account created and verified across active databases.");
+        console.error("[SECURITY] Master provisioning skipped: configured password is shorter than 24 characters.");
       } else {
-        const currentRole = String(existingMaster.role || "").trim().toLowerCase();
-        if (currentRole !== "owner") {
-          throw new Error("[SECURITY] The configured master username is already occupied by a non-owner account; no privilege or password changes were made.");
+        const existingMaster = await storage.getUserByUsername(masterUsername);
+        if (!existingMaster) {
+          const salt = randomBytes(16).toString("hex");
+          const hash = (await scryptAsync(masterPassword, salt, 64)) as Buffer;
+          await storage.createUser({
+            username: masterUsername,
+            password: `${hash.toString("hex")}.${salt}`,
+            role: "owner",
+          } as any);
+          const verifiedMaster = await storage.getUserByUsername(masterUsername);
+          if (!verifiedMaster || String(verifiedMaster.role).toLowerCase() !== "owner") {
+            throw new Error("[SECURITY] Master account creation could not be verified.");
+          }
+          console.log("[BOOT] Master owner account created through mirrored storage.");
+        } else {
+          const currentRole = String(existingMaster.role || "").trim().toLowerCase();
+          if (currentRole !== "owner") {
+            console.error("[SECURITY] Master provisioning skipped: configured username is already occupied; no account was changed.");
+          } else {
+            console.log("[BOOT] Existing master owner account found; password was not changed.");
+          }
         }
-        console.log("[BOOT] Existing master owner account found; password was not changed.");
+        // Do not retain the plaintext secret in the running process.
+        process.env.AURA_MASTER_PASSWORD = "";
       }
-      // Do not retain the plaintext secret in the running process.
-      process.env.AURA_MASTER_PASSWORD = "";
     } else {
       console.log("[BOOT] Master account provisioning skipped; secure Render secret is not configured.");
     }
