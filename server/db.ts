@@ -671,7 +671,7 @@ export async function setupDatabase() {
   // Add missing columns as nullable locally; preserve safe literal defaults where possible.
   if (isRemoteEnabled && tursoClient) {
     const mirrorSchemaTables = [...new Set(TABLE_DEFINITIONS
-      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
       .filter((table): table is string => Boolean(table)))];
 
     for (const table of mirrorSchemaTables) {
@@ -688,7 +688,7 @@ export async function setupDatabase() {
         const rawDefault = column.dflt_value === null || column.dflt_value === undefined
           ? ""
           : String(column.dflt_value).trim();
-        const safeDefault = /^(?:NULL|TRUE|FALSE|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|-?\\d+(?:\\.\\d+)?|'(?:''|[^'])*'|"(?:\"\\"|[^"])*"|\\(.+\\))$/i.test(rawDefault)
+        const safeDefault = /^(?:NULL|TRUE|FALSE|CURRENT_TIMESTAMP|CURRENT_DATE|CURRENT_TIME|-?\d+(?:\.\d+)?|'(?:''|[^'])*'|\(.+\))$/i.test(rawDefault)
           ? ` DEFAULT ${rawDefault}`
           : "";
         const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
