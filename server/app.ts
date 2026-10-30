@@ -1,5 +1,8 @@
 import express, { type Express, Request, Response, NextFunction } from "express";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, scrypt } from "node:crypto";
+import { promisify } from "node:util";
+
+const scryptAsync = promisify(scrypt);
 import { runWithAuraContext } from "./aura-request-context";
 import { registerRoutes } from "./routes";
 import { storage } from "./storage";
@@ -220,6 +223,43 @@ export async function initApp() {
 
     const { setupDatabase } = await import("./db");
     await setupDatabase();
+
+    // One-time-by-absence master provisioning. The password is supplied only as
+    // a Render secret; it is scrypt-hashed and never logged or returned by an API.
+    const masterUsername = String(process.env.AURA_MASTER_USERNAME || "master").trim();
+    const masterPassword = String(process.env.AURA_MASTER_PASSWORD || "");
+    if (masterPassword) {
+      if (masterPassword.length < 24) {
+        console.error("[SECURITY] Master provisioning skipped: configured password is shorter than 24 characters.");
+      } else {
+        const existingMaster = await storage.getUserByUsername(masterUsername);
+        if (!existingMaster) {
+          const salt = randomBytes(16).toString("hex");
+          const hash = (await scryptAsync(masterPassword, salt, 64)) as Buffer;
+          await storage.createUser({
+            username: masterUsername,
+            password: `${hash.toString("hex")}.${salt}`,
+            role: "owner",
+          } as any);
+          const verifiedMaster = await storage.getUserByUsername(masterUsername);
+          if (!verifiedMaster || String(verifiedMaster.role).toLowerCase() !== "owner") {
+            throw new Error("[SECURITY] Master account creation could not be verified.");
+          }
+          console.log("[BOOT] Master owner account created through mirrored storage.");
+        } else {
+          const currentRole = String(existingMaster.role || "").trim().toLowerCase();
+          if (currentRole !== "owner") {
+            console.error("[SECURITY] Master provisioning skipped: configured username is already occupied; no account was changed.");
+          } else {
+            console.log("[BOOT] Existing master owner account found; password was not changed.");
+          }
+        }
+        // Do not retain the plaintext secret in the running process.
+        process.env.AURA_MASTER_PASSWORD = "";
+      }
+    } else {
+      console.log("[BOOT] Master account provisioning skipped; secure Render secret is not configured.");
+    }
 
     // Explicitly authorized, narrowly scoped bootstrap for the named MCP operator.
     // Never promotes arbitrary users: the exact username must be configured in Render.

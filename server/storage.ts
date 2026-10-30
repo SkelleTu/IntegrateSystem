@@ -242,21 +242,28 @@ export class DatabaseStorage implements IStorage {
 
   async createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise> {
     this.logAction(`Criação de instituição: ${enterprise.name}`);
-    const insertResultenterprises: any = await db.insert(enterprises).values(enterprise);
-      const identerprises = insertResultenterprises.lastInsertRowid;
-      const [newEnterprise] = await db.select().from(enterprises).where(eq(enterprises.id, identerprises));
-    // Initialize settings for new enterprise
-    await db.insert(settings).values({ enterpriseId: newEnterprise.id });
-    
-    if (adminData) {
-      await db.insert(users).values({
-        ...adminData,
-        enterpriseId: newEnterprise.id,
-        role: "admin"
-      });
-    }
-    
-    return newEnterprise;
+    const sharedEnterpriseId = await nextSharedId(enterprises);
+    const sharedAdminId = adminData ? await nextSharedId(users) : undefined;
+
+    return await dualWrite(async (database: any) => {
+      await database.insert(enterprises).values({ ...enterprise, id: sharedEnterpriseId } as any);
+      const [newEnterprise] = await database.select().from(enterprises)
+        .where(eq(enterprises.id, sharedEnterpriseId)).limit(1);
+      if (!newEnterprise) {
+        throw new Error("Não foi possível verificar a instituição recém-criada.");
+      }
+
+      await database.insert(settings).values({ enterpriseId: newEnterprise.id });
+      if (adminData) {
+        await database.insert(users).values({
+          ...adminData,
+          id: sharedAdminId,
+          enterpriseId: newEnterprise.id,
+          role: "admin",
+        } as any);
+      }
+      return newEnterprise;
+    });
   }
 
   async updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise> {
