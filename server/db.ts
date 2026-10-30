@@ -666,6 +666,45 @@ export async function setupDatabase() {
     );
   }
 
+  // Bring the local SQLite mirror up to the remote Turso column shape before hydration.
+  // Legacy local files may predate fields added to Turso (for example users.email).
+  // Add missing columns as nullable locally; preserve safe literal defaults where possible.
+  if (isRemoteEnabled && tursoClient) {
+    const mirrorSchemaTables = [...new Set(TABLE_DEFINITIONS
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
+      .filter((table): table is string => Boolean(table)))];
+
+    for (const table of mirrorSchemaTables) {
+      const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
+      const localInfo = localSqlite.exec(`PRAGMA table_info("${table}")`)[0]?.values ?? [];
+      const localColumns = new Set(localInfo.map((row: any[]) => String(row[1])));
+
+      for (const column of remoteInfo.rows as any[]) {
+        const columnName = String(column.name || "");
+        if (!columnName || localColumns.has(columnName)) continue;
+
+        const rawType = String(column.type || "TEXT").trim();
+        const safeType = /^[A-Za-z0-9_(), ]+$/.test(rawType) ? rawType : "TEXT";
+        const rawDefault = column.dflt_value === null || column.dflt_value === undefined
+          ? ""
+          : String(column.dflt_value).trim();
+        const safeDefault = /^(?:NULL|TRUE|FALSE|-?\d+(?:\.\d+)?|'(?:''|[^'])*')$/i.test(rawDefault)
+          ? ` DEFAULT ${rawDefault}`
+          : "";
+        const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+        const migration = `ALTER TABLE ${quote(table)} ADD COLUMN ${quote(columnName)} ${safeType}${safeDefault}`;
+
+        try {
+          localSqlite.prepare(migration).run();
+          localColumns.add(columnName);
+          console.warn(`[DB] SQLite mirror column added from Turso schema: ${table}.${columnName}`);
+        } catch (error: any) {
+          throw new Error(`[DB] Could not align SQLite mirror column ${table}.${columnName}: ${error.message}`, { cause: error });
+        }
+      }
+    }
+  }
+
   // In Render, SQLite is an ephemeral mirror and Turso is the durable source of truth.
   // Hydrate only when explicitly enabled; never overwrite a developer's local database by default.
   if (isRemoteEnabled && tursoClient && process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true") {
