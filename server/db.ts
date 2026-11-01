@@ -57,7 +57,7 @@ export const isRemoteEnabled = !!dbRemote;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
 const primaryDatabase: any = dbRemote ?? dbLocal;
-const mirrorDatabase: any = dbRemote ? dbLocal : null;
+const mirrorDatabase: any = null; // Turso is the sole business-data database in remote mode; SQLite remains process-local telemetry only.
 
 function isPromiseLike(value: any): boolean {
   if (!value) return false;
@@ -149,7 +149,7 @@ export const db = (mirrorDatabase
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
   if (dbRemote) {
-    return [dbRemote, dbLocal];
+    return [dbRemote];
   }
   return [dbLocal];
 }
@@ -711,7 +711,7 @@ export async function setupDatabase() {
 
   // In Render, SQLite is an ephemeral mirror and Turso is the durable source of truth.
   // Hydrate only when explicitly enabled; never overwrite a developer's local database by default.
-  if (isRemoteEnabled && tursoClient && process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true") {
+  if (isRemoteEnabled && tursoClient && process.env.NODE_ENV !== "production" && process.env.AURA_SYNC_LOCAL_MIRROR_FROM_TURSO === "true") {
     const mirrorTables = [...new Set(TABLE_DEFINITIONS
       .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
       .filter((table): table is string => Boolean(table)))];
@@ -790,6 +790,9 @@ export async function setupDatabase() {
 }
 
 export async function auditDatabaseParity() {
+  if (tursoClient && dbRemote) {
+    return { ok: true, remoteEnabled: true, mirrorEnabled: false, tablesChecked: 0, mismatches: [], note: "SQLite business-data mirror is disabled; Turso is the sole source of truth." };
+  }
   if (!tursoClient) {
     return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
   }
