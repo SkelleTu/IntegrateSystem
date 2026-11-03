@@ -1,4 +1,4 @@
-import { db, dbRemote, dbLocal, multiWrite, localSqlite, getAllDatabases } from "./db.js";
+import { db, dbRemote, dbLocal, multiWrite, localSqlite, getAllDatabases, tursoClient } from "./db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
@@ -296,7 +296,41 @@ export class DatabaseStorage implements IStorage {
     const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
       const email = String((user as any).email || `aura-user-${sharedUserId}@localhost.invalid`).trim();
-      await database.insert(users).values({ ...user, email, id: sharedUserId } as any);
+      if (database === dbRemote && tursoClient) {
+        // Use an explicit SQL insert for Turso's legacy users table. This avoids
+        // Drizzle silently omitting columns when the remote table has evolved
+        // independently from the shared SQLite schema.
+        const schemaResult = await tursoClient.execute({ sql: 'PRAGMA table_info("users")' });
+        const schemaRows = schemaResult.rows as any[];
+        const remoteColumns = new Map(schemaRows.map((row: any) => [
+          String(row.name ?? row[1]),
+          { notNull: Number(row.notnull ?? row[3]) === 1, defaultValue: row.dflt_value ?? row[4] ?? null },
+        ]));
+        const availableValues: Record<string, any> = {
+          id: String(sharedUserId),
+          username: user.username,
+          email,
+          password: user.password,
+          role: user.role || "barber",
+          fingerprint_id: (user as any).fingerprintId ?? null,
+          enterprise_id: (user as any).enterpriseId ?? null,
+        };
+        const missingRequired = [...remoteColumns.entries()]
+          .filter(([name, meta]) => meta.notNull && meta.defaultValue === null && !(name in availableValues))
+          .map(([name]) => name);
+        if (missingRequired.length) {
+          throw new Error("Turso users table has unsupported required columns: " + missingRequired.join(", "));
+        }
+        const columns = Object.keys(availableValues).filter((name) => remoteColumns.has(name));
+        const quotedColumns = columns.map((name) => '"' + name.replace(/"/g, '""') + '"').join(", ");
+        const placeholders = columns.map(() => "?").join(", ");
+        await tursoClient.execute({
+          sql: `INSERT INTO users (${quotedColumns}) VALUES (${placeholders})`,
+          args: columns.map((name) => availableValues[name]),
+        });
+      } else {
+        await database.insert(users).values({ ...user, email, id: sharedUserId } as any);
+      }
       const [newUser] = await database.select().from(users)
         .where(eq(users.id, sharedUserId)).limit(1);
       if (!newUser) {
