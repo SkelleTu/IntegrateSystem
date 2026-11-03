@@ -30,6 +30,7 @@ export const userSessions = pgTable("user_sessions", {
 export const users = pgTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
+  email: text("email"),
   password: text("password").notNull(),
   role: text("role").notNull().default("barber"), // "admin", "barber", "owner"
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
