@@ -295,7 +295,8 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Novo usuário cadastrado: ${user.username}`);
     const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
-      await database.insert(users).values({ ...user, id: sharedUserId } as any);
+      const email = String((user as any).email || `aura-user-${sharedUserId}@localhost.invalid`).trim();
+      await database.insert(users).values({ ...user, email, id: sharedUserId } as any);
       const [newUser] = await database.select().from(users)
         .where(eq(users.id, sharedUserId)).limit(1);
       if (!newUser) {

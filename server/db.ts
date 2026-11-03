@@ -212,6 +212,7 @@ const TABLE_DEFINITIONS = [
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
+    email TEXT,
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'barber',
     fingerprint_id TEXT UNIQUE,
@@ -505,6 +506,7 @@ export async function setupDatabase() {
 
   // ── SQLite local: migrações incrementais (espelho das remotas) ───────────
   const localMigrations = [
+    "ALTER TABLE users ADD COLUMN email TEXT",
     "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
     "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
     "ALTER TABLE enterprises ADD COLUMN city TEXT",
