@@ -105,7 +105,7 @@ export async function registerRoutes(
       const configuredOperator = operatorUsername
         ? await storage.getUserByUsername(operatorUsername)
         : null;
-      const tokenSubjectId = tokenSubject && /^\\d+$/.test(tokenSubject) ? Number(tokenSubject) : null;
+      const tokenSubjectId = tokenSubject && /^\d+$/.test(tokenSubject) ? Number(tokenSubject) : null;
       const tokenOperator = tokenSubjectId !== null && Number.isSafeInteger(tokenSubjectId)
         ? await storage.getUser(tokenSubjectId).catch(() => undefined)
         : null;
