@@ -315,6 +315,23 @@ export class DatabaseStorage implements IStorage {
           fingerprint_id: (user as any).fingerprintId ?? null,
           enterprise_id: (user as any).enterpriseId ?? null,
         };
+        const legacyRequiredValues: Record<string, any> = {
+          password_hash: user.password,
+          nome_completo: (user as any).nomeCompleto || user.username,
+          cpf: (user as any).cpf || `PENDENTE-${sharedUserId}`,
+          telefone: (user as any).telefone || `PENDENTE-${sharedUserId}`,
+          endereco: (user as any).endereco || "Não informado",
+          cidade: (user as any).cidade || "Não informado",
+          estado: (user as any).estado || "Não informado",
+          cep: (user as any).cep || "Não informado",
+          chave_pix: (user as any).chavePix || "Não configurada",
+          tipo_chave_pix: (user as any).tipoChavePix || "não configurado",
+        };
+        for (const [name, meta] of remoteColumns.entries()) {
+          if (meta.notNull && meta.defaultValue === null && !(name in availableValues) && name in legacyRequiredValues) {
+            availableValues[name] = legacyRequiredValues[name];
+          }
+        }
         const missingRequired = [...remoteColumns.entries()]
           .filter(([name, meta]) => meta.notNull && meta.defaultValue === null && !(name in availableValues))
           .map(([name]) => name);
