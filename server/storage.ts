@@ -303,6 +303,7 @@ export class DatabaseStorage implements IStorage {
     const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
       const email = String((user as any).email || `aura-user-${sharedUserId}@localhost.invalid`).trim();
+      let newUser: any;
       if (database === dbRemote && tursoClient) {
         // Use an explicit SQL insert for Turso's legacy users table. This avoids
         // Drizzle silently omitting columns when the remote table has evolved
@@ -352,14 +353,18 @@ export class DatabaseStorage implements IStorage {
           sql: `INSERT INTO users (${quotedColumns}) VALUES (${placeholders})`,
           args: columns.map((name) => availableValues[name]),
         });
+        const verification = await tursoClient.execute({
+          sql: "SELECT * FROM users WHERE username = ? LIMIT 1",
+          args: [user.username],
+        });
+        newUser = verification.rows[0] as any;
       } else {
         await database.insert(users).values({ ...user, email, id: sharedUserId } as any);
+        const [localUser] = await database.select().from(users)
+          .where(eq(users.id, sharedUserId)).limit(1);
+        newUser = localUser;
       }
-      const [newUser] = await database.select().from(users)
-        .where(eq(users.id, sharedUserId)).limit(1);
-      if (!newUser) {
-        throw new Error(`Não foi possível verificar o usuário recém-criado: ${user.username}`);
-      }
+      if (!newUser) throw new Error(`Não foi possível verificar o usuário recém-criado: ${user.username}`);
       return newUser;
     });
   }
