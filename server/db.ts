@@ -793,7 +793,7 @@ export async function setupDatabase() {
 
 export async function auditDatabaseParity() {
   if (tursoClient && dbRemote) {
-    return { ok: true, remoteEnabled: true, mirrorEnabled: false, tablesChecked: 0, mismatches: [], note: "SQLite business-data mirror is disabled; Turso is the sole source of truth." };
+    return { ok: false, remoteEnabled: true, mirrorEnabled: false, neonEnabled: false, tablesChecked: 0, mismatches: [{ component: "database-parity", expected: "SQLite + Neon synchronized", actual: "Turso-only; SQLite business mirror disabled; Neon not connected" }], note: "Parity is not active. Turso is the sole business-data database; SQLite is process-local and Neon is not connected." };
   }
   if (!tursoClient) {
     return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
