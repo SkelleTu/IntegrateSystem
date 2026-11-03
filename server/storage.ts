@@ -47,6 +47,13 @@ async function dualWrite(operation: (database: any) => Promise<any>) {
   return result;
 }
 
+async function dualWriteTransaction(operation: (database: any) => Promise<any>) {
+  return dualWrite((database) => {
+    if (typeof database.transaction !== "function") throw new Error("O banco ativo não oferece transações; operação crítica cancelada.");
+    return database.transaction((transaction: any) => operation(transaction));
+  });
+}
+
 
 // Generate one identifier shared by all active databases before mirrored inserts.
 async function nextSharedId(table: any): Promise<number> {
@@ -296,6 +303,7 @@ export class DatabaseStorage implements IStorage {
     const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
       const email = String((user as any).email || `aura-user-${sharedUserId}@localhost.invalid`).trim();
+      let newUser: any;
       if (database === dbRemote && tursoClient) {
         // Use an explicit SQL insert for Turso's legacy users table. This avoids
         // Drizzle silently omitting columns when the remote table has evolved
@@ -345,14 +353,18 @@ export class DatabaseStorage implements IStorage {
           sql: `INSERT INTO users (${quotedColumns}) VALUES (${placeholders})`,
           args: columns.map((name) => availableValues[name]),
         });
+        const verification = await tursoClient.execute({
+          sql: "SELECT * FROM users WHERE username = ? LIMIT 1",
+          args: [user.username],
+        });
+        newUser = verification.rows[0] as any;
       } else {
         await database.insert(users).values({ ...user, email, id: sharedUserId } as any);
+        const [localUser] = await database.select().from(users)
+          .where(eq(users.id, sharedUserId)).limit(1);
+        newUser = localUser;
       }
-      const [newUser] = await database.select().from(users)
-        .where(eq(users.id, sharedUserId)).limit(1);
-      if (!newUser) {
-        throw new Error(`Não foi possível verificar o usuário recém-criado: ${user.username}`);
-      }
+      if (!newUser) throw new Error(`Não foi possível verificar o usuário recém-criado: ${user.username}`);
       return newUser;
     });
   }
@@ -519,7 +531,10 @@ export class DatabaseStorage implements IStorage {
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
     const sharedRegisterId = await nextSharedId(cashRegisters);
-    return await dualWrite(async (database) => {
+    return await dualWriteTransaction(async (database) => {
+      const [existingRegister] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.userId, register.userId), isNull(cashRegisters.closedAt))).limit(1);
+      if (existingRegister) throw new Error("Já existe um caixa aberto para este usuário.");
       const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, id: sharedRegisterId } as any).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
@@ -527,27 +542,17 @@ export class DatabaseStorage implements IStorage {
         openingAmount: newRegister.openingAmount ?? 0,
       });
       
-      if (newRegister.openingAmount && newRegister.openingAmount > 0) {
-        const businessType = await getBusinessTypeForUser(database, register.userId);
-        await database.insert(transactions).values({
-          businessType,
-          type: "income",
-          category: "caixa",
-          description: `Abertura de Caixa #${newRegister.id}`,
-          amount: newRegister.openingAmount,
-          createdAt: new Date()
-        } as any);
-      }
-      
+      // Opening cash is a float, not revenue. It belongs to cash reconciliation only.
       return newRegister;
     });
   }
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteTransaction(async (database) => {
       const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
       if (!register) throw new Error("Caixa não encontrado");
+      if (register.status === "closed" || register.closedAt) return register;
 
       const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
       const completedSales = salesList.filter((s: any) => s.status === "completed");
@@ -574,14 +579,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(cashRegisters.id, id));
       const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
 
-      await database.insert(transactions).values({
-        businessType: "padaria",
-        type: "income",
-        category: "caixa",
-        description: `Fechamento de Caixa #${id} - Valor em Gaveta`,
-        amount: closingAmount,
-        createdAt: new Date()
-      } as any);
+      // Closing cash is a physical count, not a second income entry.
 
       runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
         phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
@@ -593,7 +591,14 @@ export class DatabaseStorage implements IStorage {
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     const sharedSaleId = await nextSharedId(sales);
-    return await dualWrite(async (database) => {
+    return await dualWriteTransaction(async (database) => {
+      if (!items.length || !paymentsData.length) throw new Error("Venda exige itens e pagamentos.");
+      const paymentTotal = paymentsData.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+      if (!Number.isSafeInteger(paymentTotal) || paymentTotal !== Number(sale.totalAmount)) throw new Error("A soma dos pagamentos deve corresponder exatamente ao total da venda.");
+      if (sale.cashRegisterId) {
+        const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, sale.cashRegisterId)).limit(1);
+        if (!register || register.status !== "open" || register.closedAt) throw new Error("A venda exige um caixa aberto.");
+      }
       for (const item of items) {
         const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
         if (batchId !== null) {
@@ -687,6 +692,7 @@ export class DatabaseStorage implements IStorage {
         }
 
         if (inventoryItem) {
+          if (Number(inventoryItem.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o item ${inventoryItem.id}: disponível ${inventoryItem.quantity}, solicitado ${item.quantity}`);
           await database.update(inventory)
             .set({ 
               quantity: inventoryItem.quantity - item.quantity,
@@ -742,7 +748,7 @@ export class DatabaseStorage implements IStorage {
 
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
-    return await dualWrite(async (database) => {
+    return await dualWriteTransaction(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
       const transaction = database;
@@ -842,8 +848,9 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
+        const businessType = await getBusinessTypeForUser(transaction, sale.userId);
         await transaction.insert(transactions).values({
-          businessType: "padaria",
+          businessType,
           type: "expense",
           category: "vendas",
           description: `ESTORNO: Venda PDV #${id} CANCELADA`,
