@@ -209,6 +209,11 @@ const TABLE_DEFINITIONS = [
     user_agent TEXT,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS aura_sessions (
+    sid TEXT PRIMARY KEY,
+    sess TEXT NOT NULL,
+    expire INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
