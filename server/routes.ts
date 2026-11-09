@@ -35,9 +35,20 @@ const uploadStorage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
+const privateRegistrationUploadsPath = process.env.VERCEL
+  ? path.join("/tmp", "private-registration-uploads")
+  : path.join(process.cwd(), "private_registration_uploads");
+if (!fs.existsSync(privateRegistrationUploadsPath)) fs.mkdirSync(privateRegistrationUploadsPath, { recursive: true });
+const privateRegistrationStorage = multer.diskStorage({
+  destination: privateRegistrationUploadsPath,
+  filename: (req: any, file: any, cb: any) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname).toLowerCase());
+  },
+});
 const upload = multer({ storage: uploadStorage });
 const publicDocumentUpload = multer({
-  storage: uploadStorage,
+  storage: privateRegistrationStorage,
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
@@ -571,7 +582,7 @@ export async function registerRoutes(
     publicDocumentUpload.single("file")(req, res, (error: any) => {
       if (error) return res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ message: error.message || "Arquivo inválido." });
       if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
-      return res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+      return res.json({ url: `/api/admin/registration-documents/${req.file.filename}` });
     });
   });
 
@@ -606,10 +617,10 @@ export async function registerRoutes(
 
     const validDocumentUrl = (value?: string | null) => {
       if (!value) return null;
-      const prefix = "/attached_assets/uploads/";
+      const prefix = "/api/admin/registration-documents/";
       if (!value.startsWith(prefix)) throw new Error("Documento inválido; envie o arquivo novamente.");
       const filename = value.slice(prefix.length);
-      if (!filename || filename !== path.basename(filename) || !fs.existsSync(path.join(process.cwd(), "attached_assets/uploads", filename))) {
+      if (!filename || filename !== path.basename(filename) || !fs.existsSync(path.join(privateRegistrationUploadsPath, filename))) {
         throw new Error("Documento não encontrado; envie o arquivo novamente.");
       }
       return value;
@@ -679,6 +690,20 @@ export async function registerRoutes(
       console.error("[REGISTRATION] Public registration failed:", error?.message || error);
       return res.status(500).json({ message: "Não foi possível concluir o cadastro. Tente novamente ou contate o administrador." });
     }
+  });
+
+  // Documentos de cadastro são privados: somente o proprietário do sistema pode visualizá-los.
+  app.get("/api/admin/registration-documents/:filename", isAuthenticated, (req: any, res: any) => {
+    if (String(req.user?.username || "").toLowerCase() !== "skelletu") {
+      return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    }
+    const filename = String(req.params.filename || "");
+    if (!filename || filename !== path.basename(filename) || !/^[a-zA-Z0-9._-]+$/.test(filename)) {
+      return res.status(400).json({ message: "Nome de documento inválido." });
+    }
+    const filepath = path.join(privateRegistrationUploadsPath, filename);
+    if (!fs.existsSync(filepath)) return res.status(404).json({ message: "Documento não encontrado." });
+    return res.sendFile(filepath);
   });
 
   // Rota de upload autenticada (para uso interno/admin)
