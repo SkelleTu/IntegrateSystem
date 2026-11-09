@@ -808,15 +808,15 @@ export async function auditDatabaseParity() {
   // each required table can be queried. Never compare row contents against localSqlite.
   const definitions = TABLE_DEFINITIONS
     .map((statement) => {
-      const match = statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i);
+      const match = statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i);
       if (!match) return null;
       const table = match[1];
       const open = statement.indexOf("(");
       const close = statement.lastIndexOf(")");
       const body = open >= 0 && close > open ? statement.slice(open + 1, close) : "";
-      const columns = body.split("\\n")
+      const columns = body.split("\n")
         .map((line) => line.trim().replace(/,$/, ""))
-        .map((line) => line.match(/^["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\\s+(?:INTEGER|TEXT|REAL|BLOB|NUMERIC|VARCHAR|CHAR|BOOLEAN|DATE|DATETIME)\\b/i)?.[1])
+        .map((line) => line.match(/^["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\s+(?:INTEGER|TEXT|REAL|BLOB|NUMERIC|VARCHAR|CHAR|BOOLEAN|DATE|DATETIME)\b/i)?.[1])
         .filter((column): column is string => Boolean(column));
       return { table, columns };
     })
