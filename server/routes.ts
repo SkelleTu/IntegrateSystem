@@ -332,6 +332,12 @@ export async function registerRoutes(
 
   // Auth Routes
   app.post(api.auth.login.path, (req, res, next) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const attemptedUsername = String(req.body?.username || "").trim().toLowerCase().slice(0, 64);
+    if (!allowPublicAction("login-ip:" + ip, 30, 15 * 60 * 1000)
+      || (attemptedUsername && !allowPublicAction("login-user:" + attemptedUsername, 10, 15 * 60 * 1000))) {
+      return res.status(429).json({ message: "Muitas tentativas de login. Aguarde antes de tentar novamente." });
+    }
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return res.status(500).json({ message: "Login failed." });
       if (!user) {
