@@ -1940,7 +1940,7 @@ export async function registerRoutes(
 
     if (responseStatus === 200) {
       const residuals = await Promise.all(getAllDatabases().map(async (database) => {
-        const testSaleIds = [saleId, secondSaleId].filter((id): id is number => Number.isSafeInteger(id) && Number(id) > 0) as number[];
+        const testSaleIds = [saleId, secondSaleId].filter((id): id is number => typeof id === "number" && Number.isSafeInteger(id) && id > 0);
         const dependentPayments = (await Promise.all(testSaleIds.map((id) => database.select().from(payments).where(eq(payments.saleId, id)) ))).flat();
         const dependentSaleItems = (await Promise.all(testSaleIds.map((id) => database.select().from(saleItems).where(eq(saleItems.saleId, id)) ))).flat();
         const transactionDescriptions = testSaleIds.flatMap((id) => [
