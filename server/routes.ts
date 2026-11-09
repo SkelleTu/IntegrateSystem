@@ -444,6 +444,51 @@ export async function registerRoutes(
     });
   });
 
+  app.post("/api/auth/change-password", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user as any;
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const username = String(user?.username || "").toLowerCase();
+    if (!allowPublicAction("password-change:" + ip + ":" + username, 5, 15 * 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas tentativas. Aguarde antes de tentar novamente." });
+    }
+
+    const currentPassword = typeof req.body?.currentPassword === "string" ? req.body.currentPassword : "";
+    const newPassword = typeof req.body?.newPassword === "string" ? req.body.newPassword : "";
+    if (newPassword.length < 12 || newPassword.length > 128) {
+      return res.status(400).json({ message: "A nova senha deve ter entre 12 e 128 caracteres." });
+    }
+    if (!currentPassword || currentPassword === newPassword) {
+      return res.status(400).json({ message: "Informe a senha atual e escolha uma senha diferente." });
+    }
+
+    try {
+      const dbUser = await storage.getUser(Number(user.id));
+      if (!dbUser || !(await comparePassword(dbUser.password, currentPassword))) {
+        return res.status(403).json({ message: "A senha atual está incorreta." });
+      }
+
+      const updatedUser = await storage.updateUser(dbUser.id, { password: await hashPassword(newPassword) });
+      if (!updatedUser) return res.status(500).json({ message: "Não foi possível salvar a nova senha." });
+
+      // Revoke every other persisted session for this account; preserve the current session.
+      if (tursoClient && req.sessionID) {
+        try {
+          await tursoClient.execute({
+            sql: "DELETE FROM aura_sessions WHERE CAST(json_extract(sess, '$.passport.user') AS TEXT) = ? AND sid <> ?",
+            args: [String(dbUser.id), String(req.sessionID)],
+          });
+        } catch (sessionError: any) {
+          console.error("[SECURITY] Could not revoke other sessions after password change:", sessionError?.message || sessionError);
+        }
+      }
+
+      return res.json({ ok: true, message: "Senha alterada. As outras sessões foram encerradas." });
+    } catch (error: any) {
+      console.error("[SECURITY] Password change failed:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível alterar a senha." });
+    }
+  });
+
   app.get(api.auth.me.path, (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     res.json(toPublicUser(req.user));

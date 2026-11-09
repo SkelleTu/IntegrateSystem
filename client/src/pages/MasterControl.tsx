@@ -1,4 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { apiRequest } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -22,12 +24,46 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 export default function MasterControl() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
   const { data: monitoring, isLoading } = useQuery<any>({
     queryKey: ["/api/admin/monitoring"],
     refetchInterval: 5000, // Real-time emphasis
   });
 
   if (isLoading) return null;
+
+  const handlePasswordChange = async () => {
+    setPasswordMessage("");
+    setPasswordError(false);
+    if (newPassword.length < 12 || newPassword.length > 128) {
+      setPasswordError(true);
+      setPasswordMessage("A nova senha deve ter entre 12 e 128 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError(true);
+      setPasswordMessage("A confirmação não corresponde à nova senha.");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      await apiRequest("POST", "/api/auth/change-password", { currentPassword, newPassword });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage("Senha alterada. As outras sessões foram encerradas.");
+    } catch {
+      setPasswordError(true);
+      setPasswordMessage("Não foi possível alterar a senha. Confira a senha atual e tente novamente.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
 
   return (
     <div className="min-h-screen w-full bg-black text-white relative overflow-hidden p-6 md:p-12">
@@ -59,6 +95,9 @@ export default function MasterControl() {
             </TabsTrigger>
             <TabsTrigger value="documents" className="data-[state=active]:bg-primary data-[state=active]:text-black font-bold uppercase tracking-widest text-[10px]">
               Documentos de Cadastro
+            </TabsTrigger>
+            <TabsTrigger value="security" className="data-[state=active]:bg-primary data-[state=active]:text-black font-bold uppercase tracking-widest text-[10px]">
+              Segurança da Conta
             </TabsTrigger>
           </TabsList>
 
@@ -120,6 +159,33 @@ export default function MasterControl() {
                 </Card>
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-6">
+            <Card className="bg-white/5 border-white/10 text-white max-w-2xl">
+              <CardHeader>
+                <CardTitle className="text-xl font-bold uppercase tracking-wide">Alterar senha da conta MASTER</CardTitle>
+                <p className="text-sm text-zinc-400">Use uma senha exclusiva com pelo menos 12 caracteres. A alteração encerra as outras sessões dessa conta.</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  Senha atual
+                  <input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} className="w-full rounded-lg border border-white/15 bg-black/60 px-3 py-2 text-white outline-none focus:border-primary" />
+                </label>
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  Nova senha
+                  <input type="password" autoComplete="new-password" minLength={12} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} className="w-full rounded-lg border border-white/15 bg-black/60 px-3 py-2 text-white outline-none focus:border-primary" />
+                </label>
+                <label className="block space-y-2 text-sm text-zinc-300">
+                  Confirmar nova senha
+                  <input type="password" autoComplete="new-password" minLength={12} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} className="w-full rounded-lg border border-white/15 bg-black/60 px-3 py-2 text-white outline-none focus:border-primary" />
+                </label>
+                {passwordMessage && <p role="status" className={passwordError ? "text-sm text-red-400" : "text-sm text-emerald-400"}>{passwordMessage}</p>}
+                <Button onClick={handlePasswordChange} disabled={passwordBusy || !currentPassword || !newPassword || !confirmPassword} className="font-bold uppercase tracking-wide">
+                  {passwordBusy ? "Alterando..." : "Alterar senha"}
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="documents" className="space-y-6">
