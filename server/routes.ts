@@ -691,9 +691,12 @@ export async function registerRoutes(
       const rollbackErrors: string[] = [];
       try {
         let cleanupUserId = userId;
-        if (!cleanupUserId) {
+        if (!cleanupUserId && enterpriseId) {
           const partialUser = await storage.getUserByUsername(username);
-          if (partialUser?.id) cleanupUserId = Number(partialUser.id);
+          // Never delete an account created by a concurrent registration attempt.
+          if (partialUser?.id && Number(partialUser.enterpriseId) === enterpriseId) {
+            cleanupUserId = Number(partialUser.id);
+          }
         }
         if (cleanupUserId) await storage.deleteUser(cleanupUserId);
       } catch (rollbackError: any) {
