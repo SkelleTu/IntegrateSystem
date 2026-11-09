@@ -134,7 +134,7 @@ class TursoSessionStore extends session.Store {
     void this.client.execute({
       sql: "UPDATE aura_sessions SET sess = ?, expire = ? WHERE sid = ?",
       args: [JSON.stringify(sess), this.expiry(sess), sid],
-    }).then(() => callback?.(null)).catch((error) => callback?.(error));
+    }).then(() => callback?.(null)).catch((error: any) => callback?.(error));
   }
 }
 
