@@ -262,6 +262,9 @@ async function mirrorLegacySnapshot(snapshot: Record<string, any[]>) {
 }
 
 async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
+  if (dbRemote) {
+    throw new Error("Restauração bloqueada: o banco primário é Turso. Este dump foi concebido para SQLite local e não pode substituir dados remotos.");
+  }
   const incoming = await databaseFromSql(sqlText);
   const comparison = compareDatabases(localSqlite, incoming);
 
@@ -293,8 +296,11 @@ async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
 }
 
 export function exportAllDataSync(): Record<string, any[]> {
+  if (dbRemote) {
+    throw new Error("Backup bloqueado: a produção usa Turso e este exportador lê apenas o SQLite local. Nenhum backup completo foi criado.");
+  }
   const snapshot: Record<string, any[]> = {
-    _meta: { version: "2.0", exportedAt: new Date().toISOString(), exportedBy: "Aura System Backup" } as any,
+    _meta: { version: "2.1", exportedAt: new Date().toISOString(), exportedBy: "Aura System Backup", source: "sqlite-local", complete: true } as any,
   };
   for (const table of LEGACY_TABLES) {
     try {
@@ -308,6 +314,9 @@ export function exportAllDataSync(): Record<string, any[]> {
 }
 
 export function saveBackupToFile(name?: string): string {
+  if (dbRemote) {
+    throw new Error("Backup bloqueado: Turso é o banco primário e o backup remoto ainda não foi implementado. Nenhum arquivo local será apresentado como backup de produção.");
+  }
   ensureBackupDir();
   const sourceName = name || "backup";
   const isSql = sourceName.startsWith("__SQL__");
@@ -334,6 +343,11 @@ export function saveBackupToFile(name?: string): string {
 let autoBackupTimer: ReturnType<typeof setTimeout> | null = null;
 export function scheduleAutoBackup(delayMs = 5000) {
   if (autoBackupTimer) clearTimeout(autoBackupTimer);
+  if (dbRemote) {
+    console.warn("[BACKUP] Auto-backup local desativado: Turso é o banco primário e o exportador remoto ainda não está implementado.");
+    autoBackupTimer = null;
+    return;
+  }
   autoBackupTimer = setTimeout(() => {
     try {
       ensureBackupDir();
@@ -379,6 +393,9 @@ export function listBackups(): Array<{ filename: string; name: string; createdAt
 }
 
 export async function importDataFromSnapshot(snapshot: Record<string, any[]> & { _sql?: string }): Promise<any> {
+  if (dbRemote) {
+    throw new Error("Importação bloqueada: o banco primário é Turso. Restauração remota segura ainda não está implementada.");
+  }
   if (typeof snapshot?._sql === "string") return restoreSqlDump(snapshot._sql, "loaded");
 
   const errors: string[] = [];

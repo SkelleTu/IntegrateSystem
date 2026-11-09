@@ -2276,23 +2276,44 @@ export async function registerRoutes(
     buildSqlDump,
   } = await import("./backup.js");
 
+  // Backup contains organization-wide data: owner-only access.
+  const requireBackupOwner = (req: any, res: any) => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ message: "Não autenticado" });
+      return false;
+    }
+    if ((req.user as any)?.username !== "SkelleTu") {
+      res.status(403).json({ message: "Acesso restrito ao proprietário do sistema" });
+      return false;
+    }
+    return true;
+  };
+
   // GET /api/backup/status — info do auto-backup e bancos ativos
   const { isRemoteEnabled } = await import("./db.js");
   app.get("/api/backup/status", (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     res.json({
       autoBackup: getAutoBackupInfo(),
+      backup: {
+        complete: !isRemoteEnabled,
+        authoritativeSource: isRemoteEnabled ? "turso" : "sqlite-local",
+        message: isRemoteEnabled
+          ? "O banco primário é Turso. O backup local não é uma cópia completa e a restauração está bloqueada até existir backup remoto verificado."
+          : "O banco primário é SQLite local.",
+      },
       databases: {
-        local: true,
+        primary: isRemoteEnabled ? "turso" : "sqlite-local",
+        localMirror: isRemoteEnabled,
         remote: isRemoteEnabled,
-        count: isRemoteEnabled ? 2 : 1,
+        authoritativeCount: 1,
       },
     });
   });
 
   // GET /api/backup/export — baixa snapshot JSON completo
   app.get("/api/backup/export", (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     try {
       const snapshot = exportAllDataSync();
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -2309,7 +2330,7 @@ export async function registerRoutes(
 
   // POST /api/backup/save — salva snapshot nomeado em arquivo
   app.post("/api/backup/save", (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     try {
       const { name } = req.body;
       const filepath = saveBackupToFile(name || undefined);
@@ -2322,7 +2343,7 @@ export async function registerRoutes(
 
   // GET /api/backup/list — lista backups salvos
   app.get("/api/backup/list", (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     try {
       res.json(listBackups());
     } catch (e: any) {
@@ -2332,7 +2353,7 @@ export async function registerRoutes(
 
   // GET /api/backup/download/:filename — baixa arquivo de backup específico
   app.get("/api/backup/download/:filename", (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     const { filename } = req.params;
     // segurança: só permite nomes simples sem paths
     if (filename.includes("..") || filename.includes("/")) {
@@ -2347,7 +2368,7 @@ export async function registerRoutes(
 
   // POST /api/backup/import — restaura a partir de JSON enviado no body
   app.post("/api/backup/import", async (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     try {
       const snapshot = req.body;
       if (!snapshot || typeof snapshot !== "object") {
@@ -2362,7 +2383,7 @@ export async function registerRoutes(
 
   // POST /api/backup/restore/:filename — restaura a partir de arquivo salvo
   app.post("/api/backup/restore/:filename", async (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     const { filename } = req.params;
     if (filename.includes("..") || filename.includes("/")) {
       return res.status(400).json({ message: "Nome inválido" });
@@ -2377,7 +2398,7 @@ export async function registerRoutes(
 
   // POST /api/backup/restore-auto — restaura a partir do auto-backup
   app.post("/api/backup/restore-auto", async (req: any, res: any) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
+    if (!requireBackupOwner(req, res)) return;
     try {
       const result = await restoreFromFile("auto-backup");
       res.json({ ok: true, ...result, message: "Auto-backup restaurado com sucesso" });
