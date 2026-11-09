@@ -65,9 +65,24 @@ export default function LandingPage() {
         return data.url;
       };
 
-      const addressProofUrl = await uploadFile(formData.addressProof);
-      const rgFrontUrl = await uploadFile(formData.rgFront);
-      const rgBackUrl = await uploadFile(formData.rgBack);
+      const uploadOptionalFile = async (file: File | null) => {
+        if (!file) return null;
+        try {
+          return await uploadFile(file);
+        } catch {
+          return null;
+        }
+      };
+      const [addressProofUrl, rgFrontUrl, rgBackUrl] = await Promise.all([
+        uploadOptionalFile(formData.addressProof),
+        uploadOptionalFile(formData.rgFront),
+        uploadOptionalFile(formData.rgBack),
+      ]);
+      const selectedDocuments = [formData.addressProof, formData.rgFront, formData.rgBack];
+      const uploadedDocuments = [addressProofUrl, rgFrontUrl, rgBackUrl];
+      if (selectedDocuments.some(Boolean) && selectedDocuments.some((file, index) => Boolean(file) && !uploadedDocuments[index])) {
+        toast({ title: "Cadastro sem todos os anexos", description: "O cadastro continuará. Você poderá enviar os documentos depois, quando o armazenamento privado estiver disponível." });
+      }
 
       // 2. Submit the registration with URLs
       await apiRequest("POST", "/api/public/register", {
