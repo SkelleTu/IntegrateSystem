@@ -255,8 +255,8 @@ export async function registerRoutes(
 
   // Session & Auth Setup
   const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
-  if (process.env.NODE_ENV === "production" && !sessionSecret) {
-    throw new Error("[SECURITY] SESSION_SECRET precisa estar configurado em produção; segredo fixo conhecido foi removido.");
+  if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
+    throw new Error("[SECURITY] SESSION_SECRET precisa conter pelo menos 32 caracteres em produção; segredo fixo conhecido foi removido.");
   }
   const sessionStore = tursoClient
     ? new TursoSessionStore(tursoClient)
