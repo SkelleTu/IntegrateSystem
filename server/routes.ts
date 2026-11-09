@@ -38,7 +38,7 @@ const uploadStorage = multer.diskStorage({
 const privateRegistrationUploadsPath = path.resolve(
   process.env.AURA_PRIVATE_UPLOAD_DIR || (process.env.VERCEL ? path.join("/tmp", "private-registration-uploads") : path.join(process.cwd(), "private_registration_uploads")),
 );
-const privateRegistrationStorageConfigured = (!process.env.RENDER && !process.env.VERCEL) || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
+const privateRegistrationStorageConfigured = (!process.env.RENDER && !process.env.RENDER_EXTERNAL_URL && !process.env.VERCEL && process.env.NODE_ENV !== "production") || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
 if (!fs.existsSync(privateRegistrationUploadsPath)) fs.mkdirSync(privateRegistrationUploadsPath, { recursive: true });
 const privateRegistrationStorage = multer.diskStorage({
   destination: privateRegistrationUploadsPath,
@@ -679,6 +679,9 @@ export async function registerRoutes(
         status: "pending",
       } as any);
       enterpriseId = Number(enterprise.id);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        throw new Error("ID de instituição inválido após criação.");
+      }
 
       const createdUser = await storage.createUser({
         username,
@@ -688,6 +691,9 @@ export async function registerRoutes(
         enterpriseId,
       } as any);
       userId = Number(createdUser.id);
+      if (!Number.isSafeInteger(userId) || userId <= 0) {
+        throw new Error("ID de usuário inválido após criação.");
+      }
       await storage.updateEnterprise(enterpriseId, { ownerId: userId } as any);
 
       return res.status(201).json({
