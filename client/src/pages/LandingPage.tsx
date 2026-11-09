@@ -425,7 +425,7 @@ export default function LandingPage() {
             <div className="mt-12 p-6 rounded-2xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
               <p className="text-[9px] font-bold text-white/50 leading-relaxed uppercase tracking-wider relative z-10">
-                A Aura utiliza criptografia de ponta a ponta para proteger seus documentos e dados institucionais.
+                O envio de documentos é opcional. Anexos só serão aceitos quando houver armazenamento privado permanente configurado.
               </p>
             </div>
           </Card>
