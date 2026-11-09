@@ -344,7 +344,6 @@ let autoBackupTimer: ReturnType<typeof setTimeout> | null = null;
 export function scheduleAutoBackup(delayMs = 5000) {
   if (autoBackupTimer) clearTimeout(autoBackupTimer);
   if (dbRemote) {
-    console.warn("[BACKUP] Auto-backup local desativado: Turso é o banco primário e o exportador remoto ainda não está implementado.");
     autoBackupTimer = null;
     return;
   }
