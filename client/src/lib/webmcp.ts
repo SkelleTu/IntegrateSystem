@@ -269,10 +269,10 @@ export async function installAuraWebMCP(): Promise<() => void> {
   tools.push(
     managedTool("aura_get_system", "Read Aura system/database status and authenticated session state.", {
       database: { method: "GET", path: () => "/api/db/status" },
-      session: { method: "GET", path: () => "/api/auth/me" },
+      session: { method: "GET", path: () => "/api/user" },
     }, false),
     managedTool("aura_manage_auth", "Manage the current Aura browser session. Logout changes session state.", {
-      me: { method: "GET", path: () => "/api/auth/me" },
+      me: { method: "GET", path: () => "/api/user" },
       logout: { method: "POST", path: () => "/api/auth/logout" },
     }, true),
     managedTool("aura_read_enterprises", "Read establishments available to the current Aura owner or admin.", {
