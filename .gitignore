@@ -9,3 +9,9 @@ runtime/*.jsonl
 runtime/.sync-repo/
 runtime/runtime-sync.log
 runtime/runtime-sync.stop
+*.db
+*.sqlite
+*.sqlite3
+attached_assets/backups/*.json
+attached_assets/*log-export*.json
+attached_assets/uploads/
