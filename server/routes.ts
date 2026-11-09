@@ -202,8 +202,9 @@ export async function registerRoutes(
       const configuredOperator = operatorUsername
         ? await storage.getUserByUsername(operatorUsername)
         : null;
-      const tokenOperator = tokenSubject
-        ? await storage.getUser(Number(tokenSubject)).catch(() => undefined)
+      const numericSubject = tokenSubject ? Number(tokenSubject) : NaN;
+      const tokenOperator = Number.isSafeInteger(numericSubject) && numericSubject > 0
+        ? await storage.getUser(numericSubject).catch(() => undefined)
         : null;
       const operator = tokenOperator || configuredOperator;
       if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
