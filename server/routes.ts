@@ -100,7 +100,7 @@ class TursoSessionStore extends session.Store {
 
   get(sid: string, callback: (err?: any, sess?: any) => void): void {
     void this.client.execute({ sql: "SELECT sess, expire FROM aura_sessions WHERE sid = ? LIMIT 1", args: [sid] })
-      .then(async (result) => {
+      .then(async (result: any) => {
         const row = result.rows[0] as any;
         if (!row) return callback(null, null);
         const expiresAt = Number(row.expire ?? row[1]);
@@ -115,14 +115,14 @@ class TursoSessionStore extends session.Store {
           return callback(null, null);
         }
       })
-      .catch((error) => callback(error));
+      .catch((error: any) => callback(error));
   }
 
   set(sid: string, sess: any, callback?: (err?: any) => void): void {
     void this.client.execute({
       sql: "INSERT INTO aura_sessions (sid, sess, expire) VALUES (?, ?, ?) ON CONFLICT(sid) DO UPDATE SET sess = excluded.sess, expire = excluded.expire",
       args: [sid, JSON.stringify(sess), this.expiry(sess)],
-    }).then(() => callback?.(null)).catch((error) => callback?.(error));
+    }).then(() => callback?.(null)).catch((error: any) => callback?.(error));
   }
 
   destroy(sid: string, callback?: (err?: any) => void): void {
