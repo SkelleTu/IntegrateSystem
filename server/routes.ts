@@ -1659,6 +1659,9 @@ export async function registerRoutes(
   // Aura MCP operator. It exercises the same storage/business operations used by
   // the normal cashier flow, then removes every test artifact in a finally block.
   app.post("/api/audit/e2e/cash", async (req, res) => {
+    if ((process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.VERCEL)) && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
+      return res.status(403).json({ message: "Testes com escrita são proibidos em produção. Execute somente em homologação autorizada." });
+    }
     if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
       return res.status(403).json({ message: "E2E audit requires authenticated Aura MCP execution" });
     }
@@ -1981,12 +1984,36 @@ export async function registerRoutes(
     }
 
     if (responseStatus === 200) {
-      const residuals = await Promise.all(getAllDatabases().map(async (database) => ({
-        products: (await database.select().from(products).where(eq(products.codigoProduto, marker))).length,
-        sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
-        batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
-      })));
-      responsePayload.cleanupVerified = residuals.every((r) => r.products === 0 && r.sales === 0 && r.batches === 0);
+      const residuals = await Promise.all(getAllDatabases().map(async (database) => {
+        const testSaleIds = [saleId, secondSaleId].filter((id): id is number => typeof id === "number" && Number.isSafeInteger(id) && id > 0);
+        const dependentPayments = (await Promise.all(testSaleIds.map((id) => database.select().from(payments).where(eq(payments.saleId, id)) ))).flat();
+        const dependentSaleItems = (await Promise.all(testSaleIds.map((id) => database.select().from(saleItems).where(eq(saleItems.saleId, id)) ))).flat();
+        const transactionDescriptions = testSaleIds.flatMap((id) => [
+          `Venda PDV #${id}`,
+          `ESTORNO: Venda PDV #${id} CANCELADA`,
+        ]);
+        if (registerId) transactionDescriptions.push(`Fechamento de Caixa #${registerId} - Valor em Gaveta`);
+        const remainingTransactions = transactionDescriptions.length
+          ? await database.select().from(transactions).where(or(...transactionDescriptions.map((description) => eq(transactions.description, description))))
+          : [];
+        const remainingRegisters = registerOpenedAt
+          ? await database.select().from(cashRegisters).where(and(eq(cashRegisters.userId, testUserId), eq(cashRegisters.openedAt, registerOpenedAt)))
+          : [];
+        const remainingBatchLogs = batchId
+          ? await database.select().from(batchLogs).where(eq(batchLogs.batchId, batchId))
+          : [];
+        return {
+          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker)))).length,
+          sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
+          batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
+          payments: dependentPayments.length,
+          saleItems: dependentSaleItems.length,
+          transactions: remainingTransactions.length,
+          cashRegisters: remainingRegisters.length,
+          batchLogs: remainingBatchLogs.length,
+        };
+      }));
+      responsePayload.cleanupVerified = residuals.every((r) => Object.values(r).every((count) => count === 0));
       responsePayload.cleanupEvidence = residuals;
       if (!responsePayload.cleanupVerified) responseStatus = 500;
     }
