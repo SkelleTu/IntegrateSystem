@@ -323,6 +323,7 @@ export class DatabaseStorage implements IStorage {
           fingerprint_id: (user as any).fingerprintId ?? null,
           enterprise_id: (user as any).enterpriseId ?? null,
         };
+        const now = Date.now();
         const legacyRequiredValues: Record<string, any> = {
           password_hash: user.password,
           nome_completo: (user as any).nomeCompleto || user.username,
@@ -334,6 +335,25 @@ export class DatabaseStorage implements IStorage {
           cep: (user as any).cep || "Não informado",
           chave_pix: (user as any).chavePix || "Não configurada",
           tipo_chave_pix: (user as any).tipoChavePix || "não configurado",
+          telefone_verificado: 0,
+          conta_aprovada: 0,
+          aprovada_por: null,
+          aprovada_em: null,
+          documentos_verificados: 0,
+          documentos_aprovados_em: null,
+          is_admin: user.role === "admin" ? 1 : 0,
+          senha_fallback: null,
+          usar_senha_fallback: 0,
+          biometria_configurada: 0,
+          saldo: 0,
+          deposito_data: null,
+          rendimento_saque_automatico: 0,
+          codigo_verificacao: null,
+          codigo_expires_at: null,
+          password_reset_token: null,
+          password_reset_token_expires_at: null,
+          created_at: now,
+          updated_at: now,
         };
         for (const [name, meta] of remoteColumns.entries()) {
           if (meta.notNull && meta.defaultValue === null && !(name in availableValues) && name in legacyRequiredValues) {
