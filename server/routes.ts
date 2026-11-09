@@ -2282,10 +2282,18 @@ export async function registerRoutes(
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Não autenticado" });
     res.json({
       autoBackup: getAutoBackupInfo(),
+      backup: {
+        complete: !isRemoteEnabled,
+        authoritativeSource: isRemoteEnabled ? "turso" : "sqlite-local",
+        message: isRemoteEnabled
+          ? "O banco primário é Turso. O backup local não é uma cópia completa e a restauração está bloqueada até existir backup remoto verificado."
+          : "O banco primário é SQLite local.",
+      },
       databases: {
-        local: true,
+        primary: isRemoteEnabled ? "turso" : "sqlite-local",
+        localMirror: isRemoteEnabled,
         remote: isRemoteEnabled,
-        count: isRemoteEnabled ? 2 : 1,
+        authoritativeCount: 1,
       },
     });
   });
