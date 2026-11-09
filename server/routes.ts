@@ -121,6 +121,63 @@ import {
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
 } from "../shared/schema";
 
+export class TursoSessionStore extends session.Store {
+  constructor(private readonly client: NonNullable<typeof tursoClient>) {
+    super();
+    const cleanup = setInterval(() => {
+      void this.client.execute({ sql: "DELETE FROM aura_sessions WHERE expire <= ?", args: [Date.now()] })
+        .catch((error: any) => console.warn("[SESSION] Expired session cleanup failed:", error?.message || error));
+    }, 60 * 60 * 1000);
+    cleanup.unref?.();
+  }
+
+  private expiry(sess: any): number {
+    const cookieExpiry = sess?.cookie?.expires ? new Date(sess.cookie.expires).getTime() : NaN;
+    if (Number.isFinite(cookieExpiry)) return cookieExpiry;
+    const maxAge = Number(sess?.cookie?.maxAge);
+    return Date.now() + (Number.isFinite(maxAge) && maxAge > 0 ? maxAge : 30 * 24 * 60 * 60 * 1000);
+  }
+
+  get(sid: string, callback: (err?: any, sess?: any) => void): void {
+    void this.client.execute({ sql: "SELECT sess, expire FROM aura_sessions WHERE sid = ? LIMIT 1", args: [sid] })
+      .then(async (result: any) => {
+        const row = result.rows[0] as any;
+        if (!row) return callback(null, null);
+        const expiresAt = Number(row.expire ?? row[1]);
+        if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+          await this.client.execute({ sql: "DELETE FROM aura_sessions WHERE sid = ?", args: [sid] });
+          return callback(null, null);
+        }
+        try {
+          return callback(null, JSON.parse(String(row.sess ?? row[0])));
+        } catch {
+          await this.client.execute({ sql: "DELETE FROM aura_sessions WHERE sid = ?", args: [sid] });
+          return callback(null, null);
+        }
+      })
+      .catch((error: any) => callback(error));
+  }
+
+  set(sid: string, sess: any, callback?: (err?: any) => void): void {
+    void this.client.execute({
+      sql: "INSERT INTO aura_sessions (sid, sess, expire) VALUES (?, ?, ?) ON CONFLICT(sid) DO UPDATE SET sess = excluded.sess, expire = excluded.expire",
+      args: [sid, JSON.stringify(sess), this.expiry(sess)],
+    }).then(() => callback?.(null)).catch((error: any) => callback?.(error));
+  }
+
+  destroy(sid: string, callback?: (err?: any) => void): void {
+    void this.client.execute({ sql: "DELETE FROM aura_sessions WHERE sid = ?", args: [sid] })
+      .then(() => callback?.(null)).catch((error: any) => callback?.(error));
+  }
+
+  touch(sid: string, sess: any, callback?: (err?: any) => void): void {
+    void this.client.execute({
+      sql: "UPDATE aura_sessions SET sess = ?, expire = ? WHERE sid = ?",
+      args: [JSON.stringify(sess), this.expiry(sess), sid],
+    }).then(() => callback?.(null)).catch((error: any) => callback?.(error));
+  }
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -237,15 +294,24 @@ export async function registerRoutes(
   });
 
   // Session & Auth Setup
+  const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
+  if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
+    throw new Error("[SECURITY] SESSION_SECRET precisa conter pelo menos 32 caracteres em produção; segredo fixo conhecido foi removido.");
+  }
+  const sessionStore = tursoClient
+    ? new TursoSessionStore(tursoClient)
+    : new MemoryStore({ checkPeriod: 86400000 });
   app.use(
     session({
-      store: new MemoryStore({ checkPeriod: 86400000 }),
-      secret: process.env.SESSION_SECRET || "barber_shop_secret",
+      store: sessionStore,
+      secret: sessionSecret || "aura-local-development-only-secret",
       resave: false,
       saveUninitialized: false,
       cookie: {
-        secure: process.env.SESSION_COOKIE_SECURE === "true",
-        maxAge: 30 * 24 * 60 * 60 * 1000
+        secure: process.env.NODE_ENV === "production" || process.env.SESSION_COOKIE_SECURE === "true",
+        httpOnly: true,
+        sameSite: "lax",
+        maxAge: 30 * 24 * 60 * 60 * 1000,
       },
     })
   );
