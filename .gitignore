@@ -9,3 +9,4 @@ runtime/*.jsonl
 runtime/.sync-repo/
 runtime/runtime-sync.log
 runtime/runtime-sync.stop
+private_registration_uploads/
