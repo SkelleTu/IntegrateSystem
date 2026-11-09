@@ -254,7 +254,7 @@ export async function registerRoutes(
   });
 
   // Session & Auth Setup
-  const sessionSecret = String(process.env.SESSION_SECRET || "");
+  const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
   if (process.env.NODE_ENV === "production" && !sessionSecret) {
     throw new Error("[SECURITY] SESSION_SECRET precisa estar configurado em produção; segredo fixo conhecido foi removido.");
   }
