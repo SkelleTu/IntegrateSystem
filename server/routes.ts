@@ -618,7 +618,7 @@ export async function registerRoutes(
       if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Este nome de usuário já está em uso." });
 
       const baseSlug = (data.slug || data.name).toLowerCase().normalize("NFD")
-        .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9\\s-]/g, "").trim().replace(/\\s+/g, "-").slice(0, 70);
+        .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 70);
       let slug = baseSlug || "instituicao";
       let suffix = 1;
       while (await storage.getEnterpriseBySlug(slug)) slug = `${baseSlug || "instituicao"}-${suffix++}`;
