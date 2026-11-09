@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { localSqlite } from "./db";
+import { localSqlite, dbRemote } from "./db";
 
 const DEFAULT_BACKUP_DIR = "G:\\Meu Drive\\Aura System - Backups\\Banco de Dados\\sqlite";
 const BACKUP_DIR = process.env.AURA_GOOGLE_DRIVE_BACKUP_DIR || (process.platform === "win32" ? DEFAULT_BACKUP_DIR : "");
@@ -26,6 +26,9 @@ function ensureBackupDir() {
 }
 
 export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
+  if (dbRemote) {
+    return { available: false, lastSuccessfulBackupAt: null, lastErrorMessage: "Backup Google Drive bloqueado: Turso é o banco primário; o SQLite local é apenas espelho." };
+  }
   return {
     available: !driveWasUnavailable && lastSuccessfulBackupAt > 0,
     lastSuccessfulBackupAt: lastSuccessfulBackupAt || null,
@@ -34,6 +37,10 @@ export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
 }
 
 export function backupSqliteToGoogleDrive(): string | null {
+  if (dbRemote) {
+    lastErrorMessage = "Backup Google Drive bloqueado: Turso é o banco primário; o SQLite local é apenas espelho.";
+    return null;
+  }
   if (process.env.VERCEL || !BACKUP_DIR) return null;
 
   lastAttemptAt = Date.now();
@@ -67,7 +74,7 @@ export function backupSqliteToGoogleDrive(): string | null {
 }
 
 export function startGoogleDriveBackupScheduler() {
-  if (process.env.VERCEL || !BACKUP_DIR || timer) return;
+  if (dbRemote || process.env.VERCEL || !BACKUP_DIR || timer) return;
 
   // Primeira tentativa imediatamente ao iniciar.
   backupSqliteToGoogleDrive();
