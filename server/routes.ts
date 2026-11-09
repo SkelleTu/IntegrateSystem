@@ -41,7 +41,10 @@ const publicDocumentUpload = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
-    if (!allowed.has(file.mimetype)) return cb(new Error("Envie somente PDF, JPG, PNG ou WEBP."));
+    const allowedExtensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp"]);
+    if (!allowed.has(file.mimetype) || !allowedExtensions.has(path.extname(file.originalname).toLowerCase())) {
+      return cb(new Error("Envie somente PDF, JPG, PNG ou WEBP."));
+    }
     cb(null, true);
   },
 });
