@@ -70,7 +70,7 @@ export default function LandingPage() {
       const rgBackUrl = await uploadFile(formData.rgBack);
 
       // 2. Submit the registration with URLs
-      await apiRequest("POST", "/api/admin/enterprises", {
+      await apiRequest("POST", "/api/public/register", {
         name: formData.name,
         taxId: formData.taxId,
         email: formData.email,
