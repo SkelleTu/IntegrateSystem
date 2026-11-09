@@ -81,7 +81,7 @@ import {
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
 } from "../shared/schema";
 
-class TursoSessionStore extends session.Store {
+export class TursoSessionStore extends session.Store {
   constructor(private readonly client: NonNullable<typeof tursoClient>) {
     super();
     const cleanup = setInterval(() => {
