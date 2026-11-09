@@ -252,7 +252,7 @@ export async function registerRoutes(
         // Newly registered institutions remain blocked until an owner approves them.
         if (user.enterpriseId && String(user.username).toLowerCase() !== "skelletu") {
           const enterprise = await storage.getEnterprise(user.enterpriseId);
-          if (enterprise && enterprise.status !== "active") {
+          if (!enterprise || enterprise.status !== "active") {
             return done(null, false, { message: "ACCOUNT_PENDING_APPROVAL" });
           }
         }
@@ -657,15 +657,24 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       // Compensate partial creation so a failed signup does not leave orphan records.
+      const rollbackErrors: string[] = [];
       try {
-        if (userId) await storage.deleteUser(userId);
-        else {
+        let cleanupUserId = userId;
+        if (!cleanupUserId) {
           const partialUser = await storage.getUserByUsername(username);
-          if (partialUser?.id) await storage.deleteUser(Number(partialUser.id));
+          if (partialUser?.id) cleanupUserId = Number(partialUser.id);
         }
+        if (cleanupUserId) await storage.deleteUser(cleanupUserId);
+      } catch (rollbackError: any) {
+        rollbackErrors.push("user: " + (rollbackError?.message || String(rollbackError)));
+      }
+      try {
         if (enterpriseId) await storage.deleteEnterprise(enterpriseId);
-      } catch (rollbackError) {
-        console.error("[REGISTRATION] Compensation failed; owner review required.", rollbackError);
+      } catch (rollbackError: any) {
+        rollbackErrors.push("enterprise: " + (rollbackError?.message || String(rollbackError)));
+      }
+      if (rollbackErrors.length) {
+        console.error("[REGISTRATION] Compensation incomplete; owner review required.", rollbackErrors);
       }
       console.error("[REGISTRATION] Public registration failed:", error?.message || error);
       return res.status(500).json({ message: "Não foi possível concluir o cadastro. Tente novamente ou contate o administrador." });
