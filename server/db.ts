@@ -792,121 +792,76 @@ export async function setupDatabase() {
 }
 
 export async function auditDatabaseParity() {
-  // Turso is authoritative; localSqlite is hydrated as a process-local mirror.
-  // Compare both to detect drift instead of reporting a permanent false failure.
   if (!tursoClient) {
-    return { ok: false, remoteEnabled: false, error: "Turso is not configured", tablesChecked: 0, mismatches: [] };
+    return {
+      ok: false,
+      primaryDatabase: "sqlite-local",
+      comparison: "not-applicable",
+      error: "Turso não está configurado; não há banco remoto para auditar.",
+      tablesChecked: 0,
+      mismatches: [],
+    };
   }
 
-  const tableNames = [...new Set(TABLE_DEFINITIONS
-    .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
-    .filter((table): table is string => Boolean(table)))];
-  if (tableNames.length === 0) {
-    return { ok: false, remoteEnabled: true, error: "No table definitions found", tablesChecked: 0, mismatches: [] };
-  }
+  // In production, localSqlite is not a business-data replica. Turso is authoritative,
+  // so compare the live Turso schema with the application's required DDL and verify
+  // each required table can be queried. Never compare row contents against localSqlite.
+  const definitions = TABLE_DEFINITIONS
+    .map((statement) => {
+      const match = statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i);
+      if (!match) return null;
+      const table = match[1];
+      const open = statement.indexOf("(");
+      const close = statement.lastIndexOf(")");
+      const body = open >= 0 && close > open ? statement.slice(open + 1, close) : "";
+      const columns = body.split("\n")
+        .map((line) => line.trim().replace(/,$/, ""))
+        .map((line) => line.match(/^["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\s+(?:INTEGER|TEXT|REAL|BLOB|NUMERIC|VARCHAR|CHAR|BOOLEAN|DATE|DATETIME)\b/i)?.[1])
+        .filter((column): column is string => Boolean(column));
+      return { table, columns };
+    })
+    .filter((entry): entry is { table: string; columns: string[] } => Boolean(entry));
 
   const mismatches: Array<Record<string, unknown>> = [];
   const tables: Array<Record<string, unknown>> = [];
-  const normalize = (value: any): unknown => {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "bigint") return value.toString();
-    if (value instanceof Uint8Array) return Array.from(value);
-    if (value instanceof Date) return value.toISOString();
-    return value;
-  };
-  const readLocal = (statement: string) => {
-    const handle = localSqlite.prepare(statement);
-    const rows: Array<Record<string, unknown>> = [];
+
+  for (const definition of definitions) {
     try {
-      while (handle.step()) rows.push(handle.getAsObject() as Record<string, unknown>);
-    } finally {
-      handle.free();
-    }
-    return rows;
-  };
-
-  for (const table of tableNames) {
-    try {
-      const localInfo = readLocal(`PRAGMA table_info("${table}")`);
-      const localColumns: string[] = localInfo.map((row: any) => String(row.name)).sort();
-      const remoteInfo = await tursoClient.execute(`PRAGMA table_info("${table}")`);
-      const remoteColumns: string[] = remoteInfo.rows.map((row: any) => String(row.name)).sort();
-      const missingLocal = remoteColumns.filter((column) => !localColumns.includes(column));
-      const missingRemote = localColumns.filter((column) => !remoteColumns.includes(column));
-
-      let localRows = 0;
-      let remoteRows = 0;
-      let rowCountsMatch = true;
-      let rowContentsMatch = true;
-      const mismatchedRowIds: string[] = [];
-      const mismatchedColumns = new Set<string>();
-
-      // Runtime events are written asynchronously by multiple processes; compare their schema,
-      // but do not treat their momentary row-count/content drift as business-data divergence.
-      if (table !== "runtime_events") {
-        const localData = readLocal(`SELECT * FROM "${table}" ORDER BY id`);
-        const remoteData = await tursoClient.execute(`SELECT * FROM "${table}" ORDER BY id`);
-        const remoteDataRows = remoteData.rows as any[];
-        localRows = localData.length;
-        remoteRows = remoteDataRows.length;
-        rowCountsMatch = localRows === remoteRows;
-
-        const localById = new Map(localData.map((row: any, index) => [String(row.id ?? index), row]));
-        const remoteById = new Map(remoteDataRows.map((row: any, index) => [String(row.id ?? index), row]));
-        const allIds = new Set([...localById.keys(), ...remoteById.keys()]);
-        for (const id of allIds) {
-          const localRow = localById.get(id) as Record<string, unknown> | undefined;
-          const remoteRow = remoteById.get(id) as Record<string, unknown> | undefined;
-          if (!localRow || !remoteRow) {
-            rowContentsMatch = false;
-            if (mismatchedRowIds.length < 10) mismatchedRowIds.push(id);
-            continue;
-          }
-          for (const column of new Set([...localColumns, ...remoteColumns])) {
-            if (JSON.stringify(normalize(localRow[column])) !== JSON.stringify(normalize(remoteRow[column]))) {
-              rowContentsMatch = false;
-              mismatchedColumns.add(column);
-              if (mismatchedRowIds.length < 10 && !mismatchedRowIds.includes(id)) mismatchedRowIds.push(id);
-            }
-          }
-        }
+      const info = await tursoClient.execute(`PRAGMA table_info("${definition.table.replace(/"/g, '""')}")`);
+      const actualColumns = (info.rows as any[]).map((row) => String(row.name ?? row[1]));
+      const missingColumns = definition.columns.filter((column) => !actualColumns.includes(column));
+      if (!actualColumns.length) {
+        const entry = { table: definition.table, error: "Tabela obrigatória ausente no Turso.", expectedColumns: definition.columns, actualColumns };
+        tables.push(entry);
+        mismatches.push(entry);
+        continue;
       }
 
-      const countCompared = table !== "runtime_events";
+      const readability = await tursoClient.execute(`SELECT 1 AS readable FROM "${definition.table.replace(/"/g, '""')}" LIMIT 1`);
       const entry = {
-        table,
-        localColumns: localColumns.length,
-        remoteColumns: remoteColumns.length,
-        missingLocalColumns: missingLocal,
-        missingRemoteColumns: missingRemote,
-        localRows,
-        remoteRows,
-        rowCountsMatch: !countCompared || rowCountsMatch,
-        rowContentsMatch: !countCompared || rowContentsMatch,
-        mismatchedRowIds,
-        mismatchedColumns: [...mismatchedColumns],
+        table: definition.table,
+        expectedColumns: definition.columns,
+        actualColumns,
+        missingColumns,
+        queryable: true,
+        hasRows: readability.rows.length > 0,
+        schemaValid: missingColumns.length === 0,
       };
       tables.push(entry);
-      if (
-        missingLocal.length ||
-        missingRemote.length ||
-        (countCompared && (!rowCountsMatch || !rowContentsMatch))
-      ) {
-        mismatches.push(entry);
-      }
+      if (missingColumns.length) mismatches.push(entry);
     } catch (error: any) {
-      const entry = { table, error: error?.message || String(error) };
+      const entry = { table: definition.table, error: error?.message || String(error) };
       tables.push(entry);
       mismatches.push(entry);
     }
   }
 
   return {
-    ok: mismatches.length === 0,
-    remoteEnabled: true,
+    ok: mismatches.length === 0 && tables.length === definitions.length,
+    primaryDatabase: "turso",
+    comparison: "remote-schema-and-readability",
+    mirrorCompared: false,
     tablesChecked: tables.length,
-    rowCountsCompared: tables.filter((table: any) => table.table !== "runtime_events").length,
-    rowContentsCompared: tables.filter((table: any) => table.table !== "runtime_events").length,
     mismatches,
     tables,
   };
