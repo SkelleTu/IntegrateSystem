@@ -35,9 +35,10 @@ const uploadStorage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
-const privateRegistrationUploadsPath = process.env.VERCEL
-  ? path.join("/tmp", "private-registration-uploads")
-  : path.join(process.cwd(), "private_registration_uploads");
+const privateRegistrationUploadsPath = path.resolve(
+  process.env.AURA_PRIVATE_UPLOAD_DIR || (process.env.VERCEL ? path.join("/tmp", "private-registration-uploads") : path.join(process.cwd(), "private_registration_uploads")),
+);
+const privateRegistrationStorageConfigured = process.env.RENDER !== "true" || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
 if (!fs.existsSync(privateRegistrationUploadsPath)) fs.mkdirSync(privateRegistrationUploadsPath, { recursive: true });
 const privateRegistrationStorage = multer.diskStorage({
   destination: privateRegistrationUploadsPath,
@@ -549,7 +550,23 @@ export async function registerRoutes(
     if (!["active", "rejected", "pending"].includes(status)) {
       return res.status(400).json({ message: "Status inválido" });
     }
-    const updated = await storage.updateEnterprise(Number(req.params.id), { status });
+    const enterpriseId = Number(req.params.id);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(400).json({ message: "ID de instituição inválido" });
+    // Keep legacy approval fields consistent when they exist in the Turso schema.
+    if (tursoClient) {
+      const info = await tursoClient.execute('PRAGMA table_info("users")');
+      const columns = new Set((info.rows as any[]).map((row: any) => String(row.name ?? row[1])));
+      const assignments: string[] = [];
+      const args: any[] = [];
+      if (columns.has("conta_aprovada")) { assignments.push('"conta_aprovada" = ?'); args.push(status === "active" ? 1 : 0); }
+      if (columns.has("aprovada_por")) { assignments.push('"aprovada_por" = ?'); args.push(status === "active" ? user.id : null); }
+      if (columns.has("aprovada_em")) { assignments.push('"aprovada_em" = ?'); args.push(status === "active" ? Date.now() : null); }
+      if (assignments.length) {
+        args.push(enterpriseId);
+        await tursoClient.execute({ sql: `UPDATE users SET ${assignments.join(", ")} WHERE enterprise_id = ?`, args });
+      }
+    }
+    const updated = await storage.updateEnterprise(enterpriseId, { status });
     res.json(updated);
   });
 
@@ -575,6 +592,9 @@ export async function registerRoutes(
 
   // Upload público limitado a documentos do cadastro; não aceita arquivos arbitrários.
   app.post("/api/public/upload", (req: any, res: any) => {
+    if (!privateRegistrationStorageConfigured) {
+      return res.status(503).json({ message: "O armazenamento privado permanente de documentos ainda não foi configurado. O envio de documentos é opcional; continue o cadastro sem anexos." });
+    }
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("upload:" + ip, 12, 15 * 60 * 1000)) {
       return res.status(429).json({ message: "Limite de envios atingido. Tente novamente mais tarde." });
