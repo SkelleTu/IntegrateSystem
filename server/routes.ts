@@ -127,7 +127,7 @@ class TursoSessionStore extends session.Store {
 
   destroy(sid: string, callback?: (err?: any) => void): void {
     void this.client.execute({ sql: "DELETE FROM aura_sessions WHERE sid = ?", args: [sid] })
-      .then(() => callback?.(null)).catch((error) => callback?.(error));
+      .then(() => callback?.(null)).catch((error: any) => callback?.(error));
   }
 
   touch(sid: string, sess: any, callback?: (err?: any) => void): void {
