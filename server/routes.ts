@@ -28,15 +28,39 @@ import path from "path";
 import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 
-const upload = multer({
-  storage: multer.diskStorage({
-    destination: "attached_assets/uploads/",
-    filename: (req: any, file: any, cb: any) => {
-      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
-    },
-  }),
+const uploadStorage = multer.diskStorage({
+  destination: "attached_assets/uploads/",
+  filename: (req: any, file: any, cb: any) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+  },
 });
+const upload = multer({ storage: uploadStorage });
+const publicDocumentUpload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+    if (!allowed.has(file.mimetype)) return cb(new Error("Envie somente PDF, JPG, PNG ou WEBP."));
+    cb(null, true);
+  },
+});
+
+const publicActionWindows = new Map<string, { count: number; resetAt: number }>();
+function allowPublicAction(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  if (publicActionWindows.size > 10000) {
+    for (const [entry, value] of publicActionWindows) if (value.resetAt <= now) publicActionWindows.delete(entry);
+  }
+  const current = publicActionWindows.get(key);
+  if (!current || current.resetAt <= now) {
+    publicActionWindows.set(key, { count: 1, resetAt: now + windowMs });
+    return true;
+  }
+  if (current.count >= limit) return false;
+  current.count += 1;
+  return true;
+}
 
 const scryptAsync = promisify(scrypt);
 
@@ -218,10 +242,18 @@ export async function registerRoutes(
       try {
         const user = await storage.getUserByUsername(username);
         if (!user) return done(null, false, { message: "Incorrect username." });
-        
+
         const isValid = await comparePassword(user.password, password);
         if (!isValid) return done(null, false, { message: "Incorrect password." });
-        
+
+        // Newly registered institutions remain blocked until an owner approves them.
+        if (user.enterpriseId && String(user.username).toLowerCase() !== "skelletu") {
+          const enterprise = await storage.getEnterprise(user.enterpriseId);
+          if (enterprise && enterprise.status !== "active") {
+            return done(null, false, { message: "ACCOUNT_PENDING_APPROVAL" });
+          }
+        }
+
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -285,8 +317,12 @@ export async function registerRoutes(
 
   // Auth Routes
   app.post(api.auth.login.path, (req, res, next) => {
-    passport.authenticate("local", (err: any, user: any) => {
-      if (err || !user) {
+    passport.authenticate("local", (err: any, user: any, info: any) => {
+      if (err) return res.status(500).json({ message: "Login failed." });
+      if (!user) {
+        if (info?.message === "ACCOUNT_PENDING_APPROVAL") {
+          return res.status(403).json({ message: "Cadastro recebido. Sua instituição ainda aguarda aprovação do administrador." });
+        }
         return res.status(401).json({ message: "Incorrect username or password." });
       }
       req.login(user, (loginErr: any) => {
@@ -523,10 +559,114 @@ export async function registerRoutes(
     res.json(s);
   });
 
-  // Rota pública de upload usada durante o cadastro (sem auth, pois o usuário ainda não está logado)
-  app.post("/api/public/upload", upload.single("file"), (req: any, res) => {
-    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
-    res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+  // Upload público limitado a documentos do cadastro; não aceita arquivos arbitrários.
+  app.post("/api/public/upload", (req: any, res: any) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("upload:" + ip, 12, 15 * 60 * 1000)) {
+      return res.status(429).json({ message: "Limite de envios atingido. Tente novamente mais tarde." });
+    }
+    publicDocumentUpload.single("file")(req, res, (error: any) => {
+      if (error) return res.status(error.code === "LIMIT_FILE_SIZE" ? 413 : 400).json({ message: error.message || "Arquivo inválido." });
+      if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
+      return res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+    });
+  });
+
+  // Cadastro público de instituição: cria conta administrativa pendente de aprovação.
+  app.post("/api/public/register", async (req: any, res: any) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("register:" + ip, 5, 15 * 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas tentativas de cadastro. Tente novamente mais tarde." });
+    }
+
+    const schema = z.object({
+      name: z.string().trim().min(2).max(120),
+      taxId: z.string().trim().min(8).max(24),
+      email: z.string().trim().email().max(254),
+      phone: z.string().trim().min(8).max(24),
+      address: z.string().trim().min(5).max(240),
+      slug: z.string().trim().max(80).optional().default(""),
+      username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
+      password: z.string().min(12).max(128),
+      addressProofUrl: z.string().max(300).nullable().optional(),
+      rgFrontUrl: z.string().max(300).nullable().optional(),
+      rgBackUrl: z.string().max(300).nullable().optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos. Confira os campos e use uma senha com pelo menos 12 caracteres.", issues: parsed.error.issues.map((issue) => ({ path: issue.path, message: issue.message })) });
+
+    const data = parsed.data;
+    const username = data.username.toLowerCase();
+    if (["admin", "master", "owner", "root", "skelletu"].includes(username)) {
+      return res.status(400).json({ message: "Este nome de usuário não está disponível." });
+    }
+
+    const validDocumentUrl = (value?: string | null) => {
+      if (!value) return null;
+      const prefix = "/attached_assets/uploads/";
+      if (!value.startsWith(prefix)) throw new Error("Documento inválido; envie o arquivo novamente.");
+      const filename = value.slice(prefix.length);
+      if (!filename || filename !== path.basename(filename) || !fs.existsSync(path.join(process.cwd(), "attached_assets/uploads", filename))) {
+        throw new Error("Documento não encontrado; envie o arquivo novamente.");
+      }
+      return value;
+    };
+
+    let enterpriseId: number | null = null;
+    let userId: number | null = null;
+    try {
+      if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Este nome de usuário já está em uso." });
+
+      const baseSlug = (data.slug || data.name).toLowerCase().normalize("NFD")
+        .replace(/[\\u0300-\\u036f]/g, "").replace(/[^a-z0-9\\s-]/g, "").trim().replace(/\\s+/g, "-").slice(0, 70);
+      let slug = baseSlug || "instituicao";
+      let suffix = 1;
+      while (await storage.getEnterpriseBySlug(slug)) slug = `${baseSlug || "instituicao"}-${suffix++}`;
+
+      const enterprise = await storage.createEnterprise({
+        name: data.name,
+        taxId: data.taxId,
+        email: data.email.toLowerCase(),
+        phone: data.phone,
+        address: data.address,
+        addressProofUrl: validDocumentUrl(data.addressProofUrl),
+        rgFrontUrl: validDocumentUrl(data.rgFrontUrl),
+        rgBackUrl: validDocumentUrl(data.rgBackUrl),
+        slug,
+        status: "pending",
+      } as any);
+      enterpriseId = Number(enterprise.id);
+
+      const createdUser = await storage.createUser({
+        username,
+        email: data.email.toLowerCase(),
+        password: await hashPassword(data.password),
+        role: "admin",
+        enterpriseId,
+      } as any);
+      userId = Number(createdUser.id);
+      await storage.updateEnterprise(enterpriseId, { ownerId: userId } as any);
+
+      return res.status(201).json({
+        ok: true,
+        enterprise: { id: enterpriseId, name: enterprise.name, status: "pending" },
+        message: "Cadastro recebido. Aguarde a aprovação do administrador.",
+      });
+    } catch (error: any) {
+      // Compensate partial creation so a failed signup does not leave orphan records.
+      try {
+        if (userId) await storage.deleteUser(userId);
+        else {
+          const partialUser = await storage.getUserByUsername(username);
+          if (partialUser?.id) await storage.deleteUser(Number(partialUser.id));
+        }
+        if (enterpriseId) await storage.deleteEnterprise(enterpriseId);
+      } catch (rollbackError) {
+        console.error("[REGISTRATION] Compensation failed; owner review required.", rollbackError);
+      }
+      console.error("[REGISTRATION] Public registration failed:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível concluir o cadastro. Tente novamente ou contate o administrador." });
+    }
   });
 
   // Rota de upload autenticada (para uso interno/admin)
