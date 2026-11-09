@@ -1614,7 +1614,7 @@ export async function registerRoutes(
   // Aura MCP operator. It exercises the same storage/business operations used by
   // the normal cashier flow, then removes every test artifact in a finally block.
   app.post("/api/audit/e2e/cash", async (req, res) => {
-    if (process.env.NODE_ENV === "production" && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
+    if ((process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.VERCEL)) && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
       return res.status(403).json({ message: "Testes com escrita são proibidos em produção. Execute somente em homologação autorizada." });
     }
     if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
