@@ -316,8 +316,9 @@ export default function LandingPage() {
                     className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.username}
                     onChange={(e) => {
-                      setFormData({...formData, username: e.target.value});
-                      updateChecklist("username", e.target.value);
+                      const username = e.target.value.toLowerCase();
+                      setFormData({...formData, username});
+                      updateChecklist("username", username);
                     }}
                   />
                 </div>
