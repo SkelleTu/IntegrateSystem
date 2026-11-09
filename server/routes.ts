@@ -650,6 +650,9 @@ export async function registerRoutes(
     let userId: number | null = null;
     try {
       if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Este nome de usuário já está em uso." });
+      const [existingEmailUser] = await db.select({ id: users.id }).from(users)
+        .where(eq(users.email, data.email.toLowerCase())).limit(1);
+      if (existingEmailUser) return res.status(409).json({ message: "Este e-mail já está vinculado a uma conta." });
 
       const baseSlug = (data.slug || data.name).toLowerCase().normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9\s-]/g, "").trim().replace(/\s+/g, "-").slice(0, 70);
