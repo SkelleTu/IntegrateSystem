@@ -39,9 +39,10 @@ const privateRegistrationUploadsPath = path.resolve(
   process.env.AURA_PRIVATE_UPLOAD_DIR || (process.env.VERCEL ? path.join("/tmp", "private-registration-uploads") : path.join(process.cwd(), "private_registration_uploads")),
 );
 const privateRegistrationStorageConfigured = (!process.env.RENDER && !process.env.RENDER_EXTERNAL_URL && !process.env.VERCEL && process.env.NODE_ENV !== "production") || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
-if (!fs.existsSync(privateRegistrationUploadsPath)) fs.mkdirSync(privateRegistrationUploadsPath, { recursive: true });
 const privateRegistrationStorage = multer.diskStorage({
-  destination: privateRegistrationUploadsPath,
+  destination: (_req: any, _file: any, cb: any) => {
+    fs.mkdir(privateRegistrationUploadsPath, { recursive: true }, (error) => cb(error, privateRegistrationUploadsPath));
+  },
   filename: (req: any, file: any, cb: any) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname).toLowerCase());
