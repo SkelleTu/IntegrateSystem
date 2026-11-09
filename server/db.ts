@@ -837,15 +837,14 @@ export async function auditDatabaseParity() {
         continue;
       }
 
-      const countResult = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${definition.table.replace(/"/g, '""')}"`);
-      const countRow = countResult.rows[0] as any;
-      const rowCount = Number(countRow?.count ?? countRow?.[0] ?? 0);
+      const readability = await tursoClient.execute(`SELECT 1 AS readable FROM "${definition.table.replace(/"/g, '""')}" LIMIT 1`);
       const entry = {
         table: definition.table,
         expectedColumns: definition.columns,
         actualColumns,
         missingColumns,
-        rowCount: Number.isFinite(rowCount) ? rowCount : null,
+        queryable: true,
+        hasRows: readability.rows.length > 0,
         schemaValid: missingColumns.length === 0,
       };
       tables.push(entry);
