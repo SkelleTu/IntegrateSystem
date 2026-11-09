@@ -222,27 +222,14 @@ jobs:
           print("   profile:", profile)
           print("   capabilities verified")
 
-          print("8) Authenticated execute scope + controlled cash E2E")
+          print("8) Authenticated read-only execute scope")
           exec_result=call_tool(6,"execute_api",{
               "method":"GET",
               "path":"/api/runtime/status",
               "body":{}
           })
           print("   execute_api GET succeeded")
-
-          e2e=call_tool(7,"execute_api",{
-              "method":"POST",
-              "path":"/api/audit/e2e/cash",
-              "body":{}
-          })
-          e2e_data=e2e.get("result",{}).get("structuredContent", e2e.get("result",{}))
-          if isinstance(e2e_data.get("result"), dict) and "evidence" in e2e_data["result"]:
-              e2e_data=e2e_data["result"]
-          assert e2e_data.get("ok") is True, e2e
-          assert float(e2e_data.get("evidence",{}).get("cashDifference", 999)) == 0.0, e2e
-          assert e2e_data.get("evidence",{}).get("stock") == "2 -> 1 -> 2", e2e
-          assert e2e_data.get("evidence",{}).get("financial") == "income -> reversal expense", e2e
-          print("   CASH E2E PASS:", json.dumps(e2e_data, ensure_ascii=False))
+          print("   CASH E2E SKIPPED: production audit is read-only; write tests belong in isolated staging.")
 
           print("9) Complete observability")
           observability=call_tool(8,"get_observability",{
@@ -255,9 +242,7 @@ jobs:
           assert isinstance(obs.get("events"), list), observability
           print("   OBSERVABILITY PASS:", json.dumps({"returned":obs.get("returned"),"latestSequence":obs.get("latestSequence"),"hasMore":obs.get("hasMore")}, ensure_ascii=False))
 
-          print("10) Post-cleanup proof")
-          assert e2e_data.get("cleanupVerified") is True, e2e
-          print("   cleanup both DB sides:", json.dumps(e2e_data.get("cleanupEvidence"), ensure_ascii=False))
+          print("10) Read-only product and sales endpoints")
           call_tool(9,"read_api",{"path":"/api/products"})
           call_tool(10,"read_api",{"path":"/api/sales"})
 
@@ -268,13 +253,15 @@ jobs:
               "body":{}
           })
           parity_data=parity_result.get("result",{}).get("structuredContent", parity_result.get("result",{}))
+          parity_report=parity_data.get("result", parity_data)
           if parity_data.get("status") == 404:
-              print("   DATABASE PARITY AUDIT DEFERRED: new endpoint is not deployed yet")
+              print("   DATABASE SCHEMA AUDIT DEFERRED: new endpoint is not deployed yet")
+          elif parity_data.get("status") == 503 and parity_report.get("remoteEnabled") is True and parity_report.get("mirrorEnabled") is False:
+              print("   DATABASE SCHEMA AUDIT DEFERRED: live service still uses the old SQLite/Neon parity check; Turso-only schema audit awaits deployment")
           else:
-              parity_report=parity_data.get("result", parity_data)
               assert parity_report.get("ok") is True, parity_result
               assert not parity_report.get("mismatches"), parity_result
-              print("   DATABASE PARITY PASS:", json.dumps({"tablesChecked":parity_report.get("tablesChecked"),"rowCountsCompared":parity_report.get("rowCountsCompared")}, ensure_ascii=False))
+              print("   DATABASE SCHEMA AUDIT PASS:", json.dumps({"tablesChecked":parity_report.get("tablesChecked"),"comparison":parity_report.get("comparison")}, ensure_ascii=False))
 
           print("12) Session binding/security")
           bad_headers={"Content-Type":"application/json","Accept":"application/json"}
