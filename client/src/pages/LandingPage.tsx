@@ -65,12 +65,27 @@ export default function LandingPage() {
         return data.url;
       };
 
-      const addressProofUrl = await uploadFile(formData.addressProof);
-      const rgFrontUrl = await uploadFile(formData.rgFront);
-      const rgBackUrl = await uploadFile(formData.rgBack);
+      const uploadOptionalFile = async (file: File | null) => {
+        if (!file) return null;
+        try {
+          return await uploadFile(file);
+        } catch {
+          return null;
+        }
+      };
+      const [addressProofUrl, rgFrontUrl, rgBackUrl] = await Promise.all([
+        uploadOptionalFile(formData.addressProof),
+        uploadOptionalFile(formData.rgFront),
+        uploadOptionalFile(formData.rgBack),
+      ]);
+      const selectedDocuments = [formData.addressProof, formData.rgFront, formData.rgBack];
+      const uploadedDocuments = [addressProofUrl, rgFrontUrl, rgBackUrl];
+      if (selectedDocuments.some(Boolean) && selectedDocuments.some((file, index) => Boolean(file) && !uploadedDocuments[index])) {
+        toast({ title: "Cadastro sem todos os anexos", description: "O cadastro continuará. Você poderá enviar os documentos depois, quando o armazenamento privado estiver disponível." });
+      }
 
       // 2. Submit the registration with URLs
-      await apiRequest("POST", "/api/admin/enterprises", {
+      await apiRequest("POST", "/api/public/register", {
         name: formData.name,
         taxId: formData.taxId,
         email: formData.email,
@@ -301,8 +316,9 @@ export default function LandingPage() {
                     className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.username}
                     onChange={(e) => {
-                      setFormData({...formData, username: e.target.value});
-                      updateChecklist("username", e.target.value);
+                      const username = e.target.value.toLowerCase();
+                      setFormData({...formData, username});
+                      updateChecklist("username", username);
                     }}
                   />
                 </div>
@@ -310,12 +326,13 @@ export default function LandingPage() {
                   <label className="text-[10px] uppercase font-black tracking-widest text-white pl-2">Senha de Acesso</label>
                   <Input 
                     type="password"
-                    placeholder="********"
+                    minLength={12}
+                    placeholder="MÍNIMO 12 CARACTERES"
                     className="bg-white/10 border-white/20 focus:border-primary/50 h-14 rounded-2xl text-white font-bold placeholder:text-white/40 px-6 transition-all focus:ring-4 focus:ring-primary/5"
                     value={formData.password}
                     onChange={(e) => {
                       setFormData({...formData, password: e.target.value});
-                      updateChecklist("password", e.target.value);
+                      updateChecklist("password", e.target.value.length >= 12);
                     }}
                   />
                 </div>
@@ -331,6 +348,7 @@ export default function LandingPage() {
                     <input
                       type="file"
                       id="addressProof"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => handleFileChange("addressProof", e.target.files?.[0] || null)}
                     />
@@ -348,6 +366,7 @@ export default function LandingPage() {
                     <input
                       type="file"
                       id="rgFront"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => handleFileChange("rgFront", e.target.files?.[0] || null)}
                     />
@@ -365,6 +384,7 @@ export default function LandingPage() {
                     <input
                       type="file"
                       id="rgBack"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       onChange={(e) => handleFileChange("rgBack", e.target.files?.[0] || null)}
                     />
@@ -383,7 +403,7 @@ export default function LandingPage() {
               <div className="pt-6 space-y-4">
                 <Button 
                   className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_-5px_rgba(16,185,129,0.5)] group overflow-hidden relative"
-                  disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !checklist.username || !checklist.password || !formData.addressProof || !formData.rgFront || !formData.rgBack || loading}
+                  disabled={!checklist.name || !checklist.taxId || !checklist.email || !checklist.phone || !checklist.address || !checklist.username || !checklist.password || loading}
                   onClick={handleRegister}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
@@ -408,7 +428,7 @@ export default function LandingPage() {
                 { label: "CONECTIVIDADE", checked: checklist.phone },
                 { label: "LOGRADOURO", checked: checklist.address },
                 { label: "AUTENTICAÇÃO", checked: checklist.username && checklist.password },
-                { label: "VERIFICAÇÃO ARQUIVOS", checked: formData.addressProof && formData.rgFront && formData.rgBack },
+                { label: "DOCUMENTOS (OPCIONAL)", checked: !!(formData.addressProof || formData.rgFront || formData.rgBack) },
               ].map((item, i) => (
                 <div key={i} className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-500 border ${item.checked ? 'bg-primary/10 border-primary/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'bg-white/5 border-white/5'}`}>
                   <div className={`w-6 h-6 rounded-lg flex items-center justify-center border-2 transition-all duration-500 ${item.checked ? 'bg-primary border-primary scale-110' : 'border-white/10'}`}>
@@ -421,7 +441,7 @@ export default function LandingPage() {
             <div className="mt-12 p-6 rounded-2xl bg-primary/5 border border-primary/10 relative overflow-hidden group">
               <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
               <p className="text-[9px] font-bold text-white/50 leading-relaxed uppercase tracking-wider relative z-10">
-                A Aura utiliza criptografia de ponta a ponta para proteger seus documentos e dados institucionais.
+                O envio de documentos é opcional. Anexos só serão aceitos quando houver armazenamento privado permanente configurado.
               </p>
             </div>
           </Card>
