@@ -82,12 +82,7 @@ process.once("SIGTERM", () => shutdown("SIGTERM"));
 
     await initApp();
 
-    void import("./mcp-compatibility-controller").then(
-      ({ startMcpCompatibilityLoop }) => startMcpCompatibilityLoop(),
-    ).catch((error) => {
-      runtimeError(error, "Falha ao iniciar o loop de compatibilidade MCP");
-      console.error("[MCP] Compatibility loop failed to start:", error);
-    });
+
   } catch (error) {
     runtimeError(error, "Falha fatal ao iniciar o servidor");
     console.error("[BOOT] Fatal startup error:", error);
