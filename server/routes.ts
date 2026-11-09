@@ -38,7 +38,7 @@ const uploadStorage = multer.diskStorage({
 const privateRegistrationUploadsPath = path.resolve(
   process.env.AURA_PRIVATE_UPLOAD_DIR || (process.env.VERCEL ? path.join("/tmp", "private-registration-uploads") : path.join(process.cwd(), "private_registration_uploads")),
 );
-const privateRegistrationStorageConfigured = process.env.RENDER !== "true" || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
+const privateRegistrationStorageConfigured = (!process.env.RENDER && !process.env.VERCEL) || Boolean(process.env.AURA_PRIVATE_UPLOAD_DIR);
 if (!fs.existsSync(privateRegistrationUploadsPath)) fs.mkdirSync(privateRegistrationUploadsPath, { recursive: true });
 const privateRegistrationStorage = multer.diskStorage({
   destination: privateRegistrationUploadsPath,
