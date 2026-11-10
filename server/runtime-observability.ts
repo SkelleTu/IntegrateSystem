@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { and, asc, eq, gt } from "drizzle-orm";
-import { runtimeEvents } from "../shared/schema";
+import { runtimeEvents } from "../shared/pg-schema.js";
 import { db } from "./db";
 
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
