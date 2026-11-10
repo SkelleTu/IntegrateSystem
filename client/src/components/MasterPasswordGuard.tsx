@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -9,8 +8,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ShieldAlert, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
@@ -23,24 +20,23 @@ interface MasterPasswordGuardProps {
 }
 
 export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Acesso Restrito" }: MasterPasswordGuardProps) {
-  const [password, setPassword] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
   const handleConfirm = () => {
-    // If user is already master, we don't even show the dialog usually, 
-    // but as a fallback/guard:
-    if (user?.username === "SkelleTu" || password === "Victor.!.1999") {
+    // The authenticated server session is the source of truth.
+    // Never keep a second, hard-coded master password in the client.
+    if (user?.role === "owner") {
       onSuccess();
       onOpenChange(false);
-      setPassword("");
-    } else {
-      toast({
-        title: "Senha Incorreta",
-        description: "A senha master informada é inválida.",
-        variant: "destructive",
-      });
+      return;
     }
+
+    toast({
+      title: "Acesso negado",
+      description: "Entre com a conta proprietária autorizada para acessar esta área.",
+      variant: "destructive",
+    });
   };
 
   return (
@@ -54,33 +50,17 @@ export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Ac
             </AlertDialogTitle>
           </div>
           <AlertDialogDescription className="text-zinc-400">
-            Esta área é restrita. Por favor, insira a senha da conta mestre para continuar.
+            Esta área é restrita à conta proprietária autenticada. Confirme para continuar.
           </AlertDialogDescription>
         </AlertDialogHeader>
 
-        <div className="py-6 space-y-4">
-          <div className="space-y-2">
-            <Label className="text-xs font-bold uppercase text-zinc-500 tracking-widest flex items-center gap-2">
-              <Lock className="w-3 h-3" />
-              Senha Master
-            </Label>
-            <Input
-              type="password"
-              placeholder="Digite a senha Victor.!.1999"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
-              className="bg-black border-white/5 focus:border-primary/50 text-white h-12"
-              autoFocus
-            />
-          </div>
+        <div className="flex items-center gap-3 py-5 text-sm text-zinc-300">
+          <Lock className="w-4 h-4 text-primary" />
+          <span>Conta atual: {user?.username ?? "não autenticada"}</span>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel 
-            onClick={() => setPassword("")}
-            className="bg-transparent border-white/10 text-white hover:bg-white/5"
-          >
+          <AlertDialogCancel className="bg-transparent border-white/10 text-white hover:bg-white/5">
             Cancelar
           </AlertDialogCancel>
           <AlertDialogAction
