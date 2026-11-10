@@ -1,5 +1,5 @@
 import { db, dbRemote, dbLocal, multiWrite, localSqlite, getAllDatabases, tursoClient } from "./db.js";
-import { neonDb } from "./neon-db.js";
+import { neonDb, neonPool } from "./neon-db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
@@ -50,12 +50,19 @@ async function nextSharedId(table: any): Promise<number> {
     const value = Number(rows[0]?.id ?? 0);
     return Number.isSafeInteger(value) && value > 0 ? value : 0;
   }));
-  const nextId = Math.max(0, ...maxima) + 1;
-  if (neonDb) {
+  if (neonPool) {
     const tableName = getTableName(table);
-    await neonDb.execute(sql`SELECT setval(pg_get_serial_sequence(${"public." + tableName}, 'id'), ${nextId}, true)`);
+    const result = await neonPool.query(
+      "SELECT nextval(pg_get_serial_sequence($1, 'id')) AS id",
+      [`public.${tableName}`],
+    );
+    const allocatedId = Number(result.rows[0]?.id);
+    if (!Number.isSafeInteger(allocatedId) || allocatedId <= 0) {
+      throw new Error(`Não foi possível reservar um ID PostgreSQL para a tabela ${tableName}.`);
+    }
+    return allocatedId;
   }
-  return nextId;
+  return Math.max(0, ...maxima) + 1;
 }
 
 async function getBusinessTypeForUser(database: any, userId: number | null | undefined): Promise<string> {
