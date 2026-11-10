@@ -4,6 +4,7 @@ import * as schema from "../shared/schema";
 import path from "path";
 import fs from "fs";
 import { sql } from "drizzle-orm";
+import { neonDb } from "./neon-db.js";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
 const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
@@ -51,6 +52,11 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   } catch (e) {
     console.error("⚠️  Falha ao conectar ao Turso:", e);
   }
+}
+
+if (!dbRemote && neonDb) {
+  dbRemote = neonDb;
+  console.log("[DB] Neon PostgreSQL ativado como banco principal.");
 }
 
 export const isRemoteEnabled = !!dbRemote;
@@ -144,7 +150,7 @@ export const db = (mirrorDatabase
         return Reflect.get(target, property, receiver);
       },
     })
-  : primaryDatabase) as typeof dbLocal;
+  : primaryDatabase) as any;
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
@@ -171,7 +177,7 @@ export async function multiWrite<T>(
   if (failures.length > 0) {
     const details = failures
       .map(({ result, index }) => {
-        const target = dbs[index] === dbRemote ? "Turso" : "SQLite local";
+        const target = dbs[index] === dbRemote ? (neonDb ? "Neon PostgreSQL" : "Turso") : "SQLite local";
         const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
         return `${target}: ${reason}`;
       })
