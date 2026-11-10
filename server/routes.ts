@@ -2253,6 +2253,11 @@ export async function registerRoutes(
 
   app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
     try {
+      const user = req.user as any;
+      if (user?.role !== "owner" && user?.role !== "admin") {
+        return res.status(403).json({ message: "Apenas proprietário ou administrador pode cancelar vendas." });
+      }
+
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) {
         return res.status(400).json({ message: "ID de venda inválido" });
