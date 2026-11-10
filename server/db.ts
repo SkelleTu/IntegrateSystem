@@ -41,17 +41,9 @@ export const dbLocal = drizzle(localSqlite, { schema });
 export let dbRemote: any = null;
 export let tursoClient: any = null;
 
-const legacyTursoConfigured = Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN);
-if (
-  neonPool &&
-  legacyTursoConfigured &&
-  String(process.env.AURA_NEON_DATA_MIGRATION_COMPLETE || "").toLowerCase() !== "true"
-) {
-  throw new Error(
-    "[DB] Neon cutover blocked: legacy Turso credentials are present and data migration has not been explicitly verified. " +
-    "Export, reconcile and verify Turso business data before setting AURA_NEON_DATA_MIGRATION_COMPLETE=true."
-  );
-}
+// Aura is an independent application with its own Neon database.
+// Turso is retained only as a legacy fallback when DATABASE_URL is absent;
+// no Invista Pro/Turso data migration is part of this application's bootstrap.
 
 if (!process.env.DATABASE_URL && process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
