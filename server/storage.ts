@@ -396,9 +396,7 @@ export class DatabaseStorage implements IStorage {
   async createService(service: InsertService): Promise<Service> {
     this.logAction(`Criação de serviço: ${service.name}`);
     return await dualWrite(async (database) => {
-      const insertResultservices: any = await database.insert(services).values(service);
-      const idservices = insertResultservices.lastInsertRowid;
-      const [newService] = await database.select().from(services).where(eq(services.id, idservices));
+      const [newService] = await database.insert(services).values(service).returning();
       return newService;
     });
   }
@@ -432,9 +430,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Consulta estado da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
     }
     return state;
   }
@@ -457,9 +453,7 @@ export class DatabaseStorage implements IStorage {
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
     this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
     return await dualWrite(async (database) => {
-      const insertResulttickets: any = await database.insert(tickets).values(ticket);
-      const idtickets = insertResulttickets.lastInsertRowid;
-      const [newTicket] = await database.select().from(tickets).where(eq(tickets.id, idtickets));
+      const [newTicket] = await database.insert(tickets).values(ticket).returning();
       return newTicket;
     });
   }
@@ -502,9 +496,7 @@ export class DatabaseStorage implements IStorage {
   async createCategory(category: InsertCategory): Promise<Category> {
     this.logAction(`Nova categoria: ${category.name}`);
     return await dualWrite(async (database) => {
-      const insertResultcategories: any = await database.insert(categories).values(category);
-      const idcategories = insertResultcategories.lastInsertRowid;
-      const [newCategory] = await database.select().from(categories).where(eq(categories.id, idcategories));
+      const [newCategory] = await database.insert(categories).values(category).returning();
       return newCategory;
     });
   }
@@ -526,9 +518,7 @@ export class DatabaseStorage implements IStorage {
       ...item,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
     };
-    const insertResultmenuItems: any = await db.insert(menuItems).values(itemToInsert);
-      const idmenuItems = insertResultmenuItems.lastInsertRowid;
-      const [newItem] = await db.select().from(menuItems).where(eq(menuItems.id, idmenuItems));
+    const [newItem] = await db.insert(menuItems).values(itemToInsert).returning();
     return newItem;
   }
 
@@ -984,7 +974,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const [inserted] = await database.insert(inventory)
-        .values(itemToUpsert)
+        .values(itemToUpsert).returning()
       return inserted;
     });
   }
@@ -992,9 +982,7 @@ export class DatabaseStorage implements IStorage {
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
     return await dualWrite(async (database) => {
-      const insertResultinventoryLogs: any = await database.insert(inventoryLogs).values(log);
-      const idinventoryLogs = insertResultinventoryLogs.lastInsertRowid;
-      const [newLog] = await database.select().from(inventoryLogs).where(eq(inventoryLogs.id, idinventoryLogs));
+      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
       return newLog;
     });
   }
@@ -1052,9 +1040,7 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(transaction: any): Promise<Transaction> {
     return await dualWrite(async (database) => {
-      const insertResulttransactions: any = await database.insert(transactions).values(transaction);
-      const idtransactions = insertResulttransactions.lastInsertRowid;
-      const [newTransaction] = await database.select().from(transactions).where(eq(transactions.id, idtransactions));
+      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
       return newTransaction;
     });
   }
@@ -1084,9 +1070,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const insertResulttimeClock: any = await db.insert(timeClock).values(data);
-      const idtimeClock = insertResulttimeClock.lastInsertRowid;
-      const [clock] = await db.select().from(timeClock).where(eq(timeClock.id, idtimeClock));
+    const [clock] = await db.insert(timeClock).values(data).returning();
     return clock;
   }
 
@@ -1104,9 +1088,7 @@ export class DatabaseStorage implements IStorage {
     }
     const [s] = await query.limit(1);
     if (!s) {
-      const insertResultsettings: any = await db.insert(settings).values({ enterpriseId });
-      const idsettings = insertResultsettings.lastInsertRowid;
-      const [newSettings] = await db.select().from(settings).where(eq(settings.id, idsettings));
+      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
       return newSettings;
     }
     return s;
@@ -1125,9 +1107,7 @@ export class DatabaseStorage implements IStorage {
 
   // User Sessions
   async logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession> {
-    const insertResultuserSessions: any = await db.insert(userSessions).values(data);
-      const iduserSessions = insertResultuserSessions.lastInsertRowid;
-      const [session] = await db.select().from(userSessions).where(eq(userSessions.id, iduserSessions));
+    const [session] = await db.insert(userSessions).values(data).returning();
     return session;
   }
 
@@ -1774,9 +1754,7 @@ export class DatabaseStorage implements IStorage {
 
   async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
     return await dualWrite(async (database) => {
-      const insertResultbatchLogs: any = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any);
-      const idbatchLogs = insertResultbatchLogs.lastInsertRowid;
-      const [log] = await database.select().from(batchLogs).where(eq(batchLogs.id, idbatchLogs));
+      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
       return log;
     });
   }
