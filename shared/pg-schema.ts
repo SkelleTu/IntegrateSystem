@@ -1,8 +1,14 @@
 // PostgreSQL schema for the Neon primary database.
 // Kept separate from shared/schema.ts so the local SQLite adapter remains available.
-import { pgTable, text, integer, serial, boolean, timestamp, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, integer, serial, boolean, timestamp, numeric, bigint, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+export const auraSessions = pgTable("aura_sessions", {
+  sid: text("sid").primaryKey(),
+  sess: text("sess").notNull(),
+  expire: bigint("expire", { mode: "number" }).notNull(),
+}, (table) => [index("aura_sessions_expire_idx").on(table.expire)]);
 
 export const runtimeEvents = pgTable("runtime_events", {
   id: serial("id").primaryKey(),
