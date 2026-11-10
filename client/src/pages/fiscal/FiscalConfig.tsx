@@ -793,7 +793,7 @@ export default function FiscalConfig() {
                 <p className="text-xs text-white/50 mt-1">A configuração atual deve permanecer em Homologação durante testes. A emissão real só deve ocorrer após a configuração fiscal estar completa.</p>
               </div>
               <div className="rounded-xl border border-white/10 p-4 text-xs text-white/50">
-                Fluxo validado: Caixa → Venda → Fiscal → Histórico. Nenhuma venda é criada nesta aba.
+                Fluxo previsto: Caixa → Venda → Fiscal → Histórico. Esta aba é informativa; nenhum teste foi executado e nenhuma venda foi criada. A emissão permanece bloqueada até completar os dados fiscais e credenciais da SEFAZ.
               </div>
             </CardContent>
           </Card>
