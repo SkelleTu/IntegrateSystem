@@ -4,7 +4,7 @@ import * as schema from "../shared/schema";
 import path from "path";
 import fs from "fs";
 import { sql } from "drizzle-orm";
-import { neonDb } from "./neon-db.js";
+import { neonDb, neonPool } from "./neon-db.js";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
 const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
@@ -803,6 +803,28 @@ export async function setupDatabase() {
 }
 
 export async function auditDatabaseParity() {
+  if (neonPool) {
+    const expectedTables = [...new Set(TABLE_DEFINITIONS
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+      .filter((table): table is string => Boolean(table)))];
+    expectedTables.push("aura_sessions");
+    const mismatches: Array<Record<string, unknown>> = [];
+    for (const table of expectedTables) {
+      try {
+        await neonPool.query(`SELECT 1 FROM public."${table.replace(/"/g, '""')}" LIMIT 0`);
+      } catch (error: any) {
+        mismatches.push({ table, error: error?.message || String(error) });
+      }
+    }
+    return {
+      ok: mismatches.length === 0,
+      primaryDatabase: "neon-postgresql",
+      comparison: "required-table-presence",
+      tablesChecked: expectedTables.length,
+      mismatches,
+    };
+  }
+
   if (!tursoClient) {
     return {
       ok: false,
