@@ -557,7 +557,7 @@ export async function registerRoutes(
 
   app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
     
     try {
       const { username, password } = req.body;
@@ -921,7 +921,7 @@ export async function registerRoutes(
 
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
     const settings = await storage.getFiscalSettings(user.enterpriseId);
     if (!settings) {
       // Pré-preenche com os dados já cadastrados no estabelecimento
@@ -976,7 +976,7 @@ export async function registerRoutes(
 
   app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
     try {
       const enterpriseId = user.enterpriseId || 1;
       const currentSettings = await storage.getFiscalSettings(enterpriseId);
@@ -1003,7 +1003,7 @@ export async function registerRoutes(
 
   app.get("/api/fiscal/logs", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
     const logs = await storage.getLogsFiscais(user.enterpriseId);
     res.json(logs);
   });
@@ -1145,7 +1145,7 @@ export async function registerRoutes(
 
   app.get("/api/fiscal/history", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
     const history = await storage.getNfceHistory(user.enterpriseId);
     res.json(history);
   });
@@ -1441,7 +1441,7 @@ export async function registerRoutes(
   app.post("/api/products/swap-codigo", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
       const { password, displacedProductId, displacedNewCode } = req.body;
       if (!password) return res.status(400).json({ message: "Senha obrigatória" });
       const dbUser = await storage.getUserByUsername(user.username);
@@ -1502,7 +1502,7 @@ export async function registerRoutes(
   app.delete("/api/products", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
       const { password } = req.body;
       if (!password) return res.status(400).json({ message: "Senha obrigatória" });
       const dbUser = await storage.getUserByUsername(user.username);
@@ -1519,7 +1519,7 @@ export async function registerRoutes(
   app.get("/api/products/snapshot", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
       const snapshot = await storage.getLatestStockSnapshot();
       res.json(snapshot);
     } catch (err: any) {
@@ -1530,7 +1530,7 @@ export async function registerRoutes(
   app.post("/api/products/restore", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
       const { password } = req.body;
       if (!password) return res.status(400).json({ message: "Senha obrigatória" });
       const dbUser = await storage.getUserByUsername(user.username);
@@ -1547,7 +1547,7 @@ export async function registerRoutes(
   app.post("/api/products/zero-quantities", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
       const { password } = req.body;
       if (!password) return res.status(400).json({ message: "Senha obrigatória" });
       const dbUser = await storage.getUserByUsername(user.username);
@@ -1664,7 +1664,7 @@ export async function registerRoutes(
   app.patch("/api/menu-items/:id/adjust", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
-      if (user.role !== "admin" && !hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
 
       const id = Number(req.params.id);
       const { rotation, imageScale } = req.body;
@@ -2093,7 +2093,7 @@ export async function registerRoutes(
 
   app.post("/api/cash-register/adjust", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.role !== "admin" && !hasOwnerRole(user)) {
+    if (!hasAdminRole(user)) {
       return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     }
     const { id, amount } = req.body;
