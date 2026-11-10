@@ -11,7 +11,7 @@ if (process.env.NODE_ENV === "production" && !connectionString) {
 export const neonPool = connectionString
   ? new Pool({
       connectionString,
-      ssl: { rejectUnauthorized: false },
+      ssl: { rejectUnauthorized: true },
       max: Number(process.env.PG_POOL_MAX || 5),
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
