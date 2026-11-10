@@ -16,7 +16,8 @@
     "db:push": "drizzle-kit push",
     "test:session-store": "tsx scripts/verify-turso-session-store.ts",
     "db:generate:pg": "drizzle-kit generate --config=drizzle.pg.config.ts",
-    "db:push:pg": "drizzle-kit push --config=drizzle.pg.config.ts"
+    "db:push:pg": "drizzle-kit push --config=drizzle.pg.config.ts",
+    "test:neon-session-store": "tsx scripts/verify-neon-session-store.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
