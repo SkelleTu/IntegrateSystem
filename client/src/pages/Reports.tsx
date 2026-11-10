@@ -21,7 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 
 export default function Reports() {
@@ -34,7 +33,7 @@ export default function Reports() {
   });
 
   const [saleToCancel, setSaleToCancel] = useState<number | null>(null);
-  const [masterPassword, setMasterPassword] = useState("");
+  const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin";
   const [expandedRegister, setExpandedRegister] = useState<number | null>(null);
 
   const { data: sales, isLoading: isLoadingSales } = useQuery<Sale[]>({
@@ -67,7 +66,6 @@ export default function Reports() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] });
       toast({ title: "Venda cancelada com sucesso" });
       setSaleToCancel(null);
-      setMasterPassword("");
     },
     onError: (error: Error) => {
       toast({ 
@@ -81,15 +79,13 @@ export default function Reports() {
   const handleCancelClick = () => {
     if (!saleToCancel) return;
 
-    if (user?.username !== "SkelleTu") {
-      if (masterPassword !== "Victor.!.1999") {
-        toast({
-          title: "Acesso Negado",
-          description: "Senha da conta master incorreta.",
-          variant: "destructive"
-        });
-        return;
-      }
+    if (!isAuthorizedToCancel) {
+      toast({
+        title: "Acesso negado",
+        description: "Somente a conta proprietária ou administradora pode cancelar vendas.",
+        variant: "destructive"
+      });
+      return;
     }
 
     cancelMutation.mutate(saleToCancel);
@@ -323,32 +319,24 @@ export default function Reports() {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          {user?.username !== "SkelleTu" && (
-            <div className="py-6 space-y-3">
-              <label className="text-[10px] font-black uppercase text-zinc-500 tracking-[0.2em] pl-1">Senha da Conta Master</label>
-              <Input
-                type="password"
-                placeholder="AUTORIZAÇÃO MESTRE"
-                value={masterPassword}
-                onChange={(e) => setMasterPassword(e.target.value)}
-                className="bg-black border-white/10 text-white h-14 text-xl font-black italic focus:border-red-500/50 transition-all rounded-xl"
-              />
-            </div>
+          {!isAuthorizedToCancel && (
+            <p className="py-4 text-sm text-red-400">
+              O cancelamento está restrito às contas proprietária e administradora.
+            </p>
           )}
 
           <AlertDialogFooter className="gap-3">
             <AlertDialogCancel 
               onClick={() => {
                 setSaleToCancel(null);
-                setMasterPassword("");
-              }}
+                }}
               className="bg-transparent border-white/10 text-white hover:bg-white/5 h-12 px-6 font-bold uppercase italic text-xs tracking-widest rounded-xl"
             >
               Abortar
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCancelClick}
-              disabled={cancelMutation.isPending || (user?.username !== "SkelleTu" && !masterPassword)}
+              disabled={cancelMutation.isPending || !isAuthorizedToCancel}
               className="bg-red-600 hover:bg-red-700 text-white border-0 h-12 px-8 font-black uppercase italic text-sm tracking-widest rounded-xl"
             >
               {cancelMutation.isPending ? (
