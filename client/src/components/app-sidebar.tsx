@@ -413,7 +413,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                 );
               })}
 
-              {user.role === "admin" && (
+              {(user.role === "admin" || user.role === "owner") && (
                 <SidebarMenuItem>
                   <SidebarMenuButton 
                     onClick={() => setRegisterOpen(true)}
@@ -425,7 +425,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                 </SidebarMenuItem>
               )}
 
-              {user.username === "SkelleTu" && (
+              {user.role === "owner" && (
                 <>
                   <SidebarMenuItem>
                     <SidebarMenuButton 
@@ -541,7 +541,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       <Dialog open={adminPanelOpen} onOpenChange={setAdminPanelOpen}>
         <DialogContent className="bg-zinc-950 border-white/10 text-white max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter">Gestão de Contas (SkelleTu)</DialogTitle>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter">Gestão de Contas</DialogTitle>
           </DialogHeader>
           <div className="max-h-[300px] overflow-y-auto space-y-2 py-4">
             {usersList?.map(u => (
@@ -550,7 +550,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
                   <p className="font-bold text-sm">{u.username}</p>
                   <p className="text-[10px] uppercase text-zinc-500">{u.role}</p>
                 </div>
-                {u.username !== "SkelleTu" && (
+                {u.id !== user.id && (
                   <Button 
                     variant="ghost" 
                     size="icon" 
