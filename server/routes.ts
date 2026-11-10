@@ -118,10 +118,11 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
+import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
-  tickets, users, fiscalSettings, insertFiscalSettingsSchema,
+  tickets, users, fiscalSettings,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
-} from "../shared/schema";
+} from "../shared/pg-schema.js";
 
 export class TursoSessionStore extends session.Store {
   constructor(private readonly client: NonNullable<typeof tursoClient>) {
