@@ -1370,9 +1370,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined> {
-    const all = await db.select().from(products);
+    const all: any[] = await db.select().from(products);
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-    const match = all.find(p =>
+    const match = all.find((p: any) =>
       norm(p.name) === norm(data.name) &&
       norm(p.brand) === norm(data.brand) &&
       norm(p.flavor) === norm(data.flavor) &&
@@ -1686,7 +1686,7 @@ export class DatabaseStorage implements IStorage {
         norm(b.supplierCode).includes(qn) ||
         norm((b as any).sku).includes(qn) ||
         norm((b as any).variantName).includes(qn)
-      ).map(b => b.productId)
+      ).map((b: any) => b.productId)
     );
     const matched = all.filter((p: any) =>
       norm(p.name).includes(qn) ||
@@ -1706,9 +1706,9 @@ export class DatabaseStorage implements IStorage {
     const allBatchesList = await db.select().from(batches);
     const matchingBatches = allBatchesList.filter((b: any) => norm((b as any).sku) === norm(sku));
     if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
-    const all = await db.select().from(products);
-    const matched = all.filter(p => productIds.includes(p.id));
+    const productIds = Array.from(new Set<number>(matchingBatches.map((b: any) => Number(b.productId))));
+    const all: any[] = await db.select().from(products);
+    const matched = all.filter((p: any) => productIds.includes(Number(p.id)));
     if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
     const result = enriched[0];
