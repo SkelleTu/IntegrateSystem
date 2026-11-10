@@ -1486,7 +1486,7 @@ export default function InventoryPage() {
 
   // ─── Access guard ──────────────────────────────────────────────────────────
 
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "owner") {
     return (
       <div className="flex items-center justify-center min-h-[80vh] p-4">
         <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
