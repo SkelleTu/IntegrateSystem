@@ -131,7 +131,7 @@ export async function getRuntimeObservability(query: RuntimeObservationQuery = {
 
     const hasMore = rows.length > limit;
     const selected = rows.slice(0, limit);
-    const events = selected.map((row) => ({
+    const events = selected.map((row: any) => ({
       id: row.id,
       sequence: row.id,
       sessionId: row.sessionId,
