@@ -30,7 +30,7 @@ export default function Financeiro() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const dateRangeValid = dateRange.start <= dateRange.end;
 
-  if (user?.role !== "admin") {
+  if (user?.role !== "admin" && user?.role !== "owner") {
     return (
       <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center">
         <h1 className="text-white text-4xl font-black uppercase italic mb-4 tracking-tighter">Acesso Restrito</h1>
