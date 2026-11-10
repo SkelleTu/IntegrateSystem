@@ -26,9 +26,10 @@ function withoutUndefined<T extends Record<string, any>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
-// Helper de escrita simultânea em TODOS os bancos ativos
-// Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
-// Após cada write crítico, agenda um auto-backup JSON (debounced 5s).
+// Helper de escrita no banco autoritativo ativo.
+// Em modo Neon/Turso, getAllDatabases() contém apenas o banco remoto; SQLite local
+// não é tratado como réplica de dados comerciais nem como backup de produção.
+// O backup remoto precisa ser implementado separadamente antes de habilitar exports.
 async function dualWrite(operation: (database: any) => Promise<any>) {
   const result = await multiWrite(operation);
   scheduleAutoBackup(); // salva snapshot JSON automaticamente
