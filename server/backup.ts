@@ -393,7 +393,7 @@ export function listBackups(): Array<{ filename: string; name: string; createdAt
 
 export async function importDataFromSnapshot(snapshot: Record<string, any[]> & { _sql?: string }): Promise<any> {
   if (dbRemote) {
-    throw new Error("Importação bloqueada: o banco primário é Turso. Restauração remota segura ainda não está implementada.");
+    throw new Error("Importação bloqueada: o banco remoto é o banco primário. Restauração remota segura ainda não está implementada.");
   }
   if (typeof snapshot?._sql === "string") return restoreSqlDump(snapshot._sql, "loaded");
 
