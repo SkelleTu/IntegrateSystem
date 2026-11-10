@@ -4,7 +4,9 @@ import * as schema from "../shared/schema";
 import path from "path";
 import fs from "fs";
 import { sql } from "drizzle-orm";
-import { neonDb, neonPool } from "./neon-db.js";
+import { neonDb, neonPool, verifyNeonConnection } from "./neon-db.js";
+import * as pgSchema from "../shared/pg-schema.js";
+import { getTableConfig } from "drizzle-orm/pg-core";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
 const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
@@ -798,26 +800,39 @@ export async function setupDatabase() {
     }
   }
 
+  // Neon is authoritative when DATABASE_URL is configured. Validate its real
+  // PostgreSQL schema before allowing authentication/routes to start.
+  if (neonPool) {
+    await verifyNeonConnection();
+    const report = await auditDatabaseParity();
+    if (!report.ok) {
+      throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
+    }
+    console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
+  }
+
   // Ensure local sql.js changes made with prepare().run() are persisted.
   persistLocalSqlite();
 }
 
 export async function auditDatabaseParity() {
   if (neonPool) {
-    const definitions = TABLE_DEFINITIONS.map((statement) => {
-      const match = statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i);
-      if (!match) return null;
-      const table = match[1];
-      const open = statement.indexOf("(");
-      const close = statement.lastIndexOf(")");
-      const body = open >= 0 && close > open ? statement.slice(open + 1, close) : "";
-      const columns = body.split("\n")
-        .map((line) => line.trim().replace(/,$/, ""))
-        .map((line) => line.match(/^["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\s+(?:INTEGER|TEXT|REAL|BLOB|NUMERIC|VARCHAR|CHAR|BOOLEAN|DATE|DATETIME)\b/i)?.[1])
-        .filter((column): column is string => Boolean(column));
-      return { table, columns };
-    }).filter((entry): entry is { table: string; columns: string[] } => Boolean(entry));
-    definitions.push({ table: "aura_sessions", columns: ["sid", "sess", "expire"] });
+    const applicationTables = [
+      pgSchema.auraSessions, pgSchema.runtimeEvents, pgSchema.userSessions, pgSchema.users,
+      pgSchema.services, pgSchema.tickets, pgSchema.queueState, pgSchema.categories,
+      pgSchema.menuItems, pgSchema.cashRegisters, pgSchema.sales, pgSchema.saleItems,
+      pgSchema.payments, pgSchema.transactions, pgSchema.timeClock, pgSchema.enterprises,
+      pgSchema.settings, pgSchema.inventory, pgSchema.inventoryLogs, pgSchema.inventoryRestocks,
+      pgSchema.products, pgSchema.batches, pgSchema.batchLogs, pgSchema.stockSnapshots,
+      pgSchema.fiscalSettings, pgSchema.nfce,
+    ];
+    const definitions = applicationTables.map((table) => {
+      const config = getTableConfig(table);
+      return {
+        table: config.name,
+        columns: config.columns.map((column) => column.name),
+      };
+    });
     const actualResult = await neonPool.query(
       "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'"
     );
@@ -839,7 +854,7 @@ export async function auditDatabaseParity() {
     return {
       ok: mismatches.length === 0,
       primaryDatabase: "neon-postgresql",
-      comparison: "required-table-and-column-presence",
+      comparison: "drizzle-schema-table-and-column-presence",
       tablesChecked: definitions.length,
       mismatches,
     };
