@@ -366,16 +366,38 @@ export async function registerRoutes(
     return res.status(report.ok ? 200 : 503).json(report);
   });
 
-  app.get("/api/db/status", (req, res) => {
-    // Check if Turso is configured
+  app.get("/api/db/status", async (_req, res) => {
+    if (neonPool) {
+      try {
+        const startedAt = Date.now();
+        await neonPool.query("SELECT 1");
+        return res.json({
+          status: "online",
+          provider: "neon-postgresql",
+          message: "Conectado ao Neon PostgreSQL",
+          latency: Date.now() - startedAt,
+          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          timestamp: Date.now(),
+        });
+      } catch (error: any) {
+        console.error("[DB] Neon health check failed:", error?.message || error);
+        return res.status(503).json({
+          status: "degraded",
+          provider: "neon-postgresql",
+          message: "Banco de dados remoto indisponível",
+          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          timestamp: Date.now(),
+        });
+      }
+    }
     const isTurso = !!process.env.TURSO_DATABASE_URL;
-    
-    res.json({
+    return res.json({
       status: "online",
+      provider: isTurso ? "turso" : "sqlite-local",
       message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
       latency: 15,
       lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   });
 
