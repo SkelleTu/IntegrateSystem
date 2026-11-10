@@ -439,9 +439,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Atualização da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
     }
     await db.update(queueState)
       .set(update)
@@ -1488,8 +1486,8 @@ export class DatabaseStorage implements IStorage {
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
     const result = await dualWrite(async (database) => {
-      const res: any = await database.update(batches).set({ quantity: 0 }).run();
-      return res.rowsAffected;
+      const updatedRows = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
+      return updatedRows.length;
     });
     return result as number;
   }
