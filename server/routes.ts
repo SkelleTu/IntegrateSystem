@@ -498,12 +498,19 @@ export async function registerRoutes(
       if (!updatedUser) return res.status(500).json({ message: "Não foi possível salvar a nova senha." });
 
       // Revoke every other persisted session for this account; preserve the current session.
-      if (tursoClient && req.sessionID) {
+      if (req.sessionID) {
         try {
-          await tursoClient.execute({
-            sql: "DELETE FROM aura_sessions WHERE CAST(json_extract(sess, '$.passport.user') AS TEXT) = ? AND sid <> ?",
-            args: [String(dbUser.id), String(req.sessionID)],
-          });
+          if (neonPool) {
+            await neonPool.query(
+              "DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}') = $1 AND sid <> $2",
+              [String(dbUser.id), String(req.sessionID)],
+            );
+          } else if (tursoClient) {
+            await tursoClient.execute({
+              sql: "DELETE FROM aura_sessions WHERE CAST(json_extract(sess, '$.passport.user') AS TEXT) = ? AND sid <> ?",
+              args: [String(dbUser.id), String(req.sessionID)],
+            });
+          }
         } catch (sessionError: any) {
           console.error("[SECURITY] Could not revoke other sessions after password change:", sessionError?.message || sessionError);
         }
