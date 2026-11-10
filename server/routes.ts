@@ -573,45 +573,35 @@ export async function registerRoutes(
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     try {
-      const owned = await storage.getEnterprisesByOwner(user.id);
-      if (owned.length >= 5) {
-        return res.status(400).json({ message: "Limite de 5 estabelecimentos por conta atingido." });
-      }
-
       const { name, businessType, taxId, phone, address, city, state } = req.body;
-      if (!name?.trim()) return res.status(400).json({ message: "Nome do estabelecimento é obrigatório." });
-
-      const baseSlug = name.trim().toLowerCase()
-        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-        .replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
-      
-      // Garantir slug único
-      let slug = baseSlug;
-      let attempt = 1;
-      while (await storage.getEnterpriseBySlug(slug)) {
-        slug = `${baseSlug}-${attempt++}`;
+      if (typeof name !== "string" || !name.trim()) {
+        return res.status(400).json({ message: "Nome do estabelecimento é obrigatório." });
       }
 
-      const enterprise = await storage.createEnterprise({
+      const normalizedName = name.trim();
+      const baseSlug = normalizedName.toLowerCase()
+        .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+        .replace(/[^\\w\\s-]/g, "").replace(/\\s+/g, "-");
+
+      const enterprise = await storage.createAndActivateEnterprise(user.id, {
         ownerId: user.id,
-        name: name.trim(),
+        name: normalizedName,
         businessType: businessType || "barbearia",
         taxId: taxId || null,
         phone: phone || null,
         address: address || null,
         city: city || null,
         state: state || null,
-        slug,
+        slug: baseSlug || `estabelecimento-${user.id}`,
         status: "active",
       });
-
-      // Ativar este estabelecimento para o usuário
-      await storage.updateUser(user.id, { enterpriseId: enterprise.id });
 
       res.status(201).json(enterprise);
     } catch (err) {
       console.error("Erro ao criar estabelecimento:", err);
-      res.status(500).json({ message: "Erro ao criar estabelecimento." });
+      const message = err instanceof Error ? err.message : "Falha inesperada ao criar estabelecimento.";
+      const status = message.includes("Limite de 5") ? 400 : 500;
+      res.status(status).json({ message: status === 400 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
     }
   });
 
