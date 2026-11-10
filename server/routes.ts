@@ -2498,6 +2498,10 @@ export async function registerRoutes(
   // A reset only occurs when AURA_BOOTSTRAP_ADMIN_RESET=true; never reset credentials on every restart.
   void (async () => {
     try {
+      if (neonPool) {
+        console.log("[BOOT] Legacy SQLite/Turso owner reconciliation skipped; Neon owner provisioning is handled by initApp.");
+        return;
+      }
       const username = "SkelleTu";
       const bootstrapPassword = String(process.env.AURA_BOOTSTRAP_ADMIN_PASSWORD || "");
       const resetRequested = String(process.env.AURA_BOOTSTRAP_ADMIN_RESET || "").toLowerCase() === "true";
