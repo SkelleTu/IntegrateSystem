@@ -39,7 +39,7 @@ export const dbLocal = drizzle(localSqlite, { schema });
 export let dbRemote: any = null;
 export let tursoClient: any = null;
 
-if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+if (!process.env.DATABASE_URL && process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const { createClient } = await import("@libsql/client");
     const { drizzle: drizzleLibsql } = await import("drizzle-orm/libsql");
