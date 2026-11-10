@@ -805,7 +805,7 @@ export async function setupDatabase() {
 export async function auditDatabaseParity() {
   if (neonPool) {
     const expectedTables = [...new Set(TABLE_DEFINITIONS
-      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\\s+(\\w+)/i)?.[1])
+      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
       .filter((table): table is string => Boolean(table)))];
     expectedTables.push("aura_sessions");
     const mismatches: Array<Record<string, unknown>> = [];
