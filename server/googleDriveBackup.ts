@@ -27,7 +27,7 @@ function ensureBackupDir() {
 
 export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
   if (dbRemote) {
-    return { available: false, lastSuccessfulBackupAt: null, lastErrorMessage: "Backup Google Drive bloqueado: Turso é o banco primário; o SQLite local é apenas espelho." };
+    return { available: false, lastSuccessfulBackupAt: null, lastErrorMessage: "Backup Google Drive via SQLite bloqueado: o banco remoto é primário; o arquivo local não é uma cópia completa da produção." };
   }
   return {
     available: !driveWasUnavailable && lastSuccessfulBackupAt > 0,
@@ -38,7 +38,7 @@ export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
 
 export function backupSqliteToGoogleDrive(): string | null {
   if (dbRemote) {
-    lastErrorMessage = "Backup Google Drive bloqueado: Turso é o banco primário; o SQLite local é apenas espelho.";
+    lastErrorMessage = "Backup Google Drive via SQLite bloqueado: o banco remoto é primário; o arquivo local não é uma cópia completa da produção.";
     return null;
   }
   if (process.env.VERCEL || !BACKUP_DIR) return null;
