@@ -27,6 +27,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
+import { neonPool } from "./neon-db.js";
+import { NeonSessionStore } from "./neon-session-store.js";
 
 const uploadStorage = multer.diskStorage({
   destination: "attached_assets/uploads/",
@@ -298,9 +300,11 @@ export async function registerRoutes(
   if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
     throw new Error("[SECURITY] SESSION_SECRET precisa conter pelo menos 32 caracteres em produção; segredo fixo conhecido foi removido.");
   }
-  const sessionStore = tursoClient
-    ? new TursoSessionStore(tursoClient)
-    : new MemoryStore({ checkPeriod: 86400000 });
+  const sessionStore = neonPool
+    ? new NeonSessionStore(neonPool)
+    : tursoClient
+      ? new TursoSessionStore(tursoClient)
+      : new MemoryStore({ checkPeriod: 86400000 });
   app.use(
     session({
       store: sessionStore,
