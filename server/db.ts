@@ -842,16 +842,27 @@ export async function auditDatabaseParity() {
       const config = getTableConfig(table);
       return {
         table: config.name,
-        columns: config.columns.map((column) => column.name),
+        columns: config.columns.map((column) => ({
+          name: column.name,
+          type: column.getSQLType().toLowerCase() === "serial"
+            ? "integer"
+            : column.getSQLType().toLowerCase() === "timestamp"
+              ? "timestamp without time zone"
+              : column.getSQLType().toLowerCase(),
+          notNull: column.notNull,
+        })),
       };
     });
     const actualResult = await neonPool.query(
-      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'"
+      "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public'"
     );
-    const actual = new Map<string, Set<string>>();
-    for (const row of actualResult.rows as Array<{ table_name: string; column_name: string }>) {
-      if (!actual.has(row.table_name)) actual.set(row.table_name, new Set());
-      actual.get(row.table_name)!.add(row.column_name);
+    const actual = new Map<string, Map<string, { type: string; notNull: boolean }>>();
+    for (const row of actualResult.rows as Array<{ table_name: string; column_name: string; data_type: string; is_nullable: string }>) {
+      if (!actual.has(row.table_name)) actual.set(row.table_name, new Map());
+      actual.get(row.table_name)!.set(row.column_name, {
+        type: String(row.data_type).toLowerCase(),
+        notNull: row.is_nullable === "NO",
+      });
     }
     const mismatches: Array<Record<string, unknown>> = [];
     for (const definition of definitions) {
@@ -860,8 +871,22 @@ export async function auditDatabaseParity() {
         mismatches.push({ table: definition.table, error: "Required table is missing." });
         continue;
       }
-      const missingColumns = definition.columns.filter((column) => !actualColumns.has(column));
-      if (missingColumns.length) mismatches.push({ table: definition.table, missingColumns });
+      const missingColumns = definition.columns
+        .filter((column) => !actualColumns.has(column.name))
+        .map((column) => column.name);
+      const typeMismatches = definition.columns.flatMap((column) => {
+        const actualColumn = actualColumns.get(column.name);
+        if (!actualColumn || actualColumn.type === column.type) return [];
+        return [{ column: column.name, expected: column.type, actual: actualColumn.type }];
+      });
+      const nullabilityMismatches = definition.columns.flatMap((column) => {
+        const actualColumn = actualColumns.get(column.name);
+        if (!actualColumn || actualColumn.notNull === column.notNull) return [];
+        return [{ column: column.name, expectedNotNull: column.notNull, actualNotNull: actualColumn.notNull }];
+      });
+      if (missingColumns.length || typeMismatches.length || nullabilityMismatches.length) {
+        mismatches.push({ table: definition.table, missingColumns, typeMismatches, nullabilityMismatches });
+      }
     }
     return {
       ok: mismatches.length === 0,
