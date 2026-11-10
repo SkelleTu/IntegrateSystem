@@ -274,7 +274,7 @@ export default function LabelSystem() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-zinc-800/20 p-6 rounded-2xl border border-white/10 backdrop-blur-sm gap-6 mt-12">
         <div className="space-y-1">
           <h1 className="text-4xl font-black italic uppercase tracking-tighter text-white">Sistema de <span className="text-primary">Etiquetas</span></h1>
-          <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado SkelleTu</p>
+          <p className="text-xs font-bold text-white/40 uppercase tracking-widest">Controle Avançado</p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
           <Button 
