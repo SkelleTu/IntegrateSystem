@@ -2268,7 +2268,7 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error(`Erro ao cancelar venda #${req.params.id}:`, err);
       const message = err?.message || "Erro ao cancelar venda";
-      const status = message === "Venda não encontrada" ? 404 : 500;
+      const status = message.includes("Venda não encontrada") ? 404 : 500;
       res.status(status).json({ message });
     }
   });
