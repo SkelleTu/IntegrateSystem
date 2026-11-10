@@ -40,7 +40,7 @@ export default function Home() {
 
   const handleNavigation = (url: string, adminOnly?: boolean) => {
     if (!user) { setLocation("/login"); return; }
-    if (adminOnly && user?.role !== "admin") {
+    if (adminOnly && user?.role !== "admin" && user?.role !== "owner") {
       toast({ title: "Acesso Negado", description: "Restrito ao proprietário.", variant: "destructive" });
       return;
     }
@@ -62,8 +62,8 @@ export default function Home() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const categoriesQuery = useQuery<Category[]>({ queryKey: ["/api/categories"] });
 
-  const isFinanceLocked  = user?.role !== "admin";
-  const isInventoryLocked = user?.role !== "admin";
+  const isFinanceLocked  = user?.role !== "admin" && user?.role !== "owner";
+  const isInventoryLocked = user?.role !== "admin" && user?.role !== "owner";
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-20 md:pt-28">
