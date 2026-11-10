@@ -804,23 +804,43 @@ export async function setupDatabase() {
 
 export async function auditDatabaseParity() {
   if (neonPool) {
-    const expectedTables = [...new Set(TABLE_DEFINITIONS
-      .map((statement) => statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1])
-      .filter((table): table is string => Boolean(table)))];
-    expectedTables.push("aura_sessions");
+    const definitions = TABLE_DEFINITIONS.map((statement) => {
+      const match = statement.match(/CREATE TABLE IF NOT EXISTS\s+(\w+)/i);
+      if (!match) return null;
+      const table = match[1];
+      const open = statement.indexOf("(");
+      const close = statement.lastIndexOf(")");
+      const body = open >= 0 && close > open ? statement.slice(open + 1, close) : "";
+      const columns = body.split("\n")
+        .map((line) => line.trim().replace(/,$/, ""))
+        .map((line) => line.match(/^["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\s+(?:INTEGER|TEXT|REAL|BLOB|NUMERIC|VARCHAR|CHAR|BOOLEAN|DATE|DATETIME)\b/i)?.[1])
+        .filter((column): column is string => Boolean(column));
+      return { table, columns };
+    }).filter((entry): entry is { table: string; columns: string[] } => Boolean(entry));
+    definitions.push({ table: "aura_sessions", columns: ["sid", "sess", "expire"] });
+    const actualResult = await neonPool.query(
+      "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'"
+    );
+    const actual = new Map<string, Set<string>>();
+    for (const row of actualResult.rows as Array<{ table_name: string; column_name: string }>) {
+      if (!actual.has(row.table_name)) actual.set(row.table_name, new Set());
+      actual.get(row.table_name)!.add(row.column_name);
+    }
     const mismatches: Array<Record<string, unknown>> = [];
-    for (const table of expectedTables) {
-      try {
-        await neonPool.query(`SELECT 1 FROM public."${table.replace(/"/g, '""')}" LIMIT 0`);
-      } catch (error: any) {
-        mismatches.push({ table, error: error?.message || String(error) });
+    for (const definition of definitions) {
+      const actualColumns = actual.get(definition.table);
+      if (!actualColumns) {
+        mismatches.push({ table: definition.table, error: "Required table is missing." });
+        continue;
       }
+      const missingColumns = definition.columns.filter((column) => !actualColumns.has(column));
+      if (missingColumns.length) mismatches.push({ table: definition.table, missingColumns });
     }
     return {
       ok: mismatches.length === 0,
       primaryDatabase: "neon-postgresql",
-      comparison: "required-table-presence",
-      tablesChecked: expectedTables.length,
+      comparison: "required-table-and-column-presence",
+      tablesChecked: definitions.length,
       mismatches,
     };
   }
