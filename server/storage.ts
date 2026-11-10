@@ -83,6 +83,7 @@ export interface IStorage {
   getEnterpriseBySlug(slug: string): Promise<Enterprise | undefined>;
   getEnterprisesByOwner(ownerId: number): Promise<Enterprise[]>;
   createEnterprise(enterprise: InsertEnterprise, adminData?: any): Promise<Enterprise>;
+  createAndActivateEnterprise(ownerId: number, enterprise: InsertEnterprise): Promise<Enterprise>;
   updateEnterprise(id: number, update: Partial<Enterprise>): Promise<Enterprise>;
   deleteEnterprise(id: number): Promise<void>;
 
@@ -271,6 +272,53 @@ export class DatabaseStorage implements IStorage {
         } as any);
       }
       return newEnterprise;
+    });
+  }
+
+
+  // Atomically create and activate an establishment. Locking the owner row
+  // serializes concurrent submissions; an identical retry reuses its result.
+  async createAndActivateEnterprise(ownerId: number, enterprise: InsertEnterprise): Promise<Enterprise> {
+    this.logAction(`Criação e ativação de estabelecimento: ${enterprise.name}`);
+    return await dualWriteTransaction(async (database: any) => {
+      await database.select({ id: users.id }).from(users)
+        .where(eq(users.id, ownerId)).for("update");
+
+      const [existing] = await database.select().from(enterprises)
+        .where(and(
+          eq(enterprises.ownerId, ownerId),
+          eq(enterprises.name, enterprise.name),
+          enterprise.taxId ? eq(enterprises.taxId, enterprise.taxId) : isNull(enterprises.taxId),
+        )).limit(1);
+
+      if (existing) {
+        await database.update(users).set({ enterpriseId: existing.id }).where(eq(users.id, ownerId));
+        return existing;
+      }
+
+      const owned = await database.select({ id: enterprises.id }).from(enterprises)
+        .where(eq(enterprises.ownerId, ownerId));
+      if (owned.length >= 5) throw new Error("Limite de 5 estabelecimentos por conta atingido.");
+
+      const baseSlug = enterprise.slug;
+      let slug = baseSlug;
+      let attempt = 1;
+      while (true) {
+        const [taken] = await database.select({ id: enterprises.id }).from(enterprises)
+          .where(eq(enterprises.slug, slug)).limit(1);
+        if (!taken) break;
+        slug = `${baseSlug}-${attempt++}`;
+      }
+
+      const id = await nextSharedId(enterprises);
+      await database.insert(enterprises).values({ ...enterprise, id, slug } as any);
+      await database.insert(settings).values({ enterpriseId: id });
+      await database.update(users).set({ enterpriseId: id }).where(eq(users.id, ownerId));
+
+      const [created] = await database.select().from(enterprises)
+        .where(eq(enterprises.id, id)).limit(1);
+      if (!created) throw new Error("Não foi possível confirmar o estabelecimento criado.");
+      return created;
     });
   }
 
