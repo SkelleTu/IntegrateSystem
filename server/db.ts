@@ -891,7 +891,7 @@ export async function auditDatabaseParity() {
     return {
       ok: mismatches.length === 0,
       primaryDatabase: "neon-postgresql",
-      comparison: "drizzle-schema-table-and-column-presence",
+      comparison: "drizzle-schema-table-column-type-and-nullability",
       tablesChecked: definitions.length,
       mismatches,
     };
