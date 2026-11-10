@@ -1243,16 +1243,16 @@ export class DatabaseStorage implements IStorage {
     icmsOrigem?: number | null;
     icmsSituacaoTributaria?: string | null;
   })[]> {
-    const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const items: any[] = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
     if (items.length === 0) return [];
 
-    const ids = Array.from(new Set(items.map((i) => i.itemId)));
+    const ids = Array.from(new Set(items.map((i: any) => Number(i.itemId))));
 
     // Busca em menuItems e products em paralelo
     const [menuList, productList] = await Promise.all([
       db.select().from(menuItems).where(
         ids.length === 1
-          ? eq(menuItems.id, ids[0])
+          ? eq(menuItems.id, Number(ids[0]))
           : sql`${menuItems.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
       ),
       db.select().from(products).where(
@@ -1262,9 +1262,9 @@ export class DatabaseStorage implements IStorage {
       ),
     ]);
 
-    return items.map((item) => {
-      const mi = menuList.find((m) => m.id === item.itemId);
-      const pr = productList.find((p) => p.id === item.itemId);
+    return items.map((item: any) => {
+      const mi = menuList.find((m: any) => m.id === item.itemId);
+      const pr = productList.find((p: any) => p.id === item.itemId);
       const src = mi || pr;
       return {
         ...item,
@@ -1345,15 +1345,15 @@ export class DatabaseStorage implements IStorage {
 
   private async _enrichProducts(prods: Product[]) {
     if (prods.length === 0) return [];
-    const allBatches = await db.select().from(batches);
-    return prods.map(p => {
-      const pb = allBatches.filter(b => b.productId === p.id && b.quantity > 0);
-      const allPb = allBatches.filter(b => b.productId === p.id);
-      const totalQuantity = pb.reduce((s, b) => s + b.quantity, 0);
-      const sorted = pb.filter(b => b.expiryDate).sort((a, b) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
+    const allBatches: any[] = await db.select().from(batches);
+    return prods.map((p: any) => {
+      const pb = allBatches.filter((b: any) => b.productId === p.id && b.quantity > 0);
+      const allPb = allBatches.filter((b: any) => b.productId === p.id);
+      const totalQuantity = pb.reduce((s: number, b: any) => s + b.quantity, 0);
+      const sorted = pb.filter((b: any) => b.expiryDate).sort((a: any, b: any) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
       const nearestExpiry = sorted.length > 0 ? sorted[0].expiryDate : null;
       // Include batch SKUs and barcodes so the frontend can filter by variant code
-      const batchSkus = allPb.flatMap(b => [b.sku, b.barcode].filter((v): v is string => !!v));
+      const batchSkus = allPb.flatMap((b: any) => [b.sku, b.barcode].filter((v): v is string => !!v));
       return { ...p, totalQuantity, nearestExpiry, batchSkus };
     });
   }
@@ -1662,9 +1662,9 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca por código de barras: ${barcode}`);
     const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
     if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
+    const productIds = Array.from(new Set(matchingBatches.map((b: any) => b.productId)));
     const all = await db.select().from(products);
-    const matched = all.filter(p => productIds.includes(p.id));
+    const matched = all.filter((p: any) => productIds.includes(p.id));
     if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
     const result = enriched[0];
@@ -1681,14 +1681,14 @@ export class DatabaseStorage implements IStorage {
     const qn = norm(q);
     // Search by barcode, SKU, variant name and supplier code across batches
     const batchMatchSet = new Set(
-      allBatchesList.filter(b =>
+      allBatchesList.filter((b: any) =>
         norm(b.barcode).includes(qn) ||
         norm(b.supplierCode).includes(qn) ||
         norm((b as any).sku).includes(qn) ||
         norm((b as any).variantName).includes(qn)
       ).map(b => b.productId)
     );
-    const matched = all.filter(p =>
+    const matched = all.filter((p: any) =>
       norm(p.name).includes(qn) ||
       norm(p.brand).includes(qn) ||
       norm(p.category).includes(qn) ||
@@ -1704,7 +1704,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca por SKU de variante: ${sku}`);
     const norm = (s?: string | null) => (s || "").toLowerCase();
     const allBatchesList = await db.select().from(batches);
-    const matchingBatches = allBatchesList.filter(b => norm((b as any).sku) === norm(sku));
+    const matchingBatches = allBatchesList.filter((b: any) => norm((b as any).sku) === norm(sku));
     if (matchingBatches.length === 0) return null;
     const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
     const all = await db.select().from(products);
