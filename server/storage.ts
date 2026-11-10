@@ -45,11 +45,6 @@ async function dualWriteTransaction(operation: (database: any) => Promise<any>) 
 
 // Generate one identifier shared by all active databases before mirrored inserts.
 async function nextSharedId(table: any): Promise<number> {
-  const maxima = await Promise.all(getAllDatabases().map(async (database) => {
-    const rows = await database.select({ id: table.id }).from(table).orderBy(desc(table.id)).limit(1);
-    const value = Number(rows[0]?.id ?? 0);
-    return Number.isSafeInteger(value) && value > 0 ? value : 0;
-  }));
   if (neonPool) {
     const tableName = getTableName(table);
     const result = await neonPool.query(
@@ -62,6 +57,11 @@ async function nextSharedId(table: any): Promise<number> {
     }
     return allocatedId;
   }
+  const maxima = await Promise.all(getAllDatabases().map(async (database) => {
+    const rows = await database.select({ id: table.id }).from(table).orderBy(desc(table.id)).limit(1);
+    const value = Number(rows[0]?.id ?? 0);
+    return Number.isSafeInteger(value) && value > 0 ? value : 0;
+  }));
   return Math.max(0, ...maxima) + 1;
 }
 
