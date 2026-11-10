@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { and, asc, eq, gt } from "drizzle-orm";
-import { runtimeEvents } from "../shared/schema";
+import { runtimeEvents } from "../shared/pg-schema.js";
 import { db } from "./db";
 
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
@@ -131,7 +131,7 @@ export async function getRuntimeObservability(query: RuntimeObservationQuery = {
 
     const hasMore = rows.length > limit;
     const selected = rows.slice(0, limit);
-    const events = selected.map((row) => ({
+    const events = selected.map((row: any) => ({
       id: row.id,
       sequence: row.id,
       sessionId: row.sessionId,

@@ -222,7 +222,7 @@ async function persistRuntimeEvent(record: {
   data: Record<string, unknown>;
 }) {
   try {
-    const [{ localSqlite, tursoClient, persistLocalSqlite }] = await Promise.all([import("./db")]);
+    const [{ localSqlite, tursoClient, persistLocalSqlite }, { neonPool }] = await Promise.all([import("./db"), import("./neon-db.js")]);
     const context = record.data;
     const redactedData = redact(context);
     const statement = `INSERT INTO runtime_events
@@ -252,9 +252,29 @@ async function persistRuntimeEvent(record: {
       }
       persistLocalSqlite();
     };
-    const remoteWrite = () => tursoClient
-      ? tursoClient.execute({ sql: statement, args })
-      : Promise.resolve();
+    const remoteWrite = () => neonPool
+      ? neonPool.query(
+          `INSERT INTO runtime_events
+            (sequence, session_id, timestamp, process, pid, event, message, trace_id, request_id, source, severity, data)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+          [
+            record.sequence,
+            record.sessionId,
+            new Date(record.timestamp),
+            record.process,
+            record.pid,
+            record.event,
+            record.message,
+            typeof context.traceId === "string" ? context.traceId : null,
+            typeof context.requestId === "string" ? context.requestId : null,
+            typeof context.source === "string" ? context.source : "server",
+            record.event === "error" ? "error" : record.event.includes("warn") ? "warn" : "info",
+            JSON.stringify(redactedData),
+          ],
+        )
+      : tursoClient
+        ? tursoClient.execute({ sql: statement, args })
+        : Promise.resolve();
 
     const [localResult, remoteResult] = await Promise.allSettled([
       Promise.resolve().then(localWrite),
@@ -267,15 +287,22 @@ async function persistRuntimeEvent(record: {
         const cleanup = localSqlite.prepare("DELETE FROM runtime_events WHERE session_id = ? AND sequence = ?");
         try { cleanup.run([record.sessionId, record.sequence]); } finally { cleanup.free(); }
         persistLocalSqlite();
-      } else if (localResult.status === "rejected" && remoteResult.status === "fulfilled" && tursoClient) {
-        await tursoClient.execute({
-          sql: "DELETE FROM runtime_events WHERE session_id = ? AND sequence = ?",
-          args: [record.sessionId, record.sequence],
-        }).catch(() => undefined);
+      } else if (localResult.status === "rejected" && remoteResult.status === "fulfilled") {
+        if (neonPool) {
+          await neonPool.query(
+            "DELETE FROM runtime_events WHERE session_id = $1 AND sequence = $2",
+            [record.sessionId, record.sequence],
+          ).catch(() => undefined);
+        } else if (tursoClient) {
+          await tursoClient.execute({
+            sql: "DELETE FROM runtime_events WHERE session_id = ? AND sequence = ?",
+            args: [record.sessionId, record.sequence],
+          }).catch(() => undefined);
+        }
       }
       const localError = localResult.status === "rejected" ? String(localResult.reason) : "";
       const remoteError = remoteResult.status === "rejected" ? String(remoteResult.reason) : "";
-      throw new Error(`Runtime event dual-write failed. SQLite: ${localError || "ok"}; Turso: ${remoteError || "ok"}`);
+      throw new Error(`Runtime event dual-write failed. SQLite: ${localError || "ok"}; remote database: ${remoteError || "ok"}`);
     }
   } catch (error) {
     try {

@@ -27,6 +27,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
+import { neonPool } from "./neon-db.js";
+import { NeonSessionStore } from "./neon-session-store.js";
 
 const uploadStorage = multer.diskStorage({
   destination: "attached_assets/uploads/",
@@ -116,10 +118,11 @@ async function comparePassword(stored: string, supplied: string) {
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
+import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
-  tickets, users, fiscalSettings, insertFiscalSettingsSchema,
+  tickets, users, fiscalSettings,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
-} from "../shared/schema";
+} from "../shared/pg-schema.js";
 
 export class TursoSessionStore extends session.Store {
   constructor(private readonly client: NonNullable<typeof tursoClient>) {
@@ -298,9 +301,11 @@ export async function registerRoutes(
   if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
     throw new Error("[SECURITY] SESSION_SECRET precisa conter pelo menos 32 caracteres em produção; segredo fixo conhecido foi removido.");
   }
-  const sessionStore = tursoClient
-    ? new TursoSessionStore(tursoClient)
-    : new MemoryStore({ checkPeriod: 86400000 });
+  const sessionStore = neonPool
+    ? new NeonSessionStore(neonPool)
+    : tursoClient
+      ? new TursoSessionStore(tursoClient)
+      : new MemoryStore({ checkPeriod: 86400000 });
   app.use(
     session({
       store: sessionStore,
@@ -361,16 +366,38 @@ export async function registerRoutes(
     return res.status(report.ok ? 200 : 503).json(report);
   });
 
-  app.get("/api/db/status", (req, res) => {
-    // Check if Turso is configured
+  app.get("/api/db/status", async (_req, res) => {
+    if (neonPool) {
+      try {
+        const startedAt = Date.now();
+        await neonPool.query("SELECT 1");
+        return res.json({
+          status: "online",
+          provider: "neon-postgresql",
+          message: "Conectado ao Neon PostgreSQL",
+          latency: Date.now() - startedAt,
+          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          timestamp: Date.now(),
+        });
+      } catch (error: any) {
+        console.error("[DB] Neon health check failed:", error?.message || error);
+        return res.status(503).json({
+          status: "degraded",
+          provider: "neon-postgresql",
+          message: "Banco de dados remoto indisponível",
+          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          timestamp: Date.now(),
+        });
+      }
+    }
     const isTurso = !!process.env.TURSO_DATABASE_URL;
-    
-    res.json({
+    return res.json({
       status: "online",
+      provider: isTurso ? "turso" : "sqlite-local",
       message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
       latency: 15,
       lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
   });
 
@@ -471,12 +498,19 @@ export async function registerRoutes(
       if (!updatedUser) return res.status(500).json({ message: "Não foi possível salvar a nova senha." });
 
       // Revoke every other persisted session for this account; preserve the current session.
-      if (tursoClient && req.sessionID) {
+      if (req.sessionID) {
         try {
-          await tursoClient.execute({
-            sql: "DELETE FROM aura_sessions WHERE CAST(json_extract(sess, '$.passport.user') AS TEXT) = ? AND sid <> ?",
-            args: [String(dbUser.id), String(req.sessionID)],
-          });
+          if (neonPool) {
+            await neonPool.query(
+              "DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}') = $1 AND sid <> $2",
+              [String(dbUser.id), String(req.sessionID)],
+            );
+          } else if (tursoClient) {
+            await tursoClient.execute({
+              sql: "DELETE FROM aura_sessions WHERE CAST(json_extract(sess, '$.passport.user') AS TEXT) = ? AND sid <> ?",
+              args: [String(dbUser.id), String(req.sessionID)],
+            });
+          }
         } catch (sessionError: any) {
           console.error("[SECURITY] Could not revoke other sessions after password change:", sessionError?.message || sessionError);
         }
@@ -2471,6 +2505,10 @@ export async function registerRoutes(
   // A reset only occurs when AURA_BOOTSTRAP_ADMIN_RESET=true; never reset credentials on every restart.
   void (async () => {
     try {
+      if (neonPool) {
+        console.log("[BOOT] Legacy SQLite/Turso owner reconciliation skipped; Neon owner provisioning is handled by initApp.");
+        return;
+      }
       const username = "SkelleTu";
       const bootstrapPassword = String(process.env.AURA_BOOTSTRAP_ADMIN_PASSWORD || "");
       const resetRequested = String(process.env.AURA_BOOTSTRAP_ADMIN_RESET || "").toLowerCase() === "true";

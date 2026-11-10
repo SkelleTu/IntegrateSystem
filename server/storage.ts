@@ -1,36 +1,24 @@
 import { db, dbRemote, dbLocal, multiWrite, localSqlite, getAllDatabases, tursoClient } from "./db.js";
+import { neonDb, neonPool } from "./neon-db.js";
 import { scheduleAutoBackup } from "./backup.js";
 import {
   users, services, tickets, queueState, categories, menuItems,
   cashRegisters, sales, saleItems, payments, transactions,
   inventory, inventoryLogs, inventoryRestocks, settings, enterprises, timeClock,
   userSessions, fiscalSettings, nfce,
-  products, batches, batchLogs,
-  type User, type InsertUser,
-  type Service, type InsertService, type UpdateServiceRequest,
-  type Ticket, type InsertTicket,
-  type QueueState, type InsertQueueState,
-  type Category, type InsertCategory,
-  type MenuItem, type InsertMenuItem,
-  type CashRegister, type InsertCashRegister,
-  type Sale, type InsertSale,
-  type SaleItem, type InsertSaleItem,
-  type Payment, type InsertPayment,
-  type Transaction,
-  type Inventory, type InsertInventory,
-  type InventoryLog, type InsertInventoryLog,
-  type InventoryRestock, type InsertInventoryRestock,
-  type Settings,
-  type Enterprise, type InsertEnterprise,
-  type TimeClock, type InsertTimeClock,
-  type UserSession,
-  type FiscalSettings, type InsertFiscalSettings,
-  type Nfce, type InsertNfce,
-  type Product, type InsertProduct,
-  type Batch, type InsertBatch,
-  type BatchLog, type InsertBatchLog,
+  products, batches, batchLogs, stockSnapshots,
+} from "../shared/pg-schema.js";
+import type {
+  User, InsertUser, Service, InsertService, UpdateServiceRequest, Ticket, InsertTicket,
+  QueueState, InsertQueueState, Category, InsertCategory, MenuItem, InsertMenuItem,
+  CashRegister, InsertCashRegister, Sale, InsertSale, SaleItem, InsertSaleItem,
+  Payment, InsertPayment, Transaction, Inventory, InsertInventory, InventoryLog,
+  InsertInventoryLog, InventoryRestock, InsertInventoryRestock, Settings, Enterprise,
+  InsertEnterprise, TimeClock, InsertTimeClock, UserSession, FiscalSettings,
+  InsertFiscalSettings, Nfce, InsertNfce, Product, InsertProduct, Batch, InsertBatch,
+  BatchLog, InsertBatchLog,
 } from "../shared/schema.js";
-import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne, getTableName } from "drizzle-orm";
 import { runtimeEvent } from "./runtimeMonitor";
 
 // sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
@@ -38,9 +26,10 @@ function withoutUndefined<T extends Record<string, any>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
-// Helper de escrita simultânea em TODOS os bancos ativos
-// Usa multiWrite do db.ts que escreve em remoto + local em paralelo.
-// Após cada write crítico, agenda um auto-backup JSON (debounced 5s).
+// Helper de escrita no banco autoritativo ativo.
+// Em modo Neon/Turso, getAllDatabases() contém apenas o banco remoto; SQLite local
+// não é tratado como réplica de dados comerciais nem como backup de produção.
+// O backup remoto precisa ser implementado separadamente antes de habilitar exports.
 async function dualWrite(operation: (database: any) => Promise<any>) {
   const result = await multiWrite(operation);
   scheduleAutoBackup(); // salva snapshot JSON automaticamente
@@ -57,6 +46,18 @@ async function dualWriteTransaction(operation: (database: any) => Promise<any>) 
 
 // Generate one identifier shared by all active databases before mirrored inserts.
 async function nextSharedId(table: any): Promise<number> {
+  if (neonPool) {
+    const tableName = getTableName(table);
+    const result = await neonPool.query(
+      "SELECT nextval(pg_get_serial_sequence($1, 'id')) AS id",
+      [`public.${tableName}`],
+    );
+    const allocatedId = Number(result.rows[0]?.id);
+    if (!Number.isSafeInteger(allocatedId) || allocatedId <= 0) {
+      throw new Error(`Não foi possível reservar um ID PostgreSQL para a tabela ${tableName}.`);
+    }
+    return allocatedId;
+  }
   const maxima = await Promise.all(getAllDatabases().map(async (database) => {
     const rows = await database.select({ id: table.id }).from(table).orderBy(desc(table.id)).limit(1);
     const value = Number(rows[0]?.id ?? 0);
@@ -403,9 +404,7 @@ export class DatabaseStorage implements IStorage {
   async createService(service: InsertService): Promise<Service> {
     this.logAction(`Criação de serviço: ${service.name}`);
     return await dualWrite(async (database) => {
-      const insertResultservices: any = await database.insert(services).values(service);
-      const idservices = insertResultservices.lastInsertRowid;
-      const [newService] = await database.select().from(services).where(eq(services.id, idservices));
+      const [newService] = await database.insert(services).values(service).returning();
       return newService;
     });
   }
@@ -439,9 +438,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Consulta estado da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
     }
     return state;
   }
@@ -450,9 +447,7 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Atualização da fila");
     let [state] = await db.select().from(queueState);
     if (!state) {
-      const insertResultqueueState: any = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 });
-      const idqueueState = insertResultqueueState.lastInsertRowid;
-      [state] = await db.select().from(queueState).where(eq(queueState.id, idqueueState));
+      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
     }
     await db.update(queueState)
       .set(update)
@@ -464,9 +459,7 @@ export class DatabaseStorage implements IStorage {
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
     this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
     return await dualWrite(async (database) => {
-      const insertResulttickets: any = await database.insert(tickets).values(ticket);
-      const idtickets = insertResulttickets.lastInsertRowid;
-      const [newTicket] = await database.select().from(tickets).where(eq(tickets.id, idtickets));
+      const [newTicket] = await database.insert(tickets).values(ticket).returning();
       return newTicket;
     });
   }
@@ -509,9 +502,7 @@ export class DatabaseStorage implements IStorage {
   async createCategory(category: InsertCategory): Promise<Category> {
     this.logAction(`Nova categoria: ${category.name}`);
     return await dualWrite(async (database) => {
-      const insertResultcategories: any = await database.insert(categories).values(category);
-      const idcategories = insertResultcategories.lastInsertRowid;
-      const [newCategory] = await database.select().from(categories).where(eq(categories.id, idcategories));
+      const [newCategory] = await database.insert(categories).values(category).returning();
       return newCategory;
     });
   }
@@ -533,9 +524,7 @@ export class DatabaseStorage implements IStorage {
       ...item,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
     };
-    const insertResultmenuItems: any = await db.insert(menuItems).values(itemToInsert);
-      const idmenuItems = insertResultmenuItems.lastInsertRowid;
-      const [newItem] = await db.select().from(menuItems).where(eq(menuItems.id, idmenuItems));
+    const [newItem] = await db.insert(menuItems).values(itemToInsert).returning();
     return newItem;
   }
 
@@ -991,7 +980,7 @@ export class DatabaseStorage implements IStorage {
       }
 
       const [inserted] = await database.insert(inventory)
-        .values(itemToUpsert)
+        .values(itemToUpsert).returning()
       return inserted;
     });
   }
@@ -999,9 +988,7 @@ export class DatabaseStorage implements IStorage {
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
     return await dualWrite(async (database) => {
-      const insertResultinventoryLogs: any = await database.insert(inventoryLogs).values(log);
-      const idinventoryLogs = insertResultinventoryLogs.lastInsertRowid;
-      const [newLog] = await database.select().from(inventoryLogs).where(eq(inventoryLogs.id, idinventoryLogs));
+      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
       return newLog;
     });
   }
@@ -1059,9 +1046,7 @@ export class DatabaseStorage implements IStorage {
 
   async createTransaction(transaction: any): Promise<Transaction> {
     return await dualWrite(async (database) => {
-      const insertResulttransactions: any = await database.insert(transactions).values(transaction);
-      const idtransactions = insertResulttransactions.lastInsertRowid;
-      const [newTransaction] = await database.select().from(transactions).where(eq(transactions.id, idtransactions));
+      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
       return newTransaction;
     });
   }
@@ -1091,9 +1076,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const insertResulttimeClock: any = await db.insert(timeClock).values(data);
-      const idtimeClock = insertResulttimeClock.lastInsertRowid;
-      const [clock] = await db.select().from(timeClock).where(eq(timeClock.id, idtimeClock));
+    const [clock] = await db.insert(timeClock).values(data).returning();
     return clock;
   }
 
@@ -1111,9 +1094,7 @@ export class DatabaseStorage implements IStorage {
     }
     const [s] = await query.limit(1);
     if (!s) {
-      const insertResultsettings: any = await db.insert(settings).values({ enterpriseId });
-      const idsettings = insertResultsettings.lastInsertRowid;
-      const [newSettings] = await db.select().from(settings).where(eq(settings.id, idsettings));
+      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
       return newSettings;
     }
     return s;
@@ -1132,9 +1113,7 @@ export class DatabaseStorage implements IStorage {
 
   // User Sessions
   async logUserSession(data: { userId: number; type: string; ipAddress?: string; userAgent?: string }): Promise<UserSession> {
-    const insertResultuserSessions: any = await db.insert(userSessions).values(data);
-      const iduserSessions = insertResultuserSessions.lastInsertRowid;
-      const [session] = await db.select().from(userSessions).where(eq(userSessions.id, iduserSessions));
+    const [session] = await db.insert(userSessions).values(data).returning();
     return session;
   }
 
@@ -1272,16 +1251,16 @@ export class DatabaseStorage implements IStorage {
     icmsOrigem?: number | null;
     icmsSituacaoTributaria?: string | null;
   })[]> {
-    const items = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const items: any[] = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
     if (items.length === 0) return [];
 
-    const ids = Array.from(new Set(items.map((i) => i.itemId)));
+    const ids = Array.from(new Set(items.map((i: any) => Number(i.itemId))));
 
     // Busca em menuItems e products em paralelo
     const [menuList, productList] = await Promise.all([
       db.select().from(menuItems).where(
         ids.length === 1
-          ? eq(menuItems.id, ids[0])
+          ? eq(menuItems.id, Number(ids[0]))
           : sql`${menuItems.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
       ),
       db.select().from(products).where(
@@ -1291,9 +1270,9 @@ export class DatabaseStorage implements IStorage {
       ),
     ]);
 
-    return items.map((item) => {
-      const mi = menuList.find((m) => m.id === item.itemId);
-      const pr = productList.find((p) => p.id === item.itemId);
+    return items.map((item: any) => {
+      const mi = menuList.find((m: any) => m.id === item.itemId);
+      const pr = productList.find((p: any) => p.id === item.itemId);
       const src = mi || pr;
       return {
         ...item,
@@ -1374,15 +1353,15 @@ export class DatabaseStorage implements IStorage {
 
   private async _enrichProducts(prods: Product[]) {
     if (prods.length === 0) return [];
-    const allBatches = await db.select().from(batches);
-    return prods.map(p => {
-      const pb = allBatches.filter(b => b.productId === p.id && b.quantity > 0);
-      const allPb = allBatches.filter(b => b.productId === p.id);
-      const totalQuantity = pb.reduce((s, b) => s + b.quantity, 0);
-      const sorted = pb.filter(b => b.expiryDate).sort((a, b) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
+    const allBatches: any[] = await db.select().from(batches);
+    return prods.map((p: any) => {
+      const pb = allBatches.filter((b: any) => b.productId === p.id && b.quantity > 0);
+      const allPb = allBatches.filter((b: any) => b.productId === p.id);
+      const totalQuantity = pb.reduce((s: number, b: any) => s + b.quantity, 0);
+      const sorted = pb.filter((b: any) => b.expiryDate).sort((a: any, b: any) => a.expiryDate!.getTime() - b.expiryDate!.getTime());
       const nearestExpiry = sorted.length > 0 ? sorted[0].expiryDate : null;
       // Include batch SKUs and barcodes so the frontend can filter by variant code
-      const batchSkus = allPb.flatMap(b => [b.sku, b.barcode].filter((v): v is string => !!v));
+      const batchSkus = allPb.flatMap((b: any) => [b.sku, b.barcode].filter((v): v is string => !!v));
       return { ...p, totalQuantity, nearestExpiry, batchSkus };
     });
   }
@@ -1399,9 +1378,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined> {
-    const all = await db.select().from(products);
+    const all: any[] = await db.select().from(products);
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
-    const match = all.find(p =>
+    const match = all.find((p: any) =>
       norm(p.name) === norm(data.name) &&
       norm(p.brand) === norm(data.brand) &&
       norm(p.flavor) === norm(data.flavor) &&
@@ -1448,6 +1427,13 @@ export class DatabaseStorage implements IStorage {
       ]);
       return forcedId ?? Number(result.lastInsertRowid);
     };
+
+    if (neonDb) {
+      const [created] = await neonDb.insert(products).values(clean as any).returning();
+      if (!created) throw new Error("Neon não retornou o produto recém-criado.");
+      scheduleAutoBackup();
+      return created as Product;
+    }
 
     let productId: number;
     const requestedId = Number((data as any).id);
@@ -1508,8 +1494,8 @@ export class DatabaseStorage implements IStorage {
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
     const result = await dualWrite(async (database) => {
-      const res: any = await database.update(batches).set({ quantity: 0 }).run();
-      return res.rowsAffected;
+      const updatedRows = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
+      return updatedRows.length;
     });
     return result as number;
   }
@@ -1521,27 +1507,13 @@ export class DatabaseStorage implements IStorage {
     const allProducts = await db.select().from(products);
     const allBatches  = await db.select().from(batches);
 
-    const snapshotSql = `
-      INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-    const now = Math.floor(Date.now() / 1000);
-    (db as any).$client
-      ? await (db as any).$client.execute({
-          sql: snapshotSql,
-          args: [now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length],
-        })
-      : db.run(sql`
-          INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count)
-          VALUES (${now}, ${clearedBy}, ${JSON.stringify(allProducts)}, ${JSON.stringify(allBatches)}, ${allProducts.length})
-        `);
-
-    // Salvar também no SQLite local se o primário for remoto
-    try {
-      localSqlite.prepare(
-        `INSERT INTO stock_snapshots (created_at, created_by, products_json, batches_json, product_count) VALUES (?, ?, ?, ?, ?)`
-      ).run(now, clearedBy, JSON.stringify(allProducts), JSON.stringify(allBatches), allProducts.length);
-    } catch { /* ignora se já inserido ou tabela não existe */ }
+    await db.insert(stockSnapshots).values({
+      createdAt: new Date(),
+      createdBy: clearedBy,
+      productsJson: JSON.stringify(allProducts),
+      batchesJson: JSON.stringify(allBatches),
+      productCount: allProducts.length,
+    });
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
@@ -1552,22 +1524,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
-    const row = localSqlite.prepare(
-      `SELECT id, created_at, created_by, product_count FROM stock_snapshots ORDER BY id DESC LIMIT 1`
-    ).get() as any;
+    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) return null;
     return {
       id: row.id,
-      createdAt: new Date(row.created_at * 1000),
-      createdBy: row.created_by,
-      productCount: row.product_count,
+      createdAt: row.createdAt,
+      createdBy: row.createdBy,
+      productCount: row.productCount,
     };
   }
 
   async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
-    const row = localSqlite.prepare(
-      `SELECT products_json, batches_json FROM stock_snapshots ORDER BY id DESC LIMIT 1`
-    ).get() as any;
+    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
 
     const savedProducts: any[] = JSON.parse(row.products_json);
@@ -1586,13 +1554,11 @@ export class DatabaseStorage implements IStorage {
       const oldId = p.id;
       const { id: _id, ...rest } = p;
       const inserted = await dualWrite(async (database) => {
-        const insertResultProducts: any = await database.insert(products).values({
+        const [rec] = await database.insert(products).values({
           ...rest,
           createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           updatedAt: new Date(),
-        });
-        const idProducts = insertResultProducts.lastInsertRowid;
-        const [rec] = await database.select().from(products).where(eq(products.id, idProducts));
+        }).returning();
         return rec;
       });
       idMap.set(oldId, inserted.id);
@@ -1604,16 +1570,14 @@ export class DatabaseStorage implements IStorage {
       if (!newProductId) continue;
       const { id: _id, ...rest } = b;
       await dualWrite(async (database) => {
-        const insertResultBatches: any = await database.insert(batches).values({
+        const [rec] = await database.insert(batches).values({
           ...rest,
           productId: newProductId,
           entryDate: b.entryDate ? new Date(b.entryDate) : new Date(),
           expiryDate: b.expiryDate ? new Date(b.expiryDate) : null,
           manufactureDate: b.manufactureDate ? new Date(b.manufactureDate) : null,
           createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
-        });
-        const idBatches = insertResultBatches.lastInsertRowid;
-        const [rec] = await database.select().from(batches).where(eq(batches.id, idBatches));
+        }).returning();
         return rec;
       });
     }
@@ -1706,9 +1670,9 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca por código de barras: ${barcode}`);
     const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
     if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
+    const productIds = Array.from(new Set(matchingBatches.map((b: any) => b.productId)));
     const all = await db.select().from(products);
-    const matched = all.filter(p => productIds.includes(p.id));
+    const matched = all.filter((p: any) => productIds.includes(p.id));
     if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
     const result = enriched[0];
@@ -1725,14 +1689,14 @@ export class DatabaseStorage implements IStorage {
     const qn = norm(q);
     // Search by barcode, SKU, variant name and supplier code across batches
     const batchMatchSet = new Set(
-      allBatchesList.filter(b =>
+      allBatchesList.filter((b: any) =>
         norm(b.barcode).includes(qn) ||
         norm(b.supplierCode).includes(qn) ||
         norm((b as any).sku).includes(qn) ||
         norm((b as any).variantName).includes(qn)
-      ).map(b => b.productId)
+      ).map((b: any) => b.productId)
     );
-    const matched = all.filter(p =>
+    const matched = all.filter((p: any) =>
       norm(p.name).includes(qn) ||
       norm(p.brand).includes(qn) ||
       norm(p.category).includes(qn) ||
@@ -1748,11 +1712,11 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`Busca por SKU de variante: ${sku}`);
     const norm = (s?: string | null) => (s || "").toLowerCase();
     const allBatchesList = await db.select().from(batches);
-    const matchingBatches = allBatchesList.filter(b => norm((b as any).sku) === norm(sku));
+    const matchingBatches = allBatchesList.filter((b: any) => norm((b as any).sku) === norm(sku));
     if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set(matchingBatches.map(b => b.productId)));
-    const all = await db.select().from(products);
-    const matched = all.filter(p => productIds.includes(p.id));
+    const productIds = Array.from(new Set<number>(matchingBatches.map((b: any) => Number(b.productId))));
+    const all: any[] = await db.select().from(products);
+    const matched = all.filter((p: any) => productIds.includes(Number(p.id)));
     if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
     const result = enriched[0];
@@ -1796,9 +1760,7 @@ export class DatabaseStorage implements IStorage {
 
   async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
     return await dualWrite(async (database) => {
-      const insertResultbatchLogs: any = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any);
-      const idbatchLogs = insertResultbatchLogs.lastInsertRowid;
-      const [log] = await database.select().from(batchLogs).where(eq(batchLogs.id, idbatchLogs));
+      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
       return log;
     });
   }

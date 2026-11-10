@@ -4,6 +4,9 @@ import * as schema from "../shared/schema";
 import path from "path";
 import fs from "fs";
 import { sql } from "drizzle-orm";
+import { neonDb, neonPool, verifyNeonConnection } from "./neon-db.js";
+import * as pgSchema from "../shared/pg-schema.js";
+import { getTableConfig } from "drizzle-orm/pg-core";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
 const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
@@ -38,7 +41,11 @@ export const dbLocal = drizzle(localSqlite, { schema });
 export let dbRemote: any = null;
 export let tursoClient: any = null;
 
-if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
+// Aura is an independent application with its own Neon database.
+// Turso is retained only as a legacy fallback when DATABASE_URL is absent;
+// no Invista Pro/Turso data migration is part of this application's bootstrap.
+
+if (!process.env.DATABASE_URL && process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   try {
     const { createClient } = await import("@libsql/client");
     const { drizzle: drizzleLibsql } = await import("drizzle-orm/libsql");
@@ -51,6 +58,11 @@ if (process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN) {
   } catch (e) {
     console.error("⚠️  Falha ao conectar ao Turso:", e);
   }
+}
+
+if (!dbRemote && neonDb) {
+  dbRemote = neonDb;
+  console.log("[DB] Neon PostgreSQL ativado como banco principal.");
 }
 
 export const isRemoteEnabled = !!dbRemote;
@@ -144,7 +156,7 @@ export const db = (mirrorDatabase
         return Reflect.get(target, property, receiver);
       },
     })
-  : primaryDatabase) as typeof dbLocal;
+  : primaryDatabase) as any;
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
@@ -171,7 +183,7 @@ export async function multiWrite<T>(
   if (failures.length > 0) {
     const details = failures
       .map(({ result, index }) => {
-        const target = dbs[index] === dbRemote ? "Turso" : "SQLite local";
+        const target = dbs[index] === dbRemote ? (neonDb ? "Neon PostgreSQL" : "Turso") : "SQLite local";
         const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
         return `${target}: ${reason}`;
       })
@@ -792,11 +804,91 @@ export async function setupDatabase() {
     }
   }
 
+  // Neon is authoritative when DATABASE_URL is configured. Validate its real
+  // PostgreSQL schema before allowing authentication/routes to start.
+  if (neonPool) {
+    await verifyNeonConnection();
+    const report = await auditDatabaseParity();
+    if (!report.ok) {
+      throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
+    }
+    console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
+  }
+
   // Ensure local sql.js changes made with prepare().run() are persisted.
   persistLocalSqlite();
 }
 
 export async function auditDatabaseParity() {
+  if (neonPool) {
+    const applicationTables = [
+      pgSchema.auraSessions, pgSchema.runtimeEvents, pgSchema.userSessions, pgSchema.users,
+      pgSchema.services, pgSchema.tickets, pgSchema.queueState, pgSchema.categories,
+      pgSchema.menuItems, pgSchema.cashRegisters, pgSchema.sales, pgSchema.saleItems,
+      pgSchema.payments, pgSchema.transactions, pgSchema.timeClock, pgSchema.enterprises,
+      pgSchema.settings, pgSchema.inventory, pgSchema.inventoryLogs, pgSchema.inventoryRestocks,
+      pgSchema.products, pgSchema.batches, pgSchema.batchLogs, pgSchema.stockSnapshots,
+      pgSchema.fiscalSettings, pgSchema.nfce,
+    ];
+    const definitions = applicationTables.map((table) => {
+      const config = getTableConfig(table);
+      return {
+        table: config.name,
+        columns: config.columns.map((column) => ({
+          name: column.name,
+          type: column.getSQLType().toLowerCase() === "serial"
+            ? "integer"
+            : column.getSQLType().toLowerCase() === "timestamp"
+              ? "timestamp without time zone"
+              : column.getSQLType().toLowerCase(),
+          notNull: column.notNull,
+        })),
+      };
+    });
+    const actualResult = await neonPool.query(
+      "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema = 'public'"
+    );
+    const actual = new Map<string, Map<string, { type: string; notNull: boolean }>>();
+    for (const row of actualResult.rows as Array<{ table_name: string; column_name: string; data_type: string; is_nullable: string }>) {
+      if (!actual.has(row.table_name)) actual.set(row.table_name, new Map());
+      actual.get(row.table_name)!.set(row.column_name, {
+        type: String(row.data_type).toLowerCase(),
+        notNull: row.is_nullable === "NO",
+      });
+    }
+    const mismatches: Array<Record<string, unknown>> = [];
+    for (const definition of definitions) {
+      const actualColumns = actual.get(definition.table);
+      if (!actualColumns) {
+        mismatches.push({ table: definition.table, error: "Required table is missing." });
+        continue;
+      }
+      const missingColumns = definition.columns
+        .filter((column) => !actualColumns.has(column.name))
+        .map((column) => column.name);
+      const typeMismatches = definition.columns.flatMap((column) => {
+        const actualColumn = actualColumns.get(column.name);
+        if (!actualColumn || actualColumn.type === column.type) return [];
+        return [{ column: column.name, expected: column.type, actual: actualColumn.type }];
+      });
+      const nullabilityMismatches = definition.columns.flatMap((column) => {
+        const actualColumn = actualColumns.get(column.name);
+        if (!actualColumn || actualColumn.notNull === column.notNull) return [];
+        return [{ column: column.name, expectedNotNull: column.notNull, actualNotNull: actualColumn.notNull }];
+      });
+      if (missingColumns.length || typeMismatches.length || nullabilityMismatches.length) {
+        mismatches.push({ table: definition.table, missingColumns, typeMismatches, nullabilityMismatches });
+      }
+    }
+    return {
+      ok: mismatches.length === 0,
+      primaryDatabase: "neon-postgresql",
+      comparison: "drizzle-schema-table-column-type-and-nullability",
+      tablesChecked: definitions.length,
+      mismatches,
+    };
+  }
+
   if (!tursoClient) {
     return {
       ok: false,

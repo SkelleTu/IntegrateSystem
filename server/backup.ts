@@ -297,7 +297,7 @@ async function restoreSqlDump(sqlText: string, sourceLabel = "import") {
 
 export function exportAllDataSync(): Record<string, any[]> {
   if (dbRemote) {
-    throw new Error("Backup bloqueado: a produção usa Turso e este exportador lê apenas o SQLite local. Nenhum backup completo foi criado.");
+    throw new Error("Backup bloqueado: o banco remoto é a fonte oficial e este exportador lê apenas o SQLite local. Nenhum backup completo foi criado.");
   }
   const snapshot: Record<string, any[]> = {
     _meta: { version: "2.1", exportedAt: new Date().toISOString(), exportedBy: "Aura System Backup", source: "sqlite-local", complete: true } as any,
@@ -315,7 +315,7 @@ export function exportAllDataSync(): Record<string, any[]> {
 
 export function saveBackupToFile(name?: string): string {
   if (dbRemote) {
-    throw new Error("Backup bloqueado: Turso é o banco primário e o backup remoto ainda não foi implementado. Nenhum arquivo local será apresentado como backup de produção.");
+    throw new Error("Backup bloqueado: o banco remoto é o banco primário e o backup remoto ainda não foi implementado. Nenhum arquivo local será apresentado como backup de produção.");
   }
   ensureBackupDir();
   const sourceName = name || "backup";
@@ -393,7 +393,7 @@ export function listBackups(): Array<{ filename: string; name: string; createdAt
 
 export async function importDataFromSnapshot(snapshot: Record<string, any[]> & { _sql?: string }): Promise<any> {
   if (dbRemote) {
-    throw new Error("Importação bloqueada: o banco primário é Turso. Restauração remota segura ainda não está implementada.");
+    throw new Error("Importação bloqueada: o banco remoto é o banco primário. Restauração remota segura ainda não está implementada.");
   }
   if (typeof snapshot?._sql === "string") return restoreSqlDump(snapshot._sql, "loaded");
 
