@@ -268,7 +268,7 @@ export async function registerRoutes(
   app.post("/api/labels/print", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (user.username !== "SkelleTu") {
+    if (!isSystemOwner(user)) {
       return res.status(403).json({ error: "Acesso negado" });
     }
 
@@ -287,7 +287,7 @@ export async function registerRoutes(
   app.get("/api/labels/status", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (user.username !== "SkelleTu") {
+    if (!isSystemOwner(user)) {
       return res.status(403).json({ error: "Acesso negado" });
     }
 
@@ -334,7 +334,7 @@ export async function registerRoutes(
         if (!isValid) return done(null, false, { message: "Incorrect password." });
 
         // Newly registered institutions remain blocked until an owner approves them.
-        if (user.enterpriseId && String(user.username).toLowerCase() !== "skelletu") {
+        if (user.enterpriseId && user.role !== "owner") {
           const enterprise = await storage.getEnterprise(user.enterpriseId);
           if (!enterprise || enterprise.status !== "active") {
             return done(null, false, { message: "ACCOUNT_PENDING_APPROVAL" });
@@ -530,14 +530,14 @@ export async function registerRoutes(
 
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao proprietário" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     const data = await storage.getAdminMonitoringData();
     res.json(data);
   });
 
   app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
     await storage.deleteUser(Number(req.params.id));
     res.status(204).send();
   });
@@ -680,14 +680,14 @@ export async function registerRoutes(
 
   app.put("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
     const updated = await storage.updateEnterprise(Number(req.params.id), req.body);
     res.json(updated);
   });
 
   app.put("/api/admin/enterprises/:id/status", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
     const { status } = req.body;
     if (!["active", "rejected", "pending"].includes(status)) {
       return res.status(400).json({ message: "Status inválido" });
@@ -714,7 +714,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
     await storage.deleteEnterprise(Number(req.params.id));
     res.status(204).send();
   });
@@ -727,7 +727,7 @@ export async function registerRoutes(
 
   app.post("/api/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao dono" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
     const s = await storage.updateSettings(req.body);
     res.json(s);
   });
@@ -2449,7 +2449,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/time-clock/history/:userId", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (user.username !== "SkelleTu") return res.status(403).json({ message: "Acesso restrito ao administrador" });
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao administrador" });
     const history = await storage.getTimeClockHistory(Number(req.params.userId));
     res.json(history);
   });
@@ -2669,7 +2669,7 @@ export async function registerRoutes(
       res.status(401).json({ message: "Não autenticado" });
       return false;
     }
-    if ((req.user as any)?.username !== "SkelleTu") {
+    if (!isSystemOwner(req.user)) {
       res.status(403).json({ message: "Acesso restrito ao proprietário do sistema" });
       return false;
     }
