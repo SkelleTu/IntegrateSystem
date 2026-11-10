@@ -2684,13 +2684,15 @@ export async function registerRoutes(
       autoBackup: isRemoteEnabled ? { exists: false } : getAutoBackupInfo(),
       backup: {
         complete: !isRemoteEnabled,
-        authoritativeSource: isRemoteEnabled ? "turso" : "sqlite-local",
-        message: isRemoteEnabled
-          ? "O banco primário é Turso. O backup local não é uma cópia completa e a restauração está bloqueada até existir backup remoto verificado."
-          : "O banco primário é SQLite local.",
+        authoritativeSource: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
+        message: neonPool
+          ? "O banco primário é Neon PostgreSQL. O backup remoto verificado ainda não está configurado; snapshots locais não são cópia completa da produção."
+          : isRemoteEnabled
+            ? "O banco primário é Turso. O backup local não é uma cópia completa e a restauração está bloqueada até existir backup remoto verificado."
+            : "O banco primário é SQLite local.",
       },
       databases: {
-        primary: isRemoteEnabled ? "turso" : "sqlite-local",
+        primary: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
         localMirror: false,
         localTelemetry: true,
         remote: isRemoteEnabled,
@@ -2699,7 +2701,7 @@ export async function registerRoutes(
     });
   });
 
-  const remoteBackupUnavailable = { message: "Backup remoto Turso ainda não está configurado. Backups locais antigos não são considerados cópias confiáveis da produção." };
+  const remoteBackupUnavailable = { message: neonPool ? "Backup remoto verificado do Neon PostgreSQL ainda não está configurado. Backups locais não são cópias completas da produção." : "Backup remoto Turso ainda não está configurado. Backups locais antigos não são considerados cópias confiáveis da produção." };
 
   // GET /api/backup/export — baixa snapshot JSON completo
   app.get("/api/backup/export", (req: any, res: any) => {
