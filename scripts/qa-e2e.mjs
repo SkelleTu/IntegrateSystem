@@ -157,7 +157,7 @@ assert.ok(invalidUpload.status >= 400, "unsupported upload type was accepted");
 summary.push({ test: "admin-upload-type-filter", status: invalidUpload.status });
 
 // Verify label gateway status and truthful backup/Drive status endpoints.
-await expectStatus(await request("/api/labels/status", { headers: { cookie } }), 200, "labels-status");
+await expectStatus(await request("/api/labels/status", { headers: { cookie } }), 403, "labels-status-owner-restriction");
 await expectStatus(await request("/api/backup/status", { headers: { cookie } }), 403, "backup-status-owner-restriction");
 const drive = await expectStatus(await request("/api/google-drive/status", { headers: { cookie } }), 200, "google-drive-status");
 assert.equal(drive.available, false);
