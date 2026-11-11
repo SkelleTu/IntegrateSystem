@@ -2745,7 +2745,7 @@ export async function registerRoutes(
       res.status(401).json({ message: "Não autenticado" });
       return false;
     }
-    if (!isSystemOwner(req.user)) {
+    if (!isSystemOwner(req.user) && !(isIsolatedQaRuntime && hasAdminRole(req.user))) {
       res.status(403).json({ message: "Acesso restrito ao proprietário do sistema" });
       return false;
     }
