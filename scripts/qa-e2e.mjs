@@ -153,7 +153,7 @@ const invalidUpload = await request("/api/admin/upload", {
   headers: { cookie },
   body: invalidForm,
 });
-assert.ok(invalidUpload.status >= 400, "unsupported upload type was accepted");
+assert.equal(invalidUpload.status, 400, "unsupported upload type must be rejected with HTTP 400");
 summary.push({ test: "admin-upload-type-filter", status: invalidUpload.status });
 
 // Verify label gateway status and truthful backup/Drive status endpoints.
