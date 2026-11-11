@@ -3,6 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, Database, HardDrive, RefreshCw, ShieldCheck, CloudOff } from "lucide-react";
 
+interface GoogleDriveStatus {
+  available: boolean;
+  lastSuccessfulBackupAt: number | null;
+  lastErrorMessage: string | null;
+}
+
 interface BackupStatus {
   autoBackup: {
     exists: boolean;
@@ -36,6 +42,11 @@ export default function Backup() {
     refetchInterval: 30000,
   });
 
+  const { data: driveData, refetch: refetchDrive } = useQuery<GoogleDriveStatus>({
+    queryKey: ["/api/google-drive/status"],
+    refetchInterval: 30000,
+  });
+
   const primary = data?.backup.authoritativeSource ?? data?.databases.primary ?? "desconhecido";
   const primaryLabel = databaseLabels[primary] ?? primary;
   const backupComplete = data?.backup.complete === true;
@@ -59,7 +70,7 @@ export default function Backup() {
               <p className="text-sm text-zinc-400">Fonte oficial dos dados e estado da proteção remota</p>
             </div>
           </div>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="border-zinc-700">
+          <Button variant="outline" onClick={() => { void refetch(); void refetchDrive(); }} disabled={isFetching} className="border-zinc-700">
             <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
@@ -76,7 +87,7 @@ export default function Backup() {
 
         {data && (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               <Card className="bg-zinc-900/60 border-zinc-800">
                 <CardContent className="p-4 flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
@@ -117,6 +128,21 @@ export default function Backup() {
                     {data.autoBackup.updatedAt && (
                       <p className="text-xs text-zinc-500 mt-0.5">{formatDate(data.autoBackup.updatedAt)}</p>
                     )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-zinc-900/60 border-zinc-800">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`p-2 rounded-lg border ${driveData?.available ? "bg-green-500/10 border-green-500/20" : "bg-amber-500/10 border-amber-500/20"}`}>
+                    {driveData?.available ? <ShieldCheck className="w-5 h-5 text-green-400" /> : <CloudOff className="w-5 h-5 text-amber-400" />}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider">Google Drive</p>
+                    <p className={`text-sm font-semibold ${driveData?.available ? "text-green-400" : "text-amber-400"}`}>
+                      {driveData?.available ? "Conectado" : "Não integrado"}
+                    </p>
+                    {driveData?.lastErrorMessage && <p className="mt-1 text-[10px] leading-snug text-zinc-500">{driveData.lastErrorMessage}</p>}
                   </div>
                 </CardContent>
               </Card>
