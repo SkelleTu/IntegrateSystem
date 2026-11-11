@@ -939,13 +939,23 @@ export async function registerRoutes(
     return res.sendFile(filepath);
   });
 
-  // Upload interno: somente ADMIN/OWNER, tamanho e tipos limitados.
-  app.post("/api/admin/upload", isAuthenticated, (req: any, res: any, next: any) => {
-    if (!hasAdminRole(req.user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
-    next();
-  }, upload.single("file"), (req: any, res: any) => {
-    if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
-    res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+  // Upload interno: autoriza antes de gravar e converte erros de arquivo em HTTP 400.
+  app.post("/api/admin/upload", isAuthenticated, (req: any, res: any) => {
+    if (!hasAdminRole(req.user)) {
+      return res.status(403).json({ message: "Acesso restrito a administradores." });
+    }
+
+    upload.single("file")(req, res, (error: any) => {
+      if (error) {
+        return res.status(400).json({
+          message: error.message || "Arquivo inválido ou tipo não permitido.",
+        });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "Nenhum arquivo enviado." });
+      }
+      return res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
+    });
   });
 
   function isAuthenticated(req: any, res: any, next: any) {
