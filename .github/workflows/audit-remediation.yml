@@ -45,4 +45,6 @@ jobs:
             exit 0
           fi
           git commit -m "fix(deps): apply non-breaking npm audit remediations"
+          git fetch origin fix/aura-system-hardening-qa
+          git rebase origin/fix/aura-system-hardening-qa
           git push origin HEAD:fix/aura-system-hardening-qa
