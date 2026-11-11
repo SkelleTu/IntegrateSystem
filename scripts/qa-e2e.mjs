@@ -66,7 +66,7 @@ assert.ok(cookie.includes("connect.sid="), "session cookie was not issued");
 summary.push({ test: "qa-admin-login", status: 200 });
 
 await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
-const productsBefore = await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "products-api-before");
+await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "products-api-before");
 
 // Product catalog used by the label screen must read from /api/products.
 const product = await expectStatus(await request("/api/products", {
@@ -168,6 +168,6 @@ summary.push({ test: "backup-and-drive-report-unconfigured-state", status: "pass
 await expectStatus(await request(`/api/products/${productId}`, {
   method: "DELETE",
   headers: { cookie },
-}), 200, "delete-label-product");
+}), 204, "delete-label-product");
 
 console.log(JSON.stringify({ ok: true, tests: summary.length, summary }, null, 2));
