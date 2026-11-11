@@ -1,0 +1,48 @@
+name: Aura dependency remediation
+
+on:
+  push:
+    branches: [fix/aura-system-hardening-qa]
+    paths:
+      - ".github/workflows/audit-remediation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  safe-audit-fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/aura-system-hardening-qa
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install current dependency graph
+        run: npm install --no-audit --no-fund
+      - name: Apply non-breaking security fixes only
+        run: npm audit fix --no-fund || true
+      - name: Report remaining vulnerabilities
+        continue-on-error: true
+        run: |
+          npm audit --json > /tmp/aura-audit-after.json || true
+          node -e 'const r=require("/tmp/aura-audit-after.json"); console.log(JSON.stringify({summary:r.metadata?.vulnerabilities,packages:Object.entries(r.vulnerabilities||{}).map(([name,x])=>({name,severity:x.severity,isDirect:x.isDirect,range:x.range,fixAvailable:x.fixAvailable}))},null,2));'
+      - name: Typecheck and build after dependency updates
+        run: |
+          npm run check
+          npm run build
+      - name: Commit lockfile-only security updates
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "No lockfile changes from non-breaking audit fixes."
+            exit 0
+          fi
+          git commit -m "fix(deps): apply non-breaking npm audit remediations"
+          git push origin HEAD:fix/aura-system-hardening-qa
