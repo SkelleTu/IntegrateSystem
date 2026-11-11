@@ -268,12 +268,12 @@ export async function registerRoutes(
     const authorization = String(request.headers.authorization || "");
     const suppliedToken = authorization.replace(/^Bearer\\s+/i, "").trim();
     if (!labelsWsToken) {
-      socket.write("HTTP/1.1 503 Service Unavailable\\r\\nConnection: close\\r\\n\\r\\n");
+      socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
     }
     if (!isValidLabelsToken(suppliedToken)) {
-      socket.write("HTTP/1.1 401 Unauthorized\\r\\nConnection: close\\r\\n\\r\\n");
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
     }
