@@ -1,0 +1,66 @@
+name: Aura isolated operational E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "client/src/**"
+      - "shared/**"
+      - "scripts/qa-e2e.mjs"
+      - ".github/workflows/qa-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qa-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      RENDER_GIT_BRANCH: fix/aura-system-hardening-qa
+      AURA_ENABLE_E2E_WRITES: "true"
+      AURA_RUNTIME_DISABLED: "1"
+      SESSION_SECRET: "ci-only-aura-qa-session-secret-not-for-production"
+      PORT: "5010"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck
+        run: npm run check
+      - name: Build
+        run: npm run build
+      - name: Start isolated SQLite QA server
+        run: |
+          node dist/index.js > /tmp/aura-qa-server.log 2>&1 &
+          echo $! > /tmp/aura-qa-server.pid
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /tmp/aura-qa-health.json -w "%{http_code}" http://127.0.0.1:5010/health || true)
+            if [ "$code" = "200" ]; then
+              echo "QA server is healthy"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null; then
+              cat /tmp/aura-qa-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/aura-qa-server.log
+          echo "QA server did not become healthy"
+          exit 1
+      - name: Run authenticated operational tests
+        run: node scripts/qa-e2e.mjs
+      - name: Stop QA server
+        if: always()
+        run: |
+          if [ -f /tmp/aura-qa-server.pid ]; then
+            kill "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null || true
+          fi
