@@ -214,6 +214,7 @@ export async function registerRoutes(
 ): Promise<Server> {
   const isIsolatedQaRuntime = process.env.RENDER_GIT_BRANCH === "fix/aura-system-hardening-qa"
     || process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag"
+    || process.env.RENDER_SERVICE_NAME === "integrated-system-qa-aura"
     || process.env.RENDER_EXTERNAL_URL === "https://integrated-system-qa-aura.onrender.com";
   // Trusted Aurora/Universal service-to-service operator authentication.
   // This keeps the normal browser session flow intact while allowing the
