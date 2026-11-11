@@ -4,7 +4,7 @@ import * as schema from "../shared/pg-schema.js";
 
 const connectionString = process.env.DATABASE_URL?.trim();
 
-const allowEphemeralQa = process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
+const allowEphemeralQa = process.env.RENDER_GIT_BRANCH === "fix/aura-system-hardening-qa";
 
 if (process.env.NODE_ENV === "production" && !connectionString && !allowEphemeralQa) {
   throw new Error("[DB] DATABASE_URL is required in production before Neon can be activated.");
