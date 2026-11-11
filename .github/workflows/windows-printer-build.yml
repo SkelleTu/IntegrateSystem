@@ -24,7 +24,9 @@ jobs:
         run: dotnet publish attached_assets/windows_app/AuraPrinter/AuraPrinter.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o artifacts/AuraPrinter
       - name: Include secure launcher
         shell: pwsh
-        run: Copy-Item "attached_assets/windows_app/AuraPrinter/Iniciar AuraPrinter.bat" "artifacts/AuraPrinter/Iniciar AuraPrinter.bat"
+        run: |
+          Copy-Item "attached_assets/windows_app/AuraPrinter/Iniciar AuraPrinter.bat" "artifacts/AuraPrinter/Iniciar AuraPrinter.bat"
+          Copy-Item "attached_assets/windows_app/AuraPrinter/Iniciar AuraPrinter.ps1" "artifacts/AuraPrinter/Iniciar AuraPrinter.ps1"
       - name: Upload Windows application
         uses: actions/upload-artifact@v4
         with:
