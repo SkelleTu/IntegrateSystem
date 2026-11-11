@@ -212,8 +212,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const isIsolatedQaRuntime = process.env.AURA_QA_MODE === "true"
-    && process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
+  const isIsolatedQaRuntime = process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
   // Trusted Aurora/Universal service-to-service operator authentication.
   // This keeps the normal browser session flow intact while allowing the
   // Universal Server to execute the same authenticated Aura modules on behalf
@@ -1748,7 +1747,7 @@ export async function registerRoutes(
   // Aura MCP operator. It exercises the same storage/business operations used by
   // the normal cashier flow, then removes every test artifact in a finally block.
   app.post("/api/audit/e2e/cash", async (req, res) => {
-    if ((process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.VERCEL)) && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
+    if (!isIsolatedQaRuntime && (process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.VERCEL)) && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
       return res.status(403).json({ message: "Testes com escrita são proibidos em produção. Execute somente em homologação autorizada." });
     }
     const qaAdminAudit = isIsolatedQaRuntime && hasAdminRole((req as any).user);
