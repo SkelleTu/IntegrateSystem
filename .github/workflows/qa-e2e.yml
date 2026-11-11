@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      NODE_ENV: production
       RENDER_GIT_BRANCH: fix/aura-system-hardening-qa
       AURA_ENABLE_E2E_WRITES: "true"
       AURA_RUNTIME_DISABLED: "1"
@@ -38,6 +37,8 @@ jobs:
       - name: Build
         run: npm run build
       - name: Start isolated SQLite QA server
+        env:
+          NODE_ENV: production
         run: |
           node dist/index.js > /tmp/aura-qa-server.log 2>&1 &
           echo $! > /tmp/aura-qa-server.pid
