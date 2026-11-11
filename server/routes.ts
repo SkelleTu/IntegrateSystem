@@ -31,10 +31,13 @@ import { neonPool } from "./neon-db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
 
 const uploadStorage = multer.diskStorage({
-  destination: "attached_assets/uploads/",
+  destination: (_req: any, _file: any, cb: any) => {
+    const destination = path.resolve(process.cwd(), "attached_assets/uploads");
+    fs.mkdir(destination, { recursive: true }, (error) => cb(error, destination));
+  },
   filename: (req: any, file: any, cb: any) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname));
+    cb(null, "admin-upload-" + uniqueSuffix + path.extname(file.originalname).toLowerCase());
   },
 });
 const privateRegistrationUploadsPath = path.resolve(
@@ -50,7 +53,18 @@ const privateRegistrationStorage = multer.diskStorage({
     cb(null, file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname).toLowerCase());
   },
 });
-const upload = multer({ storage: uploadStorage });
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+    const extensions = new Set([".pdf", ".jpg", ".jpeg", ".png", ".webp"]);
+    if (!allowed.has(file.mimetype) || !extensions.has(path.extname(file.originalname).toLowerCase())) {
+      return cb(new Error("Envie somente PDF, JPG, PNG ou WEBP."));
+    }
+    cb(null, true);
+  },
+});
 const publicDocumentUpload = multer({
   storage: privateRegistrationStorage,
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
@@ -235,44 +249,69 @@ export async function registerRoutes(
     }
   });
 
-  // WebSocket for Label System
-  const wss = new WebSocketServer({ noServer: true });
+  // WebSocket for Label System — authenticated device pairing.
+  const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
   let windowsClient: WebSocket | null = null;
+  const labelsWsToken = String(process.env.AURA_LABELS_WS_TOKEN || "").trim();
 
-  httpServer.on('upgrade', (request, socket, head) => {
-    const pathname = request.url;
+  function isValidLabelsToken(supplied: string): boolean {
+    if (!labelsWsToken || !supplied) return false;
+    const expected = Buffer.from(labelsWsToken, "utf8");
+    const actual = Buffer.from(supplied, "utf8");
+    return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
 
-    if (pathname === '/ws/labels') {
-      wss.handleUpgrade(request, socket, head, (ws) => {
-        wss.emit('connection', ws, request);
-      });
+  httpServer.on("upgrade", (request, socket, head) => {
+    const pathname = String(request.url || "").split("?")[0];
+    if (pathname !== "/ws/labels") return;
+
+    const authorization = String(request.headers.authorization || "");
+    const suppliedToken = authorization.replace(/^Bearer\\s+/i, "").trim();
+    if (!labelsWsToken) {
+      socket.write("HTTP/1.1 503 Service Unavailable\\r\\nConnection: close\\r\\n\\r\\n");
+      socket.destroy();
+      return;
     }
+    if (!isValidLabelsToken(suppliedToken)) {
+      socket.write("HTTP/1.1 401 Unauthorized\\r\\nConnection: close\\r\\n\\r\\n");
+      socket.destroy();
+      return;
+    }
+
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      wss.emit("connection", ws, request);
+    });
   });
 
-  wss.on('connection', (ws, req) => {
-    console.log('WS Connection established for labels');
-    
-    // Enviar mensagem de boas-vindas para confirmar conexão
-    ws.send(JSON.stringify({ type: 'SERVER_HELLO', message: 'Conectado ao Aura System' }));
+  wss.on("connection", (ws) => {
+    let registeredWindowsClient = false;
+    ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
-    ws.on('message', (msg) => {
+    ws.on("message", (msg) => {
+      if (registeredWindowsClient) return;
       try {
         const data = JSON.parse(msg.toString());
-        console.log('WS Message received:', data);
-        if (data.type === 'WINDOWS_HELLO') {
-          windowsClient = ws;
-          console.log('Windows Label App connected');
-          ws.send(JSON.stringify({ type: 'HELLO_ACK', message: 'Registrado com sucesso' }));
+        if (data?.type !== "WINDOWS_HELLO") {
+          ws.close(1008, "Handshake obrigatório");
+          return;
         }
-      } catch (e) {
-        console.error('WS Message error:', e);
+        registeredWindowsClient = true;
+        const previousClient = windowsClient;
+        windowsClient = ws;
+        if (previousClient && previousClient !== ws && previousClient.readyState === WebSocket.OPEN) {
+          previousClient.close(4001, "Substituído por uma conexão autenticada mais recente");
+        }
+        ws.send(JSON.stringify({ type: "HELLO_ACK", message: "Dispositivo autenticado e registrado" }));
+        console.log("Windows Label App authenticated and connected");
+      } catch {
+        ws.close(1008, "Mensagem inválida");
       }
     });
 
-    ws.on('close', () => {
+    ws.on("close", () => {
       if (ws === windowsClient) {
         windowsClient = null;
-        console.log('Windows Label App disconnected');
+        console.log("Windows Label App disconnected");
       }
     });
   });
@@ -894,8 +933,11 @@ export async function registerRoutes(
     return res.sendFile(filepath);
   });
 
-  // Rota de upload autenticada (para uso interno/admin)
-  app.post("/api/admin/upload", isAuthenticated, upload.single("file"), (req: any, res) => {
+  // Upload interno: somente ADMIN/OWNER, tamanho e tipos limitados.
+  app.post("/api/admin/upload", isAuthenticated, (req: any, res: any, next: any) => {
+    if (!hasAdminRole(req.user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
+    next();
+  }, upload.single("file"), (req: any, res: any) => {
     if (!req.file) return res.status(400).json({ message: "Nenhum arquivo enviado" });
     res.json({ url: `/attached_assets/uploads/${req.file.filename}` });
   });
