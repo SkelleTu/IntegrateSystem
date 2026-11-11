@@ -209,11 +209,11 @@ export class TursoSessionStore extends session.Store {
 }
 
 export async function registerRoutes(
-  const isIsolatedQaRuntime = process.env.AURA_QA_MODE === "true"
-    && process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const isIsolatedQaRuntime = process.env.AURA_QA_MODE === "true"
+    && process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
   // Trusted Aurora/Universal service-to-service operator authentication.
   // This keeps the normal browser session flow intact while allowing the
   // Universal Server to execute the same authenticated Aura modules on behalf
