@@ -1014,8 +1014,15 @@ export async function registerRoutes(
     const saleId = Number(req.params.saleId);
     
     try {
+      if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
       const sale = await storage.getSale(saleId);
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      if (!isSystemOwner(user)) {
+        const saleOwner = sale.userId ? await storage.getUser(Number(sale.userId)) : undefined;
+        if (!saleOwner || Number(saleOwner.enterpriseId) !== Number(user.enterpriseId)) {
+          return res.status(404).json({ message: "Venda não encontrada" });
+        }
+      }
       
       if (sale.status === "simulation") {
         const nfceData = await storage.createNfce({
@@ -2288,12 +2295,20 @@ export async function registerRoutes(
   });
 
   app.post("/api/sales/:id/emit-fiscal", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
     try {
       const id = Number(req.params.id);
-      const salesList = await storage.getSales({});
-      const sale = salesList.find(s => s.id === id);
+      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID de venda inválido." });
+      const sale = await storage.getSale(id);
       
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
+      if (!isSystemOwner(user)) {
+        const saleOwner = sale.userId ? await storage.getUser(Number(sale.userId)) : undefined;
+        if (!saleOwner || Number(saleOwner.enterpriseId) !== Number(user.enterpriseId)) {
+          return res.status(404).json({ message: "Venda não encontrada" });
+        }
+      }
       if (!sale.customerTaxId) return res.status(400).json({ message: "CPF necessário para emissão" });
 
       // Simulação de emissão (Estrutura completa NF-e / NFC-e)
