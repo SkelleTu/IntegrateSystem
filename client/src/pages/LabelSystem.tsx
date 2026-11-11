@@ -26,12 +26,12 @@ import {
   RefreshCw
 } from "lucide-react";
 import { useState } from "react";
-import { type Inventory } from "@shared/schema";
+import { type Product } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function LabelSystem() {
   const { toast } = useToast();
-  const [selectedItem, setSelectedItem] = useState<Inventory | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Product | null>(null);
   const [bruto, setBruto] = useState("");
   const [tara, setTara] = useState("0.040");
   
@@ -40,8 +40,8 @@ export default function LabelSystem() {
     refetchInterval: 10000
   });
 
-  const { data: inventory = [] } = useQuery<Inventory[]>({
-    queryKey: ["/api/inventory"]
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ["/api/products"]
   });
 
   const [lastPrintTime, setLastPrintTime] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export default function LabelSystem() {
     if (!selectedItem) return;
     
     const labelData = {
-      produto: selectedItem.customName || "Produto",
+      produto: selectedItem.name || "Produto",
       peso: pesoLiquido.toFixed(3),
       tara: parseFloat(tara).toFixed(3),
       precoKg: ((selectedItem.salePrice || 0) / 100).toFixed(2),
@@ -310,14 +310,14 @@ export default function LabelSystem() {
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-primary/20">
-              {inventory.filter(i => i.itemType === 'custom').map(item => (
+              {products.map(item => (
                 <Button
                   key={item.id}
                   variant="outline"
                   className={`h-24 flex flex-col gap-1 border-white/5 transition-all ${selectedItem?.id === item.id ? 'border-primary bg-primary/10' : 'bg-black/20'}`}
                   onClick={() => setSelectedItem(item)}
                 >
-                  <span className="font-black uppercase italic tracking-tighter truncate w-full">{item.customName}</span>
+                  <span className="font-black uppercase italic tracking-tighter truncate w-full">{item.name}</span>
                   <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest">R$ {((item.salePrice || 0)/100).toFixed(2)}/Kg</span>
                 </Button>
               ))}
@@ -420,7 +420,7 @@ export default function LabelSystem() {
             <p className={status?.appConnected ? 'text-primary' : 'text-red-500'}>
               [WS] App Windows {status?.appConnected ? 'CONECTADO' : 'DESCONECTADO'}
             </p>
-            <p>[DB] Inventário carregado: {inventory.length} itens.</p>
+            <p>[DB] Produtos carregados: {products.length} itens.</p>
             {lastPrintTime && <p className="text-primary">[LOG] Etiqueta enviada com sucesso às {lastPrintTime}</p>}
           </CardContent>
         </Card>
