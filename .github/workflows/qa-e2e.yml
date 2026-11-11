@@ -21,7 +21,6 @@ jobs:
     env:
       RENDER_GIT_BRANCH: fix/aura-system-hardening-qa
       AURA_ENABLE_E2E_WRITES: "true"
-      AURA_LABELS_WS_TOKEN: "ci-only-labels-gateway-token-not-for-production"
       AURA_RUNTIME_DISABLED: "1"
       SESSION_SECRET: "ci-only-aura-qa-session-secret-not-for-production"
       PORT: "5010"
