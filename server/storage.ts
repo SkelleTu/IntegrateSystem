@@ -1473,7 +1473,13 @@ export class DatabaseStorage implements IStorage {
         nowSec,
         nowSec
       ]);
-      return forcedId ?? Number(result.lastInsertRowid);
+      const generatedId = result.lastInsertRowid
+        ?? localSqlite.exec("SELECT last_insert_rowid() AS id")[0]?.values?.[0]?.[0];
+      const resolvedId = forcedId ?? Number(generatedId);
+      if (!Number.isSafeInteger(resolvedId) || resolvedId <= 0) {
+        throw new Error("SQLite não retornou um ID válido para o produto recém-criado.");
+      }
+      return resolvedId;
     };
 
     if (neonDb) {
