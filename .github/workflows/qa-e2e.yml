@@ -1,3 +1,4 @@
+# Re-run operational checks after dependency lockfile remediation.
 name: Aura isolated operational E2E
 
 on:
