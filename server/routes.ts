@@ -1751,8 +1751,9 @@ export async function registerRoutes(
     if ((process.env.NODE_ENV === "production" || Boolean(process.env.RENDER || process.env.RENDER_EXTERNAL_URL || process.env.VERCEL)) && process.env.AURA_ENABLE_E2E_WRITES !== "true") {
       return res.status(403).json({ message: "Testes com escrita são proibidos em produção. Execute somente em homologação autorizada." });
     }
-    if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
-      return res.status(403).json({ message: "E2E audit requires authenticated Aura MCP execution" });
+    const qaAdminAudit = isIsolatedQaRuntime && hasAdminRole((req as any).user);
+    if (!(((req as any).auroraOperator && (req as any).mcpClaims) || qaAdminAudit)) {
+      return res.status(403).json({ message: "E2E audit requires authenticated Aura MCP execution or an isolated QA administrator." });
     }
 
     const marker = "__AURA_E2E_CASH__" + Date.now().toString(36) + "_" + Math.random().toString(16).slice(2);
