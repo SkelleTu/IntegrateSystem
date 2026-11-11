@@ -212,7 +212,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  const isIsolatedQaRuntime = process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag";
+  const isIsolatedQaRuntime = process.env.RENDER_GIT_BRANCH === "fix/aura-system-hardening-qa";
   // Trusted Aurora/Universal service-to-service operator authentication.
   // This keeps the normal browser session flow intact while allowing the
   // Universal Server to execute the same authenticated Aura modules on behalf
