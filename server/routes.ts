@@ -277,38 +277,6 @@ export async function registerRoutes(
     });
   });
 
-  // Label Printing Route
-  app.post("/api/labels/print", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-    const user = req.user as any;
-    if (!isSystemOwner(user)) {
-      return res.status(403).json({ error: "Acesso negado" });
-    }
-
-    if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
-      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
-    }
-
-    windowsClient.send(JSON.stringify({
-      type: "PRINT_LABEL",
-      payload: req.body
-    }));
-
-    res.json({ status: "ENVIADO" });
-  });
-
-  app.get("/api/labels/status", async (req, res) => {
-    if (!req.user) return res.sendStatus(401);
-    const user = req.user as any;
-    if (!isSystemOwner(user)) {
-      return res.status(403).json({ error: "Acesso negado" });
-    }
-
-    res.json({
-      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
-    });
-  });
-
   // Session & Auth Setup
   const sessionSecret = String(process.env.SESSION_SECRET || "").trim();
   if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
@@ -370,6 +338,39 @@ export async function registerRoutes(
       done(err);
     }
   });
+
+  // Label Printing Route
+  app.post("/api/labels/print", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const user = req.user as any;
+    if (!isSystemOwner(user)) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
+      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+    }
+
+    windowsClient.send(JSON.stringify({
+      type: "PRINT_LABEL",
+      payload: req.body
+    }));
+
+    res.json({ status: "ENVIADO" });
+  });
+
+  app.get("/api/labels/status", async (req, res) => {
+    if (!req.user) return res.sendStatus(401);
+    const user = req.user as any;
+    if (!isSystemOwner(user)) {
+      return res.status(403).json({ error: "Acesso negado" });
+    }
+
+    res.json({
+      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
+    });
+  });
+
 
   app.get("/api/audit/db-parity", async (req, res) => {
     if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
