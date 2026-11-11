@@ -61,10 +61,8 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
   const fileInputRef = useRef<HTMLInputElement>(null);
   const role = String((user as any)?.role || "").trim().toLowerCase();
   const canManage = !!user && (role === "owner" || String((user as any)?.username || "").trim().toLowerCase() === "skelletu");
-  const remoteBackupUnavailable = !!backupStatus?.backup
-    && backupStatus.backup.authoritativeSource !== "sqlite-local"
-    && backupStatus.backup.complete === false;
-  const backupActionsDisabled = !canManage || !!busy || backupStatusLoading || remoteBackupUnavailable;
+  const remoteBackupUnavailable = backupStatus?.backup?.complete === false;
+  const backupActionsDisabled = !canManage || !!busy || backupStatusLoading || !backupStatus || remoteBackupUnavailable;
 
   const loadBackupStatus = async () => {
     if (!canManage) return;
@@ -266,6 +264,7 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
 
               {!canManage && <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-3 text-xs text-yellow-200">Operações de backup e restauração são restritas ao proprietário do sistema.</div>}
               {remoteBackupUnavailable && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">{backupStatus?.backup?.message || "O banco principal é remoto; backups SQL locais não são uma cópia completa e a restauração está bloqueada."}</div>}
+              {canManage && !backupStatusLoading && !backupStatus && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">Não foi possível verificar a fonte do banco. As operações SQL permanecem bloqueadas por segurança.</div>}
               {message && <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-zinc-300">{message}</div>}
 
               {comparison && (
