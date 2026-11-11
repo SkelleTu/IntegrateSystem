@@ -13,7 +13,7 @@ namespace AuraLabelPrinter
     {
         // URL configurada para o seu domínio real
         private static readonly string wsUrl = Environment.GetEnvironmentVariable("AURA_LABELS_WS_URL") ?? "wss://integrated-system-1c86.onrender.com/ws/labels";
-        private static readonly string wsToken = Environment.GetEnvironmentVariable("AURA_LABELS_WS_TOKEN") ?? "";
+        private static readonly string wsToken = (Environment.GetEnvironmentVariable("AURA_LABELS_WS_TOKEN") ?? "").Trim();
 
         static async Task Main(string[] args)
         {
