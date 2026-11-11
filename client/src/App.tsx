@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,35 +8,72 @@ import { useUser } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
 
 import LandingPage from "@/pages/LandingPage";
-import AboutUs from "@/pages/AboutUs";
-import Solutions from "@/pages/Solutions";
-import SuccessCases from "@/pages/SuccessCases";
-import PrivacyPolicy from "@/pages/PrivacyPolicy";
-import TermsOfService from "@/pages/TermsOfService";
-import Blog from "@/pages/Blog";
-import Contact from "@/pages/Contact";
-import Home from "@/pages/Home";
-import BarberHome from "@/pages/BarberHome";
-import Login from "@/pages/Login";
+
+
+
+
+
+
+
+
+
+
 // Admin page removed as it does not exist
 // import Admin from "@/pages/Admin";
-import DigitalMenu from "@/pages/DigitalMenu";
-import BarberQueue from "@/pages/BarberQueue";
-import Cashier from "@/pages/Cashier";
-import CashierClose from "@/pages/CashierClose";
-import Financeiro from "@/pages/Financeiro";
-import Reports from "@/pages/Reports";
-import Inventory from "@/pages/Inventory";
-import ClientCart from "@/pages/ClientCart";
-import TimeClock from "@/pages/TimeClock";
-import FiscalConfig from "@/pages/fiscal/FiscalConfig";
-import LabelSystem from "@/pages/LabelSystem";
+
+
+
+
+
+
+
+
+
+
+
 import NotFound from "@/pages/not-found";
 import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
 const auraLogo = "/aura-system-logo.svg";
+
+const AboutUs = lazy(() => import("@/pages/AboutUs"));
+const Solutions = lazy(() => import("@/pages/Solutions"));
+const SuccessCases = lazy(() => import("@/pages/SuccessCases"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
+const Blog = lazy(() => import("@/pages/Blog"));
+const Contact = lazy(() => import("@/pages/Contact"));
+const Home = lazy(() => import("@/pages/Home"));
+const BarberHome = lazy(() => import("@/pages/BarberHome"));
+const Login = lazy(() => import("@/pages/Login"));
+const DigitalMenu = lazy(() => import("@/pages/DigitalMenu"));
+const BarberQueue = lazy(() => import("@/pages/BarberQueue"));
+const Cashier = lazy(() => import("@/pages/Cashier"));
+const CashierClose = lazy(() => import("@/pages/CashierClose"));
+const Financeiro = lazy(() => import("@/pages/Financeiro"));
+const Reports = lazy(() => import("@/pages/Reports"));
+const Inventory = lazy(() => import("@/pages/Inventory"));
+const ClientCart = lazy(() => import("@/pages/ClientCart"));
+const TimeClock = lazy(() => import("@/pages/TimeClock"));
+const FiscalConfig = lazy(() => import("@/pages/fiscal/FiscalConfig"));
+const LabelSystem = lazy(() => import("@/pages/LabelSystem"));
+const MasterControl = lazy(() => import("./pages/MasterControl"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
+const WindowsAppRunner = lazy(() => import("./pages/admin/WindowsAppRunner"));
+const AuraWindows = lazy(() => import("./pages/AuraWindows"));
+const Backup = lazy(() => import("./pages/Backup"));
+const SetupEnterprise = lazy(() => import("./pages/SetupEnterprise"));
+
+function RouteLoading() {
+  return (
+    <div className="min-h-[50vh] w-full flex items-center justify-center">
+      <Loader2 className="w-8 h-8 text-primary animate-spin" />
+    </div>
+  );
+}
+
 
 import { Navbar } from "@/components/layout/Navbar";
 import { StatusBar } from "@/components/layout/StatusBar";
@@ -49,12 +86,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-import MasterControl from "./pages/MasterControl";
-import Monitoring from "./pages/Monitoring";
-import WindowsAppRunner from "./pages/admin/WindowsAppRunner";
-import AuraWindows from "./pages/AuraWindows";
-import Backup from "./pages/Backup";
-import SetupEnterprise from "./pages/SetupEnterprise";
+
+
+
+
+
+
 import { TourProvider } from "@/components/tour/TourContext";
 import { TourEngine } from "@/components/tour/TourEngine";
 
@@ -88,12 +125,14 @@ function Router() {
 
   if (isAuthPage) {
     return (
-      <Switch>
-        <Route path="/login" component={Login} />
-        <Route path="/register" component={LandingPage} />
-        <Route path="/setup" component={SetupEnterprise} />
-        <Route component={NotFound} />
-      </Switch>
+      <Suspense fallback={<RouteLoading />}>
+        <Switch>
+          <Route path="/login" component={Login} />
+          <Route path="/register" component={LandingPage} />
+          <Route path="/setup" component={SetupEnterprise} />
+          <Route component={NotFound} />
+        </Switch>
+      </Suspense>
     );
   }
 
@@ -103,6 +142,7 @@ function Router() {
     <div className={`flex h-screen w-full ${isCashierPage ? "overflow-hidden" : ""}`}>
       <div className="flex flex-col flex-1 overflow-hidden relative">
         <main className={`flex-1 relative ${isCashierPage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"}`}>
+          <Suspense fallback={<RouteLoading />}>
           <Switch>
             <Route path="/" component={LandingPage} />
             <Route path="/quem-somos" component={AboutUs} />
@@ -133,6 +173,7 @@ function Router() {
             <Route path="/backup" component={Backup} />
             <Route component={NotFound} />
           </Switch>
+          </Suspense>
         </main>
       </div>
     </div>
