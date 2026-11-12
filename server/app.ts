@@ -102,8 +102,6 @@ app.use((req, res, next) => {
   const traceId = req.get("x-trace-id")?.trim() || randomUUID();
   const requestId = req.get("x-request-id")?.trim() || randomUUID();
 
-  res.setHeader("X-Trace-Id", traceId);
-  res.setHeader("X-Request-Id", requestId);
 
   res.locals.traceId = traceId;
   res.locals.requestId = requestId;
