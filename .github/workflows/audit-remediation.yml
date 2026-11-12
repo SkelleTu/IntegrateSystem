@@ -1,4 +1,4 @@
-# Retry the dependency remediation after Zod 4 compatibility fixes.
+# Continue dependency remediation after the production audit reached zero findings.
 name: Aura dependency remediation
 
 on:
@@ -31,6 +31,8 @@ jobs:
         run: npm install drizzle-orm@0.45.4 @hookform/resolvers@5.2.2 zod@4.6.6 --save --no-fund
       - name: Keep the CSS typography plugin in build-only dependencies
         run: npm install --save-dev @tailwindcss/typography@^0.5.20 --no-fund
+      - name: Upgrade the Electron desktop toolchain
+        run: npm install --save-dev @electron-forge/cli@8.0.1 @electron-forge/maker-deb@8.0.1 @electron-forge/maker-rpm@8.0.1 @electron-forge/maker-squirrel@8.0.1 @electron-forge/maker-zip@8.0.1 @electron-forge/plugin-auto-unpack-natives@8.0.1 @electron-forge/plugin-fuses@8.0.1 electron@45.3.0 --no-fund
       - name: Patch the remaining production AJV advisory
         run: npm install ajv@^8.18.0 --save --no-fund
       - name: Apply remaining non-breaking security fixes
