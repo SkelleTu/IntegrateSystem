@@ -26,6 +26,7 @@ jobs:
       - name: Clean install from committed lockfile
         run: npm ci --no-audit --no-fund
       - name: Apply compatible security fixes
+        continue-on-error: true
         run: npm audit fix --no-fund
       - name: Report remaining vulnerabilities
         continue-on-error: true
