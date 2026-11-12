@@ -1229,7 +1229,7 @@ export async function registerRoutes(
       res.status(201).json(service);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        res.status(400).json({ message: err.errors[0].message });
+        res.status(400).json({ message: err.issues[0].message });
       } else {
         res.status(500).json({ message: "Internal server error" });
       }
@@ -1339,7 +1339,7 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Erro no upsert de inventário:", err);
       if (err instanceof z.ZodError) {
-        res.status(400).json({ message: err.errors[0].message });
+        res.status(400).json({ message: err.issues[0].message });
       } else {
         res.status(500).json({ message: "Erro ao atualizar estoque" });
       }
@@ -1544,7 +1544,7 @@ export async function registerRoutes(
       const p = await storage.createProduct(data);
       res.status(201).json(p);
     } catch (err: any) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Dados do produto inválidos" });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.issues[0]?.message || "Dados do produto inválidos" });
       res.status(500).json({ message: err.message || "Erro ao criar produto" });
     }
   });
@@ -1665,7 +1665,7 @@ export async function registerRoutes(
       const b = await storage.createBatch({ ...payload, userId: user.id } as any);
       res.status(201).json(b);
     } catch (err: any) {
-      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0]?.message || "Dados do lote inválidos" });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.issues[0]?.message || "Dados do lote inválidos" });
       res.status(500).json({ message: err.message || "Erro ao criar lote" });
     }
   });
@@ -2490,7 +2490,7 @@ export async function registerRoutes(
       res.status(201).json(transaction);
     } catch (err) {
       if (err instanceof z.ZodError) {
-        res.status(400).json({ message: err.errors[0].message });
+        res.status(400).json({ message: err.issues[0].message });
       } else {
         res.status(500).json({ message: "Internal server error" });
       }
