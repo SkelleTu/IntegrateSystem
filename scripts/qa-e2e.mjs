@@ -68,6 +68,12 @@ summary.push({ test: "qa-admin-login", status: 200 });
 await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
 await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "products-api-before");
 
+// Queue control mutations must never be callable by anonymous visitors.
+await expectStatus(await request("/api/queue/next", { method: "POST" }), 401, "anonymous-queue-next-denied");
+await expectStatus(await request("/api/queue/prev", { method: "POST" }), 401, "anonymous-queue-prev-denied");
+await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 401, "anonymous-queue-reset-denied");
+await expectStatus(await request("/api/queue/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ number: 0 }) }), 401, "anonymous-queue-set-denied");
+
 // Product catalog used by the label screen must read from /api/products.
 const product = await expectStatus(await request("/api/products", {
   method: "POST",
