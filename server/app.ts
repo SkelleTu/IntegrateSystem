@@ -172,7 +172,7 @@ app.use((req, res, next) => {
 });
 
 app.post("/api/runtime/event", (req: Request, res: Response) => {
-  const token = req.get("authorization")?.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim();
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!token || !verifyMcpAccessToken(token, "aura.execute")) {
     return res.status(401).json({ ok: false, error: "Valid MCP aura.execute token required" });
   }
@@ -198,7 +198,7 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
 });
 
 app.get("/api/runtime/observability", async (req: Request, res: Response) => {
-  const token = req.get("authorization")?.match(/^Bearer\\s+(.+)$/i)?.[1]?.trim();
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
   if (!token || !verifyMcpAccessToken(token, "aura.read")) {
     return res.status(401).json({ ok: false, error: "Valid MCP aura.read token required" });
   }
