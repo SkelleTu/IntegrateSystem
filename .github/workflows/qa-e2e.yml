@@ -45,6 +45,8 @@ jobs:
         run: npm run check
       - name: Build
         run: npm run build
+      - name: Prune development dependencies from the runtime
+        run: npm prune --omit=dev --no-audit --no-fund
       - name: Start isolated SQLite QA server
         env:
           NODE_ENV: production
