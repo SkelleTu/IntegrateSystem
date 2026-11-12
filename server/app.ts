@@ -12,7 +12,6 @@ import path from "path";
 import fs from "fs";
 import { startGoogleDriveBackupScheduler, getGoogleDriveBackupStatus } from "./googleDriveBackup";
 import {
-  getRuntimeStatus,
   runtimeError,
   runtimeEvent,
   startRuntimeMonitor,
@@ -206,12 +205,13 @@ app.get("/api/runtime/observability", async (req: Request, res: Response) => {
   }));
 });
 
+// Public status endpoint returns liveness only; never expose process, host, or operator internals.
 app.get("/api/runtime/status", (_req: Request, res: Response) => {
-  res.json({
-    ...getRuntimeStatus(),
-    operatorMode: res.locals.operatorMode || "supreme",
-    traceId: res.locals.traceId || null,
-    requestId: res.locals.requestId || null,
+  res.status(appReady ? 200 : 503).json({
+    status: appReady ? "ok" : "starting",
+    service: "integrated-system",
+    timestamp: new Date().toISOString(),
+    uptimeSeconds: Math.floor(process.uptime()),
   });
 });
 
