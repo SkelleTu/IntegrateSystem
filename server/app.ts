@@ -212,6 +212,10 @@ app.get("/api/runtime/observability", async (req: Request, res: Response) => {
 
 // Public status endpoint returns liveness only; never expose process, host, or operator internals.
 app.get("/api/runtime/status", (_req: Request, res: Response) => {
+  // Public liveness must not disclose correlation identifiers or internal operator mode.
+  res.removeHeader("X-Trace-Id");
+  res.removeHeader("X-Request-Id");
+  res.removeHeader("X-Aurora-Operator-Mode");
   res.status(appReady ? 200 : 503).json({
     status: appReady ? "ok" : "starting",
     service: "integrated-system",
