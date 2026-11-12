@@ -128,8 +128,7 @@ export default function LandingPage() {
       toast({ title: "Selecione um método", description: "Escolha Cartão ou PIX antes de finalizar.", variant: "destructive" });
       return;
     }
-    toast({ title: "Cadastro realizado!", description: "Aguarde a aprovação da sua conta pelo administrador." });
-    setLocation("/login");
+    toast({ title: "Pagamento indisponível", description: "Nenhuma cobrança foi realizada. O cadastro foi enviado; aguarde a confirmação da equipe antes de efetuar qualquer pagamento.", variant: "destructive" });
   };
 
   return (
@@ -178,9 +177,9 @@ export default function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-24">
             {[
-              { icon: ShieldCheck, title: "CYBER SECURITY", desc: "Arquitetura ultra-protegida com criptografia de ponta a ponta para seus dados institucionais." },
+              { icon: ShieldCheck, title: "CYBER SECURITY", desc: "Controles de acesso e proteção de dados para apoiar a segurança da operação." },
               { icon: Zap, title: "INSTANT FLOW", desc: "Fluxo de caixa inteligente e comanda digital ultra-veloz em tempo real." },
-              { icon: CreditCard, title: "NEO PAYMENTS", desc: "Integração nativa com gateways globais e conciliação automática." }
+              { icon: CreditCard, title: "NEO PAYMENTS", desc: "Recursos de pagamento sujeitos à disponibilidade e à configuração dos provedores integrados." }
             ].map((feature, i) => (
               <div key={i} className="p-8 rounded-2xl glass-panel text-left border border-white/5 hover:border-primary/40 transition-all group relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -205,7 +204,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
                 { title: "Gestão Unificada", desc: "Controle financeiro, estoque e equipe em um único terminal centralizado.", color: "text-blue-400" },
-                { title: "Segurança de Dados", desc: "Backup em nuvem militar com redundância global para nunca perder nada.", color: "text-green-400" },
+                { title: "Segurança de Dados", desc: "Recursos de backup e recuperação apresentados conforme a integração estiver configurada e validada.", color: "text-green-400" },
                 { title: "Escalabilidade", desc: "Cresça sem limites. Aura adapta-se de pequenas lojas a grandes redes.", color: "text-purple-400" },
                 { title: "Suporte VIP", desc: "Atendimento técnico prioritário 24/7 para manter sua operação ativa.", color: "text-amber-400" }
               ].map((benefit, i) => (
@@ -453,7 +452,7 @@ export default function LandingPage() {
         <Card className="w-full max-w-md bg-black/60 backdrop-blur-2xl border-white/10 shadow-2xl animate-in zoom-in-95 duration-500">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-black uppercase text-white tracking-tighter">Plano Pro</CardTitle>
-            <CardDescription className="text-primary font-black uppercase text-[10px] tracking-widest">Gateway de Pagamento Integrado</CardDescription>
+            <CardDescription className="text-primary font-black uppercase text-[10px] tracking-widest">Pagamento ainda não habilitado</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="p-6 rounded-2xl bg-primary/10 border border-primary/20 text-center">
@@ -478,7 +477,8 @@ export default function LandingPage() {
                 <span className="text-[10px] font-black uppercase text-white">PIX</span>
               </Button>
             </div>
-            <Button onClick={handlePayment} className="w-full h-14 bg-primary text-white font-black text-lg uppercase tracking-tighter shadow-[0_0_20px_rgba(0,229,255,0.4)]">Finalizar Pagamento</Button>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100" role="status">O gateway de pagamento ainda não está conectado. Não informe dados de cartão nem faça PIX por esta tela. Nenhuma cobrança será iniciada.</div>
+            <Button onClick={handlePayment} disabled className="w-full h-14 bg-zinc-700 text-white/60 font-black text-lg uppercase tracking-tighter cursor-not-allowed">Pagamento indisponível</Button>
           </CardContent>
         </Card>
       )}
