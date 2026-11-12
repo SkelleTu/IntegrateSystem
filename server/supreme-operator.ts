@@ -10,9 +10,6 @@ export function supremeOperatorMiddleware(req: Request, res: Response, next: Nex
   const mode = req.get("x-aurora-operator-mode")?.trim().toLowerCase() || "supreme";
   const activeMode = (process.env.AURORA_OPERATOR_MODE || "supreme").trim().toLowerCase() || "supreme";
 
-  res.setHeader("X-Trace-Id", traceId);
-  res.setHeader("X-Request-Id", requestId);
-  res.setHeader("X-Aurora-Operator-Mode", activeMode);
 
   res.locals.traceId = traceId;
   res.locals.requestId = requestId;
@@ -30,10 +27,6 @@ export function supremeOperatorMiddleware(req: Request, res: Response, next: Nex
     res.status(403).json({
       ok: false,
       error: "Aurora operator mode is not permitted",
-      requestedMode: mode,
-      activeMode,
-      traceId,
-      requestId,
     });
     return;
   }
