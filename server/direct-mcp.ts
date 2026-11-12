@@ -246,7 +246,7 @@ function createServer(token: string) {
       inputSchema: {
         method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
         path: z.string().regex(/^\/api(?:\/|$)/),
-        body: z.record(z.unknown()).optional().default({}),
+        body: z.record(z.string(), z.unknown()).optional().default({}),
       },
       _meta: { securitySchemes: EXECUTE_SECURITY },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
