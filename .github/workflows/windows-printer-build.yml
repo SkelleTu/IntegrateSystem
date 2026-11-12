@@ -5,6 +5,11 @@ on:
     branches: [fix/aura-system-hardening-qa]
     paths:
       - "attached_assets/windows_app/AuraPrinter/**"
+      - "electron/**"
+      - "electron-builder.config.json"
+      - "forge.config.js"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/windows-printer-build.yml"
   workflow_dispatch:
 
