@@ -158,10 +158,12 @@ summary.push({ test: "admin-upload-type-filter", status: invalidUpload.status })
 
 // Verify label gateway status and truthful backup/Drive status endpoints.
 await expectStatus(await request("/api/labels/status", { headers: { cookie } }), 403, "labels-status-owner-restriction");
-await expectStatus(await request("/api/backup/status", { headers: { cookie } }), 200, "backup-status-local-qa");
+const backup = await expectStatus(await request("/api/backup/status", { headers: { cookie } }), 200, "backup-status-local-qa");
+assert.equal(backup.backup.authoritativeSource, "sqlite-local");
+assert.equal(backup.backup.complete, true);
 const drive = await expectStatus(await request("/api/google-drive/status", { headers: { cookie } }), 200, "google-drive-status");
 assert.equal(drive.available, false);
-summary.push({ test: "backup-owner-protection-and-drive-unconfigured-state", status: "passed" });
+summary.push({ test: "qa-backup-status-and-drive-unconfigured-state", status: "passed" });
 
 // Remove the disposable label product. The cash E2E route already verifies its own cleanup.
 await expectStatus(await request(`/api/products/${productId}`, {
