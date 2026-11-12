@@ -28,6 +28,10 @@ jobs:
         run: npm uninstall nfe-signer zod-validation-error --no-fund
       - name: Upgrade patched production libraries
         run: npm install drizzle-orm@0.45.4 @hookform/resolvers@5.2.2 zod@4.6.6 --save --no-fund
+      - name: Keep the CSS typography plugin in build-only dependencies
+        run: npm install --save-dev @tailwindcss/typography@^0.5.20 --no-fund
+      - name: Patch the remaining production AJV advisory
+        run: npm install ajv@^8.18.0 --save --no-fund
       - name: Apply remaining non-breaking security fixes
         run: npm audit fix --no-fund || true
       - name: Report remaining vulnerabilities
