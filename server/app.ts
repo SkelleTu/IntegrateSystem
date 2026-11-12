@@ -19,7 +19,7 @@ import {
   enableDurableRuntimePersistence,
 } from "./runtimeMonitor";
 import { supremeOperatorMiddleware } from "./supreme-operator";
-import { registerMcpOAuth } from "./mcp-oauth";
+import { registerMcpOAuth, verifyMcpAccessToken } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 import { getRuntimeObservability } from "./runtime-observability";
@@ -171,6 +171,10 @@ app.use((req, res, next) => {
 });
 
 app.post("/api/runtime/event", (req: Request, res: Response) => {
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!token || !verifyMcpAccessToken(token, "aura.execute")) {
+    return res.status(401).json({ ok: false, error: "Valid MCP aura.execute token required" });
+  }
   const body = req.body && typeof req.body === "object" ? req.body : {};
   const event = typeof body.event === "string" ? body.event.slice(0, 200) : "renderer-event";
   const message =
@@ -193,8 +197,9 @@ app.post("/api/runtime/event", (req: Request, res: Response) => {
 });
 
 app.get("/api/runtime/observability", async (req: Request, res: Response) => {
-  if (req.get("X-MCP-Direct-Control") !== "true") {
-    return res.status(403).json({ ok: false, error: "MCP direct control required" });
+  const token = req.get("authorization")?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!token || !verifyMcpAccessToken(token, "aura.read")) {
+    return res.status(401).json({ ok: false, error: "Valid MCP aura.read token required" });
   }
   res.json(await getRuntimeObservability({
     limit: Number(req.query.limit ?? 250),
