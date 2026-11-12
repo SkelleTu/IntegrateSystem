@@ -5,6 +5,7 @@ const required = [
   ["server/runtime-observability.ts", ["aura-runtime-ledger", "nextSequence", "limit + 1"]],
   ["server/aura-request-context.ts", ["AsyncLocalStorage", "traceId", "requestId"]],
   ["server/app.ts", ["runWithAuraContext", "await getRuntimeObservability", 'status: appReady ? "ok" : "starting"', 'verifyMcpAccessToken(token, "aura.read")', 'verifyMcpAccessToken(token, "aura.execute")']],
+  ["server/routes.ts", ['lastAction: req.isAuthenticated?.() ?']],
   ["server/storage.ts", ["sale-created", "sale-items-created", "sale-payments-created", "sale-financial-transaction", "sale-completed", "cash-register-opened", "cash-register-closed"]],
   ["shared/schema.ts", ['runtimeEvents = pgTable("runtime_events"']],
   ["server/db.ts", ["CREATE TABLE IF NOT EXISTS runtime_events"]],
