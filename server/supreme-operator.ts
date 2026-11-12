@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { runtimeEvent } from "./runtimeMonitor";
 
 export function supremeOperatorMiddleware(req: Request, res: Response, next: NextFunction) {
+  // Public liveness is independent of operator mode and must not disclose internal mode on rejection.
+  if (req.method === "GET" && req.path === "/api/runtime/status") return next();
   const traceId = req.get("x-trace-id")?.trim() || randomUUID();
   const requestId = req.get("x-request-id")?.trim() || randomUUID();
   const mode = req.get("x-aurora-operator-mode")?.trim().toLowerCase() || "supreme";
