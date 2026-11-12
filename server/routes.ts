@@ -1257,26 +1257,26 @@ export async function registerRoutes(
     res.json(state);
   });
 
-  app.post(api.queue.next.path, async (req, res) => {
+  app.post(api.queue.next.path, isAuthenticated, async (req, res) => {
     const state = await storage.getQueueState();
     const newState = await storage.updateQueueState({ servingNumber: state.servingNumber + 1 });
     res.json(newState);
   });
 
-  app.post(api.queue.prev.path, async (req, res) => {
+  app.post(api.queue.prev.path, isAuthenticated, async (req, res) => {
     const state = await storage.getQueueState();
     const newNum = Math.max(0, state.servingNumber - 1);
     const newState = await storage.updateQueueState({ servingNumber: newNum });
     res.json(newState);
   });
 
-  app.post(api.queue.reset.path, async (req, res) => {
+  app.post(api.queue.reset.path, isAuthenticated, async (req, res) => {
     const input = api.queue.reset.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.startFrom, currentNumber: input.startFrom });
     res.json(newState);
   });
 
-  app.post(api.queue.set.path, async (req, res) => {
+  app.post(api.queue.set.path, isAuthenticated, async (req, res) => {
     const input = api.queue.set.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.number });
     res.json(newState);
