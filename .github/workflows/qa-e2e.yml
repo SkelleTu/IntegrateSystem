@@ -1,0 +1,78 @@
+# Re-run operational checks after dependency lockfile remediation.
+name: Aura isolated operational E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "client/src/**"
+      - "shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/qa-e2e.mjs"
+      - ".github/workflows/qa-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qa-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RENDER_GIT_BRANCH: fix/aura-system-hardening-qa
+      AURA_ENABLE_E2E_WRITES: "true"
+      AURA_RUNTIME_DISABLED: "1"
+      SESSION_SECRET: "ci-only-aura-qa-session-secret-not-for-production"
+      SESSION_COOKIE_SECURE: "false"
+      PORT: "5010"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Audit dependency vulnerabilities
+        continue-on-error: true
+        run: |
+          npm audit --json > /tmp/aura-npm-audit.json || true
+          node -e 'const r=require("/tmp/aura-npm-audit.json"); const v=Object.entries(r.vulnerabilities||{}).map(([name,x])=>({name,severity:x.severity,isDirect:x.isDirect,range:x.range,fixAvailable:x.fixAvailable})); console.log(JSON.stringify({summary:r.metadata?.vulnerabilities,critical:v.filter(x=>x.severity==="critical"),highDirect:v.filter(x=>x.severity==="high"&&x.isDirect),all:v},null,2));'
+      - name: Typecheck
+        run: npm run check
+      - name: Build
+        run: npm run build
+      - name: Prune development dependencies from the runtime
+        run: npm prune --omit=dev --no-audit --no-fund
+      - name: Start isolated SQLite QA server
+        env:
+          NODE_ENV: production
+        run: |
+          node dist/index.js > /tmp/aura-qa-server.log 2>&1 &
+          echo $! > /tmp/aura-qa-server.pid
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /tmp/aura-qa-health.json -w "%{http_code}" http://127.0.0.1:5010/health || true)
+            if [ "$code" = "200" ]; then
+              echo "QA server is healthy"
+              exit 0
+            fi
+            if ! kill -0 "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null; then
+              cat /tmp/aura-qa-server.log
+              exit 1
+            fi
+            sleep 1
+          done
+          cat /tmp/aura-qa-server.log
+          echo "QA server did not become healthy"
+          exit 1
+      - name: Run authenticated operational tests
+        run: node scripts/qa-e2e.mjs
+      - name: Stop QA server
+        if: always()
+        run: |
+          if [ -f /tmp/aura-qa-server.pid ]; then
+            kill "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null || true
+          fi

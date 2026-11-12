@@ -13,6 +13,14 @@ type BackupEntry = {
   format?: "json" | "sql";
 };
 
+type BackupStatus = {
+  backup?: {
+    complete?: boolean;
+    authoritativeSource?: string;
+    message?: string;
+  };
+};
+
 type ImportResult = {
   ok?: boolean;
   tablesRestored?: number;
@@ -46,10 +54,29 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [backups, setBackups] = useState<BackupEntry[]>([]);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [backupStatusLoading, setBackupStatusLoading] = useState(false);
   const [message, setMessage] = useState<string>("");
   const [comparison, setComparison] = useState<ImportResult["comparison"]>();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const canManage = !!user;
+  const role = String((user as any)?.role || "").trim().toLowerCase();
+  const canManage = !!user && (role === "owner" || String((user as any)?.username || "").trim().toLowerCase() === "skelletu");
+  const remoteBackupUnavailable = backupStatus?.backup?.complete === false;
+  const backupActionsDisabled = !canManage || !!busy || backupStatusLoading || !backupStatus || remoteBackupUnavailable;
+
+  const loadBackupStatus = async () => {
+    if (!canManage) return;
+    setBackupStatusLoading(true);
+    try {
+      const result = await apiRequest("GET", "/api/backup/status");
+      if (!result.ok) throw new Error("Status de backup indisponível.");
+      setBackupStatus((await result.json()) as BackupStatus);
+    } catch {
+      setBackupStatus(null);
+    } finally {
+      setBackupStatusLoading(false);
+    }
+  };
 
   const loadHistory = async () => {
     if (!canManage) return;
@@ -63,7 +90,10 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
   };
 
   useEffect(() => {
-    if (open) loadHistory();
+    if (open && canManage) {
+      void loadBackupStatus();
+      void loadHistory();
+    }
   }, [open, canManage]);
 
   const requireAccess = () => {
@@ -105,6 +135,10 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
 
   const saveSql = async () => {
     if (!requireAccess()) return;
+    if (remoteBackupUnavailable) {
+      setMessage(backupStatus?.backup?.message || "Backup SQL local indisponível para o banco remoto.");
+      return;
+    }
     setBusy("save");
     setMessage("");
     try {
@@ -137,6 +171,10 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
 
   const importSql = async (file: File) => {
     if (!requireAccess()) return;
+    if (remoteBackupUnavailable) {
+      setMessage(backupStatus?.backup?.message || "Importação SQL local bloqueada para o banco remoto.");
+      return;
+    }
     setBusy("load");
     setMessage("");
     setComparison(undefined);
@@ -161,6 +199,10 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
 
   const restore = async (filename: string) => {
     if (!requireAccess()) return;
+    if (remoteBackupUnavailable) {
+      setMessage(backupStatus?.backup?.message || "Restauração SQL local bloqueada para o banco remoto.");
+      return;
+    }
     if (!window.confirm(`Restaurar a versão ${filename}? Um backup do estado atual será criado antes da restauração.`)) return;
     setBusy(`restore:${filename}`);
     setMessage("");
@@ -209,18 +251,20 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
 
             <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-4 space-y-4">
               <div className="grid grid-cols-2 gap-2">
-                <Button disabled={!canManage || !!busy} onClick={saveSql} className="h-11 bg-cyan-400 text-black hover:bg-cyan-300">
+                <Button disabled={backupActionsDisabled} onClick={saveSql} className="h-11 bg-cyan-400 text-black hover:bg-cyan-300">
                   {busy === "save" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Salvar Banco SQL
                 </Button>
                 <>
                   <input ref={fileInputRef} type="file" accept=".sql,text/plain" className="hidden" onChange={(event) => event.target.files?.[0] && importSql(event.target.files[0])} />
-                  <Button disabled={!canManage || !!busy} onClick={() => fileInputRef.current?.click()} variant="outline" className="h-11 border-orange-400/30 text-orange-300 hover:bg-orange-400/10">
+                  <Button disabled={backupActionsDisabled} onClick={() => fileInputRef.current?.click()} variant="outline" className="h-11 border-orange-400/30 text-orange-300 hover:bg-orange-400/10">
                     {busy === "load" ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />} Carregar Banco SQL
                   </Button>
                 </>
               </div>
 
-              {!canManage && <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-3 text-xs text-yellow-200">O controle permanece visível na Landing Page e em toda a aplicação, mas operações de banco exigem autenticação.</div>}
+              {!canManage && <div className="rounded-xl border border-yellow-400/20 bg-yellow-400/5 p-3 text-xs text-yellow-200">Operações de backup e restauração são restritas ao proprietário do sistema.</div>}
+              {remoteBackupUnavailable && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">{backupStatus?.backup?.message || "O banco principal é remoto; backups SQL locais não são uma cópia completa e a restauração está bloqueada."}</div>}
+              {canManage && !backupStatusLoading && !backupStatus && <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-100">Não foi possível verificar a fonte do banco. As operações SQL permanecem bloqueadas por segurança.</div>}
               {message && <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-xs text-zinc-300">{message}</div>}
 
               {comparison && (
@@ -252,7 +296,7 @@ export default function DatabaseControl({ embedded = false }: DatabaseControlPro
                         <div className="truncate text-xs font-medium text-zinc-200">{backup.name}</div>
                         <div className="text-[10px] text-zinc-500">{new Date(backup.createdAt).toLocaleString("pt-BR")} · {backup.sizeKb} KB · {backup.totalRows.toLocaleString()} linhas</div>
                       </div>
-                      <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => restore(backup.filename)} className="shrink-0 text-zinc-400 hover:text-white" title="Restaurar esta versão">
+                      <Button size="sm" variant="ghost" disabled={!!busy || remoteBackupUnavailable || !canManage} onClick={() => restore(backup.filename)} className="shrink-0 text-zinc-400 hover:text-white" title="Restaurar esta versão">
                         {busy === `restore:${backup.filename}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
                       </Button>
                     </div>

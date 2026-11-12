@@ -12,7 +12,8 @@ namespace AuraLabelPrinter
     class Program
     {
         // URL configurada para o seu domínio real
-        private static string wsUrl = "wss://bbb42672-7fe2-4197-964e-f32951ce4490-00-d4lz4avucqpo.picard.replit.dev/ws/labels";
+        private static readonly string wsUrl = Environment.GetEnvironmentVariable("AURA_LABELS_WS_URL") ?? "wss://integrated-system-1c86.onrender.com/ws/labels";
+        private static readonly string wsToken = (Environment.GetEnvironmentVariable("AURA_LABELS_WS_TOKEN") ?? "").Trim();
 
         static async Task Main(string[] args)
         {
@@ -25,6 +26,9 @@ namespace AuraLabelPrinter
                 {
                     using (var ws = new ClientWebSocket())
                     {
+                        if (string.IsNullOrWhiteSpace(wsToken))
+                            throw new InvalidOperationException("Configure a variável de ambiente AURA_LABELS_WS_TOKEN antes de iniciar o AuraPrinter.");
+                        ws.Options.SetRequestHeader("Authorization", $"Bearer {wsToken}");
                         await ws.ConnectAsync(new Uri(wsUrl), CancellationToken.None);
                         Console.WriteLine("Conectado com sucesso!");
 

@@ -26,13 +26,13 @@ function ensureBackupDir() {
 }
 
 export function getGoogleDriveBackupStatus(): GoogleDriveBackupStatus {
-  if (dbRemote) {
-    return { available: false, lastSuccessfulBackupAt: null, lastErrorMessage: "Backup Google Drive via SQLite bloqueado: o banco remoto é primário; o arquivo local não é uma cópia completa da produção." };
-  }
+  const message = dbRemote
+    ? "Google Drive API/OAuth não configurada. O backup SQLite local está bloqueado porque o banco remoto é a fonte primária."
+    : "Google Drive API/OAuth não configurada. O mecanismo atual grava apenas em pasta local e não comprova sincronização com o Google Drive.";
   return {
-    available: !driveWasUnavailable && lastSuccessfulBackupAt > 0,
-    lastSuccessfulBackupAt: lastSuccessfulBackupAt || null,
-    lastErrorMessage,
+    available: false,
+    lastSuccessfulBackupAt: null,
+    lastErrorMessage: message,
   };
 }
 
