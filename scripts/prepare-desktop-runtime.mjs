@@ -10,7 +10,7 @@ const runtimePackage = {
   type: "module",
   dependencies: rootPackage.dependencies || {},
 };
-await writeFile(path.join("dist", "package.json"), JSON.stringify(runtimePackage, null, 2) + "\\n");
+await writeFile(path.join("dist", "package.json"), JSON.stringify(runtimePackage, null, 2) + "\n");
 const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 execFileSync(npm, ["install", "--prefix", "dist", "--omit=dev", "--package-lock=false", "--no-audit", "--no-fund"], {
   stdio: "inherit",
