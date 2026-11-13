@@ -42,6 +42,13 @@ process.on("beforeExit", (code) => {
 
 process.once("SIGINT", () => shutdown("SIGINT"));
 process.once("SIGTERM", () => shutdown("SIGTERM"));
+const utilityParentPort = (process as any).parentPort;
+utilityParentPort?.on("message", (event: any) => {
+  const message = event?.data;
+  if (message && typeof message === "object" && message.type === "AURA_SHUTDOWN") {
+    shutdown("SIGTERM");
+  }
+});
 
 (async () => {
   try {
@@ -68,13 +75,18 @@ process.once("SIGTERM", () => shutdown("SIGTERM"));
 
     // Open the port immediately so Render can detect the service while the
     // remote database is initializing. /health remains 503 until initApp finishes.
+    const host = process.env.AURA_BIND_HOST || "0.0.0.0";
+    const listenOptions: { port: number; host: string; reusePort?: boolean } = { port, host };
+    if (process.env.AURA_DESKTOP_LOCAL !== "1") listenOptions.reusePort = true;
+
     httpServer.listen(
-      { port, host: "0.0.0.0", reusePort: true },
+      listenOptions,
       () => {
-        log(`serving on port ${port}`);
-        runtimeEvent("server-listening", `Servidor ouvindo na porta ${port}`, {
+        log(`serving on ${host}:${port}`);
+        runtimeEvent("server-listening", `Servidor ouvindo em ${host}:${port}`, {
           phase: "server",
           progress: 20,
+          host,
           port,
         });
       },

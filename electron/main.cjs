@@ -1,16 +1,38 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_DIR = __dirname;
+const USER_DATA_DIR = app.getPath('userData');
+const APP_DATA_DIR = path.join(USER_DATA_DIR, 'aura-data');
 const RUNTIME_DIR = path.resolve(
-  process.env.AURA_RUNTIME_DIR || path.join(process.cwd(), 'runtime')
+  process.env.AURA_RUNTIME_DIR || path.join(USER_DATA_DIR, 'runtime')
 );
-const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-runtime.jsonl');
+const SERVER_ENTRY = path.join(PROJECT_ROOT, 'dist', 'index.js');
+const SERVER_PORT = Number(process.env.AURA_PORT || 5010);
+const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
+const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-electron-runtime.jsonl');
 const runtimeStartedAt = Date.now();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 let runtimeSequence = 0;
 let mainWindow = null;
+let serverProcess = null;
+let serverReady = false;
+let serverStartupError = null;
+let shutdownStarted = false;
+let allowAppQuit = false;
 
 function ensureRuntimeDir() {
   try {
@@ -45,15 +67,145 @@ function writeLocalRuntime(event, message, data = {}) {
 }
 
 function sendRuntimeEvent(event, message, data = {}) {
+  // The runtime event endpoint requires a dedicated MCP OAuth token.
+  // Electron has no such grant, so diagnostics stay in the local JSONL file.
   writeLocalRuntime(event, message, data);
+}
 
-  void fetch('http://127.0.0.1:5010/api/runtime/event', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ event, message, data }),
-  }).catch(() => {
-    // The local event was already persisted. Server forwarding is best-effort.
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function isAuraServerHealthy() {
+  try {
+    const [healthResponse, dbResponse] = await Promise.all([
+      fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(1500) }),
+      fetch(`${SERVER_URL}/api/db/status`, { signal: AbortSignal.timeout(1500) }),
+    ]);
+    if (!healthResponse.ok || !dbResponse.ok) return false;
+    const [health, database] = await Promise.all([
+      healthResponse.json(),
+      dbResponse.json(),
+    ]);
+    return health?.status === 'ok'
+      && health?.service === 'integrated-system'
+      && database?.status === 'online'
+      && database?.provider === 'sqlite-local';
+  } catch {
+    return false;
+  }
+}
+
+async function waitForAuraServer(timeoutMs = 60000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (serverStartupError) throw serverStartupError;
+    if (await isAuraServerHealthy()) {
+      serverReady = true;
+      writeLocalRuntime('local-server-ready', 'Servidor local Aura System pronto', {
+        phase: 'server',
+        port: SERVER_PORT,
+        databaseDirectory: APP_DATA_DIR,
+      });
+      return;
+    }
+    await delay(500);
+  }
+
+  throw new Error(
+    `Servidor local não ficou saudável na porta ${SERVER_PORT} em ${timeoutMs} ms.`
+  );
+}
+
+async function startLocalServer() {
+  if (!Number.isInteger(SERVER_PORT) || SERVER_PORT < 1 || SERVER_PORT > 65535) {
+    throw new Error('A porta local configurada para o Aura System é inválida.');
+  }
+
+  // Reuse an already-running Aura instance rather than launching a duplicate.
+  if (await isAuraServerHealthy()) {
+    serverReady = true;
+    writeLocalRuntime('local-server-reused', 'Servidor Aura System já estava ativo', {
+      phase: 'server',
+      port: SERVER_PORT,
+    });
+    return;
+  }
+
+  if (!fs.existsSync(SERVER_ENTRY)) {
+    throw new Error(`Arquivo do servidor local não encontrado: ${SERVER_ENTRY}`);
+  }
+
+  fs.mkdirSync(APP_DATA_DIR, { recursive: true });
+  ensureRuntimeDir();
+
+  const childEnv = {
+    ...process.env,
+    NODE_ENV: 'production',
+    AURA_DESKTOP_LOCAL: '1',
+    AURA_BIND_HOST: '127.0.0.1',
+    PORT: String(SERVER_PORT),
+    AURA_DATA_DIR: APP_DATA_DIR,
+    AURA_RUNTIME_DIR: RUNTIME_DIR,
+  };
+  delete childEnv.DATABASE_URL;
+  delete childEnv.TURSO_DATABASE_URL;
+  delete childEnv.TURSO_AUTH_TOKEN;
+  delete childEnv.VERCEL;
+  delete childEnv.VERCEL_ENV;
+
+  writeLocalRuntime('local-server-start', 'Iniciando servidor local Aura System', {
+    phase: 'server',
+    port: SERVER_PORT,
+    entry: SERVER_ENTRY,
+    databaseDirectory: APP_DATA_DIR,
   });
+
+  const child = utilityProcess.fork(SERVER_ENTRY, [], {
+    cwd: PROJECT_ROOT,
+    env: childEnv,
+    stdio: 'pipe',
+    serviceName: 'Aura System Local Server',
+  });
+  serverProcess = child;
+
+  child.stdout.on('data', (chunk) => {
+    const message = String(chunk).trim();
+    if (message) writeLocalRuntime('local-server-stdout', message.slice(0, 3000), { phase: 'server' });
+  });
+  child.stderr.on('data', (chunk) => {
+    const message = String(chunk).trim();
+    if (message) writeLocalRuntime('local-server-stderr', message.slice(0, 3000), { phase: 'server' });
+  });
+  child.on('error', (error) => {
+    serverStartupError = new Error(error?.message || error?.report || 'Falha no processo utilitário do servidor.');
+    writeLocalRuntime('local-server-process-error', 'Não foi possível iniciar o servidor local', {
+      phase: 'server',
+      error: { name: error?.name || 'UtilityProcessError', message: error?.message || error?.report },
+    });
+  });
+  child.on('exit', (code) => {
+    if (serverProcess === child) serverProcess = null;
+    const message = `Servidor local encerrou (code=${code}).`;
+    writeLocalRuntime('local-server-exit', message, { phase: 'server', code });
+
+    if (shutdownStarted) {
+      allowAppQuit = true;
+      app.quit();
+      return;
+    }
+
+    if (!serverReady) {
+      serverStartupError = new Error(message);
+      return;
+    }
+
+    dialog.showErrorBox('Aura System', message + '\\n\\nO aplicativo será encerrado para evitar uma tela sem conexão.');
+    allowAppQuit = true;
+    app.quit();
+  });
+
+  await waitForAuraServer();
 }
 
 process.on('uncaughtException', (error) => {
@@ -80,7 +232,7 @@ process.on('unhandledRejection', (reason) => {
   );
 });
 
-writeLocalRuntime('electron-process-start', 'Processo Electron iniciado', {
+if (hasSingleInstanceLock) writeLocalRuntime('electron-process-start', 'Processo Electron iniciado', {
   phase: 'electron',
   progress: 95,
 });
@@ -97,7 +249,8 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Aura System',
-    icon: path.join(PROJECT_ROOT, 'ico.ico'),
+    show: process.env.AURA_AUTOTEST !== '1',
+    icon: path.join(PROJECT_ROOT, 'dist', 'public', 'aura-system-logo.svg'),
     frame: true,
     titleBarStyle: 'default',
     trafficLightPosition: { x: 12, y: 12 },
@@ -152,16 +305,16 @@ function createWindow() {
     });
   });
 
-  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
-    sendRuntimeEvent('renderer-console', message, {
+  mainWindow.webContents.on('console-message', (event) => {
+    sendRuntimeEvent('renderer-console', event.message || 'Console message', {
       phase: 'renderer-console',
-      level,
-      line,
-      sourceId,
+      level: event.level,
+      line: event.lineNumber,
+      sourceId: event.sourceId,
     });
   });
 
-  mainWindow.loadURL('http://localhost:5010').catch((error) => {
+  mainWindow.loadURL(SERVER_URL).catch((error) => {
     sendRuntimeEvent('electron-load-error', 'Falha ao carregar Aura System', {
       phase: 'electron',
       error: {
@@ -173,7 +326,7 @@ function createWindow() {
 
     dialog.showErrorBox(
       'Aura System',
-      'Não foi possível conectar ao servidor local na porta 5010.\n\n' +
+      'Não foi possível conectar ao servidor local na porta ' + SERVER_PORT + '.\n\n' +
         error.message
     );
   });
@@ -187,12 +340,16 @@ function createWindow() {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return;
   sendRuntimeEvent('electron-ready', 'Electron ficou pronto', {
     phase: 'electron',
     progress: 96,
   });
 
+  // The server keeps its bundled static assets in the app directory and
+  // stores mutable SQLite/runtime/upload data in the user's writable profile.
+  await startLocalServer();
   createWindow();
 
   app.on('activate', () => {
@@ -203,7 +360,7 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 }).catch((error) => {
-  sendRuntimeEvent('electron-ready-error', 'Falha no app.whenReady()', {
+  sendRuntimeEvent('electron-ready-error', 'Falha ao iniciar o aplicativo local', {
     phase: 'electron',
     error: {
       name: error?.name,
@@ -211,13 +368,46 @@ app.whenReady().then(() => {
       stack: error?.stack,
     },
   });
+  dialog.showErrorBox('Aura System', `Não foi possível iniciar o servidor local.\\n\\n${error.message}`);
+  allowAppQuit = true;
+  app.quit();
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   sendRuntimeEvent('electron-before-quit', 'Electron iniciando encerramento', {
     phase: 'shutdown',
     progress: 100,
   });
+
+  if (allowAppQuit || !serverProcess) return;
+  event.preventDefault();
+  if (shutdownStarted) return;
+
+  shutdownStarted = true;
+  writeLocalRuntime('local-server-stop', 'Encerrando servidor local Aura System', {
+    phase: 'shutdown',
+    port: SERVER_PORT,
+  });
+  serverProcess.once('exit', () => {
+    serverProcess = null;
+    allowAppQuit = true;
+    app.quit();
+  });
+  try {
+    serverProcess.postMessage({ type: 'AURA_SHUTDOWN' });
+  } catch {
+    serverProcess.kill();
+  }
+
+  const forcedStop = setTimeout(() => {
+    if (serverProcess) {
+      serverProcess.kill();
+      serverProcess = null;
+    }
+    allowAppQuit = true;
+    app.quit();
+  }, 10000);
+  forcedStop.unref();
 });
 
 app.on('window-all-closed', () => {

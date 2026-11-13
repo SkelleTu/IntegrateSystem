@@ -342,13 +342,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    this.logAction(`Login/Busca usuário: ${username}`);
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
+    const normalizedUsername = String(username ?? "").trim().toLocaleLowerCase("en-US");
+    if (!normalizedUsername) return undefined;
+
+    this.logAction("Login/Busca usuário: [normalized username]");
+    const matches = await db.select().from(users)
+      .where(sql`LOWER(TRIM(${users.username})) = ${normalizedUsername}`)
+      .limit(2);
+
+    // Fail closed if legacy data contains ambiguous case/space variants.
+    if (matches.length > 1) {
+      console.warn("[AUTH] Ambiguous normalized username lookup; refusing authentication.");
+      return undefined;
+    }
+    return matches[0];
   }
 
   async createUser(user: InsertUser): Promise<User> {
-    this.logAction(`Novo usuário cadastrado: ${user.username}`);
+    const normalizedUsername = String(user.username ?? "").trim().toLocaleLowerCase("en-US");
+    if (!normalizedUsername) throw new Error("Nome de usuário inválido.");
+    if (await this.getUserByUsername(normalizedUsername)) {
+      throw new Error("Nome de usuário já cadastrado.");
+    }
+    user = { ...user, username: normalizedUsername };
+    this.logAction("Novo usuário cadastrado: [normalized username]");
     const sharedUserId = await nextSharedId(users);
     return await dualWrite(async (database) => {
       const email = String((user as any).email || `aura-user-${sharedUserId}@localhost.invalid`).trim();

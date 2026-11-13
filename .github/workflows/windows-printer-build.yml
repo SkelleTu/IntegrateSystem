@@ -11,6 +11,16 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/windows-printer-build.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "attached_assets/windows_app/AuraPrinter/**"
+      - "electron/**"
+      - "electron-builder.config.json"
+      - "forge.config.js"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/windows-printer-build.yml"
   workflow_dispatch:
 
 permissions:
@@ -30,7 +40,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install Aura System dependencies
-        run: npm install --include=dev --no-audit --no-fund
+        run: npm ci --include=dev --no-audit --no-fund
       - name: Build Aura System Electron desktop app
         run: npm run build:electron
       - name: Publish AuraPrinter

@@ -500,7 +500,7 @@ export default function Cashier() {
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
 
-  const isAdmin = (register?.userId === 1) || true;
+  const isAdmin = user?.role === "admin" || user?.role === "owner";
 
   const adjustMutation = useMutation({
     mutationFn: async (amount: number) => {

@@ -33,6 +33,12 @@ async function waitForHealth() {
 
 await waitForHealth();
 
+// Public database health must not expose the authenticated operator's last action.
+const publicDbStatus = await expectStatus(await request("/api/db/status"), 200, "public-db-status");
+assert.equal(publicDbStatus.provider, "sqlite-local");
+assert.equal(Object.hasOwn(publicDbStatus, "lastAction"), false, "public database status leaked lastAction");
+summary.push({ test: "public-db-status-activity-metadata-private", status: "passed" });
+
 // Create a disposable tenant and administrator in the isolated SQLite database.
 const registration = await request("/api/public/register", {
   method: "POST",
@@ -55,7 +61,7 @@ assert.equal(registrationData.ok, true);
 const login = await request("/api/auth/login", {
   method: "POST",
   headers: { "content-type": "application/json" },
-  body: JSON.stringify({ username, password }),
+  body: JSON.stringify({ username: username.toUpperCase(), password }),
 });
 assert.equal(login.status, 200, `login failed: ${await login.text()}`);
 const setCookies = typeof login.headers.getSetCookie === "function"

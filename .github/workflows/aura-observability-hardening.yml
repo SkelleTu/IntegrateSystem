@@ -8,7 +8,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  actions: read
+  contents: read
 
 concurrency:
   group: aura-observability-${{ github.ref }}
@@ -24,21 +25,149 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
-      - name: Commit synchronized lockfile
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "push" ] && ! git diff --quiet -- package-lock.json; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package-lock.json
-            git commit -m "chore(ci): synchronize package lock"
-            git push
-          fi
+      - name: Audit high and critical vulnerabilities
+        run: npm audit --audit-level=high
       - run: npm run check
       - run: npm run test:session-store
       - run: npm run test:neon-session-store
       - run: npm run build
+      - name: Validate Electron entrypoints
+        run: |
+          node --check electron/main.cjs
+          node --check electron/preload.cjs
+      - name: Smoke test bundled Electron Node backend
+        run: npm run test:electron-backend
       - run: node scripts/verify-db-schema.mjs
       - run: node scripts/verify-observability.mjs
+
+  windows-build:
+    name: Build Windows portable package with native dependencies
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies for native Windows x64
+        run: npm ci --no-audit --no-fund
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Build Windows desktop package
+        run: npm run build:electron
+      - name: Verify packaged Windows native dependencies
+        shell: pwsh
+        run: |
+          $appRoot = Join-Path $PWD 'dist/win-unpacked/resources/app'
+          $manifest = Join-Path $appRoot 'package.json'
+          if (-not (Test-Path $manifest)) { throw 'Packaged app manifest is missing.' }
+          $package = Get-Content $manifest -Raw | ConvertFrom-Json
+          if ($package.main -ne 'electron/main.cjs') { throw "Unexpected Electron main entry: $($package.main)" }
+
+          foreach ($relative in @(
+            'electron/main.cjs',
+            'dist/index.js',
+            'node_modules/rollup/package.json',
+            'node_modules/@rollup/rollup-win32-x64-msvc/package.json',
+            'node_modules/@esbuild/win32-x64/package.json',
+            'node_modules/express/package.json'
+          )) {
+            $path = Join-Path $appRoot $relative
+            if (-not (Test-Path $path)) { throw "Required packaged runtime file missing: $relative" }
+          }
+          Write-Host 'Windows package layout and native Rollup binding verified.'
+      - name: Publish Windows portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-system-windows-portable
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-runtime-smoke:
+    name: Windows packaged runtime smoke
+    needs: windows-build
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/update-electron-desktop-toolchain' }}
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download portable Windows executable
+        uses: actions/download-artifact@v4
+        with:
+          name: aura-system-windows-portable
+          run-id: ${{ github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifact
+
+      - name: Launch packaged app and verify local backend
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path artifact -Filter '*.exe' | Select-Object -First 1
+          if (-not $exe) { throw 'Portable Aura System executable was not found.' }
+
+          $env:AURA_AUTOTEST = '1'
+          $env:AURA_PORT = '5119'
+          $env:SESSION_SECRET = 'ci-only-aura-windows-smoke-session-secret'
+          $env:AURA_RUNTIME_DIR = Join-Path $env:RUNNER_TEMP 'aura-runtime'
+          New-Item -ItemType Directory -Force -Path $env:AURA_RUNTIME_DIR | Out-Null
+          $stdoutLog = Join-Path $env:RUNNER_TEMP 'aura-electron-stdout.log'
+          $stderrLog = Join-Path $env:RUNNER_TEMP 'aura-electron-stderr.log'
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu --enable-logging --v=1' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
+          $healthy = $false
+          try {
+            $deadline = (Get-Date).AddSeconds(180)
+            while ((Get-Date) -lt $deadline) {
+              try {
+                $health = Invoke-RestMethod -Uri 'http://127.0.0.1:5119/health' -TimeoutSec 2
+                if ($health.status -eq 'ok' -and $health.service -eq 'integrated-system') {
+                  $healthy = $true
+                  break
+                }
+              } catch {}
+              Start-Sleep -Milliseconds 500
+            }
+
+            if (-not $healthy) {
+              Write-Host 'Packaged app startup diagnostics:'
+              Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host (Get-Content -Path $_.FullName -Raw)
+              }
+              Get-Content -Path $stdoutLog,$stderrLog -ErrorAction SilentlyContinue | Write-Host
+              throw 'Packaged Windows app did not start its local backend.'
+            }
+
+            Start-Sleep -Seconds 3
+            $events = foreach ($file in (Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Filter '*.jsonl' -Recurse -File -ErrorAction SilentlyContinue)) {
+              Get-Content -Path $file.FullName | ForEach-Object {
+                try { $_ | ConvertFrom-Json } catch {}
+              }
+            }
+            $mainStarts = @($events | Where-Object { $_.event -eq 'electron-process-start' })
+            if ($mainStarts.Count -ne 1) { throw "Expected one Electron main process, found $($mainStarts.Count)." }
+
+            $db = Invoke-RestMethod -Uri 'http://127.0.0.1:5119/api/db/status' -TimeoutSec 5
+            if ($db.provider -ne 'sqlite-local') { throw "Expected isolated SQLite, got $($db.provider)." }
+            if ($db.PSObject.Properties.Name -contains 'lastAction') { throw 'Public database status leaked operator activity.' }
+
+            $page = Invoke-WebRequest -Uri 'http://127.0.0.1:5119/' -TimeoutSec 5
+            if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') {
+              throw 'Packaged SPA did not serve the application shell.'
+            }
+
+            $cors = Invoke-WebRequest -Uri 'http://127.0.0.1:5119/api/health' -Headers @{ Origin = 'https://attacker.example' } -TimeoutSec 5
+            if ($cors.Headers['Access-Control-Allow-Origin'] -eq 'https://attacker.example') {
+              throw 'Desktop API accepted an untrusted CORS origin.'
+            }
+
+            Write-Host 'Windows portable executable: single main process, local API, isolated SQLite, SPA and CORS passed.'
+          } finally {
+            if ($process -and -not $process.HasExited) {
+              taskkill /PID $process.Id /T /F | Out-Null
+            }
+            Get-Process -Name 'Aura System' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          }

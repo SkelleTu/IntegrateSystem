@@ -9,7 +9,8 @@ import * as pgSchema from "../shared/pg-schema.js";
 import { getTableConfig } from "drizzle-orm/pg-core";
 
 // ─── 1. SQLite Local via sql.js (WASM) ─────────────────────────────────────────
-const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
+const dataDir = path.resolve(process.env.AURA_DATA_DIR || process.cwd());
+const sqliteFile = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(dataDir, "sqlite.db");
 console.log("[DB] sqliteFile=", sqliteFile, "exists=", fs.existsSync(sqliteFile), "size=", fs.existsSync(sqliteFile) ? fs.statSync(sqliteFile).size : 0);
 
 // Initialize sql.js database
