@@ -83,7 +83,8 @@ try {
   assert.equal(pageResponse.status, 200);
   const html = await pageResponse.text();
   assert.match(html, /<div[^>]+id=["']root["']/i);
-  console.log("Electron Node backend: packaged SPA static route passed.");
+  assert.match(html, /ws:\/\/127\\.0\\.0\\.1:\*/);
+  console.log("Electron Node backend: packaged SPA static route and loopback CSP passed.");
 } finally {
   if (child.exitCode === null) {
     child.kill("SIGTERM");
