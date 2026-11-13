@@ -122,10 +122,14 @@ async function startLocalServer() {
   const childEnv = {
     ...process.env,
     NODE_ENV: 'production',
+    AURA_DESKTOP_LOCAL: '1',
     PORT: String(SERVER_PORT),
     AURA_DATA_DIR: USER_DATA_DIR,
     AURA_RUNTIME_DIR: RUNTIME_DIR,
   };
+  delete childEnv.DATABASE_URL;
+  delete childEnv.TURSO_DATABASE_URL;
+  delete childEnv.TURSO_AUTH_TOKEN;
   delete childEnv.VERCEL;
   delete childEnv.VERCEL_ENV;
 
