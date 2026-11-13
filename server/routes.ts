@@ -236,8 +236,9 @@ export async function registerRoutes(
       const configuredOperator = operatorUsername
         ? await storage.getUserByUsername(operatorUsername)
         : null;
-      const tokenOperator = tokenSubject
-        ? await storage.getUser(Number(tokenSubject)).catch(() => undefined)
+      const tokenSubjectId = tokenSubject && /^\d+$/.test(tokenSubject) ? Number(tokenSubject) : null;
+      const tokenOperator = tokenSubjectId !== null && Number.isSafeInteger(tokenSubjectId)
+        ? await storage.getUser(tokenSubjectId).catch(() => undefined)
         : null;
       const operator = tokenOperator || configuredOperator;
       if (!operator || !["admin", "owner"].includes(String(operator.role).toLowerCase())) {
