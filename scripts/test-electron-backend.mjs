@@ -19,6 +19,7 @@ const childEnv = {
   ...process.env,
   ELECTRON_RUN_AS_NODE: "1",
   NODE_ENV: "production",
+  AURA_DESKTOP_LOCAL: "1",
   PORT: String(port),
   SESSION_SECRET: "ci-only-aura-electron-smoke-session-secret",
   AURA_DATA_DIR: dataDir,
