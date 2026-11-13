@@ -1,7 +1,6 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { spawn } = require('child_process');
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_DIR = __dirname;
@@ -125,7 +124,6 @@ async function startLocalServer() {
 
   const childEnv = {
     ...process.env,
-    ELECTRON_RUN_AS_NODE: '1',
     NODE_ENV: 'production',
     PORT: String(SERVER_PORT),
     AURA_DATA_DIR: USER_DATA_DIR,
@@ -141,11 +139,11 @@ async function startLocalServer() {
     databaseDirectory: USER_DATA_DIR,
   });
 
-  const child = spawn(process.execPath, [SERVER_ENTRY], {
+  const child = utilityProcess.fork(SERVER_ENTRY, [], {
     cwd: PROJECT_ROOT,
     env: childEnv,
-    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
-    windowsHide: true,
+    stdio: 'pipe',
+    serviceName: 'Aura System Local Server',
   });
   serverProcess = child;
 
@@ -158,15 +156,15 @@ async function startLocalServer() {
     if (message) writeLocalRuntime('local-server-stderr', message.slice(0, 3000), { phase: 'server' });
   });
   child.on('error', (error) => {
-    serverStartupError = error;
+    serverStartupError = new Error(error?.message || error?.report || 'Falha no processo utilitário do servidor.');
     writeLocalRuntime('local-server-process-error', 'Não foi possível iniciar o servidor local', {
       phase: 'server',
-      error: { name: error?.name, message: error?.message },
+      error: { name: error?.name || 'UtilityProcessError', message: error?.message || error?.report },
     });
   });
-  child.on('exit', (code, signal) => {
+  child.on('exit', (code) => {
     if (serverProcess === child) serverProcess = null;
-    const message = `Servidor local encerrou (code=${code}, signal=${signal || 'none'}).`;
+    const message = `Servidor local encerrou (code=${code}).`;
     writeLocalRuntime('local-server-exit', message, { phase: 'server', code, signal });
 
     if (shutdownStarted) {
@@ -371,17 +369,15 @@ app.on('before-quit', (event) => {
     allowAppQuit = true;
     app.quit();
   });
-  if (serverProcess.connected) {
-    serverProcess.send({ type: 'AURA_SHUTDOWN' }, (error) => {
-      if (error && serverProcess) serverProcess.kill('SIGTERM');
-    });
-  } else {
-    serverProcess.kill('SIGTERM');
+  try {
+    serverProcess.postMessage({ type: 'AURA_SHUTDOWN' });
+  } catch {
+    serverProcess.kill();
   }
 
   const forcedStop = setTimeout(() => {
     if (serverProcess) {
-      serverProcess.kill('SIGKILL');
+      serverProcess.kill();
       serverProcess = null;
     }
     allowAppQuit = true;
