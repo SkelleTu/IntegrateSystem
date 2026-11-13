@@ -1,12 +1,11 @@
-import { execFileSync } from "node:child_process";
+import { execSync } from "node:child_process";
 import { copyFile, readFile, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 const rootPackage = JSON.parse(await readFile("package.json", "utf8"));
 await writeFile(path.join("dist", "package.json"), JSON.stringify(rootPackage, null, 2) + "\n");
 await copyFile("package-lock.json", path.join("dist", "package-lock.json"));
-const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-execFileSync(npm, ["ci", "--prefix", "dist", "--omit=dev", "--no-audit", "--no-fund"], {
+execSync("npm ci --prefix dist --omit=dev --no-audit --no-fund", {
   stdio: "inherit",
   env: { ...process.env, NODE_ENV: "production" },
 });
