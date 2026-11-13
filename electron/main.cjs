@@ -65,12 +65,19 @@ function delay(ms) {
 
 async function isAuraServerHealthy() {
   try {
-    const response = await fetch(`${SERVER_URL}/health`, {
-      signal: AbortSignal.timeout(1500),
-    });
-    if (!response.ok) return false;
-    const health = await response.json();
-    return health?.status === 'ok' && health?.service === 'integrated-system';
+    const [healthResponse, dbResponse] = await Promise.all([
+      fetch(`${SERVER_URL}/health`, { signal: AbortSignal.timeout(1500) }),
+      fetch(`${SERVER_URL}/api/db/status`, { signal: AbortSignal.timeout(1500) }),
+    ]);
+    if (!healthResponse.ok || !dbResponse.ok) return false;
+    const [health, database] = await Promise.all([
+      healthResponse.json(),
+      dbResponse.json(),
+    ]);
+    return health?.status === 'ok'
+      && health?.service === 'integrated-system'
+      && database?.status === 'online'
+      && database?.provider === 'sqlite-local';
   } catch {
     return false;
   }
