@@ -37,9 +37,10 @@ runtimeEvent("server-bootstrap", "Servidor começando a inicialização", {
   progress: 5,
 });
 
+const dataDir = path.resolve(process.env.AURA_DATA_DIR || process.cwd());
 const uploadsPath = process.env.VERCEL
   ? path.join("/tmp", "uploads")
-  : path.join(process.cwd(), "attached_assets", "uploads");
+  : path.join(dataDir, "attached_assets", "uploads");
 
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
