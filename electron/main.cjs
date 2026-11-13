@@ -93,7 +93,7 @@ async function waitForAuraServer(timeoutMs = 60000) {
   }
 
   throw new Error(
-    `Servidor local não ficou saudável na porta ${SERVER_PORT} em ${timeoutMs} ms.` +
+    `Servidor local não ficou saudável na porta ${SERVER_PORT} em ${timeoutMs} ms.`
   );
 }
 
