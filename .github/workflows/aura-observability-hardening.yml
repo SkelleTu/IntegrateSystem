@@ -83,7 +83,8 @@ jobs:
             'dist/index.js',
             'node_modules/rollup/package.json',
             'node_modules/@rollup/rollup-win32-x64-msvc/package.json',
-            'dist/node_modules/express/package.json'
+            'node_modules/@esbuild/win32-x64/package.json',
+            'node_modules/express/package.json'
           )) {
             $path = Join-Path $appRoot $relative
             if (-not (Test-Path $path)) { throw "Required packaged runtime file missing: $relative" }
