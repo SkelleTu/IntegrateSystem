@@ -35,7 +35,7 @@ await access(dataDir, constants.W_OK);
 const child = spawn(electronBinary, [serverEntry], {
   cwd: root,
   env: childEnv,
-  stdio: ["ignore", "pipe", "pipe", "ipc"],
+  stdio: ["ignore", "pipe", "pipe"],
 });
 let output = "";
 child.stdout.on("data", chunk => { output = (output + chunk.toString()).slice(-12000); });
@@ -79,8 +79,7 @@ try {
   console.log("Electron Node backend: packaged SPA static route passed.");
 } finally {
   if (child.exitCode === null) {
-    if (child.connected) child.send({ type: "AURA_SHUTDOWN" });
-    else child.kill("SIGTERM");
+    child.kill("SIGTERM");
     await Promise.race([
       new Promise(resolve => child.once("exit", resolve)),
       new Promise(resolve => setTimeout(resolve, 12000)),
