@@ -26,7 +26,7 @@ function redact(value: unknown): unknown {
 const enabled = !process.env.VERCEL && process.env.AURA_RUNTIME_DISABLED !== "1";
 const runtimeDir = process.env.AURA_RUNTIME_DIR
   ? path.resolve(process.env.AURA_RUNTIME_DIR)
-  : path.join(process.cwd(), "runtime");
+  : path.join(process.env.AURA_DATA_DIR || process.cwd(), "runtime");
 
 const statusFile = path.join(runtimeDir, "aura-runtime.json");
 const eventsFile = path.join(runtimeDir, "aura-runtime.jsonl");
