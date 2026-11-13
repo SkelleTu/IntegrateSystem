@@ -87,7 +87,9 @@ jobs:
           $env:SESSION_SECRET = 'ci-only-aura-windows-smoke-session-secret'
           $env:AURA_RUNTIME_DIR = Join-Path $env:RUNNER_TEMP 'aura-runtime'
           New-Item -ItemType Directory -Force -Path $env:AURA_RUNTIME_DIR | Out-Null
-          $process = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru
+          $stdoutLog = Join-Path $env:RUNNER_TEMP 'aura-electron-stdout.log'
+          $stderrLog = Join-Path $env:RUNNER_TEMP 'aura-electron-stderr.log'
+          $process = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu --enable-logging --v=1' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
           $healthy = $false
           try {
             $deadline = (Get-Date).AddSeconds(120)
@@ -107,7 +109,9 @@ jobs:
               Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
                 Write-Host (Get-Content -Path $_.FullName -Raw)
               }
-              Get-Process | Where-Object { $_.ProcessName -match 'Aura|electron' } | Format-Table -AutoSize | Out-String | Write-Host
+              Get-ChildItem -Path $env:APPDATA -Filter 'aura-electron-runtime.jsonl' -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object { Write-Host (Get-Content -Path $_.FullName -Raw) }
+              Get-Content -Path $stdoutLog,$stderrLog -ErrorAction SilentlyContinue | Write-Host
+              Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'Aura|electron' } | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | Format-List | Out-String | Write-Host
               throw 'Packaged Windows app did not start its local backend.'
             }
 
