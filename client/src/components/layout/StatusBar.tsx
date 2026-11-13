@@ -30,16 +30,14 @@ export function StatusBar() {
   const [time, setTime] = useState(new Date());
   const [displayAction, setDisplayAction] = useState<string>("Sistema ocioso");
 
-  const { data: dbStatus } = useQuery<DBStatus>({
+  const { data: dbStatus, isError: dbStatusError } = useQuery<DBStatus>({
     queryKey: ["/api/db/status"],
     refetchInterval: 10000,
-    initialData: { status: "online", message: "Sistema operando normalmente" }
   });
 
-  const { data: googleDriveStatus } = useQuery<GoogleDriveStatus>({
+  const { data: googleDriveStatus, isError: googleDriveError } = useQuery<GoogleDriveStatus>({
     queryKey: ["/api/google-drive/status"],
     refetchInterval: 10000,
-    initialData: { available: true, lastSuccessfulBackupAt: null, lastErrorMessage: null },
   });
 
   useEffect(() => {
@@ -57,8 +55,17 @@ export function StatusBar() {
     }
   };
 
-  const driveUnavailable = googleDriveStatus?.available === false;
-  const driveError = googleDriveStatus?.lastErrorMessage || "O backup do banco não pôde ser sincronizado com o Google Drive.";
+  const driveChecking = !googleDriveStatus && !googleDriveError;
+  const driveUnavailable = !googleDriveStatus || googleDriveStatus.available === false;
+  const driveError = googleDriveStatus?.lastErrorMessage
+    || (googleDriveError ? "Não foi possível consultar a integração do Google Drive." : "Google Drive ainda não foi verificado.");
+  const driveTooltip = driveChecking
+    ? "Verificando a configuração e a disponibilidade do Google Drive..."
+    : driveUnavailable
+      ? driveError
+      : googleDriveStatus.lastSuccessfulBackupAt
+        ? `Último backup confirmado em ${format(new Date(googleDriveStatus.lastSuccessfulBackupAt), "dd/MM/yyyy HH:mm", { locale: ptBR })}.`
+        : "Integração conectada, mas ainda não há backup concluído confirmado.";
 
   return (
     <div className="fixed bottom-0 left-0 w-full h-8 bg-black/80 backdrop-blur-md border-t border-white/10 z-[10000] px-2 md:px-4 flex items-center justify-between text-[10px] uppercase tracking-widest font-bold text-zinc-400 select-none overflow-visible">
@@ -67,13 +74,13 @@ export function StatusBar() {
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="flex items-center gap-1.5 cursor-help shrink-0">
-                <div className={cn("w-2 h-2 rounded-full animate-pulse", getStatusColor(dbStatus?.status || "online"))} />
-                <span className={cn("hidden xs:inline", dbStatus?.status === "online" ? "text-green-500" : dbStatus?.status === "unstable" ? "text-yellow-500" : "text-red-500")}>
-                  {dbStatus?.status === "online" ? "AURA" : dbStatus?.status === "unstable" ? "INSTÁVEL" : "OFFLINE"}
+                <div className={cn("w-2 h-2 rounded-full", dbStatus ? "animate-pulse" : "", getStatusColor(dbStatus?.status || "unknown"))} />
+                <span className={cn("hidden xs:inline", dbStatus?.status === "online" ? "text-green-500" : dbStatus?.status === "unstable" ? "text-yellow-500" : dbStatus ? "text-red-500" : "text-zinc-500")}>
+                  {dbStatus?.status === "online" ? "AURA" : dbStatus?.status === "unstable" ? "INSTÁVEL" : dbStatus ? "OFFLINE" : dbStatusError ? "SEM CONEXÃO" : "VERIFICANDO"}
                 </span>
               </div>
             </TooltipTrigger>
-            <TooltipContent className="bg-zinc-900 border-white/10 text-white text-[10px] p-2"><p>{dbStatus?.message || "Verificando conexão..."}</p></TooltipContent>
+            <TooltipContent className="bg-zinc-900 border-white/10 text-white text-[10px] p-2"><p>{dbStatus?.message || (dbStatusError ? "Não foi possível consultar o banco de dados." : "Verificando conexão...")}</p></TooltipContent>
           </Tooltip>
         </TooltipProvider>
 
@@ -106,21 +113,26 @@ export function StatusBar() {
                 "hidden sm:flex items-center gap-2 border-l pl-3 md:pl-6 overflow-hidden min-w-0 cursor-help",
                 driveUnavailable ? "border-red-500/20" : "border-white/5"
               )}>
-                {driveUnavailable ? (
+                {driveChecking ? (
+                  <>
+                    <Cloud className="w-3 h-3 text-zinc-500 shrink-0" />
+                    <span className="text-[9px] text-zinc-500 truncate">GOOGLE DRIVE VERIFICANDO</span>
+                  </>
+                ) : driveUnavailable ? (
                   <>
                     <CloudOff className="w-3 h-3 text-red-400 shrink-0" />
                     <span className="text-[9px] text-red-400 truncate">GOOGLE DRIVE INDISPONÍVEL</span>
                   </>
                 ) : (
                   <>
-                    <Cloud className="w-3 h-3 text-zinc-500 shrink-0" />
-                    <span className="text-[9px] text-zinc-600 truncate">GOOGLE DRIVE ATIVO</span>
+                    <Cloud className="w-3 h-3 text-green-400 shrink-0" />
+                    <span className="text-[9px] text-green-400 truncate">GOOGLE DRIVE CONECTADO</span>
                   </>
                 )}
               </div>
             </TooltipTrigger>
             <TooltipContent className="bg-zinc-900 border-white/10 text-white text-[10px] p-2 max-w-sm">
-              <p>{driveUnavailable ? driveError : "Backup automático do SQLite sincronizado com o Google Drive."}</p>
+              <p>{driveTooltip}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
