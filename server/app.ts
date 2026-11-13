@@ -81,7 +81,10 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const allowedOrigin = process.env.AURA_DESKTOP_LOCAL === "1"
+    ? `http://127.0.0.1:${process.env.PORT || "5010"}`
+    : "*";
+  res.header("Access-Control-Allow-Origin", allowedOrigin);
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
