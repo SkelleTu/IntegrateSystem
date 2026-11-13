@@ -130,11 +130,13 @@
     "@hono/node-server": "^2.1.8",
     "@fastify/busboy": "^3.2.5",
     "undici": "^6.29.1",
-    "path-to-regexp": "^6.3.0",
     "ajv": "^8.20.0",
     "glob": "^14.0.2",
     "minimatch": "^11.0.8",
     "postcss-selector-parser": "^6.1.5",
-    "esbuild": "^0.25.12"
+    "esbuild": "^0.25.12",
+    "@vercel/node": {
+      "path-to-regexp": "^6.3.0"
+    }
   }
 }
