@@ -3,7 +3,7 @@ name: Aura MCP Full Audit
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/mcp-audit-runtime-status-contract]
   pull_request:
     branches: [main]
     paths:
