@@ -42,6 +42,12 @@ jobs:
       - run: npm run test:session-store
       - run: npm run test:neon-session-store
       - run: npm run build
+      - name: Validate Electron entrypoints
+        run: |
+          node --check electron/main.cjs
+          node --check electron/preload.cjs
+      - name: Smoke test bundled Electron Node backend
+        run: npm run test:electron-backend
       - name: Build Windows desktop package
         run: npm run build:electron
       - name: Publish Windows portable package
