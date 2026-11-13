@@ -144,7 +144,7 @@ async function startLocalServer() {
   const child = spawn(process.execPath, [SERVER_ENTRY], {
     cwd: PROJECT_ROOT,
     env: childEnv,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     windowsHide: true,
   });
   serverProcess = child;
@@ -229,7 +229,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Aura System',
-    icon: path.join(PROJECT_ROOT, 'dist', 'aura-system-logo.svg'),
+    icon: path.join(PROJECT_ROOT, 'dist', 'public', 'aura-system-logo.svg'),
     frame: true,
     titleBarStyle: 'default',
     trafficLightPosition: { x: 12, y: 12 },
@@ -371,7 +371,13 @@ app.on('before-quit', (event) => {
     allowAppQuit = true;
     app.quit();
   });
-  serverProcess.kill('SIGTERM');
+  if (serverProcess.connected) {
+    serverProcess.send({ type: 'AURA_SHUTDOWN' }, (error) => {
+      if (error && serverProcess) serverProcess.kill('SIGTERM');
+    });
+  } else {
+    serverProcess.kill('SIGTERM');
+  }
 
   const forcedStop = setTimeout(() => {
     if (serverProcess) {
