@@ -42,7 +42,9 @@ process.on("beforeExit", (code) => {
 
 process.once("SIGINT", () => shutdown("SIGINT"));
 process.once("SIGTERM", () => shutdown("SIGTERM"));
-process.on("message", (message) => {
+const utilityParentPort = (process as any).parentPort;
+utilityParentPort?.on("message", (event: any) => {
+  const message = event?.data;
   if (message && typeof message === "object" && message.type === "AURA_SHUTDOWN") {
     shutdown("SIGTERM");
   }
