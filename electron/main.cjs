@@ -123,6 +123,7 @@ async function startLocalServer() {
     ...process.env,
     NODE_ENV: 'production',
     AURA_DESKTOP_LOCAL: '1',
+    AURA_BIND_HOST: '127.0.0.1',
     PORT: String(SERVER_PORT),
     AURA_DATA_DIR: USER_DATA_DIR,
     AURA_RUNTIME_DIR: RUNTIME_DIR,
