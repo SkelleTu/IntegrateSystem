@@ -44,5 +44,12 @@ jobs:
       - run: npm run build
       - name: Build Windows desktop package
         run: npm run build:electron
+      - name: Publish Windows portable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: aura-system-windows-portable
+          path: dist/*.exe
+          if-no-files-found: error
+          retention-days: 14
       - run: node scripts/verify-db-schema.mjs
       - run: node scripts/verify-observability.mjs
