@@ -70,6 +70,11 @@ try {
   const dbStatus = await dbResponse.json();
   assert.equal(dbStatus.provider, "sqlite-local");
   assert.equal(Object.hasOwn(dbStatus, "lastAction"), false);
+  assert.equal(dbResponse.headers.get("access-control-allow-origin"), `http://127.0.0.1:${port}`);
+  const crossOrigin = await fetch(`${base}/api/db/status`, {
+    headers: { Origin: "https://untrusted.example" },
+  });
+  assert.notEqual(crossOrigin.headers.get("access-control-allow-origin"), "*");
   await access(path.join(dataDir, "sqlite.db"), constants.R_OK);
   await access(runtimeDir, constants.R_OK);
   console.log("Electron Node backend: health, writable SQLite data path, and isolated status passed.");
