@@ -10,8 +10,9 @@ import initSqlJs from "sql.js";
 import fs from "fs";
 import path from "path";
 
-const SQLITE_FILE = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(process.cwd(), "sqlite.db");
-const BACKUP_DIR = path.join(process.cwd(), "attached_assets", "backups");
+const DATA_DIR = path.resolve(process.env.AURA_DATA_DIR || process.cwd());
+const SQLITE_FILE = process.env.VERCEL ? "/tmp/sqlite.db" : path.join(DATA_DIR, "sqlite.db");
+const BACKUP_DIR = path.join(DATA_DIR, "attached_assets", "backups");
 const AUTO_BACKUP_FILE = path.join(BACKUP_DIR, "auto-backup.json");
 
 const LEGACY_TABLES = [
