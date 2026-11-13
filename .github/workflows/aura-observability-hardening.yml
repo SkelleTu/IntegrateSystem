@@ -85,6 +85,8 @@ jobs:
           $env:AURA_AUTOTEST = '1'
           $env:AURA_PORT = '5119'
           $env:SESSION_SECRET = 'ci-only-aura-windows-smoke-session-secret'
+          $env:AURA_RUNTIME_DIR = Join-Path $env:RUNNER_TEMP 'aura-runtime'
+          New-Item -ItemType Directory -Force -Path $env:AURA_RUNTIME_DIR | Out-Null
           $process = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu' -PassThru
           $healthy = $false
           try {
@@ -100,7 +102,14 @@ jobs:
               Start-Sleep -Milliseconds 500
             }
 
-            if (-not $healthy) { throw 'Packaged Windows app did not start its local backend.' }
+            if (-not $healthy) {
+              Write-Host 'Packaged app startup diagnostics:'
+              Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host (Get-Content -Path $_.FullName -Raw)
+              }
+              Get-Process | Where-Object { $_.ProcessName -match 'Aura|electron' } | Format-Table -AutoSize | Out-String | Write-Host
+              throw 'Packaged Windows app did not start its local backend.'
+            }
 
             $db = Invoke-RestMethod -Uri 'http://127.0.0.1:5119/api/db/status' -TimeoutSec 5
             if ($db.provider -ne 'sqlite-local') { throw "Expected isolated SQLite, got $($db.provider)." }
