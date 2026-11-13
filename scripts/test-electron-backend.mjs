@@ -83,7 +83,7 @@ try {
   assert.equal(pageResponse.status, 200);
   const html = await pageResponse.text();
   assert.match(html, /<div[^>]+id=["']root["']/i);
-  assert.match(html, /ws:\/\/127\\.0\\.0\\.1:\*/);
+  assert.ok(html.includes("ws://127.0.0.1:*"), "desktop WebSocket origin missing from CSP");
   console.log("Electron Node backend: packaged SPA static route and loopback CSP passed.");
 } finally {
   if (child.exitCode === null) {
