@@ -425,7 +425,7 @@ export async function registerRoutes(
     return res.status(report.ok ? 200 : 503).json(report);
   });
 
-  app.get("/api/db/status", async (_req, res) => {
+  app.get("/api/db/status", async (req, res) => {
     if (neonPool) {
       try {
         const startedAt = Date.now();
@@ -435,7 +435,7 @@ export async function registerRoutes(
           provider: "neon-postgresql",
           message: "Conectado ao Neon PostgreSQL",
           latency: Date.now() - startedAt,
-          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          lastAction: req.isAuthenticated?.() ? (storage.getLastAction ? storage.getLastAction() : "Sistema ocioso") : undefined,
           timestamp: Date.now(),
         });
       } catch (error: any) {
@@ -444,7 +444,7 @@ export async function registerRoutes(
           status: "degraded",
           provider: "neon-postgresql",
           message: "Banco de dados remoto indisponível",
-          lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+          lastAction: req.isAuthenticated?.() ? (storage.getLastAction ? storage.getLastAction() : "Sistema ocioso") : undefined,
           timestamp: Date.now(),
         });
       }
@@ -455,7 +455,7 @@ export async function registerRoutes(
       provider: isTurso ? "turso" : "sqlite-local",
       message: isTurso ? "Conectado ao Turso (Cloud DB)" : "Conectado ao SQLite Local",
       latency: 15,
-      lastAction: storage.getLastAction ? storage.getLastAction() : "Sistema ocioso",
+      lastAction: req.isAuthenticated?.() ? (storage.getLastAction ? storage.getLastAction() : "Sistema ocioso") : undefined,
       timestamp: Date.now(),
     });
   });
