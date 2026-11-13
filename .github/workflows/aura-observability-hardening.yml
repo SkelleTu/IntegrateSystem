@@ -49,8 +49,46 @@ jobs:
           node --check electron/preload.cjs
       - name: Smoke test bundled Electron Node backend
         run: npm run test:electron-backend
+      - run: node scripts/verify-db-schema.mjs
+      - run: node scripts/verify-observability.mjs
+
+  windows-build:
+    name: Build Windows portable package with native dependencies
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies for native Windows x64
+        run: npm ci --no-audit --no-fund
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Build Windows desktop package
         run: npm run build:electron
+      - name: Verify packaged Windows native dependencies
+        shell: pwsh
+        run: |
+          $appRoot = Join-Path $PWD 'dist/win-unpacked/resources/app'
+          $manifest = Join-Path $appRoot 'package.json'
+          if (-not (Test-Path $manifest)) { throw 'Packaged app manifest is missing.' }
+          $package = Get-Content $manifest -Raw | ConvertFrom-Json
+          if ($package.main -ne 'electron/main.cjs') { throw "Unexpected Electron main entry: $($package.main)" }
+
+          foreach ($relative in @(
+            'electron/main.cjs',
+            'dist/index.js',
+            'node_modules/rollup/package.json',
+            'node_modules/@rollup/rollup-win32-x64-msvc/package.json',
+            'dist/node_modules/express/package.json'
+          )) {
+            $path = Join-Path $appRoot $relative
+            if (-not (Test-Path $path)) { throw "Required packaged runtime file missing: $relative" }
+          }
+          Write-Host 'Windows package layout and native Rollup binding verified.'
       - name: Publish Windows portable package
         uses: actions/upload-artifact@v4
         with:
@@ -58,15 +96,13 @@ jobs:
           path: dist/*.exe
           if-no-files-found: error
           retention-days: 14
-      - run: node scripts/verify-db-schema.mjs
-      - run: node scripts/verify-observability.mjs
 
   windows-runtime-smoke:
     name: Windows packaged runtime smoke
-    needs: verify
+    needs: windows-build
     if: ${{ github.event_name == 'pull_request' && github.head_ref == 'fix/update-electron-desktop-toolchain' }}
     runs-on: windows-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - name: Download portable Windows executable
         uses: actions/download-artifact@v4
@@ -76,41 +112,11 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: artifact
 
-      - name: Inspect and launch packaged app
+      - name: Launch packaged app and verify local backend
         shell: pwsh
         run: |
           $exe = Get-ChildItem -Path artifact -Filter '*.exe' | Select-Object -First 1
           if (-not $exe) { throw 'Portable Aura System executable was not found.' }
-
-          $sevenZip = 'C:/Program Files/7-Zip/7z.exe'
-          if (Test-Path $sevenZip) {
-            $extractDir = Join-Path $env:RUNNER_TEMP 'aura-unpacked'
-            New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
-            & $sevenZip x $exe.FullName "-o$extractDir" -y | Out-Host
-            if ($LASTEXITCODE -eq 0) {
-              $appManifest = Get-ChildItem -Path $extractDir -Filter package.json -Recurse -File -ErrorAction SilentlyContinue | Where-Object { $_.DirectoryName.EndsWith('/resources/app') -or $_.DirectoryName.EndsWith('\resources\app') } | Select-Object -First 1
-              if ($appManifest) {
-                Write-Host 'Packaged app manifest:'
-                Get-Content -Path $appManifest.FullName -Raw | Write-Host
-                $appRoot = Split-Path $appManifest.FullName -Parent
-                $requiredPaths = @(
-                  [IO.Path]::Combine($appRoot, 'electron', 'main.cjs'),
-                  [IO.Path]::Combine($appRoot, 'dist', 'index.js'),
-                  [IO.Path]::Combine($appRoot, 'dist', 'node_modules', 'express', 'package.json'),
-                  [IO.Path]::Combine($appRoot, 'node_modules', 'express', 'package.json')
-                )
-                foreach ($requiredPath in $requiredPaths) {
-                  Write-Host "$requiredPath exists: $(Test-Path $requiredPath)"
-                }
-              } else {
-                Write-Host '7-Zip extraction completed but resources/app/package.json was not located.'
-              }
-            } else {
-              Write-Host '7-Zip could not inspect the portable SFX archive.'
-            }
-          } else {
-            Write-Host '7-Zip is unavailable; skipping SFX inspection.'
-          }
 
           $env:AURA_AUTOTEST = '1'
           $env:AURA_PORT = '5119'
@@ -122,7 +128,7 @@ jobs:
           $process = Start-Process -FilePath $exe.FullName -ArgumentList '--disable-gpu --enable-logging --v=1' -PassThru -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog
           $healthy = $false
           try {
-            $deadline = (Get-Date).AddSeconds(120)
+            $deadline = (Get-Date).AddSeconds(180)
             while ((Get-Date) -lt $deadline) {
               try {
                 $health = Invoke-RestMethod -Uri 'http://127.0.0.1:5119/health' -TimeoutSec 2
@@ -139,26 +145,37 @@ jobs:
               Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
                 Write-Host (Get-Content -Path $_.FullName -Raw)
               }
-              Get-ChildItem -Path $env:APPDATA -Filter 'aura-electron-runtime.jsonl' -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host (Get-Content -Path $_.FullName -Raw)
-              }
               Get-Content -Path $stdoutLog,$stderrLog -ErrorAction SilentlyContinue | Write-Host
-              Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'Aura|electron' } | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine | Format-List | Out-String | Write-Host
               throw 'Packaged Windows app did not start its local backend.'
             }
 
+            Start-Sleep -Seconds 3
+            $events = foreach ($file in (Get-ChildItem -Path $env:AURA_RUNTIME_DIR -Filter '*.jsonl' -Recurse -File -ErrorAction SilentlyContinue)) {
+              Get-Content -Path $file.FullName | ForEach-Object {
+                try { $_ | ConvertFrom-Json } catch {}
+              }
+            }
+            $mainStarts = @($events | Where-Object { $_.event -eq 'electron-process-start' })
+            if ($mainStarts.Count -ne 1) { throw "Expected one Electron main process, found $($mainStarts.Count)." }
+
             $db = Invoke-RestMethod -Uri 'http://127.0.0.1:5119/api/db/status' -TimeoutSec 5
             if ($db.provider -ne 'sqlite-local') { throw "Expected isolated SQLite, got $($db.provider)." }
+            if ($db.PSObject.Properties.Name -contains 'lastAction') { throw 'Public database status leaked operator activity.' }
 
             $page = Invoke-WebRequest -Uri 'http://127.0.0.1:5119/' -TimeoutSec 5
             if ($page.StatusCode -ne 200 -or $page.Content -notmatch 'id="root"') {
               throw 'Packaged SPA did not serve the application shell.'
             }
 
-            Write-Host 'Windows portable executable: backend, SQLite and SPA startup passed.'
+            $cors = Invoke-WebRequest -Uri 'http://127.0.0.1:5119/api/health' -Headers @{ Origin = 'https://attacker.example' } -TimeoutSec 5
+            if ($cors.Headers['Access-Control-Allow-Origin'] -eq 'https://attacker.example') {
+              throw 'Desktop API accepted an untrusted CORS origin.'
+            }
+
+            Write-Host 'Windows portable executable: single main process, local API, isolated SQLite, SPA and CORS passed.'
           } finally {
-            Get-Process -Name 'Aura System' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
             if ($process -and -not $process.HasExited) {
               taskkill /PID $process.Id /T /F | Out-Null
             }
+            Get-Process -Name 'Aura System' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
           }
