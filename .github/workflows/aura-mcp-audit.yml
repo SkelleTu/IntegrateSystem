@@ -4,6 +4,12 @@ name: Aura MCP Full Audit
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/aura-mcp-audit.yml"
+      - "server/**"
+      - "client/src/lib/webmcp.ts"
   workflow_dispatch:
   schedule:
     - cron: "17 * * * *"
@@ -120,7 +126,7 @@ jobs:
 
           print("1) Runtime and discovery")
           runtime = json_get("/api/runtime/status")
-          assert runtime.get("progress") == 100, runtime
+          assert runtime.get("status") == "ok" and runtime.get("service") == "integrated-system", runtime
           pr = json_get("/.well-known/oauth-protected-resource")
           assert "aura.read" in pr["scopes_supported"] and "aura.execute" in pr["scopes_supported"], pr
           assert pr["resource"] == MCP, pr
