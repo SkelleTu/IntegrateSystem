@@ -35,7 +35,7 @@ await access(dataDir, constants.W_OK);
 const child = spawn(electronBinary, [serverEntry], {
   cwd: root,
   env: childEnv,
-  stdio: ["ignore", "pipe", "pipe"],
+  stdio: ["ignore", "pipe", "pipe", "ipc"],
 });
 let output = "";
 child.stdout.on("data", chunk => { output = (output + chunk.toString()).slice(-12000); });
@@ -68,7 +68,9 @@ try {
   const dbStatus = await dbResponse.json();
   assert.equal(dbStatus.provider, "sqlite-local");
   assert.equal(Object.hasOwn(dbStatus, "lastAction"), false);
-  console.log("Electron Node backend: health and isolated SQLite status passed.");
+  await access(path.join(dataDir, "sqlite.db"), constants.R_OK);
+  await access(runtimeDir, constants.R_OK);
+  console.log("Electron Node backend: health, writable SQLite data path, and isolated status passed.");
 
   const pageResponse = await fetch(base);
   assert.equal(pageResponse.status, 200);
@@ -77,7 +79,8 @@ try {
   console.log("Electron Node backend: packaged SPA static route passed.");
 } finally {
   if (child.exitCode === null) {
-    child.kill("SIGTERM");
+    if (child.connected) child.send({ type: "AURA_SHUTDOWN" });
+    else child.kill("SIGTERM");
     await Promise.race([
       new Promise(resolve => child.once("exit", resolve)),
       new Promise(resolve => setTimeout(resolve, 12000)),
