@@ -54,8 +54,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - name: Install and synchronize dependencies for native Windows x64
-        run: npm install --no-audit --no-fund
+      - name: Install locked dependencies for native Windows x64
+        run: npm ci --no-audit --no-fund
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=moderate
       - name: Build Windows desktop package
