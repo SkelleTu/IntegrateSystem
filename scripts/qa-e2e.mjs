@@ -61,7 +61,7 @@ assert.equal(registrationData.ok, true);
 const login = await request("/api/auth/login", {
   method: "POST",
   headers: { "content-type": "application/json" },
-  body: JSON.stringify({ username, password }),
+  body: JSON.stringify({ username: username.toUpperCase(), password }),
 });
 assert.equal(login.status, 200, `login failed: ${await login.text()}`);
 const setCookies = typeof login.headers.getSetCookie === "function"
