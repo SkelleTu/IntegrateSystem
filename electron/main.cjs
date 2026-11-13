@@ -12,7 +12,7 @@ const RUNTIME_DIR = path.resolve(
 const SERVER_ENTRY = path.join(PROJECT_ROOT, 'dist', 'index.js');
 const SERVER_PORT = Number(process.env.AURA_PORT || 5010);
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
-const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-runtime.jsonl');
+const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-electron-runtime.jsonl');
 const runtimeStartedAt = Date.now();
 let runtimeSequence = 0;
 let mainWindow = null;
@@ -128,6 +128,7 @@ async function startLocalServer() {
     ELECTRON_RUN_AS_NODE: '1',
     NODE_ENV: 'production',
     PORT: String(SERVER_PORT),
+    AURA_DATA_DIR: USER_DATA_DIR,
     AURA_RUNTIME_DIR: RUNTIME_DIR,
   };
   delete childEnv.VERCEL;
@@ -141,7 +142,7 @@ async function startLocalServer() {
   });
 
   const child = spawn(process.execPath, [SERVER_ENTRY], {
-    cwd: USER_DATA_DIR,
+    cwd: PROJECT_ROOT,
     env: childEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -228,7 +229,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Aura System',
-    icon: path.join(PROJECT_ROOT, 'ico.ico'),
+    icon: path.join(PROJECT_ROOT, 'dist', 'aura-system-logo.svg'),
     frame: true,
     titleBarStyle: 'default',
     trafficLightPosition: { x: 12, y: 12 },
@@ -324,9 +325,8 @@ app.whenReady().then(async () => {
     progress: 96,
   });
 
-  // The bundled backend stores its local SQLite database in the user's
-  // writable application-data directory, never in Program Files.
-  process.chdir(USER_DATA_DIR);
+  // The server keeps its bundled static assets in the app directory and
+  // stores mutable SQLite/runtime/upload data in the user's writable profile.
   await startLocalServer();
   createWindow();
 
