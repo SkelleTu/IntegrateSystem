@@ -1,229 +1,145 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Folder, 
-  File, 
-  ChevronRight, 
-  ChevronLeft, 
-  RefreshCw, 
-  AlertCircle, 
-  Play,
-  FileText,
-  Terminal
-} from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { AlertCircle, CheckCircle2, Monitor, RefreshCw, ShieldAlert } from "lucide-react";
 
-interface FileItem {
-  name: string;
-  path: string;
-  isDirectory: boolean;
-  size?: number;
-  extension?: string;
-}
-
-interface FileError {
-  message: string;
-  stack?: string;
-  timestamp: string;
-}
+type RuntimeState =
+  | { kind: "checking"; message: string }
+  | { kind: "ready"; message: string; database: string }
+  | { kind: "browser"; message: string }
+  | { kind: "error"; message: string };
 
 export default function AuraWindows() {
-  const [currentPath, setCurrentPath] = useState(".");
-  const { toast } = useToast();
-  const [logs, setLogs] = useState<string[]>([]);
+  const electronApiAvailable =
+    typeof window !== "undefined" && Boolean((window as any).electronAPI);
+  const [runtime, setRuntime] = useState<RuntimeState>({
+    kind: "checking",
+    message: "Verificando o ambiente local...",
+  });
 
-  const { data: files, isLoading, error, refetch } = useQuery<FileItem[]>({
-    queryKey: ["/api/windows/files", currentPath],
-    queryFn: async () => {
-      const res = await fetch(`/api/windows/files?path=${encodeURIComponent(currentPath)}`);
-      if (!res.ok) throw new Error("Falha ao listar arquivos");
-      return res.json();
+  const refreshRuntime = useCallback(async () => {
+    if (!electronApiAvailable) {
+      setRuntime({
+        kind: "browser",
+        message: "Esta página foi aberta no navegador. O navegador não tem acesso ao disco, aos processos ou aos arquivos locais do Windows.",
+      });
+      return;
     }
-  });
 
-  const { data: errors } = useQuery<FileError[]>({
-    queryKey: ["/api/windows/errors"],
-    refetchInterval: 15000
-  });
+    setRuntime({ kind: "checking", message: "Verificando o servidor desktop e o banco local..." });
 
-  const openFileMutation = useMutation({
-    mutationFn: async (filePath: string) => {
-      const res = await apiRequest("POST", "/api/windows/open", { path: filePath });
-      return res.json();
-    },
-    onSuccess: (data) => {
-      if (data.success) {
-        toast({ title: "Sucesso", description: "Arquivo aberto com sucesso" });
-      } else {
-        toast({ 
-          title: "Erro ao abrir", 
-          description: data.error, 
-          variant: "destructive" 
-        });
+    try {
+      const [healthResponse, databaseResponse] = await Promise.all([
+        fetch("/health", { cache: "no-store" }),
+        fetch("/api/db/status", { cache: "no-store" }),
+      ]);
+
+      if (!healthResponse.ok || !databaseResponse.ok) {
+        throw new Error("O servidor local não respondeu corretamente.");
       }
-    },
-    onError: (err: any) => {
-      toast({ 
-        title: "Erro crítico", 
-        description: err.message, 
-        variant: "destructive" 
+
+      const [health, database] = await Promise.all([
+        healthResponse.json(),
+        databaseResponse.json(),
+      ]);
+
+      if (
+        health.status !== "ok" ||
+        health.service !== "integrated-system" ||
+        database.status !== "online" ||
+        database.provider !== "sqlite-local"
+      ) {
+        throw new Error("O aplicativo abriu, mas o servidor ou o banco SQLite local não passou na verificação.");
+      }
+
+      setRuntime({
+        kind: "ready",
+        message: "Aplicativo desktop ativo; servidor local e banco SQLite responderam.",
+        database: database.provider,
+      });
+    } catch (error) {
+      setRuntime({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Falha ao verificar o runtime Windows.",
       });
     }
-  });
+  }, [electronApiAvailable]);
 
-  const navigateUp = () => {
-    if (currentPath === ".") return;
-    const parts = currentPath.split("/");
-    parts.pop();
-    setCurrentPath(parts.length === 0 ? "." : parts.join("/"));
-  };
+  useEffect(() => {
+    void refreshRuntime();
+  }, [refreshRuntime]);
 
-  const handleItemClick = (item: FileItem) => {
-    if (item.isDirectory) {
-      setCurrentPath(item.path);
-    } else {
-      openFileMutation.mutate(item.path);
-    }
-  };
+  const statusIcon =
+    runtime.kind === "ready" ? CheckCircle2 :
+    runtime.kind === "browser" ? ShieldAlert :
+    runtime.kind === "error" ? AlertCircle :
+    RefreshCw;
+
+  const StatusIcon = statusIcon;
 
   return (
-    <div className="p-6 space-y-6 bg-zinc-950 min-h-screen text-white">
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen space-y-6 bg-zinc-950 p-6 text-white">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight text-primary">Aura Windows Explorer</h1>
-          <p className="text-zinc-400">Gerencie arquivos e monitore erros do sistema desktop.</p>
+          <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-primary">
+            <Monitor className="h-8 w-8" />
+            Aura Windows Runtime
+          </h1>
+          <p className="text-zinc-400">
+            Diagnóstico do aplicativo desktop e de seu servidor local.
+          </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="icon" 
-          onClick={() => refetch()}
-          className="border-zinc-800 hover:bg-zinc-900"
+        <Button
+          variant="outline"
+          onClick={() => void refreshRuntime()}
+          disabled={runtime.kind === "checking"}
+          className="border-zinc-800 text-white hover:bg-zinc-900"
         >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          <RefreshCw className={`mr-2 h-4 w-4 ${runtime.kind === "checking" ? "animate-spin" : ""}`} />
+          Atualizar diagnóstico
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 bg-zinc-900 border-zinc-800">
-          <CardHeader className="border-b border-zinc-800 py-4">
-            <div className="flex items-center gap-2 text-zinc-400 text-sm">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={navigateUp}
-                disabled={currentPath === "."}
-                className="h-8 w-8 p-0"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <span className="font-mono bg-black/50 px-2 py-1 rounded border border-zinc-800">
-                {currentPath}
-              </span>
-            </div>
+      <Alert className="border-zinc-800 bg-zinc-900 text-white">
+        <StatusIcon className={`h-4 w-4 ${runtime.kind === "ready" ? "text-emerald-400" : runtime.kind === "error" ? "text-red-400" : "text-amber-400"}`} />
+        <AlertTitle className="font-bold">
+          {runtime.kind === "ready" ? "Runtime Windows verificado" :
+           runtime.kind === "browser" ? "Navegador web detectado" :
+           runtime.kind === "error" ? "Falha na verificação" :
+           "Verificando runtime"}
+        </AlertTitle>
+        <AlertDescription className="text-zinc-400">{runtime.message}</AlertDescription>
+      </Alert>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card className="border-zinc-800 bg-zinc-900">
+          <CardHeader>
+            <CardTitle className="text-sm text-zinc-300">Ambiente de execução</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-full text-zinc-500">
-                  Carregando arquivos...
-                </div>
-              ) : error ? (
-                <div className="flex flex-col items-center justify-center h-full text-red-400 gap-2">
-                  <AlertCircle className="w-8 h-8" />
-                  <span>Erro ao carregar diretório</span>
-                </div>
-              ) : (
-                <div className="divide-y divide-zinc-800/50">
-                  {files?.map((file) => (
-                    <button
-                      key={file.path}
-                      onClick={() => handleItemClick(file)}
-                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/5 transition-colors text-left group"
-                    >
-                      {file.isDirectory ? (
-                        <Folder className="w-5 h-5 text-blue-400 fill-blue-400/20" />
-                      ) : (
-                        <FileText className="w-5 h-5 text-zinc-400" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                          {file.name}
-                        </p>
-                        {!file.isDirectory && (
-                          <p className="text-xs text-zinc-500">
-                            {(file.size! / 1024).toFixed(1)} KB
-                          </p>
-                        )}
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-zinc-700 group-hover:text-zinc-500" />
-                    </button>
-                  ))}
-                  {files?.length === 0 && (
-                    <div className="p-8 text-center text-zinc-500 italic">
-                      Pasta vazia
-                    </div>
-                  )}
-                </div>
-              )}
-            </ScrollArea>
+          <CardContent className="text-sm text-zinc-400">
+            {electronApiAvailable ? "Electron desktop detectado" : "Aplicação web no navegador"}
           </CardContent>
         </Card>
-
-        <div className="space-y-6">
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Terminal className="w-4 h-4 text-primary" />
-                Console de Erros
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ScrollArea className="h-[300px] rounded border border-zinc-800 bg-black p-4 font-mono text-[10px]">
-                {errors && errors.length > 0 ? (
-                  <div className="space-y-4">
-                    {errors.map((err, i) => (
-                      <div key={i} className="text-red-400 border-l-2 border-red-900 pl-2">
-                        <p className="font-bold">[{new Date(err.timestamp).toLocaleTimeString()}] {err.message}</p>
-                        {err.stack && <pre className="mt-1 opacity-50 overflow-x-auto">{err.stack}</pre>}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-zinc-600 italic">Nenhum erro registrado recentemente...</div>
-                )}
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-zinc-900 border-zinc-800">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Ações Rápidas</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2 border-zinc-800 hover:bg-zinc-800"
-                onClick={() => handleItemClick({ name: "main.js", path: "main.js", isDirectory: false })}
-              >
-                <Play className="w-4 h-4" />
-                Executar main.js
-              </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start gap-2 border-zinc-800 hover:bg-zinc-800"
-                onClick={() => setCurrentPath(".")}
-              >
-                <Folder className="w-4 h-4" />
-                Ir para Raiz
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <Card className="border-zinc-800 bg-zinc-900">
+          <CardHeader>
+            <CardTitle className="text-sm text-zinc-300">Banco de dados</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-zinc-400">
+            {runtime.kind === "ready" ? runtime.database : "Ainda não verificado"}
+          </CardContent>
+        </Card>
       </div>
+
+      {runtime.kind === "browser" && (
+        <Alert className="border-amber-500/20 bg-amber-500/5 text-white">
+          <ShieldAlert className="h-4 w-4 text-amber-400" />
+          <AlertTitle className="font-bold text-amber-300">Acesso local indisponível no navegador</AlertTitle>
+          <AlertDescription className="text-zinc-400">
+            Abra o executável Aura System no Windows para verificar o servidor local, o banco SQLite e os recursos nativos. A versão hospedada não pode navegar nem abrir arquivos do computador.
+          </AlertDescription>
+        </Alert>
+      )}
     </div>
   );
 }
