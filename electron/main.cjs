@@ -237,6 +237,7 @@ function createWindow() {
     minWidth: 900,
     minHeight: 600,
     title: 'Aura System',
+    show: process.env.AURA_AUTOTEST !== '1',
     icon: path.join(PROJECT_ROOT, 'dist', 'public', 'aura-system-logo.svg'),
     frame: true,
     titleBarStyle: 'default',
