@@ -17,7 +17,8 @@
     "test:session-store": "tsx scripts/verify-turso-session-store.ts",
     "db:generate:pg": "drizzle-kit generate --config=drizzle.pg.config.ts",
     "db:push:pg": "drizzle-kit push --config=drizzle.pg.config.ts",
-    "test:neon-session-store": "tsx scripts/verify-neon-session-store.ts"
+    "test:neon-session-store": "tsx scripts/verify-neon-session-store.ts",
+    "test:electron-backend": "node scripts/test-electron-backend.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
