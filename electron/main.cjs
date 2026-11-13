@@ -146,7 +146,7 @@ async function startLocalServer() {
     phase: 'server',
     port: SERVER_PORT,
     entry: SERVER_ENTRY,
-    databaseDirectory: USER_DATA_DIR,
+    databaseDirectory: APP_DATA_DIR,
   });
 
   const child = utilityProcess.fork(SERVER_ENTRY, [], {
