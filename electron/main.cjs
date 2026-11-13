@@ -78,8 +78,6 @@ async function isAuraServerHealthy() {
 
 async function waitForAuraServer(timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
-  let lastError = null;
-
   while (Date.now() < deadline) {
     if (serverStartupError) throw serverStartupError;
     if (await isAuraServerHealthy()) {
@@ -96,7 +94,6 @@ async function waitForAuraServer(timeoutMs = 60000) {
 
   throw new Error(
     `Servidor local não ficou saudável na porta ${SERVER_PORT} em ${timeoutMs} ms.` +
-    (lastError ? ` Último erro: ${lastError.message}` : '')
   );
 }
 
@@ -165,7 +162,7 @@ async function startLocalServer() {
   child.on('exit', (code) => {
     if (serverProcess === child) serverProcess = null;
     const message = `Servidor local encerrou (code=${code}).`;
-    writeLocalRuntime('local-server-exit', message, { phase: 'server', code, signal });
+    writeLocalRuntime('local-server-exit', message, { phase: 'server', code });
 
     if (shutdownStarted) {
       allowAppQuit = true;
@@ -303,7 +300,7 @@ function createWindow() {
 
     dialog.showErrorBox(
       'Aura System',
-      'Não foi possível conectar ao servidor local na porta 5010.\n\n' +
+      'Não foi possível conectar ao servidor local na porta ' + SERVER_PORT + '.\n\n' +
         error.message
     );
   });
