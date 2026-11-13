@@ -14,6 +14,18 @@ const SERVER_PORT = Number(process.env.AURA_PORT || 5010);
 const SERVER_URL = `http://127.0.0.1:${SERVER_PORT}`;
 const RUNTIME_EVENTS_FILE = path.join(RUNTIME_DIR, 'aura-electron-runtime.jsonl');
 const runtimeStartedAt = Date.now();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!hasSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
 let runtimeSequence = 0;
 let mainWindow = null;
 let serverProcess = null;
@@ -220,7 +232,7 @@ process.on('unhandledRejection', (reason) => {
   );
 });
 
-writeLocalRuntime('electron-process-start', 'Processo Electron iniciado', {
+if (hasSingleInstanceLock) writeLocalRuntime('electron-process-start', 'Processo Electron iniciado', {
   phase: 'electron',
   progress: 95,
 });
@@ -329,6 +341,7 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  if (!hasSingleInstanceLock) return;
   sendRuntimeEvent('electron-ready', 'Electron ficou pronto', {
     phase: 'electron',
     progress: 96,
