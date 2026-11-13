@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "tsx server/index.ts",
     "build": "tsx script/build.ts",
-    "build:electron": "npm run build && electron-builder --config electron-builder.config.json --win portable",
+    "build:electron": "npm run build && node scripts/prepare-desktop-runtime.mjs && electron-builder --config electron-builder.config.json --win portable",
     "vercel-build": "npm run build",
     "start": "node dist/index.js",
     "check": "tsc",
@@ -140,4 +140,4 @@
       "path-to-regexp": "^6.3.0"
     }
   }
-}
+}\n
