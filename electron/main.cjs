@@ -5,6 +5,7 @@ const fs = require('fs');
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ELECTRON_DIR = __dirname;
 const USER_DATA_DIR = app.getPath('userData');
+const APP_DATA_DIR = path.join(USER_DATA_DIR, 'aura-data');
 const RUNTIME_DIR = path.resolve(
   process.env.AURA_RUNTIME_DIR || path.join(USER_DATA_DIR, 'runtime')
 );
@@ -92,7 +93,7 @@ async function waitForAuraServer(timeoutMs = 60000) {
       writeLocalRuntime('local-server-ready', 'Servidor local Aura System pronto', {
         phase: 'server',
         port: SERVER_PORT,
-        databaseDirectory: USER_DATA_DIR,
+        databaseDirectory: APP_DATA_DIR,
       });
       return;
     }
@@ -123,7 +124,7 @@ async function startLocalServer() {
     throw new Error(`Arquivo do servidor local não encontrado: ${SERVER_ENTRY}`);
   }
 
-  fs.mkdirSync(USER_DATA_DIR, { recursive: true });
+  fs.mkdirSync(APP_DATA_DIR, { recursive: true });
   ensureRuntimeDir();
 
   const childEnv = {
@@ -132,7 +133,7 @@ async function startLocalServer() {
     AURA_DESKTOP_LOCAL: '1',
     AURA_BIND_HOST: '127.0.0.1',
     PORT: String(SERVER_PORT),
-    AURA_DATA_DIR: USER_DATA_DIR,
+    AURA_DATA_DIR: APP_DATA_DIR,
     AURA_RUNTIME_DIR: RUNTIME_DIR,
   };
   delete childEnv.DATABASE_URL;
