@@ -42,6 +42,11 @@ process.on("beforeExit", (code) => {
 
 process.once("SIGINT", () => shutdown("SIGINT"));
 process.once("SIGTERM", () => shutdown("SIGTERM"));
+process.on("message", (message) => {
+  if (message && typeof message === "object" && message.type === "AURA_SHUTDOWN") {
+    shutdown("SIGTERM");
+  }
+});
 
 (async () => {
   try {
