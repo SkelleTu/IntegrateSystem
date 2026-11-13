@@ -2,7 +2,7 @@ name: Aura Observability Hardening
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/update-electron-desktop-toolchain]
   pull_request:
     branches: [main]
   workflow_dispatch:
