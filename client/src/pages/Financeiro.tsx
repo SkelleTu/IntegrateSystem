@@ -46,7 +46,7 @@ export default function Financeiro() {
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
       const start = new Date(dateRange.start + 'T00:00:00');
-      const end = new Date(dateRange.end + 'T23:59:59');
+      const end = new Date(dateRange.end + 'T23:59:59.999');
       const res = await fetch(`/api/sales?start=${start.toISOString()}&end=${end.toISOString()}`);
       return res.json();
     },
@@ -58,7 +58,7 @@ export default function Financeiro() {
     queryKey: ["/api/transactions", dateRange.start, dateRange.end, businessType],
     queryFn: async () => {
       const start = new Date(dateRange.start + 'T00:00:00');
-      const end = new Date(dateRange.end + 'T23:59:59');
+      const end = new Date(dateRange.end + 'T23:59:59.999');
       const url = `/api/transactions?start=${start.toISOString()}&end=${end.toISOString()}&businessType=${businessType}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erro ao buscar transações");
