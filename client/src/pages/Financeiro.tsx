@@ -142,7 +142,7 @@ export default function Financeiro() {
     const completedSales = (sales || []).filter(s => s.status === "completed");
     
     const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType && t.category !== "vendas" && !String(t.description || "").startsWith("Venda PDV #")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType && t.category !== "vendas" && !String(t.description || "").startsWith("ESTORNO: Venda PDV #")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     
     const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
     
