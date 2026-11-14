@@ -289,3 +289,5 @@
 - [x] Erros de estoque e concorrência no fluxo de venda agora retornam HTTP 409; ticket inexistente retorna 404, sem mascarar conflito operacional como erro interno genérico.
 
 - [x] E2E isolado do commit `ec235bde87fa64baea2fff57f3aaae9edd17556a` passou após a mudança de conclusão atômica de comanda e venda.
+
+- [x] Commit `ec235bde87fa64baea2fff57f3aaae9edd17556a`: Integrated System CI (typecheck/build), E2E isolado, observabilidade, MCP Full Audit e forensic PR checks concluíram com sucesso.
