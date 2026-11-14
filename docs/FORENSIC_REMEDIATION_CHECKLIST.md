@@ -69,6 +69,7 @@
 - [ ] Revisar categoria, ordenação, imagem, disponibilidade e exclusão com dependências.
 - [ ] Validar arredondamento monetário em centavos e quantidade fracionária.
 - [ ] Testar importação/exportação e busca por nome, código e código de barras.
+- [~] Permissões admin/owner adicionadas também à consulta de lotes, histórico de estoque, reposições e verificação de duplicidade. Testes específicos desses novos guards ainda pendentes.
 - [ ] Garantir tenant e permissões em todas as operações.
 
 ## 6. Estoque, lotes, validade e reposição
@@ -249,3 +250,5 @@
 - [~] CI e E2E após estas alterações: em execução/aguardando conclusão; não marcar como validado até os workflows terminarem.
 
 - [x] GitHub Actions `Aura isolated operational E2E` do commit `253347735f96de123801b4019888822246ea0394`: sucesso; incluiu os novos casos de negação para barber.
+
+- [x] Endpoints de custo/rastreabilidade do estoque (`inventory-restocks`, reposições por item, lotes, logs de lote e checagem de duplicidade) agora exigem admin/owner; validar regressão específica no próximo E2E.
