@@ -2549,7 +2549,7 @@ export async function registerRoutes(
         return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
       }
       const enterpriseUsers = await db.select({ id: users.id }).from(users).where(eq(users.enterpriseId, enterpriseId));
-      const allowedUserIds = new Set(enterpriseUsers.map((entry) => Number(entry.id)));
+      const allowedUserIds = new Set(enterpriseUsers.map((entry: any) => Number(entry.id)));
       const allRegisters = await storage.getCashRegisters(filters);
       const registers = allRegisters.filter((register) => allowedUserIds.has(Number(register.userId)));
 
@@ -2596,7 +2596,7 @@ export async function registerRoutes(
       .innerJoin(users, eq(sales.userId, users.id))
       .where(and(...conditions))
       .orderBy(desc(sales.createdAt));
-    res.json(rows.map((row) => row.sale));
+    res.json(rows.map((row: any) => row.sale));
   });
 
   app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
