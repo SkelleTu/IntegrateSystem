@@ -137,6 +137,11 @@ export default function Financeiro() {
     queryKey: ["/api/inventory"],
   });
 
+  const { data: batchStock = [] } = useQuery<any[]>({
+    queryKey: ["/api/products/cashier-items"],
+    staleTime: 15000,
+  });
+
   const financialData = useMemo(() => {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0, finalNetBalance: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
@@ -144,14 +149,16 @@ export default function Financeiro() {
     const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType && t.category !== "vendas" && !String(t.description || "").startsWith("Venda PDV #")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType && t.category !== "vendas" && !String(t.description || "").startsWith("ESTORNO: Venda PDV #")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     
-    const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    const legacyInventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    const batchInventoryValue = batchStock.reduce((sum, item) => sum + (Number(item.costPrice || 0) * Number(item.quantity || 0)), 0);
+    const inventoryValue = legacyInventoryValue + batchInventoryValue;
     
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     
     const totalNet = salesGross + extraIncome - expenses;
     const finalNetBalance = salesGross + extraIncome - expenses - inventoryValue;
     return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
-  }, [sales, transactions, inventory, businessType]);
+  }, [sales, transactions, inventory, batchStock, businessType]);
 
   const onSubmit = (data: any) => {
     transactionMutation.mutate(data);
