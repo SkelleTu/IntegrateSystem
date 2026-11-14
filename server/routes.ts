@@ -1463,7 +1463,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/inventory/:id/restocks", isAuthenticated, async (req, res) => {
+  app.get("/api/inventory/:id/restocks", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const restocks = await storage.getInventoryRestocks(id);
@@ -1474,7 +1474,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/inventory-restocks", isAuthenticated, async (req, res) => {
+  app.get("/api/inventory-restocks", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const restocks = await storage.getAllInventoryRestocks();
       res.json(restocks);
@@ -1587,7 +1587,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/check-duplicate", isAuthenticated, async (req, res) => {
+  app.post("/api/products/check-duplicate", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const dup = await storage.findDuplicateProduct(req.body);
       res.json(dup || null);
@@ -1700,7 +1700,7 @@ export async function registerRoutes(
   });
 
   // Batches
-  app.get("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+  app.get("/api/products/:id/batches", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const b = await storage.getProductBatches(Number(req.params.id));
       res.json(b);
@@ -1770,7 +1770,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/products/:id/logs", isAuthenticated, async (req, res) => {
+  app.get("/api/products/:id/logs", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const logs = await storage.getBatchLogs(Number(req.params.id));
       res.json(logs);
