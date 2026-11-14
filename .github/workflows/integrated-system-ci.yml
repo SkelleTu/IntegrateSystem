@@ -39,6 +39,7 @@ jobs:
       - name: Verify fractional stock migration on PostgreSQL
         run: |
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE public.users (id INTEGER PRIMARY KEY);
           CREATE TABLE public.batches (quantity INTEGER NOT NULL DEFAULT 0);
           CREATE TABLE public.batch_logs (quantity INTEGER NOT NULL);
           CREATE TABLE public.inventory (quantity INTEGER NOT NULL DEFAULT 0);
@@ -51,9 +52,12 @@ jobs:
           INSERT INTO public.inventory_restocks VALUES (6);
           SQL
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/pg/0002_fractional_stock_quantities.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/pg/0003_tutorial_completion.sql
           numeric_columns=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('batches','batch_logs','inventory','inventory_logs','inventory_restocks') AND column_name='quantity' AND data_type='numeric' AND numeric_scale=3")
           test "$numeric_columns" = "5"
           preserved_value=$(psql "$DATABASE_URL" -Atc "SELECT quantity::text FROM public.batches")
           test "$preserved_value" = "10.000"
+          tutorial_column=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='tutorial_completed_at' AND data_type='timestamp without time zone'")
+          test "$tutorial_column" = "1"
       - run: npm run check
       - run: npm run build
