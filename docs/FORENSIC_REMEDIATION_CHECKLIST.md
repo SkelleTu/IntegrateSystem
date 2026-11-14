@@ -301,3 +301,5 @@
 - [x] Financeiro legado: bloqueadas operações administrativas de transações para admins quando há mais de uma empresa; businessType de lançamentos passa a ser derivado do estabelecimento ativo, não do payload.
 
 - [x] Mitigação multiempresa imediata: endpoints de cadastro público, criação de empresa pelo owner e criação por usuário não podem criar um segundo tenant enquanto o isolamento não estiver concluído; resposta 409 TENANT_ISOLATION_REQUIRED.
+
+- [x] A alteração genérica de dados de empresa não pode mais mudar status; ativação passa pela rota dedicada, que também bloqueia uma segunda empresa enquanto tenant isolation não estiver pronta.
