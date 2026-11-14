@@ -607,7 +607,7 @@ export async function registerRoutes(
     const account = await storage.getUser(Number(user.id));
     if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
     if (!account.tutorialCompletedAt) {
-      await storage.updateUser(Number(user.id), { tutorialCompletedAt: new Date() });
+      await storage.updateUser(Number(user.id), { tutorialCompletedAt: new Date().toISOString() });
     }
     return res.json({ completed: true });
   });
