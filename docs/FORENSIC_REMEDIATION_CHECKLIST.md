@@ -41,7 +41,7 @@
 - [ ] Testar acesso horizontal e vertical com matriz completa de papéis, inclusive por chamadas HTTP diretas.
 
 ## 3. Multiempresa / tenant isolation
-- [~] Relatórios de vendas e histórico de caixa agora filtram por usuários da empresa ativa (users.enterpriseId). Tabelas operacionais sem tenant direto continuam bloqueadoras.
+- [~] Relatórios de vendas, histórico de caixa, ajuste de caixa e cancelamento de venda agora verificam users.enterpriseId do registro. Tabelas operacionais sem tenant direto continuam bloqueadoras.
 - [!] Mapear todas as tabelas, índices, relações e queries sem enterpriseId.
 - [!] Definir estratégia de tenant para owner multiempresa e usuário vinculado a uma empresa.
 - [ ] Planejar backfill determinístico dos dados existentes, sem atribuição ambígua.
@@ -295,3 +295,5 @@
 
 - [x] Sales history e cash-register history passam a exigir empresa ativa e filtram registros pelo enterpriseId do usuário proprietário do caixa/venda.
 - [~] Contexto enterpriseId do owner em produção ainda precisa ser confirmado após restabelecer sessão autenticada do Kernel; sem contexto a API falha fechado com HTTP 409.
+
+- [x] Ajuste de saldo de caixa e cancelamento de venda agora retornam 404 quando o registro não pertence à empresa ativa do administrador.
