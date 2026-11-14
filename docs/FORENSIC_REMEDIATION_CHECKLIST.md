@@ -36,7 +36,7 @@
 - [~] Reforçadas rotas administrativas: CRUD de serviços, reset/definição da fila e leitura de vendas, histórico de caixa e transações agora exigem admin/owner. Faltam as demais rotas e escopo tenant.
 - [ ] Garantir que funcionário de caixa só execute operações operacionais necessárias.
 - [~] Operações administrativas principais já possuem guards; endpoint legado de emissão fiscal fictícia foi desativado. Falta auditoria rota a rota.
-- [ ] Testar IDOR/BOLA: trocar IDs de usuário, produto, lote, venda, caixa, transação, empresa e documento.
+- [~] Rotas públicas de comanda têm rate limit e validação, mas ainda precisam de token de posse não enumerável para impedir alteração de ticket de terceiros por ID sequencial.
 - [x] E2E comprovou que usuário barber recebe 403 ao criar serviço, resetar fila, ler vendas e ler transações financeiras.
 - [ ] Testar acesso horizontal e vertical com matriz completa de papéis, inclusive por chamadas HTTP diretas.
 
@@ -267,3 +267,5 @@
 - [x] Corrigida configuração TLS da transmissão fiscal: certificado do servidor SEFAZ agora é validado; resposta HTTP fora de 2xx falha; certificado A1 sem chave/certificado válidos é rejeitado; UF sem endpoint configurado não usa fallback incorreto para SP.
 
 - [x] Rotas fiscais deixam de usar empresa 1 como fallback: exigem contexto ativo de empresa para GET/POST de configurações, logs, histórico e emissão.
+
+- [x] Preservado o fluxo público de autoatendimento em /cart: o endpoint de itens não exige login do cliente, mas valida JSON, IDs e quantidades, usa nome/preço do catálogo no servidor e aplica rate limit. A criação/consulta pública de senhas também ganhou rate limit e verificação de serviço ativo.
