@@ -41,6 +41,7 @@
 - [ ] Testar acesso horizontal e vertical com matriz completa de papéis, inclusive por chamadas HTTP diretas.
 
 ## 3. Multiempresa / tenant isolation
+- [~] Relatórios de vendas e histórico de caixa agora filtram por usuários da empresa ativa (users.enterpriseId). Tabelas operacionais sem tenant direto continuam bloqueadoras.
 - [!] Mapear todas as tabelas, índices, relações e queries sem enterpriseId.
 - [!] Definir estratégia de tenant para owner multiempresa e usuário vinculado a uma empresa.
 - [ ] Planejar backfill determinístico dos dados existentes, sem atribuição ambígua.
@@ -291,3 +292,6 @@
 - [x] E2E isolado do commit `ec235bde87fa64baea2fff57f3aaae9edd17556a` passou após a mudança de conclusão atômica de comanda e venda.
 
 - [x] Commit `ec235bde87fa64baea2fff57f3aaae9edd17556a`: Integrated System CI (typecheck/build), E2E isolado, observabilidade, MCP Full Audit e forensic PR checks concluíram com sucesso.
+
+- [x] Sales history e cash-register history passam a exigir empresa ativa e filtram registros pelo enterpriseId do usuário proprietário do caixa/venda.
+- [~] Contexto enterpriseId do owner em produção ainda precisa ser confirmado após restabelecer sessão autenticada do Kernel; sem contexto a API falha fechado com HTTP 409.
