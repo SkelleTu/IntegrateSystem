@@ -76,3 +76,7 @@ jobs:
           if [ -f /tmp/aura-qa-server.pid ]; then
             kill "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null || true
           fi
+          if [ -f /tmp/aura-qa-server.log ]; then
+            echo "----- Isolated QA server log -----"
+            cat /tmp/aura-qa-server.log
+          fi
