@@ -195,7 +195,7 @@ export const inventory = pgTable("inventory", {
   itemId: integer("item_id"), // Can be null for custom items
   itemType: text("item_type").notNull(), // "product", "service", or "custom"
   customName: text("custom_name"), // Name for custom items
-  quantity: integer("quantity").notNull().default(0),
+  quantity: numeric("quantity", { mode: "number" }).notNull().default(0),
   unit: text("unit").notNull(), 
   itemsPerUnit: integer("items_per_unit").notNull().default(1),
   costPrice: integer("cost_price").notNull().default(0), // in cents
@@ -214,7 +214,7 @@ export const inventoryLogs = pgTable("inventory_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   inventoryId: integer("inventory_id").notNull(),
   type: text("type").notNull(), // "in" or "out"
-  quantity: integer("quantity").notNull(),
+  quantity: numeric("quantity", { mode: "number" }).notNull(),
   reason: text("reason"),
   userId: integer("user_id").notNull(),
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
@@ -223,7 +223,7 @@ export const inventoryLogs = pgTable("inventory_logs", {
 export const inventoryRestocks = pgTable("inventory_restocks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   inventoryId: integer("inventory_id").notNull(),
-  quantity: integer("quantity").notNull(),
+  quantity: numeric("quantity", { mode: "number" }).notNull(),
   unit: text("unit").notNull(),
   itemsPerUnit: integer("items_per_unit").notNull().default(1),
   costPrice: integer("cost_price").notNull().default(0),
@@ -270,7 +270,7 @@ export const batches = pgTable("batches", {
   expiryDate: integer("expiry_date", { mode: 'timestamp' }),
   entryDate: integer("entry_date", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
   // ── Estoque e preços ─────────────────────────────────────────────────────────
-  quantity: integer("quantity").notNull().default(0),
+  quantity: numeric("quantity", { mode: "number" }).notNull().default(0),
   costPrice: integer("cost_price").notNull().default(0), // in cents
   salePrice: integer("sale_price"),                      // Preço de venda em centavos por variante (sobrepõe produto)
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
