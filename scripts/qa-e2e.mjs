@@ -333,7 +333,7 @@ assert.ok(routesSource.includes("const allowedTypes = new Set") && routesSource.
 assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produto"), "inventory sale price placeholder must be explicit");
 assert.ok(reportsSource.includes('new Date(`${dateRange.start}T00:00:00`).toISOString()') && !reportsSource.includes('T00:00:00.000Z'), "reports must filter by local business-day boundaries");
 assert.ok(routesSource.includes('String(user?.role || "").trim().toLowerCase() === "owner";') && !routesSource.includes('String(user?.username || "").trim().toLowerCase() === "skelletu"'), "server owner authorization must rely on the owner role only");
-assert.ok(routesSource.includes('app.get("/api/admin/users"') && routesSource.includes("users.map(toPublicUser)"), "owner user-list endpoint must exist and redact sensitive fields");
+assert.ok(routesSource.includes('app.get("/api/admin/users"') && routesSource.includes("users.map(toAdminPublicUser)"), "owner user-list endpoint must exist and redact sensitive fields");
 assert.ok(routesSource.includes("enterpriseId,") && routesSource.includes('role: "barber"'), "new staff accounts must inherit the active enterprise");
 assert.ok(routesSource.includes("complete: !neonPool && !isRemoteEnabled") && routesSource.includes("if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);"), "backup must not treat a local SQLite snapshot as a complete Neon backup");
 summary.push({ test: "cross-module-read-only-api-coverage", status: "passed", routes: moduleReadRoutes.length });
