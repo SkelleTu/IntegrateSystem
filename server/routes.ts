@@ -2526,9 +2526,12 @@ export async function registerRoutes(
     return res.json(newSale);
     } catch (err: any) {
       console.error("[SALE_CREATE] Falha ao registrar venda:", err);
-      return res.status(500).json({
-        message: "Não foi possível concluir a venda. Consulte vendas, estoque e financeiro antes de repetir a operação.",
-        code: "SALE_CREATE_FAILED"
+      const message = String(err?.message || "");
+      const conflict = /estoque insuficiente|lote .*não encontrado|item de estoque .*não encontrado|comanda .*não está mais ativa|caixa aberto/i.test(message);
+      const notFound = /comanda não encontrada/i.test(message);
+      return res.status(notFound ? 404 : conflict ? 409 : 500).json({
+        message: "Não foi possível concluir a venda. " + (message || "Consulte vendas, estoque e financeiro antes de repetir a operação."),
+        code: notFound ? "TICKET_NOT_FOUND" : conflict ? "SALE_CONFLICT" : "SALE_CREATE_FAILED"
       });
     }
   });
