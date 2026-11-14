@@ -32,6 +32,8 @@ export default function Reports() {
     end: format(new Date(), "yyyy-MM-dd"),
   });
 
+  const dateRangeValid = dateRange.start <= dateRange.end;
+
   const [saleToCancel, setSaleToCancel] = useState<number | null>(null);
   const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin";
   const [expandedRegister, setExpandedRegister] = useState<number | null>(null);
@@ -39,18 +41,27 @@ export default function Reports() {
   const { data: sales, isLoading: isLoadingSales } = useQuery<Sale[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const start = dateRange.start ? `${dateRange.start}T00:00:00.000Z` : "";
-      const end = dateRange.end ? `${dateRange.end}T23:59:59.999Z` : "";
-      const res = await fetch(`/api/sales?start=${start}&end=${end}`);
+      const start = dateRange.start ? new Date(`${dateRange.start}T00:00:00`).toISOString() : "";
+      const end = dateRange.end ? new Date(`${dateRange.end}T23:59:59.999`).toISOString() : "";
+      const params = new URLSearchParams();
+      if (start) params.set("start", start);
+      if (end) params.set("end", end);
+      const res = await fetch(`/api/sales?${params.toString()}`);
       if (!res.ok) return [];
       return res.json();
-    }
+    },
+    enabled: dateRangeValid,
   });
 
   const { data: registers, isLoading: isLoadingRegisters } = useQuery<(CashRegister & { sales?: (Sale & { items: SaleItem[], payments: Payment[] })[] })[]>({
     queryKey: ["/api/cash-registers/history", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const res = await fetch(`/api/cash-registers/history?start=${dateRange.start}&end=${dateRange.end}`);
+      const start = dateRange.start ? new Date(`${dateRange.start}T00:00:00`).toISOString() : "";
+      const end = dateRange.end ? new Date(`${dateRange.end}T23:59:59.999`).toISOString() : "";
+      const params = new URLSearchParams();
+      if (start) params.set("start", start);
+      if (end) params.set("end", end);
+      const res = await fetch(`/api/cash-registers/history?${params.toString()}`);
       if (!res.ok) return [];
       return res.json();
     }
