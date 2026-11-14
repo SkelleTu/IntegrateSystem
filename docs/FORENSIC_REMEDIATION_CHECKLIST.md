@@ -98,7 +98,7 @@
 - [ ] Garantir atomicidade entre venda, itens, pagamentos, estoque, caixa e financeiro.
 - [x] Venda de simulação bloqueada fora do QA isolado; status de venda real é definido pelo servidor.
 - [ ] Revisar clique duplo, retry de rede e idempotency key.
-- [~] ticketId é validado e a conclusão da comanda agora ocorre dentro da mesma transação da venda; ainda falta vincular com segurança ao tenant/posse da comanda.
+- [~] ticketId é validado e a conclusão da comanda ocorre dentro da mesma transação da venda; corridas/estoque insuficiente retornam 409 e comanda inexistente 404. Ainda falta vincular com segurança ao tenant/posse da comanda.
 - [ ] Revisar cancelamento total/parcial, estorno de pagamento e reposição de estoque.
 - [ ] Validar impressão/recibo e recuperação de venda após refresh.
 - [ ] Testar visualmente tablet em retrato/paisagem e resoluções menores.
@@ -285,3 +285,5 @@
 - [x] `Aura MCP Full Audit` do commit `22697b335c6b1ec38ba0a5e36b1dabe84b88b952` concluiu com sucesso após o workflow passar a tratar a medição de determinismo não autorizada como pendente, conforme a própria especificação do gate, sem exigir publicação de consentimento em produção.
 
 - [x] Venda com ticketId inválido é rejeitada antes da gravação; ticket ativo é validado e marcado concluído dentro da transação da venda, com rollback se o estado mudar concorrentemente.
+
+- [x] Erros de estoque e concorrência no fluxo de venda agora retornam HTTP 409; ticket inexistente retorna 404, sem mascarar conflito operacional como erro interno genérico.
