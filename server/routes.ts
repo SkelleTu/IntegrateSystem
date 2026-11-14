@@ -2384,28 +2384,90 @@ export async function registerRoutes(
     if (!sale || !Array.isArray(items) || items.length === 0 || !Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ message: "Venda exige dados, ao menos um item e ao menos um pagamento." });
     }
-    const totalAmount = Number(sale.totalAmount);
-    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
-      return res.status(400).json({ message: "Total da venda deve ser um valor positivo em centavos." });
-    }
+    const menuCatalog = await storage.getMenuItems();
+    const authoritativeItems: any[] = [];
+    let itemsTotal = 0;
+
     for (const [index, item] of items.entries()) {
       const quantity = Number(item?.quantity);
-      const unitPrice = Number(item?.unitPrice);
-      const totalPrice = Number(item?.totalPrice);
-      const unitType = item?.unitType === "kg" ? "kg" : "unit";
-      const expectedTotal = unitType === "kg"
-        ? Math.round(quantity * unitPrice / 1000)
-        : quantity * unitPrice;
-      if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
-          !Number.isSafeInteger(unitPrice) || unitPrice <= 0 ||
-          !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
-          !Number.isSafeInteger(expectedTotal) || totalPrice !== expectedTotal) {
-        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes com a unidade informada.` });
+      if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+        return res.status(400).json({ message: "Quantidade inválida no item " + (index + 1) + "." });
       }
+
+      const sourceType = String(item?.sourceType || "");
+      const sourceId = Number(item?.sourceId);
+      if (!Number.isSafeInteger(sourceId) || sourceId <= 0) {
+        return res.status(400).json({ message: "Origem do item " + (index + 1) + " inválida." });
+      }
+
+      let authoritativePrice = 0;
+      let authoritativeUnitType: "kg" | "unit" = "unit";
+      let authoritativeItemId = 0;
+
+      if (sourceType === "menu") {
+        const menuItem = menuCatalog.find((candidate) => Number(candidate.id) === sourceId);
+        if (!menuItem) return res.status(409).json({ message: "Um item do cardápio não está mais disponível. Atualize o caixa." });
+        authoritativePrice = Number(menuItem.price);
+        authoritativeUnitType = String((menuItem as any).unitType || "unit").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = Number(menuItem.id);
+      } else if (sourceType === "inventory") {
+        const inventoryItem = await storage.getInventoryItem(sourceId);
+        if (!inventoryItem) return res.status(409).json({ message: "Um item do estoque não existe mais. Atualize o caixa." });
+        const configuredSalePrice = Number(inventoryItem.salePrice || 0);
+        authoritativePrice = configuredSalePrice > 0
+          ? configuredSalePrice
+          : Math.round(Number(inventoryItem.costPrice || 0) * 1.3);
+        authoritativeUnitType = String(inventoryItem.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = 10000 + Number(inventoryItem.id);
+      } else if (sourceType === "batch") {
+        const [batch] = await db.select().from(batches).where(eq(batches.id, sourceId)).limit(1);
+        if (!batch) return res.status(409).json({ message: "Um lote do produto não existe mais. Atualize o caixa." });
+        const product = await storage.getProduct(Number(batch.productId));
+        if (!product) return res.status(409).json({ message: "O produto do lote não existe mais. Atualize o caixa." });
+        authoritativePrice = Number(batch.salePrice ?? product.salePrice ?? 0);
+        authoritativeUnitType = String(product.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = 500000 + Number(batch.id);
+      } else {
+        return res.status(400).json({ message: "Origem do item " + (index + 1) + " não reconhecida." });
+      }
+
+      if (!Number.isSafeInteger(authoritativePrice) || authoritativePrice <= 0) {
+        return res.status(409).json({ message: "Um produto está sem preço de venda válido. Corrija o cadastro antes de vender." });
+      }
+      if (String(item?.unitType) !== authoritativeUnitType) {
+        return res.status(409).json({ message: "A unidade de um item mudou. Atualize o caixa antes de finalizar." });
+      }
+      if (Number(item?.unitPrice) !== authoritativePrice) {
+        return res.status(409).json({ message: "O preço de um item foi atualizado. Atualize o caixa antes de finalizar." });
+      }
+
+      const expectedTotal = authoritativeUnitType === "kg"
+        ? Math.round(quantity * authoritativePrice / 1000)
+        : quantity * authoritativePrice;
+      if (!Number.isSafeInteger(expectedTotal) || expectedTotal <= 0 ||
+          Number(item?.totalPrice) !== expectedTotal) {
+        return res.status(409).json({ message: "O subtotal de um item não corresponde ao preço oficial do catálogo." });
+      }
+
+      itemsTotal += expectedTotal;
+      if (!Number.isSafeInteger(itemsTotal)) {
+        return res.status(400).json({ message: "Total dos itens excede o limite permitido." });
+      }
+
+      authoritativeItems.push({
+        ...item,
+        itemType: "product",
+        itemId: authoritativeItemId,
+        quantity,
+        unitPrice: authoritativePrice,
+        totalPrice: expectedTotal,
+        unitType: authoritativeUnitType,
+      });
     }
-    const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
-    if (!Number.isSafeInteger(itemsTotal) || itemsTotal !== totalAmount) {
-      return res.status(400).json({ message: "A soma dos itens deve corresponder ao total da venda." });
+
+    const totalAmount = Number(sale.totalAmount);
+    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0 || itemsTotal !== totalAmount) {
+      return res.status(400).json({ message: "O total informado deve corresponder exatamente aos preços oficiais e às quantidades dos itens." });
     }
     const validPaymentMethods = new Set(["cash", "card", "pix"]);
     for (const [index, payment] of payments.entries()) {
@@ -2426,7 +2488,7 @@ export async function registerRoutes(
       fiscalStatus: sale.customerTaxId ? "pending" : "none",
       createdAt: new Date()
     });
-    const parsedItems = items.map((item: any) => insertSaleItemSchema.parse(item));
+    const parsedItems = authoritativeItems.map((item: any) => insertSaleItemSchema.parse(item));
     const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse(p));
 
     const newSale = await storage.createSale(
