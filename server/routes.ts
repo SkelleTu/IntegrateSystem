@@ -678,7 +678,7 @@ export async function registerRoutes(
         role: "barber",
         enterpriseId,
       });
-      res.status(201).json(toPublicUser(newUser));
+      res.status(201).json(toAdminPublicUser(newUser));
     } catch (err) {
       res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
     }
