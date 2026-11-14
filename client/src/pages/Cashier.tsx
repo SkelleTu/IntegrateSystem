@@ -587,7 +587,8 @@ export default function Cashier() {
           // Para unidade, permanece como inteiro
           quantity: isKg ? Math.round(i.quantity * 1000) : Math.round(i.quantity), 
           unitPrice: i.item.price, 
-          totalPrice: Math.round(i.item.price * i.quantity) 
+          totalPrice: Math.round(i.item.price * i.quantity),
+          unitType: isKg ? "kg" : "unit" 
         };
       }),
       payments: isSimulation ? [{ method: "cash", amount: total }] : payments
