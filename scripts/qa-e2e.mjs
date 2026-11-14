@@ -174,6 +174,50 @@ const ticket = await expectStatus(await request("/api/tickets", {
 }), 201, "public-queue-ticket-create");
 const ticketLookup = await expectStatus(await request(`/api/tickets/${ticket.ticketNumber}`), 200, "public-queue-ticket-lookup");
 assert.equal(ticketLookup.id, ticket.id);
+const priceProduct = await expectStatus(await request("/api/products", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ name: "QA Price Integrity", unit: "Unidade", minStock: 1, salePrice: "12.50", category: "QA", codigoProduto: "QA-PRICE-001" }),
+}), 201, "price-integrity-product-create");
+const priceBatch = await expectStatus(await request(`/api/products/${priceProduct.id}/batches`, {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ quantity: 3, costPrice: "5.00", salePrice: "12.50", batchNumber: "QA-PRICE-001" }),
+}), 201, "price-integrity-batch-create");
+await expectStatus(await request("/api/cash-register/open", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ openingAmount: 0 }),
+}), 200, "price-integrity-cash-open");
+const tamperedSale = await request("/api/sales", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({
+    sale: { totalAmount: 1 },
+    items: [{ itemType: "product", itemId: 500000 + priceBatch.id, sourceType: "batch", sourceId: priceBatch.id, quantity: 1, unitPrice: 1, totalPrice: 1, unitType: "unit" }],
+    payments: [{ method: "cash", amount: 1 }],
+  }),
+});
+await expectStatus(tamperedSale, 409, "sale-price-tampering-rejected");
+const validSale = await expectStatus(await request("/api/sales", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({
+    sale: { totalAmount: 1250 },
+    items: [{ itemType: "product", itemId: 500000 + priceBatch.id, sourceType: "batch", sourceId: priceBatch.id, quantity: 1, unitPrice: 1250, totalPrice: 1250, unitType: "unit" }],
+    payments: [{ method: "cash", amount: 1250 }],
+  }),
+}), 200, "sale-server-priced-create");
+await expectStatus(await request(`/api/sales/${validSale.id}/cancel`, { method: "POST", headers: { cookie } }), 200, "sale-server-priced-cancel");
+const restoredPriceBatches = await expectStatus(await request(`/api/products/${priceProduct.id}/batches`, { headers: { cookie } }), 200, "sale-price-stock-restored");
+assert.equal(Number(restoredPriceBatches.find(x => x.id === priceBatch.id)?.quantity), 3);
+await expectStatus(await request("/api/cash-register/close", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ closingAmount: 0 }),
+}), 200, "price-integrity-cash-close");
+await expectStatus(await request(`/api/products/${priceProduct.id}`, { method: "DELETE", headers: { cookie } }), 204, "price-integrity-product-cleanup");
+
 await expectStatus(await request(`/api/services/${serviceId}`, { method: "DELETE", headers: { cookie } }), 204, "service-delete");
 
 // Finance transaction create/read/delete cycle, using integer cents in the isolated database.
