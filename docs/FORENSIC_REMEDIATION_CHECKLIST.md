@@ -32,12 +32,12 @@
 ## 2. Autorização e segregação de funções
 - [x] Owner navigation baseada em role.
 - [x] Cadastro de funcionário valida username/senha e herda enterpriseId do administrador.
-- [ ] Construir matriz explícita owner/admin/barber/operador/caixa e permissões por ação.
-- [!] Aplicar autorização server-side em cada rota de leitura e escrita, sem depender da interface.
+- [~] Matriz inicial de papéis aplicada parcialmente: owner/admin para operações administrativas; barber preserva operação do caixa/fila permitida. Falta fechar matriz completa por ação.
+- [~] Reforçadas rotas administrativas: CRUD de serviços, reset/definição da fila e leitura de vendas, histórico de caixa e transações agora exigem admin/owner. Faltam as demais rotas e escopo tenant.
 - [ ] Garantir que funcionário de caixa só execute operações operacionais necessárias.
-- [ ] Proteger operações administrativas, exclusão, exportação, fiscal, configurações e gestão de usuários.
+- [~] Operações administrativas principais já possuem guards; endpoint legado de emissão fiscal fictícia foi desativado. Falta auditoria rota a rota.
 - [ ] Testar IDOR/BOLA: trocar IDs de usuário, produto, lote, venda, caixa, transação, empresa e documento.
-- [ ] Testar acesso horizontal e vertical, inclusive por chamadas HTTP diretas.
+- [ ] Testar acesso horizontal e vertical com matriz completa de papéis, inclusive por chamadas HTTP diretas.
 
 ## 3. Multiempresa / tenant isolation
 - [!] Mapear todas as tabelas, índices, relações e queries sem enterpriseId.
@@ -109,9 +109,9 @@
 
 ## 9. Fila, senhas e serviços
 - [ ] Revisar cadastro/edição/ativação/exclusão de serviços.
-- [ ] Revisar geração de senha, sequência, chamada, anterior/próxima e reset.
+- [~] Reset e definição manual de senha agora exigem admin/owner; avançar/retroceder continua autenticado para operação diária. Falta tenant isolation e concorrência.
 - [ ] Garantir atomicidade e concorrência entre vários dispositivos.
-- [ ] Garantir que reset/controle administrativo exija papel adequado.
+- [x] Reset e definição manual da fila protegidos por admin/owner.
 - [ ] Isolar fila, tickets e serviços por tenant.
 - [ ] Revisar WebSocket: autenticação, autorização, tenant, reconexão e mensagens.
 - [ ] Testar reconexão e múltiplos operadores simultâneos.
@@ -235,3 +235,13 @@
 4. Só depois avançar para WebAuthn, backup/restore, fiscal, integrações físicas e regressão final.
 
 **Definição de 100%:** todos os itens aplicáveis marcados, testes reproduzíveis aprovados, integrações reais validadas quando dependem de hardware/credenciais e nenhum bloqueador crítico aberto. Código alterado ou CI verde isoladamente não significa 100%.
+
+
+## Registro de execução — 14/11/2026
+- [x] Criado este checklist como artefato versionado na branch de remediação.
+- [x] Serviços: criação, edição e exclusão agora exigem papel admin/owner.
+- [x] Fila: reset e definição manual agora exigem papel admin/owner; avançar/retroceder seguem disponíveis a funcionário autenticado.
+- [x] Relatórios sensíveis: leitura de vendas, histórico de caixas e transações financeiras agora exige admin/owner.
+- [x] Atualização de itens de comanda exige sessão autenticada.
+- [x] Endpoint legado `/api/sales/:id/emit-fiscal` desativado (HTTP 410), pois gerava XML fictício e marcava venda como emitida sem prova SEFAZ.
+- [~] CI e E2E após estas alterações: em execução/aguardando conclusão; não marcar como validado até os workflows terminarem.
