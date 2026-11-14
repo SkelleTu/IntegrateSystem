@@ -849,7 +849,7 @@ export async function auditDatabaseParity() {
           const sqlType = column.getSQLType().toLowerCase();
           if (sqlType === "serial") return "integer";
           if (sqlType === "timestamp") return "timestamp without time zone";
-          return sqlType.replace(/\\([^)]*\\)/g, "");
+          return sqlType.replace(/\([^)]*\)/g, "");
         })(),
           notNull: column.notNull,
         })),
