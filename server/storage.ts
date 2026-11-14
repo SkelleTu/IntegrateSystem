@@ -661,7 +661,8 @@ export class DatabaseStorage implements IStorage {
         if (batchId !== null) {
           const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
           if (!batch) throw new Error(`Lote ${batchId} não encontrado para a venda.`);
-          if (Number(batch.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`);
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(batch.quantity) + 1e-9 < stockQuantity) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${stockQuantity}`);
         }
       }
       const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, id: sharedSaleId } as any).returning();
@@ -702,14 +703,13 @@ export class DatabaseStorage implements IStorage {
             throw new Error(`Lote ${batchId} não encontrado para a venda #${insertedSale.id}`);
           }
 
-          if (batch.quantity < item.quantity) {
-            throw new Error(
-              `Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`
-            );
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(batch.quantity) + 1e-9 < stockQuantity) {
+            throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${stockQuantity}`);
           }
 
           await database.update(batches)
-            .set({ quantity: batch.quantity - item.quantity })
+            .set({ quantity: Number(batch.quantity) - stockQuantity })
             .where(eq(batches.id, batchId));
 
           runtimeEvent("sale-batch-deduction", `Baixa do lote ${batch.id} na venda #${insertedSale.id}`, {
@@ -720,7 +720,7 @@ export class DatabaseStorage implements IStorage {
             productId: batch.productId,
             batchId: batch.id,
             type: "out",
-            quantity: item.quantity,
+            quantity: stockQuantity,
             reason: `Venda #${insertedSale.id}`,
             userId: sale.userId || 0,
             createdAt: new Date(),
@@ -749,10 +749,11 @@ export class DatabaseStorage implements IStorage {
         }
 
         if (inventoryItem) {
-          if (Number(inventoryItem.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o item ${inventoryItem.id}: disponível ${inventoryItem.quantity}, solicitado ${item.quantity}`);
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(inventoryItem.quantity) + 1e-9 < stockQuantity) throw new Error(`Estoque insuficiente para o item ${inventoryItem.id}: disponível ${inventoryItem.quantity}, solicitado ${stockQuantity}`);
           await database.update(inventory)
             .set({ 
-              quantity: inventoryItem.quantity - item.quantity,
+              quantity: Number(inventoryItem.quantity) - stockQuantity,
               updatedAt: new Date()
             })
             .where(eq(inventory.id, inventoryItem.id));
@@ -763,7 +764,7 @@ export class DatabaseStorage implements IStorage {
           await database.insert(inventoryLogs).values({
             inventoryId: inventoryItem.id,
             type: "out",
-            quantity: item.quantity,
+            quantity: stockQuantity,
             reason: `Venda #${insertedSale.id}`,
             userId: sale.userId || 0,
             createdAt: new Date()
@@ -873,15 +874,16 @@ export class DatabaseStorage implements IStorage {
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
           if (reversal.kind === "batch") {
+            const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
             await transaction.update(batches)
-              .set({ quantity: stock.quantity + item.quantity })
+              .set({ quantity: Number(stock.quantity) + stockQuantity })
               .where(eq(batches.id, stock.id));
 
             await transaction.insert(batchLogs).values({
               productId: (stock as Batch).productId,
               batchId: stock.id,
               type: "cancel",
-              quantity: item.quantity,
+              quantity: item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity),
               reason: `Estorno Venda Cancelada #${id}`,
               userId: sale.userId || 0,
               createdAt: new Date(),
@@ -889,7 +891,7 @@ export class DatabaseStorage implements IStorage {
           } else {
             await transaction.update(inventory)
               .set({
-                quantity: stock.quantity + item.quantity,
+                quantity: Number(stock.quantity) + (item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity)),
                 updatedAt: new Date()
               })
               .where(eq(inventory.id, stock.id));
@@ -897,7 +899,7 @@ export class DatabaseStorage implements IStorage {
             await transaction.insert(inventoryLogs).values({
               inventoryId: stock.id,
               type: "in",
-              quantity: item.quantity,
+              quantity: item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity),
               reason: `Estorno Venda Cancelada #${id}`,
               userId: sale.userId || 0,
               createdAt: new Date()
