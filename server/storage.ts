@@ -241,7 +241,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: number, update: Partial<User>): Promise<User> {
     this.logAction(`Atualização usuário ID:${id}`);
-    const [updated] = await dualWrite(async (database: any) => {
+    const updated = await dualWrite(async (database: any) => {
       await database.update(users).set(update).where(eq(users.id, id));
       const [rec] = await database.select().from(users).where(eq(users.id, id));
       return rec;
