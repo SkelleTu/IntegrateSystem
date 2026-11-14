@@ -2384,6 +2384,9 @@ export async function registerRoutes(
     if (!sale || !Array.isArray(items) || items.length === 0 || !Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ message: "Venda exige dados, ao menos um item e ao menos um pagamento." });
     }
+    if (sale.status === "simulation" && !isIsolatedQaRuntime) {
+      return res.status(403).json({ code: "SIMULATION_SALE_QA_ONLY", message: "Vendas de simulação estão disponíveis somente no ambiente isolado de QA." });
+    }
     const menuCatalog = await storage.getMenuItems();
     const authoritativeItems: any[] = [];
     let itemsTotal = 0;
@@ -2486,6 +2489,7 @@ export async function registerRoutes(
       cashRegisterId: register.id, 
       userId: user.id,
       fiscalStatus: sale.customerTaxId ? "pending" : "none",
+      status: isIsolatedQaRuntime && sale.status === "simulation" ? "simulation" : "completed",
       createdAt: new Date()
     });
     const parsedItems = authoritativeItems.map((item: any) => insertSaleItemSchema.parse(item));
