@@ -121,10 +121,16 @@ function toPublicUser(user: any) {
   if (!user || typeof user !== "object") return user;
   const safe = { ...user };
   for (const key of Object.keys(safe)) {
-    if (/(password|hash|salt|secret|token|credential|private.?key|fingerprint)/i.test(key)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
       delete safe[key];
     }
   }
+  return safe;
+}
+
+function toAdminPublicUser(user: any) {
+  const safe = toPublicUser(user);
+  if (safe && typeof safe === "object") delete (safe as any).fingerprintId;
   return safe;
 }
 
@@ -633,7 +639,7 @@ export async function registerRoutes(
     const user = req.user as any;
     if (!hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
     const users = await storage.getUsers();
-    res.json(users.map(toPublicUser));
+    res.json(users.map(toAdminPublicUser));
   });
 
   app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
