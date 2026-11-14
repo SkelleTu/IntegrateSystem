@@ -1470,7 +1470,7 @@ export async function registerRoutes(
             codigoBalanca: prod.codigoBalanca ?? null,
             imageUrl: prod.imageUrl ?? null,
             isAvailable: true,
-            unitType: prod.unit === "kg" ? "kg" : "unit",
+            unitType: String(prod.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit",
             unit: prod.unit,
             quantity: batch.quantity,
           });
