@@ -70,7 +70,22 @@ const cookie = setCookies.map(value => value.split(";")[0]).join("; ");
 assert.ok(cookie.includes("connect.sid="), "session cookie was not issued");
 summary.push({ test: "qa-admin-login", status: 200 });
 
-await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
+const sessionUser = await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
+assert.ok(Number(sessionUser.enterpriseId) > 0, "QA administrator must be linked to its isolated enterprise");
+await expectStatus(await request("/api/admin/users", { headers: { cookie } }), 403, "owner-user-list-denied-to-admin");
+const invalidStaff = await request("/api/admin/register-barber", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ username: "x", password: "short" }),
+});
+await expectStatus(invalidStaff, 400, "invalid-staff-account-rejected");
+const staff = await expectStatus(await request("/api/admin/register-barber", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ username: "qa-barber-ci", password: "QaOnly!2026-Staff" }),
+}), 201, "create-enterprise-staff");
+assert.equal(staff.role, "barber");
+assert.equal(Number(staff.enterpriseId), Number(sessionUser.enterpriseId), "staff account must inherit the administrator's enterprise");
 const tutorialBefore = await expectStatus(await request("/api/tutorial/status", { headers: { cookie } }), 200, "tutorial-status-before");
 assert.equal(tutorialBefore.completed, false);
 const tutorialCompleted = await expectStatus(await request("/api/tutorial/complete", {
@@ -87,6 +102,52 @@ await expectStatus(await request("/api/queue/next", { method: "POST" }), 401, "a
 await expectStatus(await request("/api/queue/prev", { method: "POST" }), 401, "anonymous-queue-prev-denied");
 await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 401, "anonymous-queue-reset-denied");
 await expectStatus(await request("/api/queue/set", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ number: 0 }) }), 401, "anonymous-queue-set-denied");
+
+// Exercise the service catalog and every authenticated queue control in the isolated database.
+await expectStatus(await request("/api/services", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: "QA service", price: 2500, imageUrl: "https://example.invalid/aura-qa.png", isActive: true }) }), 401, "anonymous-service-create-denied");
+const service = await expectStatus(await request("/api/services", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ name: "QA service", price: 2500, imageUrl: "https://example.invalid/aura-qa.png", isActive: true }),
+}), 201, "service-create");
+const serviceId = Number(service.id);
+assert.ok(Number.isSafeInteger(serviceId) && serviceId > 0);
+const updatedService = await expectStatus(await request(`/api/services/${serviceId}`, {
+  method: "PUT",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ price: 2750 }),
+}), 200, "service-update");
+assert.equal(updatedService.price, 2750);
+const servicesList = await expectStatus(await request("/api/services", { headers: { cookie } }), 200, "service-list");
+assert.ok(servicesList.some(item => item.id === serviceId));
+await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 200, "queue-reset");
+const queueNext = await expectStatus(await request("/api/queue/next", { method: "POST", headers: { cookie } }), 200, "queue-next");
+assert.equal(queueNext.servingNumber, 1);
+const queuePrev = await expectStatus(await request("/api/queue/prev", { method: "POST", headers: { cookie } }), 200, "queue-previous");
+assert.equal(queuePrev.servingNumber, 0);
+const queueSet = await expectStatus(await request("/api/queue/set", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ number: 7 }) }), 200, "queue-set-number");
+assert.equal(queueSet.servingNumber, 7);
+await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 200, "queue-reset-after-test");
+const ticket = await expectStatus(await request("/api/tickets", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ serviceId }),
+}), 201, "public-queue-ticket-create");
+const ticketLookup = await expectStatus(await request(`/api/tickets/${ticket.ticketNumber}`), 200, "public-queue-ticket-lookup");
+assert.equal(ticketLookup.id, ticket.id);
+await expectStatus(await request(`/api/services/${serviceId}`, { method: "DELETE", headers: { cookie } }), 204, "service-delete");
+
+// Finance transaction create/read/delete cycle, using integer cents in the isolated database.
+const transaction = await expectStatus(await request("/api/transactions", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ businessType: "barbearia", type: "expense", category: "qa", description: "E2E despesa isolada", amount: 1234 }),
+}), 201, "finance-transaction-create");
+const transactionId = Number(transaction.id);
+assert.ok(Number.isSafeInteger(transactionId) && transactionId > 0);
+const transactionList = await expectStatus(await request("/api/transactions?businessType=barbearia", { headers: { cookie } }), 200, "finance-transaction-read");
+assert.ok(transactionList.some(item => item.id === transactionId));
+await expectStatus(await request(`/api/transactions/${transactionId}`, { method: "DELETE", headers: { cookie } }), 200, "finance-transaction-delete");
 
 // Product catalog used by the label screen must read from /api/products.
 const product = await expectStatus(await request("/api/products", {
@@ -212,6 +273,7 @@ for (const [label, route] of moduleReadRoutes) {
   await expectStatus(await request(route, { headers: { cookie } }), 200, label);
 }
 await expectStatus(await request("/api/admin/monitoring", { headers: { cookie } }), 403, "owner-only-monitoring-denied-to-admin");
+await expectStatus(await request("/api/admin/users", { headers: { cookie } }), 403, "owner-only-user-list-denied-to-admin");
 
 // Anonymous write attempts must fail closed across transactional and administrative modules.
 await expectStatus(await request("/api/cash-register/open", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-cash-register-open-denied");
@@ -242,6 +304,8 @@ assert.ok(inventorySource.includes("Custo de Compra (R$/kg)") && inventorySource
 assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produto"), "inventory sale price placeholder must be explicit");
 assert.ok(reportsSource.includes('new Date(`${dateRange.start}T00:00:00`).toISOString()') && !reportsSource.includes('T00:00:00.000Z'), "reports must filter by local business-day boundaries");
 assert.ok(routesSource.includes('String(user?.role || "").trim().toLowerCase() === "owner";') && !routesSource.includes('String(user?.username || "").trim().toLowerCase() === "skelletu"'), "server owner authorization must rely on the owner role only");
+assert.ok(routesSource.includes('app.get("/api/admin/users"') && routesSource.includes("users.map(toPublicUser)"), "owner user-list endpoint must exist and redact sensitive fields");
+assert.ok(routesSource.includes("enterpriseId,") && routesSource.includes('role: "barber"'), "new staff accounts must inherit the active enterprise");
 assert.ok(routesSource.includes("complete: !neonPool && !isRemoteEnabled") && routesSource.includes("if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);"), "backup must not treat a local SQLite snapshot as a complete Neon backup");
 summary.push({ test: "cross-module-read-only-api-coverage", status: "passed", routes: moduleReadRoutes.length });
 summary.push({ test: "requested-ui-contracts", status: "passed" });
