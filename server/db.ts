@@ -808,6 +808,15 @@ export async function setupDatabase() {
   // PostgreSQL schema before allowing authentication/routes to start.
   if (neonPool) {
     await verifyNeonConnection();
+    // Preserve existing whole-unit stock values while enabling fractional kilograms.
+    // The migration is additive in precision only; no existing quantity is rescaled.
+    await neonPool.query(`
+      ALTER TABLE public.batches ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
+      ALTER TABLE public.batch_logs ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
+      ALTER TABLE public.inventory ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
+      ALTER TABLE public.inventory_logs ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
+      ALTER TABLE public.inventory_restocks ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
+    `);
     const report = await auditDatabaseParity();
     if (!report.ok) {
       throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
