@@ -131,7 +131,7 @@
 - [ ] Se WebAuthn não puder ser concluído, retirar qualquer indicação de biometria validada.
 
 ## 11. Fiscal / NFC-e / SEFAZ
-- [ ] Revisar configuração fiscal por empresa, ambiente, série e numeração.
+- [~] Rotas de configuração, logs, histórico e emissão fiscal agora exigem empresa ativa selecionada; removido fallback silencioso para empresa 1. Ainda falta isolamento completo das tabelas e validação de ponta a ponta.
 - [ ] Revisar certificado A1, armazenamento seguro, senha e expiração.
 - [ ] Revisar CSC, ID do CSC, UF, NCM, CFOP, CST/CSOSN, ICMS e regras tributárias.
 - [ ] Validar XML, assinatura, QR Code, contingência, cancelamento e inutilização.
@@ -265,3 +265,5 @@
 - [x] E2E cobriu 14 rotas de leitura de módulos, o ciclo completo de caixa/estoque/financeiro/PIX/cancelamento/limpeza e os quatro bloqueios de papel barber já descritos.
 
 - [x] Corrigida configuração TLS da transmissão fiscal: certificado do servidor SEFAZ agora é validado; resposta HTTP fora de 2xx falha; certificado A1 sem chave/certificado válidos é rejeitado; UF sem endpoint configurado não usa fallback incorreto para SP.
+
+- [x] Rotas fiscais deixam de usar empresa 1 como fallback: exigem contexto ativo de empresa para GET/POST de configurações, logs, histórico e emissão.
