@@ -133,6 +133,16 @@ function toAdminPublicUser(user: any) {
   if (safe && typeof safe === "object") delete (safe as any).fingerprintId;
   return safe;
 }
+function toPublicFiscalSettings(settings: any) {
+  if (!settings || typeof settings !== "object") return settings;
+  const { cscToken, certificadoA1, certificadoSenha, ...safe } = settings;
+  return {
+    ...safe,
+    cscTokenConfigured: Boolean(cscToken),
+    certificateConfigured: Boolean(certificadoA1 && certificadoSenha),
+  };
+}
+
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -1064,7 +1074,7 @@ export async function registerRoutes(
         simulacaoReal: false
       };
       const created = await storage.upsertFiscalSettings(defaultSettings as any);
-      return res.json(created);
+      return res.json(toPublicFiscalSettings(created));
     }
     // Se já existe mas campos estão vazios, sincroniza com dados do estabelecimento
     // Verifica cada campo individualmente para não sobrescrever dados que o usuário preencheu manualmente
@@ -1088,10 +1098,10 @@ export async function registerRoutes(
           municipio: settings.municipio || enterprise.city || "",
           uf: settings.uf || enterprise.state || "SP",
         } as any);
-        return res.json(updated);
+        return res.json(toPublicFiscalSettings(updated));
       }
     }
-    res.json(settings);
+    res.json(toPublicFiscalSettings(settings));
   });
 
   app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
@@ -1114,7 +1124,7 @@ export async function registerRoutes(
 
       const data = insertFiscalSettingsSchema.parse(dataToParse);
       const settings = await storage.upsertFiscalSettings(data);
-      res.json(settings);
+      res.json(toPublicFiscalSettings(settings));
     } catch (err) {
       console.error("Erro ao salvar configurações fiscais:", err);
       res.status(400).json({ message: "Dados fiscais inválidos" });
