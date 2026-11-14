@@ -281,3 +281,5 @@
 - [x] E2E isolado do commit `37c228e5c71e8386c553a905c4d53695eaad35bf` passou com a nova validação de preço e o bloqueio de venda simulada fora do QA.
 
 - [x] Execução E2E `43648423800` confirmou todos os passos: produto e lote QA criados, caixa aberto, venda adulterada rejeitada, venda oficial aceita, cancelamento, estoque restaurado, caixa fechado e produto de teste removido.
+
+- [x] `Aura MCP Full Audit` do commit `22697b335c6b1ec38ba0a5e36b1dabe84b88b952` concluiu com sucesso após o workflow passar a tratar a medição de determinismo não autorizada como pendente, conforme a própria especificação do gate, sem exigir publicação de consentimento em produção.
