@@ -305,3 +305,6 @@
 - [x] A alteração genérica de dados de empresa não pode mais mudar status; ativação passa pela rota dedicada, que também bloqueia uma segunda empresa enquanto tenant isolation não estiver pronta.
 
 - [x] Atualização pública de carrinho agora verifica que a comanda existe e permanece pending/serving; tickets concluídos retornam 409 e não podem ser alterados.
+
+- [x] Commit `e89d4805502af46e4e4d07aab8ed8725a3e7218d`: Integrated System CI, E2E isolado, MCP Full Audit, observabilidade e forensic PR checks passaram após os guards de tenant e as validações de comanda pública.
+- [x] Render conferido via integração: serviço original integrated-system continua em main, autoDeploy=off, atualizado em 13/11; nenhum deploy/alteração foi aplicado à produção. QA continua em serviço separado e branch própria.
