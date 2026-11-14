@@ -573,7 +573,7 @@ function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts 
   );
 }
 
-function BatchFields({ form, setForm, T, productUnit }: any) {
+function BatchFields({ form, setForm, T, productUnit, requiredSalePrice = false }: any) {
   const isKg = productUnit === "kg";
   return (
   <div className="grid grid-cols-2 gap-3">
@@ -582,8 +582,7 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
       <div className="col-span-2 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2 flex items-center gap-2">
         <span className="text-lg">⚖️</span>
         <p className="text-[9px] text-primary/80 font-bold">
-          Produto por peso. Informe o custo e o preço de venda <strong>por kg</strong>.
-          A quantidade em estoque é em <strong>kg</strong>.
+          Produto vendido por peso: quantidade total em kg, custo de compra por kg e preço de venda por kg. Se comprar pacotes, converta o custo total pelo peso líquido do pacote.
         </p>
       </div>
     )}
@@ -621,7 +620,7 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
     {/* ── Estoque e preços ──────────────────────────────────────────────── */}
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-        {isKg ? "Quantidade em Estoque (kg) *" : "Quantidade *"}
+        {isKg ? "Peso Total em Estoque (kg) *" : "Quantidade em Estoque (unidades) *"}
       </Label>
       <Input
         type="number"
@@ -629,38 +628,63 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
         className={`mt-1 ${T.dialogInput}`}
         value={form.quantity}
         onChange={e => setForm((f: any) => ({ ...f, quantity: e.target.value }))}
-        placeholder={isKg ? "Ex: 5.500 (kg)" : "0"}
+        placeholder={isKg ? "Ex.: 5,500 kg" : "Ex.: 12 unidades"}
       />
-      {isKg && <p className="text-[9px] mt-1 text-white/30 font-bold">Kg disponíveis em estoque</p>}
+      <p className="text-[9px] mt-1 text-white/30 font-bold">{isKg ? "Informe o peso total disponível, somando todos os pacotes." : "Informe o total de unidades disponíveis."}</p>
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-        {isKg ? "Custo de Compra (R$/kg)" : "Custo de Compra (R$)"}
+        {isKg ? "Custo de Compra (R$/kg)" : "Custo de Compra (R$/unidade)"}
       </Label>
       <Input
         className={`mt-1 ${T.dialogInput}`}
         value={form.costPrice}
         onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))}
-        placeholder={isKg ? "Ex: 18,50 por kg" : "0,00"}
+        placeholder={isKg ? "Ex.: 18,50 por kg" : "Ex.: 1,20 por unidade"}
       />
-      {isKg && <p className="text-[9px] mt-1 text-white/30 font-bold">Custo por quilograma</p>}
+      <p className="text-[9px] mt-1 text-white/30 font-bold">{isKg ? "Custo equivalente a 1 kg. Ex.: pacote de 5 kg por R$ 90,00 = R$ 18,00/kg." : "Custo de compra de uma unidade."}</p>
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-        {isKg ? "Preço de Venda (R$/kg)" : "Preço de Venda (R$)"}
+        {isKg ? `Preço de Venda (R$/kg)${requiredSalePrice ? " *" : ""}` : `Preço de Venda (R$/unidade)${requiredSalePrice ? " *" : ""}`}
       </Label>
       <Input
         className={`mt-1 ${T.dialogInput}`}
         value={form.salePrice ?? ""}
         onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
-        placeholder={isKg ? "Ex: 29,90 por kg" : "0,00 (deixe em branco para usar o preço do produto)"}
+        placeholder={isKg ? "Ex.: 29,90 por kg" : "Ex.: 2,50 por unidade"}
       />
-      {isKg && <p className="text-[9px] mt-1 text-primary/60 font-bold">⚖️ Caixa calcula automaticamente: peso × preço/kg</p>}
+      <p className="text-[9px] mt-1 text-primary/60 font-bold">{isKg ? "O Caixa calcula: peso informado × preço por kg." : "Preço cobrado por unidade."}</p>
     </div>
     {/* ── Datas ─────────────────────────────────────────────────────────── */}
-    <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
-      <Input type="date" className={`mt-1 ${T.dialogInput} [color-scheme:dark]`} value={form.expiryDate} onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))} />
+    <div className="col-span-2">
+      <div className="flex items-center justify-between gap-3">
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
+        <label className={`inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest ${T.muted}`}>
+          <input
+            type="checkbox"
+            checked={!form.expiryDate}
+            onChange={e => setForm((f: any) => ({
+              ...f,
+              expiryDate: e.target.checked
+                ? ""
+                : (f.expiryDate || new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()))
+            }))}
+            className="h-4 w-4 accent-cyan-400"
+          />
+          Sem validade
+        </label>
+      </div>
+      <Input
+        type="date"
+        disabled={!form.expiryDate}
+        className={`mt-1 ${T.dialogInput} [color-scheme:dark] disabled:opacity-40`}
+        value={form.expiryDate}
+        onChange={e => setForm((f: any) => ({ ...f, expiryDate: e.target.value }))}
+      />
+      {!form.expiryDate && (
+        <p className={`text-[9px] mt-1 font-bold ${T.muted}`}>Este lote está marcado como sem validade e não deve gerar alertas de vencimento.</p>
+      )}
     </div>
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Data de Entrada</Label>
@@ -1170,6 +1194,15 @@ export default function InventoryPage() {
       });
     }
 
+    const salePrice = Number(String(firstBatchForm.salePrice ?? "").replace(",", "."));
+    if (!Number.isFinite(salePrice) || salePrice <= 0) {
+      return toast({
+        title: "Informe o preço de venda",
+        description: productForm.unit === "kg" ? "Informe o valor de venda por quilograma (R$/kg)." : "Informe o valor de venda por unidade (R$/unidade).",
+        variant: "destructive",
+      });
+    }
+
     const productRes = await fetch("/api/products", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1653,7 +1686,7 @@ export default function InventoryPage() {
                   onClick={() => setFilterStatus(key)}
                   className={`px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-wide transition-all
                     ${filterStatus === key
-                      ? "bg-primary border-primary text-black shadow-[0_0_12px_rgba(0,229,255,0.3)] scale-105"
+                      ? (isLight ? "bg-primary/10 border-slate-300 text-slate-800 shadow-[0_0_12px_rgba(0,229,255,0.3)] scale-105" : "bg-primary/10 border-white/20 text-white shadow-[0_0_12px_rgba(0,229,255,0.3)] scale-105")
                       : isLight
                         ? "bg-slate-100 border-slate-300 text-slate-600 hover:border-slate-400"
                         : "bg-white/5 border-white/10 text-white/60 hover:border-white/20"
@@ -1965,15 +1998,16 @@ export default function InventoryPage() {
 
             <div className={`border-t pt-4 ${isLight ? "border-slate-200" : "border-white/10"}`}>
               <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${T.muted}`}>Primeiro Lote</p>
-              <BatchFields form={firstBatchForm} setForm={setFirstBatchForm} T={T} productUnit={productForm.unit} />
+              <BatchFields form={firstBatchForm} setForm={setFirstBatchForm} T={T} productUnit={productForm.unit} requiredSalePrice />
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button variant="ghost" onClick={() => setAddProductOpen(false)} className={T.muted}>Cancelar</Button>
               <Button
+                variant="ghost"
                 onClick={handleCreateProductAndFirstBatch}
                 disabled={createProductMut.isPending}
-                className="bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                className={T.muted}
               >
                 {createProductMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar Produto"}
               </Button>
@@ -2015,9 +2049,10 @@ export default function InventoryPage() {
             <div className="flex justify-end gap-3">
               <Button variant="ghost" onClick={() => setEditingProduct(null)} className={T.muted}>Cancelar</Button>
               <Button
+                variant="ghost"
                 onClick={() => editingProduct && updateProductMut.mutate({ id: editingProduct.id, data: productForm })}
                 disabled={updateProductMut.isPending}
-                className="bg-primary hover:bg-primary/90 text-black font-black uppercase tracking-widest px-6 rounded-xl"
+                className={T.muted}
               >
                 {updateProductMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
               </Button>
