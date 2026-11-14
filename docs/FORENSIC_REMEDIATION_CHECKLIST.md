@@ -299,3 +299,5 @@
 - [x] Ajuste de saldo de caixa e cancelamento de venda agora retornam 404 quando o registro não pertence à empresa ativa do administrador.
 
 - [x] Financeiro legado: bloqueadas operações administrativas de transações para admins quando há mais de uma empresa; businessType de lançamentos passa a ser derivado do estabelecimento ativo, não do payload.
+
+- [x] Mitigação multiempresa imediata: endpoints de cadastro público, criação de empresa pelo owner e criação por usuário não podem criar um segundo tenant enquanto o isolamento não estiver concluído; resposta 409 TENANT_ISOLATION_REQUIRED.
