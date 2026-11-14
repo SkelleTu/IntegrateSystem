@@ -35,6 +35,7 @@ export const users = pgTable("users", {
   role: text("role").notNull().default("barber"), // "admin", "barber", "owner"
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
   enterpriseId: integer("enterprise_id"),
+  tutorialCompletedAt: integer("tutorial_completed_at", { mode: "timestamp" }),
 });
 
 export const services = pgTable("services", {
