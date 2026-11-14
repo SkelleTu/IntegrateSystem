@@ -269,3 +269,5 @@
 - [x] Rotas fiscais deixam de usar empresa 1 como fallback: exigem contexto ativo de empresa para GET/POST de configurações, logs, histórico e emissão.
 
 - [x] Preservado o fluxo público de autoatendimento em /cart: o endpoint de itens não exige login do cliente, mas valida JSON, IDs e quantidades, usa nome/preço do catálogo no servidor e aplica rate limit. A criação/consulta pública de senhas também ganhou rate limit e verificação de serviço ativo.
+
+- [x] Commit `7ac22535ac32d4ef79176e1b7dd0b0c690738097`: Integrated System CI, E2E isolado, observabilidade e forensic checks concluíram com sucesso após hardening do autoatendimento. O teste E2E dedicado para preço do carrinho ainda precisa ser acrescentado.
