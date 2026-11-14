@@ -186,4 +186,45 @@ await expectStatus(await request(`/api/products/${productId}`, {
   headers: { cookie },
 }), 204, "delete-label-product");
 
+// Read-only coverage across the remaining operational modules.
+const moduleReadRoutes = [
+  ["catalog-categories", "/api/categories"],
+  ["catalog-menu-items", "/api/menu-items"],
+  ["queue-state", "/api/queue/state"],
+  ["inventory-list", "/api/inventory"],
+  ["inventory-restocks", "/api/inventory-restocks"],
+  ["product-cashier-catalog", "/api/products/cashier-items"],
+  ["finance-transactions", "/api/transactions"],
+  ["sales-history", "/api/sales"],
+  ["cash-register-history", "/api/cash-registers/history"],
+  ["fiscal-settings", "/api/fiscal/settings"],
+  ["fiscal-logs", "/api/fiscal/logs"],
+  ["fiscal-history", "/api/fiscal/history"],
+  ["employee-timeclock-history", "/api/time-clock/history"],
+  ["employee-timeclock-status", "/api/time-clock/status"],
+];
+for (const [label, route] of moduleReadRoutes) {
+  await expectStatus(await request(route, { headers: { cookie } }), 200, label);
+}
+await expectStatus(await request("/api/admin/monitoring", { headers: { cookie } }), 403, "owner-only-monitoring-denied-to-admin");
+
+// Static UI contracts for the fixes requested during the assisted audit.
+const sidebarSource = fs.readFileSync("client/src/components/app-sidebar.tsx", "utf8");
+const homeSource = fs.readFileSync("client/src/pages/Home.tsx", "utf8");
+const cashierSource = fs.readFileSync("client/src/pages/Cashier.tsx", "utf8");
+const inventorySource = fs.readFileSync("client/src/pages/Inventory.tsx", "utf8");
+const guardSource = fs.readFileSync("client/src/components/MasterPasswordGuard.tsx", "utf8");
+assert.ok(sidebarSource.includes('String(user?.role ?? "").trim().toLowerCase() === "owner"'), "owner navigation must be role-based");
+assert.ok(!sidebarSource.includes('username === "SkelleTu"'), "owner access must not depend on a hard-coded username");
+assert.ok(homeSource.includes("border border-white/40") && homeSource.includes("Plataforma Multi-Serviços"), "dashboard label contrast contract missing");
+assert.ok(homeSource.includes('<item.icon className="w-8 h-8 md:w-10 md:h-10 text-white"') && homeSource.includes('<b.icon className="w-10 h-10 md:w-12 md:h-12 text-white'), "dashboard icon contrast contract missing");
+assert.ok(guardSource.includes("bg-primary text-white border border-white/30"), "authorization action contrast contract missing");
+assert.ok(cashierSource.includes("h-[46%] max-h-[46%]") && cashierSource.includes("text-white text-2xl"), "cashier portrait/total contrast contract missing");
+assert.ok(cashierSource.includes('setWeightInputValue("")') && cashierSource.includes('placeholder="0,000"'), "weight input must start empty and use pt-BR decimal notation");
+assert.ok(inventorySource.includes("Sem validade") && inventorySource.includes("Peso Total em Estoque (kg)"), "inventory expiry/weight unit contract missing");
+assert.ok(inventorySource.includes("Custo de Compra (R$/kg)") && inventorySource.includes("Preço de Venda (R$/kg)"), "inventory per-kg pricing contract missing");
+assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produto"), "inventory sale price placeholder must be explicit");
+summary.push({ test: "cross-module-read-only-api-coverage", status: "passed", routes: moduleReadRoutes.length });
+summary.push({ test: "requested-ui-contracts", status: "passed" });
+
 console.log(JSON.stringify({ ok: true, tests: summary.length, summary }, null, 2));
