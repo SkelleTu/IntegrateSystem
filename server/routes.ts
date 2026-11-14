@@ -171,7 +171,7 @@ import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
 import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
-  tickets, users, fiscalSettings,
+  tickets, users, enterprises, fiscalSettings,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
 } from "../shared/pg-schema.js";
 
