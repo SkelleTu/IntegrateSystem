@@ -10,12 +10,12 @@ import { useQuery } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/tour/TourContext";
 
-function getTutorialKey(userId: number | string) {
-  return `aura_tutorial_done_${userId}`;
+function getTutorialKey(userId: number | string, enterpriseId?: number | string | null) {
+  return `aura_tutorial_done_${enterpriseId ?? "default"}_${userId}`;
 }
 
 export default function Home() {
@@ -24,19 +24,27 @@ export default function Home() {
   const { toast } = useToast();
   const { active, openModeSelect, stop } = useTour();
 
-  // ── First-time detection ───────────────────────────────────────────────────
+  // ── First-time detection: persist only after the user completes or skips.
+  const tutorialWasActive = useRef(false);
   useEffect(() => {
     if (!user) return;
-    const key = getTutorialKey(user.id);
-    const done = localStorage.getItem(key);
-    if (!done) {
-      // Mark as seen immediately so it won't auto-open again on next visit
-      localStorage.setItem(key, "1");
-      // Slight delay so the dashboard renders first
+    const key = getTutorialKey(user.id, user.enterpriseId);
+    if (!localStorage.getItem(key)) {
       const t = setTimeout(() => openModeSelect(true), 600);
       return () => clearTimeout(t);
     }
-  }, [user]);          // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.enterpriseId, openModeSelect]);
+
+  useEffect(() => {
+    if (active) {
+      tutorialWasActive.current = true;
+      return;
+    }
+    if (tutorialWasActive.current && user) {
+      localStorage.setItem(getTutorialKey(user.id, user.enterpriseId), "1");
+      tutorialWasActive.current = false;
+    }
+  }, [active, user?.id, user?.enterpriseId]);
 
   const handleNavigation = (url: string, adminOnly?: boolean) => {
     if (!user) { setLocation("/login"); return; }
