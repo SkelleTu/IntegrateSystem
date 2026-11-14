@@ -6,7 +6,7 @@ import {
   Clock, Star, Shield, Download, BookOpen, Power,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
@@ -14,37 +14,50 @@ import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/tour/TourContext";
 
-function getTutorialKey(userId: number | string, enterpriseId?: number | string | null) {
-  return `aura_tutorial_done_${enterpriseId ?? "default"}_${userId}`;
-}
-
 export default function Home() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth() as any;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { active, openModeSelect, stop } = useTour();
 
-  // ── First-time detection: persist only after the user completes or skips.
   const tutorialWasActive = useRef(false);
-  useEffect(() => {
-    if (!user) return;
-    const key = getTutorialKey(user.id, user.enterpriseId);
-    if (!localStorage.getItem(key)) {
-      const t = setTimeout(() => openModeSelect(true), 600);
-      return () => clearTimeout(t);
-    }
-  }, [user?.id, user?.enterpriseId, openModeSelect]);
+  const { data: tutorialStatus, isLoading: isTutorialStatusLoading } = useQuery<{ completed: boolean }>({
+    queryKey: ["/api/tutorial/status"],
+    enabled: !!user,
+    queryFn: async () => {
+      const response = await fetch("/api/tutorial/status", { credentials: "include" });
+      if (!response.ok) throw new Error("Não foi possível consultar o tutorial.");
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
 
+  // Abre automaticamente somente quando o servidor confirma que ainda não foi concluído/pulado.
+  useEffect(() => {
+    if (!user || isTutorialStatusLoading || tutorialStatus?.completed !== false || active) return;
+    const timer = setTimeout(() => openModeSelect(true), 600);
+    return () => clearTimeout(timer);
+  }, [user?.id, isTutorialStatusLoading, tutorialStatus?.completed, active, openModeSelect]);
+
+  // A conclusão e o botão Pular são persistidos no banco, por conta autenticada.
   useEffect(() => {
     if (active) {
       tutorialWasActive.current = true;
       return;
     }
     if (tutorialWasActive.current && user) {
-      localStorage.setItem(getTutorialKey(user.id, user.enterpriseId), "1");
       tutorialWasActive.current = false;
+      void fetch("/api/tutorial/complete", {
+        method: "POST",
+        credentials: "include",
+      }).then((response) => {
+        if (!response.ok) throw new Error("Não foi possível salvar a conclusão do tutorial.");
+        queryClient.setQueryData(["/api/tutorial/status"], { completed: true });
+      }).catch((error) => console.error("[TUTORIAL] Falha ao salvar conclusão:", error));
     }
-  }, [active, user?.id, user?.enterpriseId]);
+  }, [active, user?.id, queryClient]);
 
   const handleNavigation = (url: string, adminOnly?: boolean) => {
     if (!user) { setLocation("/login"); return; }
