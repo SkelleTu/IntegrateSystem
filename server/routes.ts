@@ -2655,19 +2655,33 @@ export async function registerRoutes(
   });
   app.get("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const { start, end, businessType } = req.query;
-      console.log('API Request - GET /api/transactions:', { start, end, businessType });
-      
+      const user = req.user as any;
+      const enterpriseRows = await db.select({
+        id: enterprises.id,
+        businessType: enterprises.businessType
+      }).from(enterprises).limit(2);
+      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
+        return res.status(409).json({
+          code: "TRANSACTION_TENANT_REQUIRED",
+          message: "O histórico financeiro legado ainda não possui vínculo direto com empresa. A consulta administrativa fica bloqueada quando há mais de um estabelecimento."
+        });
+      }
+
+      const activeEnterpriseId = Number(user.enterpriseId);
+      const activeEnterprise = enterpriseRows.find((entry: any) => Number(entry.id) === activeEnterpriseId)
+        || (enterpriseRows.length === 1 ? enterpriseRows[0] : undefined);
+      if (!activeEnterprise && !isSystemOwner(user)) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+
+      const { start, end } = req.query;
       let startDate: Date | undefined;
       let endDate: Date | undefined;
-
       const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
-
       if (start && start !== "undefined" && start !== "") {
         const date = new Date(start as string);
         if (isValidDate(date)) startDate = date;
       }
-
       if (end && end !== "undefined" && end !== "") {
         const date = new Date(end as string);
         if (isValidDate(date)) endDate = date;
@@ -2676,20 +2690,39 @@ export async function registerRoutes(
       const filters = {
         startDate,
         endDate,
-        businessType: businessType as string,
+        businessType: activeEnterprise?.businessType || undefined,
       };
       const list = await storage.getTransactions(filters);
-      console.log('Storage returned transactions count:', list.length);
       res.json(list);
     } catch (err) {
-      console.error('Error in GET /api/transactions:', err);
+      console.error("Error in GET /api/transactions:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
   app.post("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const input = insertTransactionSchema.parse(req.body);
+      const user = req.user as any;
+      const enterpriseRows = await db.select({
+        id: enterprises.id,
+        businessType: enterprises.businessType
+      }).from(enterprises).limit(2);
+      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
+        return res.status(409).json({
+          code: "TRANSACTION_TENANT_REQUIRED",
+          message: "O lançamento financeiro legado não possui vínculo direto com empresa. A criação administrativa fica bloqueada quando há mais de um estabelecimento."
+        });
+      }
+      const activeEnterpriseId = Number(user.enterpriseId);
+      const activeEnterprise = enterpriseRows.find((entry: any) => Number(entry.id) === activeEnterpriseId)
+        || (enterpriseRows.length === 1 ? enterpriseRows[0] : undefined);
+      if (!activeEnterprise) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de lançar uma transação." });
+      }
+      const input = insertTransactionSchema.parse({
+        ...req.body,
+        businessType: activeEnterprise.businessType,
+      });
       const transaction = await storage.createTransaction(input);
       res.status(201).json(transaction);
     } catch (err) {
@@ -2703,6 +2736,14 @@ export async function registerRoutes(
 
   app.delete("/api/transactions/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
+      const user = req.user as any;
+      const enterpriseRows = await db.select({ id: enterprises.id }).from(enterprises).limit(2);
+      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
+        return res.status(409).json({
+          code: "TRANSACTION_TENANT_REQUIRED",
+          message: "A exclusão financeira fica bloqueada para administradores enquanto as transações não tiverem vínculo direto com empresa."
+        });
+      }
       const id = parseInt(req.params.id);
       await storage.deleteTransaction(id);
       res.status(200).json({ message: "Transaction deleted" });
