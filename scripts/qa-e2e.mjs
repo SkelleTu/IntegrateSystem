@@ -86,6 +86,34 @@ const staff = await expectStatus(await request("/api/admin/register-barber", {
 }), 201, "create-enterprise-staff");
 assert.equal(staff.role, "barber");
 assert.equal(Number(staff.enterpriseId), Number(sessionUser.enterpriseId), "staff account must inherit the administrator's enterprise");
+// Validate the server-side time-clock state machine in isolated QA.
+const qaCredentialId = "qa-webauthn-credential-id-1234567890";
+await expectStatus(await request("/api/auth/register-fingerprint", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ fingerprintId: qaCredentialId }),
+}), 200, "qa-timeclock-credential-registration");
+const outOfOrderPunch = await request("/api/time-clock/register", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ type: "break_start", fingerprintId: qaCredentialId }),
+});
+const outOfOrderData = await expectStatus(outOfOrderPunch, 409, "timeclock-out-of-order-rejected");
+assert.equal(outOfOrderData.expectedType, "in");
+for (const type of ["in", "break_start", "break_end", "out"]) {
+  await expectStatus(await request("/api/time-clock/register", {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ type, fingerprintId: qaCredentialId }),
+  }), 200, `timeclock-${type}`);
+}
+const repeatedPunch = await expectStatus(await request("/api/time-clock/register", {
+  method: "POST",
+  headers: { cookie, "content-type": "application/json" },
+  body: JSON.stringify({ type: "out", fingerprintId: qaCredentialId }),
+}), 409, "timeclock-duplicate-out-rejected");
+assert.equal(repeatedPunch.expectedType, "in");
+
 const tutorialBefore = await expectStatus(await request("/api/tutorial/status", { headers: { cookie } }), 200, "tutorial-status-before");
 assert.equal(tutorialBefore.completed, false);
 const tutorialCompleted = await expectStatus(await request("/api/tutorial/complete", {
@@ -301,6 +329,7 @@ assert.ok(cashierSource.includes("h-[46%] max-h-[46%]") && cashierSource.include
 assert.ok(cashierSource.includes('setWeightInputValue("")') && cashierSource.includes('placeholder="0,000"'), "weight input must start empty and use pt-BR decimal notation");
 assert.ok(inventorySource.includes("Sem validade") && inventorySource.includes("Peso Total em Estoque (kg)"), "inventory expiry/weight unit contract missing");
 assert.ok(inventorySource.includes("Custo de Compra (R$/kg)") && inventorySource.includes("Preço de Venda (R$/kg)"), "inventory per-kg pricing contract missing");
+assert.ok(routesSource.includes("const allowedTypes = new Set") && routesSource.includes("const expectedType ="), "time-clock server-side state machine contract missing");
 assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produto"), "inventory sale price placeholder must be explicit");
 assert.ok(reportsSource.includes('new Date(`${dateRange.start}T00:00:00`).toISOString()') && !reportsSource.includes('T00:00:00.000Z'), "reports must filter by local business-day boundaries");
 assert.ok(routesSource.includes('String(user?.role || "").trim().toLowerCase() === "owner";') && !routesSource.includes('String(user?.username || "").trim().toLowerCase() === "skelletu"'), "server owner authorization must rely on the owner role only");
