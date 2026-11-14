@@ -2378,6 +2378,13 @@ export async function registerRoutes(
     if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
 
     const { sale, items, payments, ticketId } = req.body;
+    let normalizedTicketId: number | undefined;
+    if (ticketId !== undefined && ticketId !== null) {
+      normalizedTicketId = Number(ticketId);
+      if (!Number.isSafeInteger(normalizedTicketId) || normalizedTicketId <= 0) {
+        return res.status(400).json({ message: "Identificador de comanda inválido." });
+      }
+    }
 
     // Fail closed before any database write: malformed lines or payment totals must
     // never create a sale that cannot be reconciled against stock and the cash register.
@@ -2498,13 +2505,9 @@ export async function registerRoutes(
     const newSale = await storage.createSale(
       parsedSale,
       parsedItems,
-      parsedPayments
+      parsedPayments,
+      normalizedTicketId
     );
-
-    if (ticketId) {
-      // Mark ticket as completed when sale is finalized
-      await db.update(tickets).set({ status: "completed" }).where(eq(tickets.id, ticketId));
-    }
 
     // Notificação Webhook Simples (Ex: para o dono receber via celular)
     const WEBHOOK_URL = process.env.NOTIFICATION_WEBHOOK_URL;
