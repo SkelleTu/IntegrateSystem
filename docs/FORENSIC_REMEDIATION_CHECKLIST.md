@@ -279,3 +279,5 @@
 - [x] E2E isolado tentou venda com preço adulterado (rejeitada), concluiu venda com preço oficial, cancelou e confirmou reposição do lote.
 
 - [x] E2E isolado do commit `37c228e5c71e8386c553a905c4d53695eaad35bf` passou com a nova validação de preço e o bloqueio de venda simulada fora do QA.
+
+- [x] Execução E2E `43648423800` confirmou todos os passos: produto e lote QA criados, caixa aberto, venda adulterada rejeitada, venda oficial aceita, cancelamento, estoque restaurado, caixa fechado e produto de teste removido.
