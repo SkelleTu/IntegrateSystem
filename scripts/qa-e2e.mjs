@@ -66,6 +66,15 @@ assert.ok(cookie.includes("connect.sid="), "session cookie was not issued");
 summary.push({ test: "qa-admin-login", status: 200 });
 
 await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
+const tutorialBefore = await expectStatus(await request("/api/tutorial/status", { headers: { cookie } }), 200, "tutorial-status-before");
+assert.equal(tutorialBefore.completed, false);
+const tutorialCompleted = await expectStatus(await request("/api/tutorial/complete", {
+  method: "POST",
+  headers: { cookie },
+}), 200, "tutorial-complete-persisted");
+assert.equal(tutorialCompleted.completed, true);
+const tutorialAfter = await expectStatus(await request("/api/tutorial/status", { headers: { cookie } }), 200, "tutorial-status-after");
+assert.equal(tutorialAfter.completed, true);
 await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "products-api-before");
 
 // Queue control mutations must never be callable by anonymous visitors.

@@ -500,7 +500,7 @@ export default function Cashier() {
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
 
-  const isAdmin = (register?.userId === 1) || true;
+  const isAdmin = user?.role === "admin" || user?.role === "owner";
 
   const adjustMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -563,6 +563,10 @@ export default function Cashier() {
   };
 
   const finalizeSale = (isSimulation: boolean = false) => {
+    if (cart.some(({ item }) => !Number.isSafeInteger(Number(item.price)) || Number(item.price) <= 0)) {
+      toast({ title: "Produto sem preço de venda", description: "Cadastre um preço válido antes de finalizar a venda.", variant: "destructive" });
+      return;
+    }
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
     if (totalPaid < total && !isSimulation) {
       toast({ title: "Pagamento Incompleto", description: `Faltam R$ ${((total - totalPaid) / 100).toFixed(2)}`, variant: "destructive" });
@@ -587,7 +591,8 @@ export default function Cashier() {
           // Para unidade, permanece como inteiro
           quantity: isKg ? Math.round(i.quantity * 1000) : Math.round(i.quantity), 
           unitPrice: i.item.price, 
-          totalPrice: Math.round(i.item.price * i.quantity) 
+          totalPrice: Math.round(i.item.price * i.quantity),
+          unitType: isKg ? "kg" : "unit" 
         };
       }),
       payments: isSimulation ? [{ method: "cash", amount: total }] : payments

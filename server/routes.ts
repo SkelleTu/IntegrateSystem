@@ -105,6 +105,14 @@ function hasAdminRole(user: any): boolean {
   return role === "admin" || role === "owner";
 }
 
+const requireAdmin = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated?.()) return res.sendStatus(401);
+  if (!hasAdminRole(req.user)) {
+    return res.status(403).json({ message: "Acesso restrito a administradores." });
+  }
+  return next();
+};
+
 function hasOwnerRole(user: any): boolean {
   return normalizeRole(user) === "owner";
 }
@@ -585,6 +593,33 @@ export async function registerRoutes(
   app.get(api.auth.me.path, (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     res.json(toPublicUser(req.user));
+  });
+
+  app.get("/api/tutorial/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const account = await storage.getUser(Number(user.id));
+      if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+      return res.json({ completed: Boolean(account.tutorialCompletedAt) });
+    } catch (error: any) {
+      console.error("[TUTORIAL] Falha ao consultar status:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível consultar o tutorial." });
+    }
+  });
+
+  app.post("/api/tutorial/complete", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const account = await storage.getUser(Number(user.id));
+      if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+      if (!account.tutorialCompletedAt) {
+        await storage.updateUser(Number(user.id), { tutorialCompletedAt: new Date().toISOString() });
+      }
+      return res.json({ completed: true });
+    } catch (error: any) {
+      console.error("[TUTORIAL] Falha ao salvar conclusão:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível salvar a conclusão do tutorial." });
+    }
   });
 
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
@@ -1318,7 +1353,7 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.post("/api/inventory", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const body = { ...req.body };
       // Trata a conversão de string de data para objeto Date se necessário
@@ -1366,7 +1401,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/inventory/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteInventoryItem(Number(req.params.id));
       res.status(204).send();
@@ -1376,17 +1411,18 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/inventory/:id/restock", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/:id/restock", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
 
-      if (!quantity || quantity <= 0) {
-        return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+      const parsedQuantity = Number(quantity);
+      if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+        return res.status(400).json({ message: "Quantidade deve ser um número positivo válido" });
       }
 
       const restockData = {
-        quantity: parseInt(quantity),
+        quantity: parsedQuantity,
         unit: unit || undefined,
         itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit) : undefined,
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(',', '.')) * 100) : undefined,
@@ -1455,13 +1491,14 @@ export async function registerRoutes(
             _batchId: batch.id,
             name,
             price: batch.salePrice ?? prod.salePrice ?? 0,
+            costPrice: batch.costPrice,
             barcode: batch.barcode ?? null,
             sku: batch.sku ?? null,
             codigoProduto: (prod as any).codigoProduto ?? null,
             codigoBalanca: prod.codigoBalanca ?? null,
             imageUrl: prod.imageUrl ?? null,
             isAvailable: true,
-            unitType: prod.unit === "kg" ? "kg" : "unit",
+            unitType: String(prod.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit",
             unit: prod.unit,
             quantity: batch.quantity,
           });
@@ -1533,7 +1570,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products", isAuthenticated, async (req, res) => {
+  app.post("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, ...rest } = req.body;
       const data = insertProductSchema.parse({
@@ -1549,7 +1586,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
       const data = {
@@ -1565,7 +1602,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/products", isAuthenticated, async (req, res) => {
+  app.delete("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1593,7 +1630,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/restore", isAuthenticated, async (req, res) => {
+  app.post("/api/products/restore", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1610,7 +1647,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/zero-quantities", isAuthenticated, async (req, res) => {
+  app.post("/api/products/zero-quantities", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1627,7 +1664,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteProduct(Number(req.params.id));
       res.status(204).send();
@@ -1646,7 +1683,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/batches", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const productId = Number(req.params.id);
@@ -1670,7 +1707,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const data: any = { ...rest };
@@ -1687,7 +1724,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteBatch(Number(req.params.id));
       res.status(204).send();
@@ -1696,7 +1733,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/:id/deduct", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/deduct", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const { quantity, reason } = req.body;
@@ -1779,6 +1816,9 @@ export async function registerRoutes(
     let registerOpenedAt: Date | null = null;
     let saleId: number | null = null;
     let secondSaleId: number | null = null;
+    let weightedProductId: number | null = null;
+    let weightedBatchId: number | null = null;
+    let weightedSaleId: number | null = null;
     let step = "init";
 
     const cleanup = async () => {
@@ -1820,14 +1860,14 @@ export async function registerRoutes(
 
           const localBatches: any[] = await database.select({ id: batches.id })
             .from(batches)
-            .where(eq(batches.batchNumber, marker));
+            .where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")));
           for (const localBatch of localBatches) {
             await database.delete(batchLogs).where(eq(batchLogs.batchId, Number(localBatch.id)));
             await database.delete(batches).where(eq(batches.id, Number(localBatch.id)));
           }
 
-          await database.delete(products).where(eq(products.codigoProduto, marker));
-          await database.delete(products).where(eq(products.name, marker));
+          await database.delete(products).where(or(eq(products.codigoProduto, marker), eq(products.codigoProduto, marker + "_KG")));
+          await database.delete(products).where(or(eq(products.name, marker), eq(products.name, marker + "_KG")));
           if (registerId) {
             // Fallback is constrained to the test user's register created in this run.
             await database.delete(cashRegisters).where(and(
@@ -2008,6 +2048,80 @@ export async function registerRoutes(
         throw new Error("E2E PIX financial reversal transaction missing");
       }
 
+      step = "createWeightedProduct";
+      const weightedProduct = await storage.createProduct({
+        name: marker + "_KG",
+        unit: "kg",
+        minStock: 0,
+        salePrice: 1000,
+        codigoProduto: marker + "_KG",
+      } as any);
+      weightedProductId = weightedProduct.id;
+
+      const weightedBatch = await storage.createBatch({
+        productId: weightedProductId,
+        quantity: 1.5,
+        sku: null,
+        variantName: "E2E WEIGHTED",
+        barcode: null,
+        batchNumber: marker + "_KG",
+        supplierCode: null,
+        supplier: null,
+        manufactureDate: null,
+        expiryDate: null,
+        costPrice: 500,
+        salePrice: 1000,
+        userId: testUserId,
+      } as any);
+      weightedBatchId = weightedBatch.id;
+
+      step = "createWeightedSale";
+      const weightedSale = await storage.createSale(
+        {
+          cashRegisterId: registerId,
+          userId: testUserId,
+          totalAmount: 375,
+          customerName: marker,
+          fiscalStatus: "none",
+          fiscalType: "NFCe",
+          status: "completed",
+        } as any,
+        [{
+          itemType: "product",
+          itemId: 500000 + weightedBatchId,
+          quantity: 375,
+          unitPrice: 1000,
+          totalPrice: 375,
+          unitType: "kg",
+        }] as any,
+        [{
+          method: "cash",
+          amount: 375,
+          createdAt: new Date(),
+        }] as any,
+      );
+      weightedSaleId = weightedSale.id;
+      const weightedItems: any[] = await storage.getSaleItems(weightedSaleId);
+      if (!weightedItems.some((item: any) => Number(item.quantity) === 375 && item.unitType === "kg")) {
+        throw new Error("E2E weighted sale quantity/unit persistence failed");
+      }
+      const weightedStockAfterSale = await storage.getProductBatches(weightedProductId);
+      const weightedRemaining = Number(weightedStockAfterSale.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRemaining - 1.125) > 0.000001) {
+        throw new Error("E2E weighted stock deduction failed: expected 1.500 -> 1.125 kg");
+      }
+
+      step = "cancelWeightedSale";
+      const weightedCancelled = await storage.cancelSale(weightedSaleId);
+      if (weightedCancelled.status !== "cancelled") {
+        throw new Error("E2E weighted sale cancellation failed");
+      }
+      const weightedStockAfterCancel = await storage.getProductBatches(weightedProductId);
+      const weightedRestored = Number(weightedStockAfterCancel.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRestored - 1.5) > 0.000001) {
+        throw new Error("E2E weighted stock reversal failed: expected 1.125 -> 1.500 kg");
+      }
+
       step = "cancelSale";
       const cancelled = await storage.cancelSale(saleId);
       if (cancelled.status !== "cancelled") {
@@ -2057,6 +2171,7 @@ export async function registerRoutes(
           "financial income for both sales",
           "cancel both sales",
           "stock 0 -> 1 -> 2",
+          "weighted sale 0.375 kg: stock 1.500 -> 1.125 -> 1.500 kg",
           "financial reversal for both sales",
           "cash close",
           "cash history",
@@ -2103,13 +2218,14 @@ export async function registerRoutes(
         const remainingRegisters = registerOpenedAt
           ? await database.select().from(cashRegisters).where(and(eq(cashRegisters.userId, testUserId), eq(cashRegisters.openedAt, registerOpenedAt)))
           : [];
-        const remainingBatchLogs = batchId
-          ? await database.select().from(batchLogs).where(eq(batchLogs.batchId, batchId))
+        const trackedBatchIds = [batchId, weightedBatchId].filter((id): id is number => typeof id === "number");
+        const remainingBatchLogs = trackedBatchIds.length
+          ? await database.select().from(batchLogs).where(or(...trackedBatchIds.map((id) => eq(batchLogs.batchId, id))))
           : [];
         return {
-          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker)))).length,
+          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker), eq(products.codigoProduto, marker + "_KG"), eq(products.name, marker + "_KG")))).length,
           sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
-          batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
+          batches: (await database.select().from(batches).where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")))).length,
           payments: dependentPayments.length,
           saleItems: dependentSaleItems.length,
           transactions: remainingTransactions.length,
@@ -2213,11 +2329,15 @@ export async function registerRoutes(
       const quantity = Number(item?.quantity);
       const unitPrice = Number(item?.unitPrice);
       const totalPrice = Number(item?.totalPrice);
+      const unitType = item?.unitType === "kg" ? "kg" : "unit";
+      const expectedTotal = unitType === "kg"
+        ? Math.round(quantity * unitPrice / 1000)
+        : quantity * unitPrice;
       if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
-          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
+          !Number.isSafeInteger(unitPrice) || unitPrice <= 0 ||
           !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
-          totalPrice !== quantity * unitPrice) {
-        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+          !Number.isSafeInteger(expectedTotal) || totalPrice !== expectedTotal) {
+        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes com a unidade informada.` });
       }
     }
     const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
@@ -2483,7 +2603,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const input = insertTransactionSchema.parse(req.body);
       const transaction = await storage.createTransaction(input);
@@ -2497,7 +2617,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTransaction(id);
@@ -2508,7 +2628,7 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.post("/api/inventory/log", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/log", isAuthenticated, requireAdmin, async (req, res) => {
     const user = req.user as any;
     const log = await storage.createInventoryLog({ ...req.body, userId: user.id });
     const inv = await storage.getInventoryItem(log.inventoryId);

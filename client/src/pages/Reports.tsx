@@ -137,7 +137,7 @@ export default function Reports() {
             <Landmark className="w-12 h-12 text-primary" />
           </div>
           <CardHeader className="pb-2">
-            <CardTitle className="text-white/40 text-[10px] font-black uppercase tracking-widest">Total Líquido</CardTitle>
+            <CardTitle className="text-white/40 text-[10px] font-black uppercase tracking-widest">Vendas Concluídas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-primary text-4xl font-black italic tracking-tighter">

@@ -233,7 +233,8 @@ const TABLE_DEFINITIONS = [
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'barber',
     fingerprint_id TEXT UNIQUE,
-    enterprise_id INTEGER
+    enterprise_id INTEGER,
+    tutorial_completed_at TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -555,6 +556,7 @@ export async function setupDatabase() {
     "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'barber'",
     "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
     "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE users ADD COLUMN tutorial_completed_at TEXT",
   ];
   for (const migration of localMigrations) {
     try {
@@ -808,6 +810,26 @@ export async function setupDatabase() {
   // PostgreSQL schema before allowing authentication/routes to start.
   if (neonPool) {
     await verifyNeonConnection();
+    await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tutorial_completed_at TEXT");
+    // Preserve existing whole-unit stock values while enabling fractional kilograms.
+    // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
+    const stockQuantityColumns = await neonPool.query(`
+      SELECT table_name, data_type, numeric_precision, numeric_scale
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'quantity'
+        AND table_name = ANY($1::text[])
+    `, [["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]]);
+    const stockQuantityShape = new Map((stockQuantityColumns.rows as any[]).map((row) => [String(row.table_name), row]));
+    for (const table of ["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]) {
+      const column = stockQuantityShape.get(table) as any;
+      if (!column || column.data_type !== "numeric" ||
+          Number(column.numeric_precision) !== 14 || Number(column.numeric_scale) !== 3) {
+        await neonPool.query(
+          `ALTER TABLE public."${table}" ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric`
+        );
+      }
+    }
     const report = await auditDatabaseParity();
     if (!report.ok) {
       throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
@@ -836,11 +858,12 @@ export async function auditDatabaseParity() {
         table: config.name,
         columns: config.columns.map((column) => ({
           name: column.name,
-          type: column.getSQLType().toLowerCase() === "serial"
-            ? "integer"
-            : column.getSQLType().toLowerCase() === "timestamp"
-              ? "timestamp without time zone"
-              : column.getSQLType().toLowerCase(),
+          type: (() => {
+          const sqlType = column.getSQLType().toLowerCase();
+          if (sqlType === "serial") return "integer";
+          if (sqlType === "timestamp") return "timestamp without time zone";
+          return sqlType.replace(/\([^)]*\)/g, "");
+        })(),
           notNull: column.notNull,
         })),
       };
