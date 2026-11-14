@@ -1283,7 +1283,7 @@ export async function registerRoutes(
     res.json(services);
   });
 
-  app.post(api.services.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.services.create.path, isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const input = api.services.create.input.parse(req.body);
       const service = await storage.createService(input);
@@ -1297,7 +1297,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.services.update.path, isAuthenticated, async (req, res) => {
+  app.put(api.services.update.path, isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const input = api.services.update.input.parse(req.body);
       const service = await storage.updateService(Number(req.params.id), input);
@@ -1307,7 +1307,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.services.delete.path, isAuthenticated, async (req, res) => {
+  app.delete(api.services.delete.path, isAuthenticated, requireAdmin, async (req, res) => {
     await storage.deleteService(Number(req.params.id));
     res.status(204).send();
   });
@@ -1331,13 +1331,13 @@ export async function registerRoutes(
     res.json(newState);
   });
 
-  app.post(api.queue.reset.path, isAuthenticated, async (req, res) => {
+  app.post(api.queue.reset.path, isAuthenticated, requireAdmin, async (req, res) => {
     const input = api.queue.reset.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.startFrom, currentNumber: input.startFrom });
     res.json(newState);
   });
 
-  app.post(api.queue.set.path, isAuthenticated, async (req, res) => {
+  app.post(api.queue.set.path, isAuthenticated, requireAdmin, async (req, res) => {
     const input = api.queue.set.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.number });
     res.json(newState);
@@ -2427,7 +2427,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
+  app.get("/api/cash-registers/history", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { start, end } = req.query;
       const filters: any = {};
@@ -2454,7 +2454,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sales", isAuthenticated, async (req, res) => {
+  app.get("/api/sales", isAuthenticated, requireAdmin, async (req, res) => {
     const { start, end } = req.query;
     
     let startDate: Date | undefined;
@@ -2499,103 +2499,16 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales/:id/emit-fiscal", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID de venda inválido." });
-      const sale = await storage.getSale(id);
-      
-      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
-      if (!isSystemOwner(user)) {
-        const saleOwner = sale.userId ? await storage.getUser(Number(sale.userId)) : undefined;
-        if (!saleOwner || Number(saleOwner.enterpriseId) !== Number(user.enterpriseId)) {
-          return res.status(404).json({ message: "Venda não encontrada" });
-        }
-      }
-      if (!sale.customerTaxId) return res.status(400).json({ message: "CPF necessário para emissão" });
-
-      // Simulação de emissão (Estrutura completa NF-e / NFC-e)
-      const isNFCe = sale.fiscalType === "NFCe";
-      const mod = isNFCe ? "65" : "55";
-      const simulatedKey = `35240100000000000191${mod}001${String(sale.id).padStart(9, '0')}123456789`;
-      
-      const simulatedXml = `<?xml version="1.0" encoding="UTF-8"?>
-<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-  <NFe>
-    <infNFe Id="NFe${simulatedKey}" versao="4.00">
-      <ide>
-        <cUF>35</cUF>
-        <natOp>Venda de Mercadoria</natOp>
-        <mod>${mod}</mod>
-        <serie>1</serie>
-        <nNF>${sale.id}</nNF>
-        <dhEmi>${new Date().toISOString()}</dhEmi>
-        <tpImp>${isNFCe ? '4' : '1'}</tpImp>
-      </ide>
-      <emit>
-        <CNPJ>00000000000191</CNPJ>
-        <xNome>Barbearia &amp; Padaria SkelleTu</xNome>
-        <enderEmit>
-          <xLgr>Rua Exemplo</xLgr><nro>123</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>SAO PAULO</xMun><UF>SP</UF>
-        </enderEmit>
-        <CRT>1</CRT>
-      </emit>
-      <dest>
-        <CPF>${sale.customerTaxId}</CPF>
-        <xNome>${sale.customerName || 'Consumidor Final'}</xNome>
-        ${!isNFCe ? `<enderDest><xLgr>${sale.customerAddress || ''}</xLgr><nro>SN</nro><xBairro>Bairro</xBairro><cMun>3550308</cMun><xMun>${sale.customerCity || ''}</xMun><UF>${sale.customerState || ''}</UF></enderDest>` : ''}
-      </dest>
-      <det nItem="1">
-        <prod>
-          <cProd>001</cProd>
-          <xProd>Serviço/Produto Geral</xProd>
-          <NCM>00000000</NCM>
-          <CFOP>${isNFCe ? '5102' : '5101'}</CFOP>
-          <uCom>UN</uCom>
-          <qCom>1.0000</qCom>
-          <vUnCom>${(sale.totalAmount/100).toFixed(2)}</vUnCom>
-          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd>
-        </prod>
-        <imposto>
-          <vTotTrib>${(sale.totalAmount * 0.1345 / 100).toFixed(2)}</vTotTrib>
-          <ICMS><ICMS00><orig>0</orig><CST>00</CST><modBC>3</modBC><vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><pICMS>18.00</pICMS><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS></ICMS00></ICMS>
-        </imposto>
-      </det>
-      <total>
-        <ICMSTot>
-          <vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS>
-          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd><vNF>${(sale.totalAmount/100).toFixed(2)}</vNF>
-        </ICMSTot>
-      </total>
-      <transp><modFrete>9</modFrete></transp>
-      <pag>
-        <detPag><tPag>01</tPag><vPag>${(sale.totalAmount/100).toFixed(2)}</vPag></detPag>
-      </pag>
-    </infNFe>
-    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>...</Signature>
-  </NFe>
-</nfeProc>`;
-      
-      const updatedSale = await storage.updateSaleFiscal(sale.id, {
-        fiscalStatus: "issued",
-        fiscalKey: simulatedKey,
-        fiscalXml: simulatedXml
-      });
-
-      res.json({ 
-        message: "Simulação de emissão concluída", 
-        key: simulatedKey,
-        status: "issued",
-        sale: updatedSale
-      });
-    } catch (err) {
-      res.status(500).json({ message: "Erro na simulação fiscal" });
-    }
+  // Legacy endpoint intentionally fails closed: its former implementation generated
+  // hard-coded, unsigned sample XML and marked a sale as issued without SEFAZ proof.
+  // Real fiscal issuance is handled only by /api/fiscal/emitir/:saleId.
+  app.post("/api/sales/:id/emit-fiscal", isAuthenticated, requireAdmin, async (_req, res) => {
+    return res.status(410).json({
+      code: "LEGACY_FISCAL_SIMULATION_DISABLED",
+      message: "Este endpoint legado gerava documento fictício. Use o fluxo fiscal configurado em /api/fiscal/emitir/:saleId; nenhuma venda foi alterada."
+    });
   });
-
-  app.get("/api/transactions", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { start, end, businessType } = req.query;
       console.log('API Request - GET /api/transactions:', { start, end, businessType });
@@ -2664,7 +2577,7 @@ export async function registerRoutes(
     }
     res.json(log);
   });
-  app.post("/api/tickets/:id/items", async (req, res) => {
+  app.post("/api/tickets/:id/items", isAuthenticated, async (req, res) => {
     try {
       const { items } = req.body;
       const ticket = await storage.updateTicketItems(Number(req.params.id), items);
