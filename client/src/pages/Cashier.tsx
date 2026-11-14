@@ -851,14 +851,16 @@ function CashierContent({
         {/* Area Principal de Produtos */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 lg:p-4">
           <div className="w-full flex items-center justify-between mb-2 sm:mb-4 shrink-0 gap-2 sm:gap-3">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => finalizeSale(true)}
-              className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[9px] sm:text-[10px] h-9 sm:h-10 px-3 sm:px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-            >
-              <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
-            </Button>
+            {import.meta.env.DEV && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => finalizeSale(true)}
+                className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[9px] sm:text-[10px] h-9 sm:h-10 px-3 sm:px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,0,0.1)]"
+              >
+                <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
+              </Button>
+            )}
 
             {/* Toggle cards / lista */}
             <button
