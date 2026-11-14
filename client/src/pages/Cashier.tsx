@@ -586,7 +586,9 @@ export default function Cashier() {
         const isKg = (i.item as any).unitType === "kg";
         return { 
           itemType: 'product', 
-          itemId: i.item.id, 
+          itemId: i.item.id,
+          sourceType: (i.item as any)._batchId ? "batch" : (i.item as any).inventoryId ? "inventory" : "menu",
+          sourceId: (i.item as any)._batchId ?? (i.item as any).inventoryId ?? i.item.id,
           // Para produtos por quilo, a quantidade é enviada em gramas (inteiro)
           // Para unidade, permanece como inteiro
           quantity: isKg ? Math.round(i.quantity * 1000) : Math.round(i.quantity), 
