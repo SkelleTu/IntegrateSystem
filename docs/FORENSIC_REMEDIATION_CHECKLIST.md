@@ -135,7 +135,7 @@
 - [ ] Revisar certificado A1, armazenamento seguro, senha e expiração.
 - [ ] Revisar CSC, ID do CSC, UF, NCM, CFOP, CST/CSOSN, ICMS e regras tributárias.
 - [ ] Validar XML, assinatura, QR Code, contingência, cancelamento e inutilização.
-- [ ] Validar comunicação com SEFAZ em homologação com credenciais reais.
+- [~] Camada de transporte SEFAZ endurecida: validação TLS do servidor habilitada por padrão e HTTP não-2xx rejeitado; UFs sem endpoint mapeado agora falham fechado em vez de enviar para SP. Falta homologação real com A1/CSC.
 - [ ] Testar rejeições, timeout, duplicidade e consulta de protocolo.
 - [ ] Garantir que venda não seja marcada como autorizada sem protocolo válido.
 - [x] Respostas de configuração fiscal removem CSC Token, certificado A1 e senha; retornam apenas indicadores booleanos de configuração.
@@ -263,3 +263,5 @@
 
 - [x] No commit `5adb7a1bd65c5b4f8c60e88920f9895064e81c2c`: Integrated System CI, Aura isolated operational E2E, Aura MCP Full Audit, Aura Observability Hardening e Forensic audit PR checks concluíram com sucesso.
 - [x] E2E cobriu 14 rotas de leitura de módulos, o ciclo completo de caixa/estoque/financeiro/PIX/cancelamento/limpeza e os quatro bloqueios de papel barber já descritos.
+
+- [x] Corrigida configuração TLS da transmissão fiscal: certificado do servidor SEFAZ agora é validado; resposta HTTP fora de 2xx falha; certificado A1 sem chave/certificado válidos é rejeitado; UF sem endpoint configurado não usa fallback incorreto para SP.
