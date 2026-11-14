@@ -2543,8 +2543,16 @@ export async function registerRoutes(
       if (start) filters.startDate = new Date(start as string);
       if (end) filters.endDate = new Date(end as string);
 
-      const registers = await storage.getCashRegisters(filters);
-      
+      const user = req.user as any;
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const enterpriseUsers = await db.select({ id: users.id }).from(users).where(eq(users.enterpriseId, enterpriseId));
+      const allowedUserIds = new Set(enterpriseUsers.map((entry) => Number(entry.id)));
+      const allRegisters = await storage.getCashRegisters(filters);
+      const registers = allRegisters.filter((register) => allowedUserIds.has(Number(register.userId)));
+
       // For each register, fetch its sales with items
       const enrichedRegisters = await Promise.all(registers.map(async (reg) => {
         const regSales = await storage.getSalesByRegisterId(reg.id);
@@ -2564,26 +2572,31 @@ export async function registerRoutes(
   });
 
   app.get("/api/sales", isAuthenticated, requireAdmin, async (req, res) => {
-    const { start, end } = req.query;
-    
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
+    const user = req.user as any;
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
 
+    const { start, end } = req.query;
+    const conditions: any[] = [eq(users.enterpriseId, enterpriseId)];
     const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
 
     if (start && start !== "undefined" && start !== "") {
       const date = new Date(start as string);
-      if (isValidDate(date)) startDate = date;
+      if (isValidDate(date)) conditions.push(gte(sales.createdAt, date));
     }
-
     if (end && end !== "undefined" && end !== "") {
       const date = new Date(end as string);
-      if (isValidDate(date)) endDate = date;
+      if (isValidDate(date)) conditions.push(lte(sales.createdAt, date));
     }
 
-    const filters = { startDate, endDate };
-    const salesList = await storage.getSales(filters);
-    res.json(salesList);
+    const rows = await db.select({ sale: sales })
+      .from(sales)
+      .innerJoin(users, eq(sales.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(sales.createdAt));
+    res.json(rows.map((row) => row.sale));
   });
 
   app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
