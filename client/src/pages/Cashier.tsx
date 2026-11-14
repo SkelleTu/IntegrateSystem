@@ -856,7 +856,7 @@ function CashierContent({
                 variant="outline" 
                 size="sm"
                 onClick={() => finalizeSale(true)}
-                className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[9px] sm:text-[10px] h-9 sm:h-10 px-3 sm:px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,0,0.1)]"
+                className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[9px] sm:text-[10px] h-9 sm:h-10 px-3 sm:px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,153,0.1)]"
               >
                 <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
               </Button>
