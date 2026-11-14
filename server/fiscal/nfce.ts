@@ -390,7 +390,7 @@ function httpsPost(
       },
       key: options.key,
       cert: options.cert,
-      rejectUnauthorized: options.rejectUnauthorized ?? false,
+      rejectUnauthorized: options.rejectUnauthorized ?? true,
       timeout: 30000,
     };
 
@@ -398,7 +398,13 @@ function httpsPost(
       let data = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => resolve(data));
+      res.on("end", () => {
+        const statusCode = Number(res.statusCode || 0);
+        if (statusCode < 200 || statusCode >= 300) {
+          return reject(new Error(\`SEFAZ respondeu HTTP \${statusCode}: \${data.slice(0, 500)}\`));
+        }
+        resolve(data);
+      });
     });
 
     req.on("error", reject);
@@ -440,7 +446,10 @@ export async function transmitToSefaz(
     };
   }
 
-  const endpoints = SEFAZ_ENDPOINTS[uf] || SEFAZ_ENDPOINTS["SP"];
+  const endpoints = SEFAZ_ENDPOINTS[uf];
+  if (!endpoints) {
+    throw new Error(\`UF \${uf} ainda não possui endpoint NFC-e homologado no Aura System. A transmissão foi interrompida para evitar envio ao estado incorreto.\`);
+  }
   const url = isHomologacao ? endpoints.hom : endpoints.prod;
 
   console.log(`[FISCAL] Transmitindo para SEFAZ-${uf} (${settings.ambiente}): ${url}`);
@@ -460,6 +469,9 @@ export async function transmitToSefaz(
 
     const privateKeyPem = keyBag?.key ? forge.pki.privateKeyToPem(keyBag.key) : undefined;
     const certPem = certBag?.cert ? forge.pki.certificateToPem(certBag.cert) : undefined;
+    if (!privateKeyPem || !certPem) {
+      throw new Error("O certificado A1 não contém chave privada e certificado público válidos.");
+    }
 
     // Monta envelope SOAP 1.2
     const cUF = settings.codigoIbge?.substring(0, 2) || "35";
@@ -489,7 +501,7 @@ export async function transmitToSefaz(
     const responseXml = await httpsPost(url, soapEnvelope, {
       key: privateKeyPem,
       cert: certPem,
-      rejectUnauthorized: false,
+      rejectUnauthorized: true,
     });
 
     console.log("[FISCAL] Resposta SEFAZ recebida");
