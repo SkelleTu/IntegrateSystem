@@ -82,9 +82,20 @@ await expectStatus(invalidStaff, 400, "invalid-staff-account-rejected");
 const staff = await expectStatus(await request("/api/admin/register-barber", {
   method: "POST",
   headers: { cookie, "content-type": "application/json" },
-  body: JSON.stringify({ username: "qa-barber-ci", password: "QaOnly!2026-Staff" }),
+  body: JSON.stringify({ username: "qa-barber-ci", password }),
 }), 201, "create-enterprise-staff");
 assert.equal(staff.role, "barber");
+const barberLogin = await request("/api/auth/login", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ username: "qa-barber-ci", password }),
+});
+assert.equal(barberLogin.status, 200);
+const barberCookie = (barberLogin.headers.get("set-cookie") || "").split(";")[0];
+await expectStatus(await request("/api/services", { method: "POST", headers: { cookie: barberCookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Forbidden", price: 100, imageUrl: "https://example.invalid/x.png", isActive: true }) }), 403, "barber-service-create-denied");
+await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie: barberCookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 403, "barber-queue-reset-denied");
+await expectStatus(await request("/api/sales", { headers: { cookie: barberCookie } }), 403, "barber-sales-report-denied");
+await expectStatus(await request("/api/transactions", { headers: { cookie: barberCookie } }), 403, "barber-financial-read-denied");
 assert.equal(Number(staff.enterpriseId), Number(sessionUser.enterpriseId), "staff account must inherit the administrator's enterprise");
 // Validate the server-side time-clock state machine in isolated QA.
 const qaCredentialId = "qa-webauthn-credential-id-1234567890";
