@@ -2221,11 +2221,15 @@ export async function registerRoutes(
       const quantity = Number(item?.quantity);
       const unitPrice = Number(item?.unitPrice);
       const totalPrice = Number(item?.totalPrice);
+      const unitType = item?.unitType === "kg" ? "kg" : "unit";
+      const expectedTotal = unitType === "kg"
+        ? Math.round(quantity * unitPrice / 1000)
+        : quantity * unitPrice;
       if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
           !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
           !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
-          totalPrice !== quantity * unitPrice) {
-        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+          !Number.isSafeInteger(expectedTotal) || totalPrice !== expectedTotal) {
+        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes com a unidade informada.` });
       }
     }
     const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
