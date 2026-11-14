@@ -17,7 +17,12 @@ async function expectStatus(response, expected, label) {
   const body = await response.text();
   assert.equal(response.status, expected, `${label}: HTTP ${response.status}; body=${body.slice(0, 800)}`);
   summary.push({ test: label, status: response.status });
-  return body ? JSON.parse(body) : null;
+  if (!body) return null;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return body;
+  }
 }
 
 async function waitForHealth() {
