@@ -2342,8 +2342,21 @@ export async function registerRoutes(
     if (!hasAdminRole(user)) {
       return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     }
-    const { id, amount } = req.body;
-    const updated = await storage.updateCashRegisterOpeningAmount(id, amount);
+    const enterpriseId = Number(user.enterpriseId);
+    const registerId = Number(req.body?.id);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    if (!Number.isSafeInteger(registerId) || registerId <= 0) {
+      return res.status(400).json({ message: "Identificador de caixa inválido." });
+    }
+    const [ownedRegister] = await db.select({ id: cashRegisters.id })
+      .from(cashRegisters)
+      .innerJoin(users, eq(cashRegisters.userId, users.id))
+      .where(and(eq(cashRegisters.id, registerId), eq(users.enterpriseId, enterpriseId)))
+      .limit(1);
+    if (!ownedRegister) return res.status(404).json({ message: "Caixa não encontrado nesta empresa." });
+    const updated = await storage.updateCashRegisterOpeningAmount(registerId, req.body.amount);
     res.json(updated);
   });
 
@@ -2611,6 +2624,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "ID de venda inválido" });
       }
 
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const [ownedSale] = await db.select({ id: sales.id })
+        .from(sales)
+        .innerJoin(users, eq(sales.userId, users.id))
+        .where(and(eq(sales.id, id), eq(users.enterpriseId, enterpriseId)))
+        .limit(1);
+      if (!ownedSale) return res.status(404).json({ message: "Venda não encontrada nesta empresa." });
       const cancelledSale = await storage.cancelSale(id);
       res.json(cancelledSale);
     } catch (err: any) {
