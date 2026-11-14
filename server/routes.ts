@@ -2820,6 +2820,12 @@ export async function registerRoutes(
     }
 
     try {
+      const [ticketRecord] = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+      if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
+      if (ticketRecord.status !== "pending" && ticketRecord.status !== "serving") {
+        return res.status(409).json({ message: "Esta comanda já foi finalizada e não pode mais ser alterada." });
+      }
+
       const requestedItems = parsedBody.data.items.map((raw) => {
         let value: unknown;
         try { value = JSON.parse(raw); } catch { throw new Error("ITEM_INVALIDO"); }
