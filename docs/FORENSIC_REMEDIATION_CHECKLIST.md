@@ -37,6 +37,7 @@
 - [ ] Garantir que funcionário de caixa só execute operações operacionais necessárias.
 - [~] Operações administrativas principais já possuem guards; endpoint legado de emissão fiscal fictícia foi desativado. Falta auditoria rota a rota.
 - [ ] Testar IDOR/BOLA: trocar IDs de usuário, produto, lote, venda, caixa, transação, empresa e documento.
+- [x] E2E comprovou que usuário barber recebe 403 ao criar serviço, resetar fila, ler vendas e ler transações financeiras.
 - [ ] Testar acesso horizontal e vertical com matriz completa de papéis, inclusive por chamadas HTTP diretas.
 
 ## 3. Multiempresa / tenant isolation
@@ -205,6 +206,7 @@
 
 ## 19. Testes e critérios de aceite
 - [x] 75 verificações E2E isoladas aprovadas no baseline informado.
+- [x] Nova execução E2E após hardening de papéis passou: barber negado em 4 operações administrativas/financeiras.
 - [ ] Unit tests para regras monetárias, quantidades, FEFO, permissões e timezone.
 - [ ] Integração para cada rota mutável e cada rota protegida.
 - [ ] Testes multi-tenant com pelo menos duas empresas.
@@ -245,3 +247,5 @@
 - [x] Atualização de itens de comanda exige sessão autenticada.
 - [x] Endpoint legado `/api/sales/:id/emit-fiscal` desativado (HTTP 410), pois gerava XML fictício e marcava venda como emitida sem prova SEFAZ.
 - [~] CI e E2E após estas alterações: em execução/aguardando conclusão; não marcar como validado até os workflows terminarem.
+
+- [x] GitHub Actions `Aura isolated operational E2E` do commit `253347735f96de123801b4019888822246ea0394`: sucesso; incluiu os novos casos de negação para barber.
