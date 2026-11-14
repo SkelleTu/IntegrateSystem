@@ -1389,12 +1389,13 @@ export async function registerRoutes(
       const id = Number(req.params.id);
       const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
 
-      if (!quantity || quantity <= 0) {
-        return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+      const parsedQuantity = Number(quantity);
+      if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+        return res.status(400).json({ message: "Quantidade deve ser um número positivo válido" });
       }
 
       const restockData = {
-        quantity: parseInt(quantity),
+        quantity: parsedQuantity,
         unit: unit || undefined,
         itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit) : undefined,
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(',', '.')) * 100) : undefined,
