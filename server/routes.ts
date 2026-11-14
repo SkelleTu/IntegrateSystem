@@ -1373,7 +1373,15 @@ export async function registerRoutes(
   });
 
   app.post(api.queue.createTicket.path, async (req, res) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-create:" + ip, 15, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas senhas solicitadas. Aguarde um minuto e tente novamente." });
+    }
     const input = api.queue.createTicket.input.parse(req.body);
+    const availableServices = await storage.getServices();
+    if (!availableServices.some((service) => Number(service.id) === Number(input.serviceId) && service.isActive)) {
+      return res.status(400).json({ message: "Serviço indisponível para emissão de senha." });
+    }
     const state = await storage.getQueueState();
     
     // Find next available ticket number that isn't currently active (pending or serving)
@@ -2606,13 +2614,61 @@ export async function registerRoutes(
     }
     res.json(log);
   });
-  app.post("/api/tickets/:id/items", isAuthenticated, async (req, res) => {
+  app.post("/api/tickets/:id/items", async (req, res) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-items:" + ip, 20, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas atualizações de comanda. Aguarde um minuto e tente novamente." });
+    }
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isSafeInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ message: "Identificador de comanda inválido." });
+    }
+
+    const parsedBody = z.object({
+      items: z.array(z.string().max(2048)).max(100)
+    }).safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ message: "Carrinho inválido. Revise os itens e tente novamente." });
+    }
+
     try {
-      const { items } = req.body;
-      const ticket = await storage.updateTicketItems(Number(req.params.id), items);
-      res.json(ticket);
-    } catch (err) {
-      res.status(500).json({ message: "Erro ao atualizar comanda" });
+      const requestedItems = parsedBody.data.items.map((raw) => {
+        let value: unknown;
+        try { value = JSON.parse(raw); } catch { throw new Error("ITEM_INVALIDO"); }
+        const parsed = z.object({
+          id: z.number().int().positive(),
+          quantity: z.number().int().min(1).max(100)
+        }).passthrough().safeParse(value);
+        if (!parsed.success) throw new Error("ITEM_INVALIDO");
+        return parsed.data;
+      });
+
+      const availableMenuItems = await storage.getMenuItems();
+      const menuById = new Map(availableMenuItems.map((item) => [Number(item.id), item]));
+      const normalizedItems = requestedItems.map((item) => {
+        const catalogItem = menuById.get(item.id);
+        if (!catalogItem) throw new Error("ITEM_INDISPONIVEL");
+        return JSON.stringify({
+          id: Number(catalogItem.id),
+          name: catalogItem.name,
+          price: Number(catalogItem.price),
+          quantity: item.quantity
+        });
+      });
+
+      const ticket = await storage.updateTicketItems(ticketId, normalizedItems);
+      if (!ticket) return res.status(404).json({ message: "Comanda não encontrada." });
+      return res.json(ticket);
+    } catch (err: any) {
+      if (err?.message === "ITEM_INVALIDO") {
+        return res.status(400).json({ message: "Um ou mais itens do carrinho estão inválidos." });
+      }
+      if (err?.message === "ITEM_INDISPONIVEL") {
+        return res.status(409).json({ message: "Um ou mais produtos não estão mais disponíveis." });
+      }
+      console.error("[TICKET] Falha ao atualizar itens:", err);
+      return res.status(500).json({ message: "Erro ao atualizar comanda." });
     }
   });
 
@@ -2699,7 +2755,15 @@ export async function registerRoutes(
   });
 
   app.get("/api/tickets/:number", async (req, res) => {
-    const ticket = await storage.getTicketByNumber(Number(req.params.number));
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas consultas de comanda. Aguarde um minuto e tente novamente." });
+    }
+    const ticketNumber = Number(req.params.number);
+    if (!Number.isSafeInteger(ticketNumber) || ticketNumber <= 0) {
+      return res.status(400).json({ message: "Número de comanda inválido." });
+    }
+    const ticket = await storage.getTicketByNumber(ticketNumber);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
     res.json(ticket);
   });
