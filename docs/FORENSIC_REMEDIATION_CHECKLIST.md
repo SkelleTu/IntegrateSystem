@@ -276,4 +276,6 @@
 - [x] Commit `7ac22535ac32d4ef79176e1b7dd0b0c690738097`: Integrated System CI, E2E isolado, observabilidade e forensic checks concluíram com sucesso após hardening do autoatendimento. O teste E2E dedicado para preço do carrinho ainda precisa ser acrescentado.
 
 - [x] Caixa/vendas: cliente envia apenas referência da origem do item; servidor busca preço e unidade oficiais em cardápio/estoque/lote, recalcula subtotais e rejeita adulteração. Venda de simulação não pode ser criada em produção e o botão só aparece em build de desenvolvimento.
-- [~] Adicionado E2E isolado para tentar venda com preço adulterado, confirmar venda com preço correto, cancelar e conferir estorno do lote; aguardar resultado do CI.
+- [x] E2E isolado tentou venda com preço adulterado (rejeitada), concluiu venda com preço oficial, cancelou e confirmou reposição do lote.
+
+- [x] E2E isolado do commit `37c228e5c71e8386c553a905c4d53695eaad35bf` passou com a nova validação de preço e o bloqueio de venda simulada fora do QA.
