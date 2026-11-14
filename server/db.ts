@@ -845,11 +845,12 @@ export async function auditDatabaseParity() {
         table: config.name,
         columns: config.columns.map((column) => ({
           name: column.name,
-          type: column.getSQLType().toLowerCase() === "serial"
-            ? "integer"
-            : column.getSQLType().toLowerCase() === "timestamp"
-              ? "timestamp without time zone"
-              : column.getSQLType().toLowerCase(),
+          type: (() => {
+          const sqlType = column.getSQLType().toLowerCase();
+          if (sqlType === "serial") return "integer";
+          if (sqlType === "timestamp") return "timestamp without time zone";
+          return sqlType.replace(/\\([^)]*\\)/g, "");
+        })(),
           notNull: column.notNull,
         })),
       };
