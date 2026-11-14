@@ -2226,7 +2226,7 @@ export async function registerRoutes(
         ? Math.round(quantity * unitPrice / 1000)
         : quantity * unitPrice;
       if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
-          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
+          !Number.isSafeInteger(unitPrice) || unitPrice <= 0 ||
           !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
           !Number.isSafeInteger(expectedTotal) || totalPrice !== expectedTotal) {
         return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes com a unidade informada.` });
