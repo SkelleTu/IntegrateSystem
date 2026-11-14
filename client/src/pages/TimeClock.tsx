@@ -53,11 +53,11 @@ export default function TimeClock() {
         if (err.name === "NotAllowedError") {
           throw new Error("Operação cancelada ou sensor não encontrado.");
         }
-        throw new Error("Erro ao ler digital real.");
+        throw new Error("Não foi possível registrar a credencial do dispositivo.");
       }
     },
     onSuccess: () => {
-      toast({ title: "Sucesso", description: "Sua digital foi cadastrada!" });
+      toast({ title: "Sucesso", description: "Credencial do dispositivo cadastrada." });
       queryClient.invalidateQueries({ queryKey: ["/api/user"] });
     },
     onError: (error: any) => toast({ title: "Falha", description: error.message, variant: "destructive" })
@@ -81,7 +81,7 @@ export default function TimeClock() {
         const res = await apiRequest("POST", "/api/time-clock/register", { type, fingerprintId: user.fingerprintId });
         return res.json();
       } catch (err: any) {
-        throw new Error("Digital não reconhecida.");
+        throw new Error(err?.message || "Falha na autenticação do dispositivo.");
       }
     },
     onSuccess: (data) => {
@@ -136,7 +136,7 @@ export default function TimeClock() {
             </Button>
             <div>
               <h1 className="text-3xl font-black italic uppercase text-white tracking-tighter leading-none">Ponto <span className="text-primary">Digital</span></h1>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-1 italic">Sistema de Biometria Aura</p>
+              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-[0.3em] mt-1 italic">Autenticação do Dispositivo Aura</p>
             </div>
           </div>
           <div className="hidden md:flex items-center gap-3 px-6 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
@@ -167,14 +167,21 @@ export default function TimeClock() {
                   </h3>
                 </div>
                 
+                {!timeClockStatus?.webauthnReady && (
+                  <p className="mb-5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-200">
+                    O servidor ainda não valida criptograficamente as credenciais WebAuthn. O cadastro e o registro de ponto estão temporariamente bloqueados neste ambiente.
+                  </p>
+                )}
+
                 {!user.fingerprintId ? (
                   <Button 
-                    size="lg" 
+                    size="lg"
+                    disabled={!timeClockStatus?.webauthnReady} 
                     className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_-5px_rgba(0,229,255,0.5)] group overflow-hidden relative"
                     onClick={() => registerFingerprintMutation.mutate()}
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
-                    CONFIGURAR BIOMETRIA
+                    CONFIGURAR CREDENCIAL
                   </Button>
                 ) : (
                   <Button 
@@ -196,7 +203,7 @@ export default function TimeClock() {
                     </p>
                   </div>
                   <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
-                    ID: {user.id} • {user.fingerprintId ? "Biometria Verificada" : "Aguardando Cadastro"}
+                    ID: {user.id} • {user.fingerprintId ? "Credencial cadastrada" : "Aguardando cadastro"}
                   </p>
                 </div>
               </CardContent>
@@ -247,7 +254,7 @@ export default function TimeClock() {
                       <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">
                         {new Date(clock.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
                       </p>
-                      <div className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 text-[8px] font-black text-zinc-500 uppercase italic">Verificado</div>
+                      <div className="px-2 py-0.5 rounded-full bg-white/5 border border-white/5 text-[8px] font-black text-zinc-500 uppercase italic">Registrado</div>
                     </div>
                   </div>
                 );
