@@ -121,6 +121,8 @@
 ## 10. Ponto e WebAuthn
 - [x] Sequência server-side de entrada/intervalo/retorno/saída.
 - [!] Implementar WebAuthn real: challenge aleatório, origem/RP ID, ceremony, assinatura, public key, counter e verificação de flags.
+- [x] Até a validação real existir, produção falha fechado: cadastro e batida de ponto respondem 503; QA isolado mantém o fluxo sintético para testes.
+- [x] Interface informa que a verificação do servidor está pendente, desabilita as ações em produção e não rotula mais credenciais como biometria verificada.
 - [ ] Criar schema seguro para credenciais e chaves públicas.
 - [ ] Implementar registro e autenticação com challenge de uso único e expiração.
 - [ ] Remover confiança em fingerprintId enviado pelo cliente.
@@ -213,6 +215,7 @@
 - [ ] Testes multi-tenant com pelo menos duas empresas.
 - [ ] Testes de concorrência, repetição, falha e rollback.
 - [ ] E2E ponta a ponta: compra/entrada → estoque → venda → pagamento → caixa → financeiro → fiscal → cancelamento.
+- [ ] Teste explícito de produção: endpoints WebAuthn devem retornar 503 e não gravar ponto/credencial; QA isolado deve continuar com 200.
 - [ ] Testes visuais em dispositivo real/tablet e desktop.
 - [ ] Teste de restore real do backup.
 - [ ] Homologação fiscal com certificado/CSC reais.
@@ -252,3 +255,5 @@
 - [x] GitHub Actions `Aura isolated operational E2E` do commit `253347735f96de123801b4019888822246ea0394`: sucesso; incluiu os novos casos de negação para barber.
 
 - [x] Endpoints de custo/rastreabilidade do estoque (`inventory-restocks`, reposições por item, lotes, logs de lote e checagem de duplicidade) agora exigem admin/owner; validar regressão específica no próximo E2E.
+
+- [x] Implementado fail-closed para ponto em produção até a verificação criptográfica WebAuthn ser concluída; fluxo sintético limitado ao ambiente QA identificado por branch/service.
