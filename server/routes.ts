@@ -105,6 +105,14 @@ function hasAdminRole(user: any): boolean {
   return role === "admin" || role === "owner";
 }
 
+const requireAdmin = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated?.()) return res.sendStatus(401);
+  if (!hasAdminRole(req.user)) {
+    return res.status(403).json({ message: "Acesso restrito a administradores." });
+  }
+  return next();
+};
+
 function hasOwnerRole(user: any): boolean {
   return normalizeRole(user) === "owner";
 }
@@ -1533,7 +1541,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products", isAuthenticated, async (req, res) => {
+  app.post("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, ...rest } = req.body;
       const data = insertProductSchema.parse({
@@ -1549,7 +1557,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
       const data = {
@@ -1627,7 +1635,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteProduct(Number(req.params.id));
       res.status(204).send();
@@ -1646,7 +1654,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/batches", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const productId = Number(req.params.id);
@@ -1670,7 +1678,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const data: any = { ...rest };
@@ -1687,7 +1695,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteBatch(Number(req.params.id));
       res.status(204).send();
@@ -1696,7 +1704,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/:id/deduct", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/deduct", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const { quantity, reason } = req.body;
@@ -2483,7 +2491,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const input = insertTransactionSchema.parse(req.body);
       const transaction = await storage.createTransaction(input);
@@ -2497,7 +2505,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteTransaction(id);
@@ -2508,7 +2516,7 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.post("/api/inventory/log", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/log", isAuthenticated, requireAdmin, async (req, res) => {
     const user = req.user as any;
     const log = await storage.createInventoryLog({ ...req.body, userId: user.id });
     const inv = await storage.getInventoryItem(log.inventoryId);
