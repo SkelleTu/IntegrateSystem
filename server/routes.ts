@@ -2190,8 +2190,9 @@ export async function registerRoutes(
         const remainingRegisters = registerOpenedAt
           ? await database.select().from(cashRegisters).where(and(eq(cashRegisters.userId, testUserId), eq(cashRegisters.openedAt, registerOpenedAt)))
           : [];
-        const remainingBatchLogs = batchId
-          ? await database.select().from(batchLogs).where(eq(batchLogs.batchId, batchId))
+        const trackedBatchIds = [batchId, weightedBatchId].filter((id): id is number => typeof id === "number");
+        const remainingBatchLogs = trackedBatchIds.length
+          ? await database.select().from(batchLogs).where(or(...trackedBatchIds.map((id) => eq(batchLogs.batchId, id))))
           : [];
         return {
           products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker), eq(products.codigoProduto, marker + "_KG"), eq(products.name, marker + "_KG")))).length,
