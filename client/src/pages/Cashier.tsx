@@ -563,6 +563,10 @@ export default function Cashier() {
   };
 
   const finalizeSale = (isSimulation: boolean = false) => {
+    if (cart.some(({ item }) => !Number.isSafeInteger(Number(item.price)) || Number(item.price) <= 0)) {
+      toast({ title: "Produto sem preço de venda", description: "Cadastre um preço válido antes de finalizar a venda.", variant: "destructive" });
+      return;
+    }
     const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
     if (totalPaid < total && !isSimulation) {
       toast({ title: "Pagamento Incompleto", description: `Faltam R$ ${((total - totalPaid) / 100).toFixed(2)}`, variant: "destructive" });
