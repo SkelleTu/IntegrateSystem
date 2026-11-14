@@ -122,7 +122,7 @@ export interface IStorage {
   getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
   openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
   closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
-  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
+  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], ticketId?: number): Promise<Sale>;
   getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
   cancelSale(id: number): Promise<Sale>;
 
@@ -645,7 +645,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
+  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], ticketId?: number): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     const sharedSaleId = await nextSharedId(sales);
     return await dualWriteTransaction(async (database) => {
@@ -655,6 +655,13 @@ export class DatabaseStorage implements IStorage {
       if (sale.cashRegisterId) {
         const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, sale.cashRegisterId)).limit(1);
         if (!register || register.status !== "open" || register.closedAt) throw new Error("A venda exige um caixa aberto.");
+      }
+      if (ticketId !== undefined) {
+        const [ticket] = await database.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+        if (!ticket) throw new Error("Comanda não encontrada.");
+        if (ticket.status !== "pending" && ticket.status !== "serving") {
+          throw new Error("A comanda não está mais ativa para finalização.");
+        }
       }
       for (const item of items) {
         const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
@@ -788,6 +795,16 @@ export class DatabaseStorage implements IStorage {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
         totalAmount: insertedSale.totalAmount,
       });
+      if (ticketId !== undefined) {
+        const [completedTicket] = await database.update(tickets)
+          .set({ status: "completed" })
+          .where(and(
+            eq(tickets.id, ticketId),
+            or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
+          ))
+          .returning();
+        if (!completedTicket) throw new Error("A comanda foi alterada durante a venda. A transação foi revertida.");
+      }
       return insertedSale;
     });
   }
