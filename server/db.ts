@@ -233,7 +233,8 @@ const TABLE_DEFINITIONS = [
     password TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT 'barber',
     fingerprint_id TEXT UNIQUE,
-    enterprise_id INTEGER
+    enterprise_id INTEGER,
+    tutorial_completed_at INTEGER
   )`,
   `CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -555,6 +556,7 @@ export async function setupDatabase() {
     "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'barber'",
     "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
     "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE users ADD COLUMN tutorial_completed_at INTEGER",
   ];
   for (const migration of localMigrations) {
     try {
@@ -808,6 +810,7 @@ export async function setupDatabase() {
   // PostgreSQL schema before allowing authentication/routes to start.
   if (neonPool) {
     await verifyNeonConnection();
+    await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tutorial_completed_at TIMESTAMP");
     // Preserve existing whole-unit stock values while enabling fractional kilograms.
     // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
     const stockQuantityColumns = await neonPool.query(`
