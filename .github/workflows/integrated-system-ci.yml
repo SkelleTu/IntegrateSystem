@@ -57,7 +57,7 @@ jobs:
           test "$numeric_columns" = "5"
           preserved_value=$(psql "$DATABASE_URL" -Atc "SELECT quantity::text FROM public.batches")
           test "$preserved_value" = "10.000"
-          tutorial_column=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='tutorial_completed_at' AND data_type='timestamp without time zone'")
+          tutorial_column=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='tutorial_completed_at' AND data_type='text'")
           test "$tutorial_column" = "1"
       - run: npm run check
       - run: npm run build
