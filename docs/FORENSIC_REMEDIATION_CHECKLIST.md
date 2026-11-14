@@ -260,3 +260,6 @@
 - [x] Implementado fail-closed para ponto em produção até a verificação criptográfica WebAuthn ser concluída; fluxo sintético limitado ao ambiente QA identificado por branch/service.
 
 - [x] Corrigido vazamento de segredos fiscais: GET/POST `/api/fiscal/settings` não devolvem CSC Token, certificado A1 ou senha do certificado; a UI informa quando o CSC já está configurado sem revelar o valor.
+
+- [x] No commit `5adb7a1bd65c5b4f8c60e88920f9895064e81c2c`: Integrated System CI, Aura isolated operational E2E, Aura MCP Full Audit, Aura Observability Hardening e Forensic audit PR checks concluíram com sucesso.
+- [x] E2E cobriu 14 rotas de leitura de módulos, o ciclo completo de caixa/estoque/financeiro/PIX/cancelamento/limpeza e os quatro bloqueios de papel barber já descritos.
