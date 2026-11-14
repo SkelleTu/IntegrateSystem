@@ -2691,18 +2691,36 @@ export async function registerRoutes(
   app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const { type, fingerprintId } = req.body;
-    
+
     if (!user.fingerprintId) {
       return res.status(400).json({ message: "Você precisa cadastrar sua digital primeiro!" });
     }
-
     if (fingerprintId !== user.fingerprintId) {
       return res.status(400).json({ message: "Digital não reconhecida." });
     }
-    
+
+    const allowedTypes = new Set(["in", "break_start", "break_end", "out"]);
+    if (!allowedTypes.has(String(type))) {
+      return res.status(400).json({ message: "Tipo de registro de ponto inválido." });
+    }
+
+    const latest = await storage.getLatestTimeClock(user.id);
+    const expectedType = !latest || latest.type === "out"
+      ? "in"
+      : latest.type === "in"
+        ? "break_start"
+        : latest.type === "break_start"
+          ? "break_end"
+          : latest.type === "break_end"
+            ? "out"
+            : "in";
+    if (type !== expectedType) {
+      return res.status(409).json({ message: "A sequência do ponto está incorreta. Atualize o status e tente novamente.", expectedType });
+    }
+
     const clock = await storage.createTimeClock({
       userId: user.id,
-      type, // "in", "break_start", "break_end", "out"
+      type,
       timestamp: new Date(),
       fingerprintId
     });
