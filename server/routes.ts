@@ -703,6 +703,15 @@ export async function registerRoutes(
 
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
+    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
+      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
+      if (existingEnterprises.length > 0) {
+        return res.status(409).json({
+          code: "TENANT_ISOLATION_REQUIRED",
+          message: "A criação de novos estabelecimentos está temporariamente bloqueada até a conclusão do isolamento multiempresa."
+        });
+      }
+    }
     try {
       const { name, businessType, taxId, phone, address, city, state } = req.body;
       if (typeof name !== "string" || !name.trim()) {
@@ -763,6 +772,15 @@ export async function registerRoutes(
   app.post("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
       return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    }
+    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
+      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
+      if (existingEnterprises.length > 0) {
+        return res.status(409).json({
+          code: "TENANT_ISOLATION_REQUIRED",
+          message: "A criação de novos estabelecimentos está temporariamente bloqueada até a conclusão do isolamento multiempresa."
+        });
+      }
     }
     try {
       const { name, slug, username, password } = req.body;
@@ -883,6 +901,15 @@ export async function registerRoutes(
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("register:" + ip, 5, 15 * 60 * 1000)) {
       return res.status(429).json({ message: "Muitas tentativas de cadastro. Tente novamente mais tarde." });
+    }
+    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
+      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
+      if (existingEnterprises.length > 0) {
+        return res.status(409).json({
+          code: "TENANT_ISOLATION_REQUIRED",
+          message: "Novos cadastros de estabelecimentos estão temporariamente bloqueados até a conclusão do isolamento multiempresa."
+        });
+      }
     }
 
     const schema = z.object({
