@@ -1326,7 +1326,7 @@ export async function registerRoutes(
   });
 
   // Inventory API
-  app.post("/api/inventory", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const body = { ...req.body };
       // Trata a conversão de string de data para objeto Date se necessário
@@ -1374,7 +1374,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/inventory/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteInventoryItem(Number(req.params.id));
       res.status(204).send();
@@ -1384,7 +1384,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/inventory/:id/restock", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/:id/restock", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
@@ -1573,7 +1573,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/products", isAuthenticated, async (req, res) => {
+  app.delete("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1601,7 +1601,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/restore", isAuthenticated, async (req, res) => {
+  app.post("/api/products/restore", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1618,7 +1618,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/zero-quantities", isAuthenticated, async (req, res) => {
+  app.post("/api/products/zero-quantities", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
