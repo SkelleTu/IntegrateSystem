@@ -2604,10 +2604,18 @@ export async function registerRoutes(
   app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const latest = await storage.getLatestTimeClock(user.id);
-    res.json({ latest });
+    // WebAuthn server-side verification is not implemented yet. Only the isolated
+    // QA runtime may exercise the legacy state machine with synthetic credentials.
+    res.json({ latest, webauthnReady: isIsolatedQaRuntime });
   });
 
   app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
+    if (!isIsolatedQaRuntime) {
+      return res.status(503).json({
+        code: "WEBAUTHN_SERVER_VERIFICATION_REQUIRED",
+        message: "Registro de ponto temporariamente bloqueado: o servidor ainda não valida criptograficamente a autenticação WebAuthn."
+      });
+    }
     const user = req.user as any;
     const { type, fingerprintId } = req.body;
 
@@ -2647,6 +2655,12 @@ export async function registerRoutes(
   });
 
   app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+    if (!isIsolatedQaRuntime) {
+      return res.status(503).json({
+        code: "WEBAUTHN_SERVER_VERIFICATION_REQUIRED",
+        message: "Cadastro de credencial temporariamente bloqueado até a validação criptográfica WebAuthn no servidor ser concluída."
+      });
+    }
     const user = req.user as any;
     const { fingerprintId } = req.body;
     if (!fingerprintId) return res.status(400).json({ message: "ID da digital é obrigatório" });
