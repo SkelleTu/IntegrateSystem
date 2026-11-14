@@ -303,7 +303,7 @@ export default function Cashier() {
       }
       // Otherwise, prompt for weight
       setActiveItemForWeight(item);
-      setWeightInputValue("1.000");
+      setWeightInputValue("");
       setWeightModalOpen(true);
       return;
     }
@@ -847,13 +847,13 @@ function CashierContent({
       <BackgroundIcons />
       <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
         {/* Area Principal de Produtos */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
-          <div className="w-full flex items-center justify-between mb-4 shrink-0 gap-3">
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2 sm:p-3 lg:p-4">
+          <div className="w-full flex items-center justify-between mb-2 sm:mb-4 shrink-0 gap-2 sm:gap-3">
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => finalizeSale(true)}
-              className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[10px] h-10 px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
+              className="bg-blue-500/10 border-blue-500/20 text-blue-400 font-black uppercase italic tracking-widest text-[9px] sm:text-[10px] h-9 sm:h-10 px-3 sm:px-6 hover:bg-blue-500 hover:text-white transition-all shadow-[0_0_15px_rgba(59,130,246,0.1)]"
             >
               <Play className="w-4 h-4 mr-2" /> Venda Simulação (Teste)
             </Button>
@@ -874,7 +874,7 @@ function CashierContent({
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
             {viewMode === "cards" ? (
               /* ── MODO CARDS ── */
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-32 lg:pb-8">
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3 pb-16 sm:pb-20 lg:pb-8">
                 {filteredMenuItems?.map((item: any) => (
                   <motion.div 
                     key={item.id} 
@@ -936,7 +936,7 @@ function CashierContent({
               </div>
             ) : (
               /* ── MODO LISTA ── */
-              <div className="flex flex-col gap-1 pb-32 lg:pb-8">
+              <div className="flex flex-col gap-1 pb-16 sm:pb-20 lg:pb-8">
                 {filteredMenuItems?.map((item: any) => (
                   <motion.div
                     key={item.id}
@@ -988,9 +988,9 @@ function CashierContent({
         </div>
 
         {/* Sidebar Direita / Carrinho */}
-        <div className="w-full lg:w-[400px] shrink-0 border-l border-white/10 bg-zinc-950/30 backdrop-blur-xl flex flex-col h-full min-h-0 relative z-40">
+        <div className="w-full lg:w-[400px] h-[46%] max-h-[46%] min-h-[260px] lg:h-full lg:max-h-none lg:min-h-0 shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 bg-zinc-950/30 backdrop-blur-xl flex flex-col min-h-0 relative z-40">
           <div className="flex-1 flex flex-col min-h-0">
-            <div className="p-4 border-b border-white/5 space-y-3 bg-white/5">
+            <div className="p-2 sm:p-3 lg:p-4 border-b border-white/5 space-y-2 sm:space-y-3 bg-white/5">
               <div className="flex flex-col gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
@@ -998,7 +998,7 @@ function CashierContent({
                     placeholder="BIPAR CÓDIGO OU BUSCAR..." 
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
-                    className="pl-10 h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 text-white" 
+                    className="pl-10 h-10 sm:h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 text-white" 
                     autoFocus
                   />
                 </div>
@@ -1008,7 +1008,7 @@ function CashierContent({
                     value={searchTicket}
                     onChange={(e) => setSearchTicket(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && loadTicketMutation.mutate(searchTicket)}
-                    className="h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 pr-12 text-white" 
+                    className="h-10 sm:h-12 bg-black border-white/10 text-xs font-black italic rounded-xl focus:border-primary/50 pr-12 text-white" 
                   />
                   <Button 
                     variant="ghost" 
@@ -1023,7 +1023,7 @@ function CashierContent({
               </div>
             </div>
 
-                    <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                    <div className="flex-1 min-h-0 overflow-y-auto p-2 sm:p-3 lg:p-4 space-y-2 sm:space-y-3 custom-scrollbar">
                       <div className="flex items-center gap-2 mb-4">
                         <ShoppingCart className="w-4 h-4 text-primary" />
                         <h3 className="text-white font-black uppercase italic text-xs tracking-tighter">Itens no <span className="text-primary">Carrinho</span></h3>
@@ -1107,7 +1107,7 @@ function CashierContent({
                       )}
                     </div>
 
-            <div className="p-3 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-2 shrink-0 pb-[50px] lg:pb-[45px]">
+            <div className="p-2 sm:p-3 bg-zinc-900/95 backdrop-blur-xl border-t border-white/10 space-y-2 shrink-0 pb-[50px] lg:pb-[45px]">
               {payments.length > 0 && (
                 <div className="space-y-1 pb-1 border-b border-white/5">
                   <p className="text-[8px] font-black uppercase text-zinc-500 tracking-widest leading-none">Pagamentos</p>
@@ -1158,7 +1158,7 @@ function CashierContent({
 
               <div className="flex items-end justify-between">
                 <span className="text-white/40 font-black uppercase text-[8px] tracking-[0.2em] pb-0.5">Total Geral</span>
-                <span className="text-primary text-2xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] leading-none">
+                <span className="text-white text-2xl font-black italic tracking-tighter drop-shadow-[0_0_10px_rgba(0,229,255,0.3)] leading-none">
                   R$ {(total / 100).toFixed(2)}
                 </span>
               </div>
@@ -1202,7 +1202,8 @@ function CashierContent({
               </div>
 
               <Button 
-                className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.2)] hover:scale-[1.01] active:scale-95 transition-all" 
+                variant="outline"
+                className="w-full h-12 border-white/10 bg-zinc-900/50 text-white font-black uppercase italic text-sm rounded-lg hover:border-primary/50 hover:bg-primary/5 active:scale-[0.99] transition-all" 
                 onClick={() => finalizeSale(false)} 
                 disabled={saleMutation.isPending || cart.length === 0}
               >
@@ -1233,7 +1234,7 @@ function CashierContent({
                 onChange={(e) => setWeightInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleWeightSubmit()}
                 className="bg-black border-white/10 h-16 text-4xl font-black text-center text-primary tracking-widest rounded-xl"
-                placeholder="0.000"
+                placeholder="0,000"
               />
             </div>
 
@@ -1255,7 +1256,8 @@ function CashierContent({
             })()}
 
             <Button 
-              className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-40"
+              variant="outline"
+              className="w-full h-14 border-white/20 bg-zinc-900/50 text-white font-black uppercase italic text-lg rounded-xl hover:border-primary/50 hover:bg-primary/5 disabled:opacity-40"
               onClick={handleWeightSubmit}
               disabled={(() => { const w = parseFloat(weightInputValue.replace(",", ".")); return isNaN(w) || w <= 0; })()}
             >
