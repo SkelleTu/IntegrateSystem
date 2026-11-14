@@ -829,7 +829,9 @@ export async function registerRoutes(
   app.put("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const updated = await storage.updateEnterprise(Number(req.params.id), req.body);
+    const updates = { ...req.body };
+    delete updates.status;
+    const updated = await storage.updateEnterprise(Number(req.params.id), updates);
     res.json(updated);
   });
 
@@ -839,6 +841,15 @@ export async function registerRoutes(
     const { status } = req.body;
     if (!["active", "rejected", "pending"].includes(status)) {
       return res.status(400).json({ message: "Status inválido" });
+    }
+    if (status === "active" && process.env.AURA_TENANT_ISOLATION_READY !== "true") {
+      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(2);
+      if (existingEnterprises.length > 1) {
+        return res.status(409).json({
+          code: "TENANT_ISOLATION_REQUIRED",
+          message: "A ativação de uma segunda empresa está bloqueada até o isolamento multiempresa ser concluído."
+        });
+      }
     }
     const enterpriseId = Number(req.params.id);
     if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(400).json({ message: "ID de instituição inválido" });
