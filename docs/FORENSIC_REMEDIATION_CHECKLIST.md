@@ -111,7 +111,7 @@
 - [ ] Revisar totais, agrupamentos, período, timezone e limites inclusivos.
 - [ ] Validar conciliação caixa ↔ vendas ↔ pagamentos ↔ financeiro.
 - [ ] Testar exportações e permissões de relatórios.
-- [ ] Garantir segregação por tenant e empresa.
+- [~] Transações financeiras legadas não têm enterpriseId: em instalação com mais de uma empresa, leitura/criação/exclusão por admin comum falha fechado (409); owner mantém administração global. Em instalação single-tenant, o businessType é derivado da empresa ativa, nunca aceito do cliente.
 
 ## 9. Fila, senhas e serviços
 - [ ] Revisar cadastro/edição/ativação/exclusão de serviços.
@@ -297,3 +297,5 @@
 - [~] Contexto enterpriseId do owner em produção ainda precisa ser confirmado após restabelecer sessão autenticada do Kernel; sem contexto a API falha fechado com HTTP 409.
 
 - [x] Ajuste de saldo de caixa e cancelamento de venda agora retornam 404 quando o registro não pertence à empresa ativa do administrador.
+
+- [x] Financeiro legado: bloqueadas operações administrativas de transações para admins quando há mais de uma empresa; businessType de lançamentos passa a ser derivado do estabelecimento ativo, não do payload.
