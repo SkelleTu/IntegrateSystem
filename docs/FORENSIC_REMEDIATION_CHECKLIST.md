@@ -138,6 +138,7 @@
 - [ ] Validar comunicação com SEFAZ em homologação com credenciais reais.
 - [ ] Testar rejeições, timeout, duplicidade e consulta de protocolo.
 - [ ] Garantir que venda não seja marcada como autorizada sem protocolo válido.
+- [x] Respostas de configuração fiscal removem CSC Token, certificado A1 e senha; retornam apenas indicadores booleanos de configuração.
 - [ ] Proteger XML, chaves e dados fiscais em repouso e em respostas.
 - [ ] Documentar limitações por UF/regime tributário; não declarar emissão real sem homologação.
 
@@ -257,3 +258,5 @@
 - [x] Endpoints de custo/rastreabilidade do estoque (`inventory-restocks`, reposições por item, lotes, logs de lote e checagem de duplicidade) agora exigem admin/owner; validar regressão específica no próximo E2E.
 
 - [x] Implementado fail-closed para ponto em produção até a verificação criptográfica WebAuthn ser concluída; fluxo sintético limitado ao ambiente QA identificado por branch/service.
+
+- [x] Corrigido vazamento de segredos fiscais: GET/POST `/api/fiscal/settings` não devolvem CSC Token, certificado A1 ou senha do certificado; a UI informa quando o CSC já está configurado sem revelar o valor.
