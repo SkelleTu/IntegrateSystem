@@ -1464,6 +1464,7 @@ export async function registerRoutes(
             _batchId: batch.id,
             name,
             price: batch.salePrice ?? prod.salePrice ?? 0,
+            costPrice: batch.costPrice,
             barcode: batch.barcode ?? null,
             sku: batch.sku ?? null,
             codigoProduto: (prod as any).codigoProduto ?? null,
