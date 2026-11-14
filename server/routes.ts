@@ -595,6 +595,23 @@ export async function registerRoutes(
     res.json(toPublicUser(req.user));
   });
 
+  app.get("/api/tutorial/status", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const account = await storage.getUser(Number(user.id));
+    if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+    return res.json({ completed: Boolean(account.tutorialCompletedAt) });
+  });
+
+  app.post("/api/tutorial/complete", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const account = await storage.getUser(Number(user.id));
+    if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+    if (!account.tutorialCompletedAt) {
+      await storage.updateUser(Number(user.id), { tutorialCompletedAt: new Date() });
+    }
+    return res.json({ completed: true });
+  });
+
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário" });
