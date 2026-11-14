@@ -94,8 +94,11 @@
 - [ ] Revisar abertura/fechamento de caixa, operador, saldo inicial/final e diferença.
 - [ ] Revisar dinheiro, troco, débito, crédito, Pix e pagamentos combinados.
 - [ ] Validar soma de pagamentos = total da venda e impedir valores negativos/inválidos.
+- [~] Preço de cada item agora é recalculado no servidor a partir do cardápio, estoque legado ou lote; o servidor rejeita preço/unidade/subtotal divergentes e valida total contra o catálogo. Falta mover a verificação para a mesma transação e completar escopo tenant.
 - [ ] Garantir atomicidade entre venda, itens, pagamentos, estoque, caixa e financeiro.
+- [x] Venda de simulação bloqueada fora do QA isolado; status de venda real é definido pelo servidor.
 - [ ] Revisar clique duplo, retry de rede e idempotency key.
+- [ ] Validar ticketId associado à venda e atualizar ticket atomicamente na mesma transação.
 - [ ] Revisar cancelamento total/parcial, estorno de pagamento e reposição de estoque.
 - [ ] Validar impressão/recibo e recuperação de venda após refresh.
 - [ ] Testar visualmente tablet em retrato/paisagem e resoluções menores.
@@ -271,3 +274,6 @@
 - [x] Preservado o fluxo público de autoatendimento em /cart: o endpoint de itens não exige login do cliente, mas valida JSON, IDs e quantidades, usa nome/preço do catálogo no servidor e aplica rate limit. A criação/consulta pública de senhas também ganhou rate limit e verificação de serviço ativo.
 
 - [x] Commit `7ac22535ac32d4ef79176e1b7dd0b0c690738097`: Integrated System CI, E2E isolado, observabilidade e forensic checks concluíram com sucesso após hardening do autoatendimento. O teste E2E dedicado para preço do carrinho ainda precisa ser acrescentado.
+
+- [x] Caixa/vendas: cliente envia apenas referência da origem do item; servidor busca preço e unidade oficiais em cardápio/estoque/lote, recalcula subtotais e rejeita adulteração. Venda de simulação não pode ser criada em produção e o botão só aparece em build de desenvolvimento.
+- [~] Adicionado E2E isolado para tentar venda com preço adulterado, confirmar venda com preço correto, cancelar e conferir estorno do lote; aguardar resultado do CI.
