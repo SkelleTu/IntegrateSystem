@@ -121,7 +121,7 @@ function toPublicUser(user: any) {
   if (!user || typeof user !== "object") return user;
   const safe = { ...user };
   for (const key of Object.keys(safe)) {
-    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key|fingerprint)/i.test(key)) {
       delete safe[key];
     }
   }
@@ -629,6 +629,13 @@ export async function registerRoutes(
     res.json(data);
   });
 
+  app.get("/api/admin/users", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (!hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    const users = await storage.getUsers();
+    res.json(users.map(toPublicUser));
+  });
+
   app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
@@ -639,17 +646,31 @@ export async function registerRoutes(
   app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
-    
+
+    const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const enterpriseId = Number(user.enterpriseId);
+
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(400).json({ message: "A conta administradora precisa estar vinculada a um estabelecimento." });
+    }
+    if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+      return res.status(400).json({ message: "Usuário inválido. Use de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado." });
+    }
+    if (password.length < 12 || password.length > 128) {
+      return res.status(400).json({ message: "A senha deve ter entre 12 e 128 caracteres." });
+    }
+
     try {
-      const { username, password } = req.body;
       const existing = await storage.getUserByUsername(username);
       if (existing) return res.status(400).json({ message: "Usuário já existe" });
-      
+
       const hashed = await hashPassword(password);
       const newUser = await storage.createUser({
         username,
         password: hashed,
-        role: "barber"
+        role: "barber",
+        enterpriseId,
       });
       res.status(201).json(toPublicUser(newUser));
     } catch (err) {
