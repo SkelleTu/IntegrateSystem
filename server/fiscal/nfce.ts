@@ -401,7 +401,7 @@ function httpsPost(
       res.on("end", () => {
         const statusCode = Number(res.statusCode || 0);
         if (statusCode < 200 || statusCode >= 300) {
-          return reject(new Error(\`SEFAZ respondeu HTTP \${statusCode}: \${data.slice(0, 500)}\`));
+          return reject(new Error("SEFAZ respondeu HTTP " + statusCode + ": " + data.slice(0, 500)));
         }
         resolve(data);
       });
@@ -448,7 +448,7 @@ export async function transmitToSefaz(
 
   const endpoints = SEFAZ_ENDPOINTS[uf];
   if (!endpoints) {
-    throw new Error(\`UF \${uf} ainda não possui endpoint NFC-e homologado no Aura System. A transmissão foi interrompida para evitar envio ao estado incorreto.\`);
+    throw new Error("UF " + uf + " ainda não possui endpoint NFC-e homologado no Aura System. A transmissão foi interrompida para evitar envio ao estado incorreto.");
   }
   const url = isHomologacao ? endpoints.hom : endpoints.prod;
 
