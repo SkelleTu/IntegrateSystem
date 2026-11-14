@@ -1052,7 +1052,11 @@ export async function registerRoutes(
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const settings = await storage.getFiscalSettings(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de acessar as configurações fiscais." });
+    }
+    const settings = await storage.getFiscalSettings(enterpriseId);
     if (!settings) {
       // Pré-preenche com os dados já cadastrados no estabelecimento
       const enterprise = await storage.getEnterprise(user.enterpriseId);
@@ -1107,8 +1111,11 @@ export async function registerRoutes(
   app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de salvar as configurações fiscais." });
+    }
     try {
-      const enterpriseId = user.enterpriseId || 1;
       const currentSettings = await storage.getFiscalSettings(enterpriseId);
       
       const dataToParse = { 
@@ -1134,7 +1141,11 @@ export async function registerRoutes(
   app.get("/api/fiscal/logs", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const logs = await storage.getLogsFiscais(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const logs = await storage.getLogsFiscais(enterpriseId);
     res.json(logs);
   });
 
@@ -1144,6 +1155,10 @@ export async function registerRoutes(
     
     try {
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de emitir documentos fiscais." });
+      }
       const sale = await storage.getSale(saleId);
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
       if (!isSystemOwner(user)) {
@@ -1283,7 +1298,11 @@ export async function registerRoutes(
   app.get("/api/fiscal/history", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const history = await storage.getNfceHistory(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const history = await storage.getNfceHistory(enterpriseId);
     res.json(history);
   });
 
