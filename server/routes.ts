@@ -2888,9 +2888,9 @@ export async function registerRoutes(
   app.get("/api/backup/status", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
     res.json({
-      autoBackup: isRemoteEnabled ? { exists: false } : getAutoBackupInfo(),
+      autoBackup: (neonPool || isRemoteEnabled) ? { exists: false } : getAutoBackupInfo(),
       backup: {
-        complete: !isRemoteEnabled,
+        complete: !neonPool && !isRemoteEnabled,
         authoritativeSource: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
         message: neonPool
           ? "O banco primário é Neon PostgreSQL. O backup remoto verificado ainda não está configurado; snapshots locais não são cópia completa da produção."
@@ -2913,7 +2913,7 @@ export async function registerRoutes(
   // GET /api/backup/export — baixa snapshot JSON completo
   app.get("/api/backup/export", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const snapshot = exportAllDataSync();
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -2931,7 +2931,7 @@ export async function registerRoutes(
   // POST /api/backup/save — salva snapshot nomeado em arquivo
   app.post("/api/backup/save", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const { name } = req.body;
       const filepath = saveBackupToFile(name || undefined);
@@ -2945,7 +2945,7 @@ export async function registerRoutes(
   // GET /api/backup/list — lista backups salvos
   app.get("/api/backup/list", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.json([]);
+    if (neonPool || isRemoteEnabled) return res.json([]);
     try {
       res.json(listBackups());
     } catch (e: any) {
@@ -2956,7 +2956,7 @@ export async function registerRoutes(
   // GET /api/backup/download/:filename — baixa arquivo de backup específico
   app.get("/api/backup/download/:filename", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     const { filename } = req.params;
     // segurança: só permite nomes simples sem paths
     if (filename.includes("..") || filename.includes("/")) {
@@ -2972,7 +2972,7 @@ export async function registerRoutes(
   // POST /api/backup/import — restaura a partir de JSON enviado no body
   app.post("/api/backup/import", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const snapshot = req.body;
       if (!snapshot || typeof snapshot !== "object") {
@@ -2988,7 +2988,7 @@ export async function registerRoutes(
   // POST /api/backup/restore/:filename — restaura a partir de arquivo salvo
   app.post("/api/backup/restore/:filename", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     const { filename } = req.params;
     if (filename.includes("..") || filename.includes("/")) {
       return res.status(400).json({ message: "Nome inválido" });
@@ -3004,7 +3004,7 @@ export async function registerRoutes(
   // POST /api/backup/restore-auto — restaura a partir do auto-backup
   app.post("/api/backup/restore-auto", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const result = await restoreFromFile("auto-backup");
       res.json({ ok: true, ...result, message: "Auto-backup restaurado com sucesso" });
