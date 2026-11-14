@@ -208,12 +208,23 @@ for (const [label, route] of moduleReadRoutes) {
 }
 await expectStatus(await request("/api/admin/monitoring", { headers: { cookie } }), 403, "owner-only-monitoring-denied-to-admin");
 
+// Anonymous write attempts must fail closed across transactional and administrative modules.
+await expectStatus(await request("/api/cash-register/open", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-cash-register-open-denied");
+await expectStatus(await request("/api/cash-register/close", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ closingAmount: 0 }) }), 401, "anonymous-cash-register-close-denied");
+await expectStatus(await request("/api/sales", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-sale-denied");
+await expectStatus(await request("/api/transactions", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-finance-write-denied");
+await expectStatus(await request("/api/fiscal/emitir/1", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-fiscal-emission-denied");
+await expectStatus(await request("/api/backup/save", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-backup-write-denied");
+await expectStatus(await request("/api/time-clock/register", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }), 401, "anonymous-timeclock-write-denied");
+
 // Static UI contracts for the fixes requested during the assisted audit.
 const sidebarSource = fs.readFileSync("client/src/components/app-sidebar.tsx", "utf8");
 const homeSource = fs.readFileSync("client/src/pages/Home.tsx", "utf8");
 const cashierSource = fs.readFileSync("client/src/pages/Cashier.tsx", "utf8");
 const inventorySource = fs.readFileSync("client/src/pages/Inventory.tsx", "utf8");
 const guardSource = fs.readFileSync("client/src/components/MasterPasswordGuard.tsx", "utf8");
+const reportsSource = fs.readFileSync("client/src/pages/Reports.tsx", "utf8");
+const routesSource = fs.readFileSync("server/routes.ts", "utf8");
 assert.ok(sidebarSource.includes('String(user?.role ?? "").trim().toLowerCase() === "owner"'), "owner navigation must be role-based");
 assert.ok(!sidebarSource.includes('username === "SkelleTu"'), "owner access must not depend on a hard-coded username");
 assert.ok(homeSource.includes("border border-white/40") && homeSource.includes("Plataforma Multi-Serviços"), "dashboard label contrast contract missing");
@@ -224,6 +235,9 @@ assert.ok(cashierSource.includes('setWeightInputValue("")') && cashierSource.inc
 assert.ok(inventorySource.includes("Sem validade") && inventorySource.includes("Peso Total em Estoque (kg)"), "inventory expiry/weight unit contract missing");
 assert.ok(inventorySource.includes("Custo de Compra (R$/kg)") && inventorySource.includes("Preço de Venda (R$/kg)"), "inventory per-kg pricing contract missing");
 assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produto"), "inventory sale price placeholder must be explicit");
+assert.ok(reportsSource.includes('new Date(`${dateRange.start}T00:00:00`).toISOString()') && !reportsSource.includes('T00:00:00.000Z'), "reports must filter by local business-day boundaries");
+assert.ok(routesSource.includes('String(user?.role || "").trim().toLowerCase() === "owner";') && !routesSource.includes('String(user?.username || "").trim().toLowerCase() === "skelletu"'), "server owner authorization must rely on the owner role only");
+assert.ok(routesSource.includes("complete: !neonPool && !isRemoteEnabled") && routesSource.includes("if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);"), "backup must not treat a local SQLite snapshot as a complete Neon backup");
 summary.push({ test: "cross-module-read-only-api-coverage", status: "passed", routes: moduleReadRoutes.length });
 summary.push({ test: "requested-ui-contracts", status: "passed" });
 
