@@ -141,7 +141,7 @@ export default function Financeiro() {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0, finalNetBalance: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
     
-    const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
+    const extraIncome = (transactions || []).filter(t => t.type === "income" && t.businessType === businessType && t.category !== "vendas" && !String(t.description || "").startsWith("Venda PDV #")).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
     
     const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
