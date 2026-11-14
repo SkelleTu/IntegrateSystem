@@ -809,14 +809,24 @@ export async function setupDatabase() {
   if (neonPool) {
     await verifyNeonConnection();
     // Preserve existing whole-unit stock values while enabling fractional kilograms.
-    // The migration is additive in precision only; no existing quantity is rescaled.
-    await neonPool.query(`
-      ALTER TABLE public.batches ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
-      ALTER TABLE public.batch_logs ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
-      ALTER TABLE public.inventory ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
-      ALTER TABLE public.inventory_logs ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
-      ALTER TABLE public.inventory_restocks ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric;
-    `);
+    // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
+    const stockQuantityColumns = await neonPool.query(`
+      SELECT table_name, data_type, numeric_precision, numeric_scale
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'quantity'
+        AND table_name = ANY($1::text[])
+    `, [["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]]);
+    const stockQuantityShape = new Map((stockQuantityColumns.rows as any[]).map((row) => [String(row.table_name), row]));
+    for (const table of ["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]) {
+      const column = stockQuantityShape.get(table) as any;
+      if (!column || column.data_type !== "numeric" ||
+          Number(column.numeric_precision) !== 14 || Number(column.numeric_scale) !== 3) {
+        await neonPool.query(
+          `ALTER TABLE public."${table}" ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric`
+        );
+      }
+    }
     const report = await auditDatabaseParity();
     if (!report.ok) {
       throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
