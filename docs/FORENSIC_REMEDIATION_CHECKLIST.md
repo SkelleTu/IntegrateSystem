@@ -98,7 +98,7 @@
 - [ ] Garantir atomicidade entre venda, itens, pagamentos, estoque, caixa e financeiro.
 - [x] Venda de simulação bloqueada fora do QA isolado; status de venda real é definido pelo servidor.
 - [ ] Revisar clique duplo, retry de rede e idempotency key.
-- [ ] Validar ticketId associado à venda e atualizar ticket atomicamente na mesma transação.
+- [~] ticketId é validado e a conclusão da comanda agora ocorre dentro da mesma transação da venda; ainda falta vincular com segurança ao tenant/posse da comanda.
 - [ ] Revisar cancelamento total/parcial, estorno de pagamento e reposição de estoque.
 - [ ] Validar impressão/recibo e recuperação de venda após refresh.
 - [ ] Testar visualmente tablet em retrato/paisagem e resoluções menores.
@@ -283,3 +283,5 @@
 - [x] Execução E2E `43648423800` confirmou todos os passos: produto e lote QA criados, caixa aberto, venda adulterada rejeitada, venda oficial aceita, cancelamento, estoque restaurado, caixa fechado e produto de teste removido.
 
 - [x] `Aura MCP Full Audit` do commit `22697b335c6b1ec38ba0a5e36b1dabe84b88b952` concluiu com sucesso após o workflow passar a tratar a medição de determinismo não autorizada como pendente, conforme a própria especificação do gate, sem exigir publicação de consentimento em produção.
+
+- [x] Venda com ticketId inválido é rejeitada antes da gravação; ticket ativo é validado e marcado concluído dentro da transação da venda, com rollback se o estado mudar concorrentemente.
