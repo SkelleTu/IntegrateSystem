@@ -281,7 +281,7 @@ export const batchLogs = pgTable("batch_logs", {
   productId: integer("product_id").notNull(),
   batchId: integer("batch_id"),
   type: text("type").notNull(), // "in","out","adjust","loss","cancel"
-  quantity: integer("quantity").notNull(),
+  quantity: numeric("quantity", { mode: "number" }).notNull(),
   reason: text("reason"),
   userId: integer("user_id").notNull(),
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
