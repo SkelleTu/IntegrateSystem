@@ -2527,7 +2527,7 @@ export async function registerRoutes(
     } catch (err: any) {
       console.error("[SALE_CREATE] Falha ao registrar venda:", err);
       const message = String(err?.message || "");
-      const conflict = /estoque insuficiente|lote .*não encontrado|item de estoque .*não encontrado|comanda .*não está mais ativa|caixa aberto/i.test(message);
+      const conflict = /estoque insuficiente|lote .*não encontrado|item de estoque .*não encontrado|comanda .*não está mais ativa|comanda foi alterada|caixa aberto/i.test(message);
       const notFound = /comanda não encontrada/i.test(message);
       return res.status(notFound ? 404 : conflict ? 409 : 500).json({
         message: "Não foi possível concluir a venda. " + (message || "Consulte vendas, estoque e financeiro antes de repetir a operação."),
