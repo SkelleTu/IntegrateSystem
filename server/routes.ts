@@ -713,8 +713,7 @@ export async function registerRoutes(
   // Enterprise administration is restricted to an authenticated system owner.
   // Public registration must never be able to create an administrator account.
   const isSystemOwner = (user: any) =>
-    String(user?.role || "").trim().toLowerCase() === "owner" ||
-    String(user?.username || "").trim().toLowerCase() === "skelletu";
+    String(user?.role || "").trim().toLowerCase() === "owner";
 
   app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
