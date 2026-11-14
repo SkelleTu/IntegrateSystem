@@ -185,7 +185,7 @@ export default function Cashier() {
               combined.push({
                 id: invItem.id + 10000,
                 name: invItem.customName || `Produto #${invItem.id}`,
-                price: invItem.salePrice || (invItem.costPrice * 1.3),
+                price: Number(invItem.salePrice) > 0 ? Number(invItem.salePrice) : Math.round(Number(invItem.costPrice || 0) * 1.3),
                 imageUrl: invItem.imageUrl,
                 barcode: invItem.barcode,
                 codigoBalanca: invItem.codigoBalanca,
