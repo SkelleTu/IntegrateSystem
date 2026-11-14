@@ -1788,6 +1788,9 @@ export async function registerRoutes(
     let registerOpenedAt: Date | null = null;
     let saleId: number | null = null;
     let secondSaleId: number | null = null;
+    let weightedProductId: number | null = null;
+    let weightedBatchId: number | null = null;
+    let weightedSaleId: number | null = null;
     let step = "init";
 
     const cleanup = async () => {
@@ -1829,14 +1832,14 @@ export async function registerRoutes(
 
           const localBatches: any[] = await database.select({ id: batches.id })
             .from(batches)
-            .where(eq(batches.batchNumber, marker));
+            .where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")));
           for (const localBatch of localBatches) {
             await database.delete(batchLogs).where(eq(batchLogs.batchId, Number(localBatch.id)));
             await database.delete(batches).where(eq(batches.id, Number(localBatch.id)));
           }
 
-          await database.delete(products).where(eq(products.codigoProduto, marker));
-          await database.delete(products).where(eq(products.name, marker));
+          await database.delete(products).where(or(eq(products.codigoProduto, marker), eq(products.codigoProduto, marker + "_KG")));
+          await database.delete(products).where(or(eq(products.name, marker), eq(products.name, marker + "_KG")));
           if (registerId) {
             // Fallback is constrained to the test user's register created in this run.
             await database.delete(cashRegisters).where(and(
@@ -2017,6 +2020,80 @@ export async function registerRoutes(
         throw new Error("E2E PIX financial reversal transaction missing");
       }
 
+      step = "createWeightedProduct";
+      const weightedProduct = await storage.createProduct({
+        name: marker + "_KG",
+        unit: "kg",
+        minStock: 0,
+        salePrice: 1000,
+        codigoProduto: marker + "_KG",
+      } as any);
+      weightedProductId = weightedProduct.id;
+
+      const weightedBatch = await storage.createBatch({
+        productId: weightedProductId,
+        quantity: 1.5,
+        sku: null,
+        variantName: "E2E WEIGHTED",
+        barcode: null,
+        batchNumber: marker + "_KG",
+        supplierCode: null,
+        supplier: null,
+        manufactureDate: null,
+        expiryDate: null,
+        costPrice: 500,
+        salePrice: 1000,
+        userId: testUserId,
+      } as any);
+      weightedBatchId = weightedBatch.id;
+
+      step = "createWeightedSale";
+      const weightedSale = await storage.createSale(
+        {
+          cashRegisterId: registerId,
+          userId: testUserId,
+          totalAmount: 375,
+          customerName: marker,
+          fiscalStatus: "none",
+          fiscalType: "NFCe",
+          status: "completed",
+        } as any,
+        [{
+          itemType: "product",
+          itemId: 500000 + weightedBatchId,
+          quantity: 375,
+          unitPrice: 1000,
+          totalPrice: 375,
+          unitType: "kg",
+        }] as any,
+        [{
+          method: "cash",
+          amount: 375,
+          createdAt: new Date(),
+        }] as any,
+      );
+      weightedSaleId = weightedSale.id;
+      const weightedItems: any[] = await storage.getSaleItems(weightedSaleId);
+      if (!weightedItems.some((item: any) => Number(item.quantity) === 375 && item.unitType === "kg")) {
+        throw new Error("E2E weighted sale quantity/unit persistence failed");
+      }
+      const weightedStockAfterSale = await storage.getProductBatches(weightedProductId);
+      const weightedRemaining = Number(weightedStockAfterSale.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRemaining - 1.125) > 0.000001) {
+        throw new Error("E2E weighted stock deduction failed: expected 1.500 -> 1.125 kg");
+      }
+
+      step = "cancelWeightedSale";
+      const weightedCancelled = await storage.cancelSale(weightedSaleId);
+      if (weightedCancelled.status !== "cancelled") {
+        throw new Error("E2E weighted sale cancellation failed");
+      }
+      const weightedStockAfterCancel = await storage.getProductBatches(weightedProductId);
+      const weightedRestored = Number(weightedStockAfterCancel.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRestored - 1.5) > 0.000001) {
+        throw new Error("E2E weighted stock reversal failed: expected 1.125 -> 1.500 kg");
+      }
+
       step = "cancelSale";
       const cancelled = await storage.cancelSale(saleId);
       if (cancelled.status !== "cancelled") {
@@ -2066,6 +2143,7 @@ export async function registerRoutes(
           "financial income for both sales",
           "cancel both sales",
           "stock 0 -> 1 -> 2",
+          "weighted sale 0.375 kg: stock 1.500 -> 1.125 -> 1.500 kg",
           "financial reversal for both sales",
           "cash close",
           "cash history",
@@ -2116,9 +2194,9 @@ export async function registerRoutes(
           ? await database.select().from(batchLogs).where(eq(batchLogs.batchId, batchId))
           : [];
         return {
-          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker)))).length,
+          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker), eq(products.codigoProduto, marker + "_KG"), eq(products.name, marker + "_KG")))).length,
           sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
-          batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
+          batches: (await database.select().from(batches).where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")))).length,
           payments: dependentPayments.length,
           saleItems: dependentSaleItems.length,
           transactions: remainingTransactions.length,
