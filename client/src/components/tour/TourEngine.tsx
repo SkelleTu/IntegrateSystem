@@ -130,9 +130,18 @@ function ModeSelectCard({ isFirstTime, onSelect, onClose }: {
           </div>
 
           {isFirstTime && (
-            <p className="text-center text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
-              Selecione uma opção para continuar
-            </p>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-center text-[10px] text-zinc-600 font-bold uppercase tracking-widest">
+                Selecione uma opção para continuar
+              </p>
+              <button
+                type="button"
+                onClick={onClose}
+                className="text-xs font-black uppercase tracking-widest text-white/70 hover:text-white px-4 py-2 rounded-lg border border-white/15 hover:bg-white/5"
+              >
+                Pular tutorial
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -410,7 +419,7 @@ function NavButtons({ isFirst, isLast, isFirstTime, onPrev, onNext, onStop }: {
 
       <div className="flex-1" />
 
-      {!isFirstTime && !isLast && (
+      {!isLast && (
         <button
           onClick={onStop}
           className="text-[10px] font-bold text-zinc-600 hover:text-zinc-400 uppercase tracking-widest transition-colors"
