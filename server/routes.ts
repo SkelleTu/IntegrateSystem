@@ -2618,7 +2618,7 @@ export async function registerRoutes(
         authoritativeUnitType = String(inventoryItem.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit";
         authoritativeItemId = 10000 + Number(inventoryItem.id);
       } else if (sourceType === "batch") {
-        const [batch] = await db.select().from(batches).where(eq(batches.id, sourceId)).limit(1);
+        const [batch] = await db.select().from(batches).where(and(eq(batches.id, sourceId), eq(batches.enterpriseId, Number(user.enterpriseId)))).limit(1);
         if (!batch) return res.status(409).json({ message: "Um lote do produto não existe mais. Atualize o caixa." });
         const product = await storage.getProduct(Number(batch.productId));
         if (!product) return res.status(409).json({ message: "O produto do lote não existe mais. Atualize o caixa." });
