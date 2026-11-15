@@ -270,7 +270,7 @@ export class DatabaseStorage implements IStorage {
           ...adminData,
           id: sharedAdminId,
           enterpriseId: newEnterprise.id,
-          role: "admin",
+          role: adminData.role || "admin",
         } as any);
       }
       return newEnterprise;
