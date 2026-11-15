@@ -485,6 +485,29 @@ export class DatabaseStorage implements IStorage {
   async getServices(): Promise<Service[]> {
     this.logAction("Consulta lista de serviços");
     const enterpriseId = this.currentEnterpriseId();
+    if (!dbRemote) {
+      const statement = localSqlite.prepare(
+        "SELECT id, name, price, image_url, is_active, enterprise_id FROM services WHERE enterprise_id = ? AND is_active = 1 ORDER BY id",
+      );
+      try {
+        statement.bind([enterpriseId]);
+        const rows: any[] = [];
+        while (statement.step()) {
+          const row = statement.getAsObject();
+          rows.push({
+            id: Number(row.id),
+            name: String(row.name),
+            price: Number(row.price),
+            imageUrl: String(row.image_url || ""),
+            isActive: Boolean(Number(row.is_active)),
+            enterpriseId: Number(row.enterprise_id),
+          });
+        }
+        return rows as Service[];
+      } finally {
+        statement.free();
+      }
+    }
     return await db.select().from(services)
       .where(and(eq(services.enterpriseId, enterpriseId), eq(services.isActive, true)));
   }
