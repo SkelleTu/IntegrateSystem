@@ -2784,20 +2784,14 @@ export async function registerRoutes(
   app.get("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      const enterpriseRows = await db.select({
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const [activeEnterprise] = await db.select({
         id: enterprises.id,
         businessType: enterprises.businessType
-      }).from(enterprises).limit(2);
-      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
-        return res.status(409).json({
-          code: "TRANSACTION_TENANT_REQUIRED",
-          message: "O histórico financeiro legado ainda não possui vínculo direto com empresa. A consulta administrativa fica bloqueada quando há mais de um estabelecimento."
-        });
-      }
-
-      const activeEnterpriseId = Number(user.enterpriseId);
-      const activeEnterprise = enterpriseRows.find((entry: any) => Number(entry.id) === activeEnterpriseId)
-        || (enterpriseRows.length === 1 ? enterpriseRows[0] : undefined);
+      }).from(enterprises).where(eq(enterprises.id, activeEnterpriseId)).limit(1);
       if (!activeEnterprise && !isSystemOwner(user)) {
         return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
       }
@@ -2831,19 +2825,14 @@ export async function registerRoutes(
   app.post("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      const enterpriseRows = await db.select({
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de lançar uma transação." });
+      }
+      const [activeEnterprise] = await db.select({
         id: enterprises.id,
         businessType: enterprises.businessType
-      }).from(enterprises).limit(2);
-      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
-        return res.status(409).json({
-          code: "TRANSACTION_TENANT_REQUIRED",
-          message: "O lançamento financeiro legado não possui vínculo direto com empresa. A criação administrativa fica bloqueada quando há mais de um estabelecimento."
-        });
-      }
-      const activeEnterpriseId = Number(user.enterpriseId);
-      const activeEnterprise = enterpriseRows.find((entry: any) => Number(entry.id) === activeEnterpriseId)
-        || (enterpriseRows.length === 1 ? enterpriseRows[0] : undefined);
+      }).from(enterprises).where(eq(enterprises.id, activeEnterpriseId)).limit(1);
       if (!activeEnterprise) {
         return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de lançar uma transação." });
       }
@@ -2865,12 +2854,9 @@ export async function registerRoutes(
   app.delete("/api/transactions/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
-      const enterpriseRows = await db.select({ id: enterprises.id }).from(enterprises).limit(2);
-      if (enterpriseRows.length > 1 && !isSystemOwner(user)) {
-        return res.status(409).json({
-          code: "TRANSACTION_TENANT_REQUIRED",
-          message: "A exclusão financeira fica bloqueada para administradores enquanto as transações não tiverem vínculo direto com empresa."
-        });
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
       }
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de transação inválido" });
