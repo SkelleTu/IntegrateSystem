@@ -114,7 +114,7 @@ export default function ClientCart() {
             <Button 
               className="w-full h-12 font-black italic uppercase tracking-tighter text-lg text-white"
               onClick={() => findTicketMutation.mutate(ticketNumber)}
-              disabled={findTicketMutation.isPending}
+              disabled={findTicketMutation.isPending || !enterpriseId}
             >
               {findTicketMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Pedido"}
             </Button>
