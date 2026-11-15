@@ -831,15 +831,18 @@ export class DatabaseStorage implements IStorage {
 
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWriteTransaction(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
       const transaction = database;
-        const [sale] = await transaction.select().from(sales).where(eq(sales.id, id));
+        const [sale] = await transaction.select().from(sales)
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
         if (!sale) throw new Error("Venda não encontrada");
         if (sale.status === "cancelled") return sale;
 
-        const items = await transaction.select().from(saleItems).where(eq(saleItems.saleId, id));
+        const items = await transaction.select().from(saleItems)
+          .where(and(eq(saleItems.saleId, id), eq(saleItems.enterpriseId, enterpriseId)));
         const stockReversals: Array<
           | { kind: "batch"; item: SaleItem; stock: Batch }
           | { kind: "inventory"; item: SaleItem; stock: Inventory }
@@ -855,7 +858,7 @@ export class DatabaseStorage implements IStorage {
           if (batchId !== null) {
             const [batch] = await transaction.select()
               .from(batches)
-              .where(eq(batches.id, batchId))
+              .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)))
               .limit(1);
             if (!batch) {
               throw new Error(`Lote ${batchId} não encontrado para estornar a venda #${id}`);
@@ -871,10 +874,14 @@ export class DatabaseStorage implements IStorage {
             .from(inventory)
             .where(
               legacyInventoryId !== null
-                ? eq(inventory.id, legacyInventoryId)
+                ? and(
+                    eq(inventory.id, legacyInventoryId),
+                    eq(inventory.enterpriseId, enterpriseId)
+                  )
                 : and(
                     eq(inventory.itemId, item.itemId),
-                    eq(inventory.itemType, item.itemType === "product" ? "product" : "service")
+                    eq(inventory.itemType, item.itemType === "product" ? "product" : "service"),
+                    eq(inventory.enterpriseId, enterpriseId)
                   )
             )
             .limit(1);
@@ -893,8 +900,9 @@ export class DatabaseStorage implements IStorage {
 
         await transaction.update(sales)
           .set({ status: "cancelled" })
-          .where(eq(sales.id, id));
-        const [updatedSale] = await transaction.select().from(sales).where(eq(sales.id, id)).limit(1);
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
+        const [updatedSale] = await transaction.select().from(sales)
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId))).limit(1);
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
