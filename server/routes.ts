@@ -1466,6 +1466,7 @@ export async function registerRoutes(
 
   // Services Routes
   app.get(api.services.list.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const services = await storage.getServices();
     res.json(services);
   });
