@@ -835,14 +835,24 @@ export async function setupDatabase() {
     for (const table of tenantTables) {
       await neonPool.query(`ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS enterprise_id INTEGER`);
     }
-    const [{ rows: enterpriseRows }] = await Promise.all([
-      neonPool.query("SELECT id FROM public.enterprises ORDER BY id ASC LIMIT 1"),
-    ]);
-    const defaultEnterpriseId = enterpriseRows?.[0]?.id ? Number(enterpriseRows[0].id) : null;
-    if (defaultEnterpriseId) {
+    const enterpriseResult = await neonPool.query("SELECT id FROM public.enterprises ORDER BY id ASC");
+    const enterpriseIds = (enterpriseResult.rows as any[]).map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    const unscopedCounts: Record<string, number> = {};
+    for (const table of tenantTables) {
+      const result = await neonPool.query(`SELECT count(*)::int AS count FROM public."${table}" WHERE enterprise_id IS NULL`);
+      unscopedCounts[table] = Number(result.rows[0]?.count || 0);
+    }
+    const totalUnscoped = Object.values(unscopedCounts).reduce((sum, value) => sum + value, 0);
+    if (totalUnscoped > 0 && enterpriseIds.length === 1) {
+      const onlyEnterpriseId = enterpriseIds[0];
       for (const table of tenantTables) {
-        await neonPool.query(`UPDATE public."${table}" SET enterprise_id = $1 WHERE enterprise_id IS NULL`, [defaultEnterpriseId]);
+        if (unscopedCounts[table] > 0) {
+          await neonPool.query(`UPDATE public."${table}" SET enterprise_id = $1 WHERE enterprise_id IS NULL`, [onlyEnterpriseId]);
+        }
       }
+      console.log(`[DB] Backfilled ${totalUnscoped} unscoped operational rows to the only existing enterprise ID ${onlyEnterpriseId}.`);
+    } else if (totalUnscoped > 0 && enterpriseIds.length !== 1) {
+      throw new Error(`[SECURITY] Tenant backfill aborted: ${totalUnscoped} operational rows have no enterprise_id while the database contains ${enterpriseIds.length} enterprises. Manual reconciliation is required; no row was reassigned automatically.`);
     }
     console.log("[DB] Tenant boundary columns verified for operational tables.");
   }
