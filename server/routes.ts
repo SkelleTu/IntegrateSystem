@@ -2887,9 +2887,16 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Identificador de comanda inválido." });
     }
 
+    const suppliedTicketToken = String(
+      req.get("x-ticket-token") || req.body?.publicAccessToken || ""
+    ).trim();
+    if (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128) {
+      return res.status(401).json({ code: "TICKET_POSSESSION_REQUIRED", message: "Token de posse da comanda obrigatório." });
+    }
+
     const parsedBody = z.object({
       items: z.array(z.string().max(2048)).max(100)
-    }).safeParse(req.body);
+    }).max(100).safeParse(req.body);
     if (!parsedBody.success) {
       return res.status(400).json({ message: "Carrinho inválido. Revise os itens e tente novamente." });
     }
@@ -2897,6 +2904,9 @@ export async function registerRoutes(
     try {
       const [ticketRecord] = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
       if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
+      if (String((ticketRecord as any).publicAccessToken || "") !== suppliedTicketToken) {
+        return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+      }
       if (ticketRecord.status !== "pending" && ticketRecord.status !== "serving") {
         return res.status(409).json({ message: "Esta comanda já foi finalizada e não pode mais ser alterada." });
       }
