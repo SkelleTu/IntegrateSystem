@@ -168,7 +168,7 @@ assert.equal(queuePrev.servingNumber, 0);
 const queueSet = await expectStatus(await request("/api/queue/set", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ number: 7 }) }), 200, "queue-set-number");
 assert.equal(queueSet.servingNumber, 7);
 await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 200, "queue-reset-after-test");
-const ticket = await expectStatus(await request("/api/tickets", {
+const ticket = await expectStatus(await request(`/api/tickets?enterpriseId=${sessionUser.enterpriseId}`, {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ serviceId }),
