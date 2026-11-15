@@ -109,7 +109,7 @@ export interface IStorage {
   getQueueState(): Promise<QueueState>;
   updateQueueState(state: Partial<QueueState>): Promise<QueueState>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
-  getTicketByNumber(number: number): Promise<Ticket | undefined>;
+  getTicketByNumber(number: number, includePublicAccessToken?: boolean): Promise<Ticket | undefined>;
   getLatestTicket(): Promise<Ticket | undefined>;
 
   // Digital Menu
@@ -534,7 +534,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async getTicketByNumber(number: number): Promise<Ticket | undefined> {
+  async getTicketByNumber(number: number, includePublicAccessToken = false): Promise<Ticket | undefined> {
     this.logAction(`Busca ticket #${number}`);
     const enterpriseId = this.currentEnterpriseId();
     const [ticket] = await db.select().from(tickets)
@@ -549,7 +549,7 @@ export class DatabaseStorage implements IStorage {
     } else if (ticket && !ticket.items) {
       (ticket as any).items = [];
     }
-    if (ticket) delete (ticket as any).publicAccessToken;
+    if (ticket && !includePublicAccessToken) delete (ticket as any).publicAccessToken;
     return ticket;
   }
 
@@ -1618,8 +1618,8 @@ export class DatabaseStorage implements IStorage {
         `INSERT INTO products
           (id, name, brand, category, flavor, unit, weight, description, image_url,
            min_stock, sale_price, em_liquidacao, ncm, cfop, codigo_balanca,
-           codigo_produto, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           codigo_produto, enterprise_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run([
         forcedId ?? null,
         String(data.name),
@@ -1637,6 +1637,7 @@ export class DatabaseStorage implements IStorage {
         data.cfop ?? null,
         data.codigoBalanca ?? null,
         data.codigoProduto ?? null,
+        enterpriseId,
         nowSec,
         nowSec
       ]);
