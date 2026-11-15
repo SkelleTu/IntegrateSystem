@@ -189,7 +189,7 @@ export default function TimeClock() {
                   </p>
                 )}
 
-                {!user.webauthnCredentialId ? (
+                {!timeClockStatus?.webauthnRegistered ? (
                   <Button 
                     size="lg"
                     disabled={timeClockStatus?.webauthnReady === false}
@@ -220,7 +220,7 @@ export default function TimeClock() {
                     </p>
                   </div>
                   <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
-                    ID: {user.id} • {user.webauthnCredentialId ? "Credencial WebAuthn cadastrada" : "Aguardando cadastro"}
+                    ID: {user.id} • {timeClockStatus?.webauthnRegistered ? "Credencial WebAuthn cadastrada" : "Aguardando cadastro"}
                   </p>
                 </div>
               </CardContent>
