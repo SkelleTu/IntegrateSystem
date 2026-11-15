@@ -8,6 +8,31 @@ import { useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import auraLogo from "@assets/AURA_1768346008566.png";
 
+const toBase64Url = (value: ArrayBuffer | Uint8Array) => {
+  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const fromBase64Url = (value: string) => {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+};
+
+const decodeWebAuthnOptions = (options: any) => ({
+  ...options,
+  challenge: fromBase64Url(options.challenge),
+  user: options.user ? { ...options.user, id: fromBase64Url(options.user.id) } : undefined,
+  allowCredentials: options.allowCredentials?.map((credential: any) => ({
+    ...credential,
+    id: fromBase64Url(credential.id),
+  })),
+});
+
+
 export default function TimeClock() {
   const { data: user } = useUser();
   const [, setLocation] = useLocation();
@@ -27,27 +52,19 @@ export default function TimeClock() {
     mutationFn: async () => {
       try {
         toast({ title: "Iniciando...", description: "Por favor, siga as instruções do seu navegador para ler sua digital." });
-        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-        const credential = await navigator.credentials.create({
-          publicKey: {
-            challenge,
-            rp: { name: "Aura" },
-            user: {
-              id: window.crypto.getRandomValues(new Uint8Array(16)),
-              name: user?.username || "user",
-              displayName: user?.username || "User"
-            },
-            pubKeyCredParams: [{ alg: -7, type: "public-key" }],
-            authenticatorSelection: {
-              authenticatorAttachment: "platform",
-              userVerification: "required"
-            },
-            timeout: 60000
-          }
+        const optionsResponse = await apiRequest("GET", "/api/auth/webauthn/register/options");
+        const options = decodeWebAuthnOptions(await optionsResponse.json());
+        const credential = await navigator.credentials.create({ publicKey: options });
+        if (!credential || !(credential instanceof PublicKeyCredential)) throw new Error("Falha ao acessar o autenticador WebAuthn.");
+        const response = credential.response as AuthenticatorAttestationResponse;
+        const publicKey = response.getPublicKey?.();
+        if (!publicKey) throw new Error("O navegador não forneceu a chave pública da credencial.");
+        const res = await apiRequest("POST", "/api/auth/register-fingerprint", {
+          credentialId: credential.id,
+          clientDataJSON: toBase64Url(response.clientDataJSON),
+          authenticatorData: toBase64Url(response.getAuthenticatorData()),
+          publicKey: toBase64Url(publicKey),
         });
-        if (!credential) throw new Error("Falha ao acessar sensor biométrico.");
-        const fpId = (credential as any).id;
-        const res = await apiRequest("POST", "/api/auth/register-fingerprint", { fingerprintId: fpId });
         return res.json();
       } catch (err: any) {
         if (err.name === "NotAllowedError") {
@@ -65,20 +82,19 @@ export default function TimeClock() {
 
   const registerClockMutation = useMutation({
     mutationFn: async (type: string) => {
-      if (!user?.fingerprintId) throw new Error("Cadastre sua digital primeiro!");
       try {
-        const challenge = window.crypto.getRandomValues(new Uint8Array(32));
-        const savedId = Uint8Array.from(atob(user.fingerprintId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-        const assertion = await navigator.credentials.get({
-          publicKey: {
-            challenge,
-            allowCredentials: [{ id: savedId, type: "public-key" }],
-            userVerification: "required",
-            timeout: 60000
-          }
+        const optionsResponse = await apiRequest("GET", "/api/auth/webauthn/assertion/options");
+        const options = decodeWebAuthnOptions(await optionsResponse.json());
+        const assertion = await navigator.credentials.get({ publicKey: options });
+        if (!assertion || !(assertion instanceof PublicKeyCredential)) throw new Error("Verificação WebAuthn falhou.");
+        const response = assertion.response as AuthenticatorAssertionResponse;
+        const res = await apiRequest("POST", "/api/time-clock/register", {
+          type,
+          credentialId: assertion.id,
+          clientDataJSON: toBase64Url(response.clientDataJSON),
+          authenticatorData: toBase64Url(response.authenticatorData),
+          signature: toBase64Url(response.signature),
         });
-        if (!assertion) throw new Error("Verificação falhou.");
-        const res = await apiRequest("POST", "/api/time-clock/register", { type, fingerprintId: user.fingerprintId });
         return res.json();
       } catch (err: any) {
         throw new Error(err?.message || "Falha na autenticação do dispositivo.");
@@ -176,7 +192,7 @@ export default function TimeClock() {
                 {!user.fingerprintId ? (
                   <Button 
                     size="lg"
-                    disabled={!timeClockStatus?.webauthnReady}
+                    disabled={timeClockStatus?.webauthnReady === false}
                     className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_-5px_rgba(0,229,255,0.5)] group overflow-hidden relative"
                     onClick={() => registerFingerprintMutation.mutate()}
                   >
@@ -204,7 +220,7 @@ export default function TimeClock() {
                     </p>
                   </div>
                   <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest">
-                    ID: {user.id} • {user.fingerprintId ? "Credencial cadastrada" : "Aguardando cadastro"}
+                    ID: {user.id} • {user.webauthnCredentialId ? "Credencial WebAuthn cadastrada" : "Aguardando cadastro"}
                   </p>
                 </div>
               </CardContent>
