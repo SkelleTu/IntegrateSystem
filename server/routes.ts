@@ -245,7 +245,7 @@ export async function registerRoutes(
 
     const requestedEnterpriseId = Number(req.query?.enterpriseId);
     const requestedSlug = typeof req.query?.enterpriseSlug === "string" ? req.query.enterpriseSlug.trim() : "";
-    if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0 || requestedSlug) {
+    if ((Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) || requestedSlug) {
       const filters = [eq(enterprises.status, "active")];
       if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) {
         filters.push(eq(enterprises.id, requestedEnterpriseId));
@@ -336,14 +336,14 @@ export async function registerRoutes(
     if (pathname !== "/ws/labels") return;
 
     const authorization = String(request.headers.authorization || "");
-    const suppliedToken = authorization.replace(/^Bearer[s+/i, "").trim();
+    const suppliedToken = authorization.replace(/^Bearer\\s+/i, "").trim();
     if (!labelsWsToken) {
-      socket.write("HTTP/1.1 503 Service Unavailable[[Connection: close[[[[");
+      socket.write("HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
     }
     if (!isValidLabelsToken(suppliedToken)) {
-      socket.write("HTTP/1.1 401 Unauthorized[[Connection: close[[[[");
+      socket.write("HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n");
       socket.destroy();
       return;
     }
@@ -736,7 +736,16 @@ export async function registerRoutes(
     }
   });
 
-  // Legacy compatibility: old barber route remains disabled so the current API stays generic.[  app.post("/api/admin/register-barber", isAuthenticated, (_req, res) => {[    return res.status(410).json({ code: "LEGACY_STAFF_ROUTE_DISABLED", message: "Endpoint legado de barbeiro desativado. Use /api/admin/register-employee." });[  });[[  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
+  // Legacy compatibility: the old barber-specific endpoint is intentionally disabled.
+  // The current domain uses generic employees, independent of establishment type.
+  app.post("/api/admin/register-barber", isAuthenticated, (_req, res) => {
+    return res.status(410).json({
+      code: "LEGACY_STAFF_ROUTE_DISABLED",
+      message: "Endpoint legado de barbeiro desativado. Use /api/admin/register-employee.",
+    });
+  });
+
+  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
   app.get("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const list = await storage.getEnterprisesByOwner(user.id);
@@ -753,8 +762,8 @@ export async function registerRoutes(
 
       const normalizedName = name.trim();
       const baseSlug = normalizedName.toLowerCase()
-        .normalize("NFD").replace(/[[u0300-[u036f]/g, "")
-        .replace(/[^[w[s-]/g, "").replace(/[s+/g, "-");
+        .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+        .replace(/[^\\w\\s-]/g, "").replace(/\\s+/g, "-");
 
       const enterprise = await storage.createAndActivateEnterprise(user.id, {
         ownerId: user.id,
@@ -817,7 +826,7 @@ export async function registerRoutes(
 
       const finalSlug = (typeof slug === "string" && slug.trim())
         ? slug.trim()
-        : name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^[\s-]/g, "").replace(/\s+/g, "-");
+        : name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
 
       const existing = await storage.getEnterpriseBySlug(finalSlug);
       if (existing) {
@@ -2894,7 +2903,7 @@ export async function registerRoutes(
 
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
     );
     const suppliedTicketToken = String(
       req.get("x-ticket-token") || req.body?.publicAccessToken || ""
@@ -3052,7 +3061,7 @@ export async function registerRoutes(
     if (!(await setPublicTenantContext(req, res))) return;
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
     );
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
