@@ -3198,8 +3198,13 @@ export async function registerRoutes(
     if (!Number.isSafeInteger(ticketNumber) || ticketNumber <= 0) {
       return res.status(400).json({ message: "Número de comanda inválido." });
     }
-    const ticket = await storage.getTicketByNumber(ticketNumber, !authenticatedStaff);
+    const suppliedTicketToken = String(req.get("x-ticket-token") || req.query?.ticketToken || "").trim();
+    const ticket = await storage.getTicketByNumber(ticketNumber, false);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
+    if (!authenticatedStaff && suppliedTicketToken && String((ticket as any).publicAccessToken || "") !== suppliedTicketToken) {
+      return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+    }
+    delete (ticket as any).publicAccessToken;
     res.json(ticket);
   });
   // Reconcile the owner account independently in each active database.
