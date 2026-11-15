@@ -32,13 +32,14 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email"),
   password: text("password").notNull(),
-  role: text("role").notNull().default("barber"), // "admin", "barber", "owner"
+  role: text("role").notNull().default("employee"), // "admin", "employee", "owner"; "barber" is legacy compatibility
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
   enterpriseId: integer("enterprise_id"),
   tutorialCompletedAt: text("tutorial_completed_at"),
 });
 
 export const services = pgTable("services", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   price: integer("price").notNull(), // in cents
@@ -47,6 +48,7 @@ export const services = pgTable("services", {
 });
 
 export const tickets = pgTable("tickets", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   ticketNumber: integer("ticket_number").notNull(),
   serviceId: integer("service_id"),
@@ -56,12 +58,14 @@ export const tickets = pgTable("tickets", {
 });
 
 export const queueState = pgTable("queue_state", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   currentNumber: integer("current_number").default(0).notNull(), 
   servingNumber: integer("serving_number").default(0).notNull(), 
 });
 
 export const categories = pgTable("categories", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   icon: text("icon").notNull(), // Lucide icon name
@@ -69,6 +73,7 @@ export const categories = pgTable("categories", {
 });
 
 export const menuItems = pgTable("menu_items", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   categoryId: integer("category_id").notNull(),
   name: text("name").notNull(),
@@ -89,6 +94,7 @@ export const menuItems = pgTable("menu_items", {
 });
 
 export const cashRegisters = pgTable("cash_register", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
   openedAt: integer("opened_at", { mode: 'timestamp' }),
@@ -100,6 +106,7 @@ export const cashRegisters = pgTable("cash_register", {
 });
 
 export const sales = pgTable("sales", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   cashRegisterId: integer("cash_register_id"),
   userId: integer("user_id"),
@@ -121,6 +128,7 @@ export const sales = pgTable("sales", {
 });
 
 export const saleItems = pgTable("sale_items", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   saleId: integer("sale_id").notNull(),
   itemType: text("item_type").notNull(), 
@@ -132,6 +140,7 @@ export const saleItems = pgTable("sale_items", {
 });
 
 export const payments = pgTable("payments", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   saleId: integer("sale_id").notNull(),
   method: text("method").notNull(), // "cash", "card", "pix"
@@ -140,6 +149,7 @@ export const payments = pgTable("payments", {
 });
 
 export const transactions = pgTable("transactions", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   businessType: text("business_type").notNull(), // "padaria"
   type: text("type").notNull(), // "income", "expense"
@@ -150,6 +160,7 @@ export const transactions = pgTable("transactions", {
 });
 
 export const timeClock = pgTable("time_clock", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),
   type: text("type").notNull(), // "in", "break_start", "break_end", "out"
@@ -192,6 +203,7 @@ export const settings = pgTable("settings", {
 });
 
 export const inventory = pgTable("inventory", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   itemId: integer("item_id"), // Can be null for custom items
   itemType: text("item_type").notNull(), // "product", "service", or "custom"
@@ -212,6 +224,7 @@ export const inventory = pgTable("inventory", {
 });
 
 export const inventoryLogs = pgTable("inventory_logs", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   inventoryId: integer("inventory_id").notNull(),
   type: text("type").notNull(), // "in" or "out"
@@ -222,6 +235,7 @@ export const inventoryLogs = pgTable("inventory_logs", {
 });
 
 export const inventoryRestocks = pgTable("inventory_restocks", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   inventoryId: integer("inventory_id").notNull(),
   quantity: numeric("quantity", { mode: "number" }).notNull(),
@@ -235,6 +249,7 @@ export const inventoryRestocks = pgTable("inventory_restocks", {
 // ─── Novo sistema Produto → Lotes ─────────────────────────────────────────────
 
 export const products = pgTable("products", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   brand: text("brand"),
@@ -256,6 +271,7 @@ export const products = pgTable("products", {
 });
 
 export const batches = pgTable("batches", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull(),
   // ── Identidade da variante (obrigatório por regra de negócio ERP/PDV) ────────
@@ -278,6 +294,7 @@ export const batches = pgTable("batches", {
 });
 
 export const batchLogs = pgTable("batch_logs", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   productId: integer("product_id").notNull(),
   batchId: integer("batch_id"),
@@ -337,6 +354,7 @@ export const fiscalSettings = pgTable("fiscal_settings", {
 });
 
 export const nfce = pgTable("nfce", {
+  enterpriseId: integer("enterprise_id"),
   id: integer("id").primaryKey({ autoIncrement: true }),
   saleId: integer("sale_id").notNull(),
   numero: integer("numero").notNull(),
