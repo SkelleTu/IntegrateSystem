@@ -1727,7 +1727,10 @@ export async function registerRoutes(
         minStock: minStock !== undefined ? Number(minStock) : undefined,
         ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
       };
-      const p = await storage.updateProduct(Number(req.params.id), data);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de produto inválido" });
+      const p = await storage.updateProduct(id, data);
+      if (!p) return res.status(404).json({ message: "Produto não encontrado." });
       res.json(p);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao atualizar produto" });
@@ -1798,7 +1801,9 @@ export async function registerRoutes(
 
   app.delete("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      await storage.deleteProduct(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de produto inválido" });
+      await storage.deleteProduct(id);
       res.status(204).send();
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao excluir produto" });
@@ -1849,7 +1854,11 @@ export async function registerRoutes(
       if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
       if (manufactureDate !== undefined) data.manufactureDate = manufactureDate ? new Date(manufactureDate) : null;
       if (entryDate !== undefined) data.entryDate = new Date(entryDate);
-      const b = await storage.updateBatch(Number(req.params.id), data);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de lote inválido" });
+      if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nenhum campo válido para atualização." });
+      const b = await storage.updateBatch(id, data);
+      if (!b) return res.status(404).json({ message: "Lote não encontrado." });
       res.json(b);
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao atualizar lote" });
@@ -1858,7 +1867,9 @@ export async function registerRoutes(
 
   app.delete("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      await storage.deleteBatch(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de lote inválido" });
+      await storage.deleteBatch(id);
       res.status(204).send();
     } catch (err: any) {
       res.status(500).json({ message: err.message || "Erro ao excluir lote" });
@@ -2813,9 +2824,10 @@ export async function registerRoutes(
           message: "A exclusão financeira fica bloqueada para administradores enquanto as transações não tiverem vínculo direto com empresa."
         });
       }
-      const id = parseInt(req.params.id);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de transação inválido" });
       await storage.deleteTransaction(id);
-      res.status(200).json({ message: "Transaction deleted" });
+      res.status(204).send();
     } catch (err) {
       res.status(500).json({ message: "Internal server error" });
     }
