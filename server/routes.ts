@@ -1544,9 +1544,20 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Serviço indisponível para emissão de senha." });
     }
     const state = await storage.getQueueState();
-    const enterpriseId = Number(getAuraContext().enterpriseId || 0);
+    let enterpriseId = Number(getAuraContext().enterpriseId || 0);
     if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
-      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Estabelecimento público não selecionado." });
+      const fallbackEnterprises = await db.select({ id: enterprises.id })
+        .from(enterprises)
+        .where(eq(enterprises.status, "active"))
+        .limit(2);
+      if (fallbackEnterprises.length !== 1) {
+        return res.status(409).json({
+          code: "ENTERPRISE_CONTEXT_REQUIRED",
+          message: "Estabelecimento público não selecionado.",
+        });
+      }
+      enterpriseId = Number(fallbackEnterprises[0].id);
+      updateAuraContext({ enterpriseId });
     }
 
     // Find next available ticket number that isn't currently active (pending or serving)
