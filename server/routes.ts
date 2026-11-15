@@ -3188,7 +3188,7 @@ export async function registerRoutes(
     if (!(await setPublicTenantContext(req, res))) return;
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "tenant_owner", "employee", "barber"].includes(normalizeRole(req.user))
     );
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
@@ -3199,7 +3199,7 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Número de comanda inválido." });
     }
     const suppliedTicketToken = String(req.get("x-ticket-token") || req.query?.ticketToken || "").trim();
-    const ticket = await storage.getTicketByNumber(ticketNumber, false);
+    const ticket = await storage.getTicketByNumber(ticketNumber, !authenticatedStaff);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
     if (!authenticatedStaff && suppliedTicketToken && String((ticket as any).publicAccessToken || "") !== suppliedTicketToken) {
       return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
