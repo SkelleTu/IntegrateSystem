@@ -298,10 +298,6 @@ export class DatabaseStorage implements IStorage {
         return existing;
       }
 
-      const owned = await database.select({ id: enterprises.id }).from(enterprises)
-        .where(eq(enterprises.ownerId, ownerId));
-      if (owned.length >= 5) throw new Error("Limite de 5 estabelecimentos por conta atingido.");
-
       const baseSlug = enterprise.slug;
       let slug = baseSlug;
       let attempt = 1;
