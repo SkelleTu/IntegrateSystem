@@ -203,7 +203,7 @@ export const enterprises = pgTable("enterprises", {
 
 export const settings = pgTable("settings", {
   id: serial("id").primaryKey(),
-  enterpriseId: integer("enterprise_id"),
+  enterpriseId: integer("enterprise_id").notNull(),
   siteName: text("site_name").default("Padaria").notNull(),
   logoUrl: text("logo_url").default(""),
   primaryColor: text("primary_color").default("#00FF66").notNull(), 
