@@ -16,6 +16,7 @@ export default function ClientCart() {
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
   const [ticketToken, setTicketToken] = useState("");
   const [cart, setCart] = useState<{ id: number, name: string, price: number, quantity: number }[]>([]);
+  const initialTicketToken = new URLSearchParams(window.location.search).get("ticketToken") || "";
 
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
     queryKey: ["/api/menu-items"],
@@ -23,13 +24,14 @@ export default function ClientCart() {
 
   const findTicketMutation = useMutation({
     mutationFn: async (number: string) => {
-      const res = await fetch(`/api/tickets/${number}`);
+      const headers: HeadersInit = initialTicketToken ? { "x-ticket-token": initialTicketToken } : {};
+      const res = await fetch(`/api/tickets/${number}${initialTicketToken ? `?ticketToken=${encodeURIComponent(initialTicketToken)}` : ""}`, { headers });
       if (!res.ok) throw new Error("Comanda não encontrada");
       return res.json();
     },
     onSuccess: (data) => {
       setCurrentTicket(data);
-      setTicketToken(String(data.publicAccessToken || ""));
+      setTicketToken(initialTicketToken);
       const initialItems = data.items ? data.items.map((i: string) => JSON.parse(i)) : [];
       setCart(initialItems);
       toast({ title: "Bem-vindo", description: `Comanda #${data.ticketNumber} ativa` });
@@ -162,7 +164,7 @@ export default function ClientCart() {
                   <Button 
                     className="w-full h-12 font-black italic uppercase tracking-tighter text-lg text-white"
                     onClick={saveCart}
-                    disabled={updateItemsMutation.isPending}
+                    disabled={updateItemsMutation.isPending || !ticketToken}
                   >
                     {updateItemsMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Pedido"}
                   </Button>
