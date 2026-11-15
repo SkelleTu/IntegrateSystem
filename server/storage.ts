@@ -787,13 +787,14 @@ export class DatabaseStorage implements IStorage {
           : null;
         const [inventoryItem] = await database.select()
           .from(inventory)
-          .where(
+          .where(and(
+            eq(inventory.enterpriseId, enterpriseId),
             legacyInventoryId !== null
               ? eq(inventory.id, legacyInventoryId)
               : item.itemType === 'product'
               ? eq(inventory.itemId, item.itemId)
               : eq(inventory.customName, item.itemId.toString())
-          )
+          ))
           .limit(1);
 
         if (legacyInventoryId !== null && !inventoryItem) {
@@ -826,6 +827,7 @@ export class DatabaseStorage implements IStorage {
 
       const businessType = await getBusinessTypeForUser(database, sale.userId);
       await database.insert(transactions).values({
+        enterpriseId,
         businessType,
         type: "income",
         category: "vendas",
