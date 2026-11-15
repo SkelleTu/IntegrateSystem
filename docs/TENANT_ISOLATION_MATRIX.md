@@ -106,3 +106,8 @@
 
 ## Critério de conclusão
 O isolamento só será considerado concluído quando cada tabela operacional tiver tenant válido, cada função de storage aplicar o escopo, todas as rotas e integrações estiverem cobertas e a bateria automatizada com duas empresas provar negação horizontal e vertical. A simples inclusão de uma coluna enterprise_id não encerra o risco.
+
+
+## Modelo de negócio vigente
+
+O Aura System é genérico e multiestabelecimento. `Barber`, `BarberHome` e rotas/configurações específicas de barbearia são legado e não definem o domínio atual. Cada usuário pode possuir múltiplos estabelecimentos independentes, cada um com seus próprios dados cadastrais, CPF/CNPJ e dados operacionais. O isolamento deve ser derivado do estabelecimento ativo pertencente ao usuário, nunca de um tipo fixo de negócio.
