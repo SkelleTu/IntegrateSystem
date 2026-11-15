@@ -969,15 +969,6 @@ export async function registerRoutes(
     if (!allowPublicAction("register:" + ip, 5, 15 * 60 * 1000)) {
       return res.status(429).json({ message: "Muitas tentativas de cadastro. Tente novamente mais tarde." });
     }
-    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
-      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
-      if (existingEnterprises.length > 0) {
-        return res.status(409).json({
-          code: "TENANT_ISOLATION_REQUIRED",
-          message: "Novos cadastros de estabelecimentos estão temporariamente bloqueados até a conclusão do isolamento multiempresa."
-        });
-      }
-    }
 
     const schema = z.object({
       name: z.string().trim().min(2).max(120),
