@@ -1120,6 +1120,8 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTransaction(id: number): Promise<void> {
     await dualWrite(async (database) => {
+      const [existing] = await database.select({ id: transactions.id }).from(transactions).where(eq(transactions.id, id)).limit(1);
+      if (!existing) throw new Error(`Transação ${id} não encontrada.`);
       await database.delete(transactions).where(eq(transactions.id, id));
     });
   }
@@ -1592,6 +1594,8 @@ export class DatabaseStorage implements IStorage {
   async deleteProduct(id: number): Promise<void> {
     this.logAction(`Exclusão produto ID:${id}`);
     await dualWrite(async (database) => {
+      const [existing] = await database.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+      if (!existing) throw new Error(`Produto ${id} não encontrado.`);
       await database.delete(batchLogs).where(eq(batchLogs.productId, id));
       await database.delete(batches).where(eq(batches.productId, id));
       await database.delete(products).where(eq(products.id, id));
@@ -1768,6 +1772,8 @@ export class DatabaseStorage implements IStorage {
   async deleteBatch(id: number): Promise<void> {
     this.logAction(`Exclusão lote ID:${id}`);
     await dualWrite(async (database) => {
+      const [existing] = await database.select({ id: batches.id }).from(batches).where(eq(batches.id, id)).limit(1);
+      if (!existing) throw new Error(`Lote ${id} não encontrado.`);
       await database.delete(batchLogs).where(eq(batchLogs.batchId, id));
       await database.delete(batches).where(eq(batches.id, id));
     });
