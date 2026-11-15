@@ -849,6 +849,7 @@ export class DatabaseStorage implements IStorage {
           .set({ status: "completed" })
           .where(and(
             eq(tickets.id, ticketId),
+            eq(tickets.enterpriseId, enterpriseId),
             or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
           ))
           .returning();
@@ -953,9 +954,10 @@ export class DatabaseStorage implements IStorage {
             const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
             await transaction.update(batches)
               .set({ quantity: Number(stock.quantity) + stockQuantity })
-              .where(eq(batches.id, stock.id));
+              .where(and(eq(batches.id, stock.id), eq(batches.enterpriseId, enterpriseId)));
 
             await transaction.insert(batchLogs).values({
+              enterpriseId,
               productId: (stock as Batch).productId,
               batchId: stock.id,
               type: "cancel",
@@ -970,9 +972,10 @@ export class DatabaseStorage implements IStorage {
                 quantity: Number(stock.quantity) + (item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity)),
                 updatedAt: new Date()
               })
-              .where(eq(inventory.id, stock.id));
+              .where(and(eq(inventory.id, stock.id), eq(inventory.enterpriseId, enterpriseId)));
 
             await transaction.insert(inventoryLogs).values({
+              enterpriseId,
               inventoryId: stock.id,
               type: "in",
               quantity: item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity),
@@ -1111,7 +1114,7 @@ export class DatabaseStorage implements IStorage {
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, existing.id))
+            .where(and(eq(inventory.id, existing.id), eq(inventory.enterpriseId, enterpriseId)))
           return updated;
         }
       }
@@ -1205,10 +1208,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
+    const enterpriseId = this.currentEnterpriseId();
     const [updated] = await db.update(tickets)
       .set({ items: JSON.stringify(items) })
-      .where(eq(tickets.id, id))
+      .where(and(eq(tickets.id, id), eq(tickets.enterpriseId, enterpriseId)))
       .returning();
+    if (!updated) throw new Error("Comanda não encontrada nesta empresa.");
     return updated;
   }
 
