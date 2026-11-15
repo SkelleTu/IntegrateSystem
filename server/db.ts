@@ -231,7 +231,7 @@ const TABLE_DEFINITIONS = [
     username TEXT NOT NULL UNIQUE,
     email TEXT,
     password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'barber',
+    role TEXT NOT NULL DEFAULT 'employee',
     fingerprint_id TEXT UNIQUE,
     enterprise_id INTEGER,
     tutorial_completed_at TEXT
@@ -526,7 +526,7 @@ export async function setupDatabase() {
   const localMigrations = [
     "ALTER TABLE users ADD COLUMN email TEXT",
     "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
-    "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
+    "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'geral'",
     "ALTER TABLE enterprises ADD COLUMN city TEXT",
     "ALTER TABLE enterprises ADD COLUMN state TEXT",
     "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
@@ -553,10 +553,13 @@ export async function setupDatabase() {
     // Legacy Turso databases may have a users table created before auth columns existed.
     "ALTER TABLE users ADD COLUMN username TEXT",
     "ALTER TABLE users ADD COLUMN password TEXT",
-    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'barber'",
+    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'employee'",
     "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
     "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE users ADD COLUMN tutorial_completed_at TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_credential_id TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_public_key TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_sign_count INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE services ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE tickets ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE tickets ADD COLUMN public_access_token TEXT",
@@ -862,6 +865,9 @@ export async function setupDatabase() {
   if (neonPool) {
     await verifyNeonConnection();
     await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tutorial_completed_at TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_sign_count INTEGER NOT NULL DEFAULT 0");
     // Preserve existing whole-unit stock values while enabling fractional kilograms.
     // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
     const stockQuantityColumns = await neonPool.query(`
