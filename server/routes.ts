@@ -1817,7 +1817,8 @@ export async function registerRoutes(
       const { salePrice, minStock, ...rest } = req.body;
       const data = insertProductSchema.parse({
         ...rest,
-        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        enterpriseId: Number((req.user as any).enterpriseId),
+        salePrice: salePrice !== undefined && salePrice !== "" ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
         minStock: minStock !== undefined && minStock !== "" ? Number(minStock) : 5,
       });
       const p = await storage.createProduct(data);
