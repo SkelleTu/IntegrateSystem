@@ -2528,16 +2528,14 @@ export async function registerRoutes(
   });
 
   // Cashier API
-  app.get("/api/cash-register/open", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.get("/api/cash-register/open", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(404).json({ message: "No open register" });
     res.json(register);
   });
 
-  app.post("/api/cash-register/open", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.post("/api/cash-register/open", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
       const existing = await storage.getOpenCashRegister(user.id);
