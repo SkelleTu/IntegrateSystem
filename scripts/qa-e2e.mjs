@@ -10,7 +10,8 @@ const email = "qa-admin@example.invalid";
 const summary = [];
 
 async function request(route, options = {}) {
-  return fetch(new URL(route, base), options);
+  const requestOptions = { ...options, signal: options.signal || AbortSignal.timeout(15000) };
+  return fetch(new URL(route, base), requestOptions);
 }
 
 async function expectStatus(response, expected, label) {
