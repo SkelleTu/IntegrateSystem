@@ -549,6 +549,7 @@ export class DatabaseStorage implements IStorage {
     } else if (ticket && !ticket.items) {
       (ticket as any).items = [];
     }
+    if (ticket) delete (ticket as any).publicAccessToken;
     return ticket;
   }
 
