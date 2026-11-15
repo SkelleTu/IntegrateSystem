@@ -832,6 +832,27 @@ export async function setupDatabase() {
 
   localSqlite.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON users(webauthn_credential_id)").run();
 
+  // Tenant boundary migration for the local SQLite mirror.
+  const localTenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  const localEnterpriseIds = (localSqlite.exec("SELECT id FROM enterprises ORDER BY id")[0]?.values ?? [])
+    .map((row: any[]) => Number(row[0])).filter((id: number) => Number.isSafeInteger(id) && id > 0);
+  const localUnscopedCounts: Record<string, number> = {};
+  for (const table of localTenantTables) {
+    const row = localSqlite.prepare(`SELECT COUNT(*) AS count FROM "${table}" WHERE enterprise_id IS NULL`).get() as any;
+    localUnscopedCounts[table] = Number(row?.count || 0);
+  }
+  const localTotalUnscoped = Object.values(localUnscopedCounts).reduce((sum, value) => sum + value, 0);
+  if (localTotalUnscoped > 0 && localEnterpriseIds.length === 1) {
+    for (const table of localTenantTables) {
+      if (localUnscopedCounts[table] > 0) {
+        localSqlite.prepare(`UPDATE "${table}" SET enterprise_id = ? WHERE enterprise_id IS NULL`).run(localEnterpriseIds[0]);
+      }
+    }
+    console.log(`[DB] SQLite tenant backfill: ${localTotalUnscoped} rows assigned to enterprise ${localEnterpriseIds[0]}.`);
+  } else if (localTotalUnscoped > 0 && localEnterpriseIds.length !== 1) {
+    throw new Error(`[SECURITY] SQLite tenant backfill aborted: ${localTotalUnscoped} rows without enterprise_id and ${localEnterpriseIds.length} enterprises exist.`);
+  }
+
   // Tenant boundary migration: operational records receive enterprise_id.
   // Existing single-tenant rows are assigned to the first enterprise only when the
   // table is currently unscoped. New code must always write the authenticated tenant.
