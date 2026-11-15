@@ -82,11 +82,11 @@ app.get("/api/health", (_req: Request, res: Response) => {
 app.use((req, res, next) => {
   const configuredOrigins = String(process.env.AURA_ALLOWED_ORIGINS || "")
     .split(",")
-    .map((origin) => origin.trim().replace(/\\/$/, ""))
+    .map((origin) => origin.trim().replace(/\/$/, ""))
     .filter(Boolean);
-  const defaultOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\\/$/, "");
+  const defaultOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\/$/, "");
   const allowedOrigins = new Set([defaultOrigin, ...configuredOrigins]);
-  const requestOrigin = String(req.get("origin") || "").trim().replace(/\\/$/, "");
+  const requestOrigin = String(req.get("origin") || "").trim().replace(/\/$/, "");
 
   if (requestOrigin && allowedOrigins.has(requestOrigin)) {
     res.header("Access-Control-Allow-Origin", requestOrigin);
