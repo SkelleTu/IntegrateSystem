@@ -57,6 +57,7 @@ export const services = pgTable("services", {
 
 export const tickets = pgTable("tickets", {
   enterpriseId: integer("enterprise_id"),
+  publicAccessToken: text("public_access_token"),
   id: serial("id").primaryKey(),
   ticketNumber: integer("ticket_number").notNull(),
   serviceId: integer("service_id"),
