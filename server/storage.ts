@@ -587,12 +587,13 @@ export class DatabaseStorage implements IStorage {
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
+    const enterpriseId = this.currentEnterpriseId();
     const sharedRegisterId = await nextSharedId(cashRegisters);
     return await dualWriteTransaction(async (database) => {
       const [existingRegister] = await database.select().from(cashRegisters)
-        .where(and(eq(cashRegisters.userId, register.userId), isNull(cashRegisters.closedAt))).limit(1);
+        .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.enterpriseId, enterpriseId), isNull(cashRegisters.closedAt))).limit(1);
       if (existingRegister) throw new Error("Já existe um caixa aberto para este usuário.");
-      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, id: sharedRegisterId } as any).returning();
+      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, enterpriseId, id: sharedRegisterId } as any).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
@@ -606,12 +607,15 @@ export class DatabaseStorage implements IStorage {
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWriteTransaction(async (database) => {
-      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
+      const [register] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)));
       if (!register) throw new Error("Caixa não encontrado");
       if (register.status === "closed" || register.closedAt) return register;
 
-      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const salesList = await database.select().from(sales)
+        .where(and(eq(sales.cashRegisterId, id), eq(sales.enterpriseId, enterpriseId)));
       const completedSales = salesList.filter((s: any) => s.status === "completed");
       const cashPayments = await Promise.all(
         completedSales.map(async (sale: any) => {
@@ -633,8 +637,9 @@ export class DatabaseStorage implements IStorage {
           closedAt: new Date(),
           status: "closed"
         })
-        .where(eq(cashRegisters.id, id));
-      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)));
+      const [updated] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId))).limit(1);
 
       // Closing cash is a physical count, not a second income entry.
 
@@ -647,17 +652,18 @@ export class DatabaseStorage implements IStorage {
 
   async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], ticketId?: number): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
+    const enterpriseId = this.currentEnterpriseId();
     const sharedSaleId = await nextSharedId(sales);
     return await dualWriteTransaction(async (database) => {
       if (!items.length || !paymentsData.length) throw new Error("Venda exige itens e pagamentos.");
       const paymentTotal = paymentsData.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
       if (!Number.isSafeInteger(paymentTotal) || paymentTotal !== Number(sale.totalAmount)) throw new Error("A soma dos pagamentos deve corresponder exatamente ao total da venda.");
       if (sale.cashRegisterId) {
-        const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, sale.cashRegisterId)).limit(1);
+        const [register] = await database.select().from(cashRegisters).where(and(eq(cashRegisters.id, sale.cashRegisterId), eq(cashRegisters.enterpriseId, enterpriseId))).limit(1);
         if (!register || register.status !== "open" || register.closedAt) throw new Error("A venda exige um caixa aberto.");
       }
       if (ticketId !== undefined) {
-        const [ticket] = await database.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+        const [ticket] = await database.select().from(tickets).where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
         if (!ticket) throw new Error("Comanda não encontrada.");
         if (ticket.status !== "pending" && ticket.status !== "serving") {
           throw new Error("A comanda não está mais ativa para finalização.");
@@ -666,26 +672,26 @@ export class DatabaseStorage implements IStorage {
       for (const item of items) {
         const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
         if (batchId !== null) {
-          const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
+          const [batch] = await database.select().from(batches).where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId))).limit(1);
           if (!batch) throw new Error(`Lote ${batchId} não encontrado para a venda.`);
           const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
           if (Number(batch.quantity) + 1e-9 < stockQuantity) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${stockQuantity}`);
         }
       }
-      const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, id: sharedSaleId } as any).returning();
+      const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, enterpriseId, id: sharedSaleId } as any).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
         userId: sale.userId ?? null, totalAmount: insertedSale.totalAmount,
       });
       
-      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
+      const itemsWithSaleId = items.map(item => ({ ...item, enterpriseId, saleId: insertedSale.id } as any));
       await database.insert(saleItems).values(itemsWithSaleId);
       runtimeEvent("sale-items-created", `Itens da venda #${insertedSale.id} gravados`, {
         phase: "sale", saleId: insertedSale.id, itemCount: itemsWithSaleId.length,
       });
       
-      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
+      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, enterpriseId, saleId: insertedSale.id } as any));
       await database.insert(payments).values(paymentsWithSaleId);
       runtimeEvent("sale-payments-created", `Pagamentos da venda #${insertedSale.id} gravados`, {
         phase: "finance", saleId: insertedSale.id, paymentCount: paymentsWithSaleId.length,
@@ -1119,17 +1125,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: any): Promise<Transaction> {
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
+      const [newTransaction] = await database.insert(transactions)
+        .values({ ...transaction, enterpriseId } as any)
+        .returning();
       return newTransaction;
     });
   }
 
   async deleteTransaction(id: number): Promise<void> {
     await dualWrite(async (database) => {
-      const [existing] = await database.select({ id: transactions.id }).from(transactions).where(eq(transactions.id, id)).limit(1);
+      const enterpriseId = this.currentEnterpriseId();
+      const [existing] = await database.select({ id: transactions.id }).from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.enterpriseId, enterpriseId))).limit(1);
       if (!existing) throw new Error(`Transação ${id} não encontrada.`);
-      await database.delete(transactions).where(eq(transactions.id, id));
+      await database.delete(transactions).where(and(eq(transactions.id, id), eq(transactions.enterpriseId, enterpriseId)));
     });
   }
 
