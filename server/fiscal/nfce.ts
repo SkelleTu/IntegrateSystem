@@ -582,8 +582,10 @@ export async function transmitToSefaz(
 
 // ─── QR Code URL (SHA1 conforme manual SEFAZ) ────────────────────────────────
 export function generateQRCode(chave: string, settings: any): string {
-  const isHomologacao = settings.ambiente !== "producao";
-  const uf = settings.uf?.toUpperCase() || "SP";
+  const isHomologacao = settings.ambiente === "homologacao";
+  if (!isHomologacao && settings.ambiente !== "producao") throw new Error("Ambiente fiscal inválido. Use homologacao ou producao.");
+  const uf = String(settings.uf || "").trim().toUpperCase();
+  if (!uf) throw new Error("UF do estabelecimento é obrigatória para NFC-e.");
 
   // URL base por UF
   const urlBases: Record<string, { hom: string; prod: string }> = {
