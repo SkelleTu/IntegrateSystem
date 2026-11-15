@@ -1754,10 +1754,18 @@ export async function registerRoutes(
   app.put("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
+      const parsedSalePrice = salePrice !== undefined ? Number(String(salePrice).replace(",", ".")) : undefined;
+      const parsedMinStock = minStock !== undefined ? Number(minStock) : undefined;
+      if (parsedSalePrice !== undefined && !Number.isFinite(parsedSalePrice)) {
+        return res.status(400).json({ message: "Preço de venda inválido." });
+      }
+      if (parsedMinStock !== undefined && !Number.isFinite(parsedMinStock)) {
+        return res.status(400).json({ message: "Estoque mínimo inválido." });
+      }
       const data = {
         ...rest,
-        salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
-        minStock: minStock !== undefined ? Number(minStock) : undefined,
+        salePrice: parsedSalePrice !== undefined ? Math.round(parsedSalePrice * 100) : undefined,
+        minStock: parsedMinStock,
         ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
       };
       const id = Number(req.params.id);
@@ -1841,7 +1849,9 @@ export async function registerRoutes(
       await storage.deleteProduct(id);
       res.status(204).send();
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao excluir produto" });
+      const message = String(err?.message || "");
+      if (/Produto .* não encontrado/.test(message)) return res.status(404).json({ message: "Produto não encontrado." });
+      res.status(500).json({ message: message || "Erro ao excluir produto" });
     }
   });
 
