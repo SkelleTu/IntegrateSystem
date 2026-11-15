@@ -706,6 +706,26 @@ export async function setupDatabase() {
     await tursoClient.execute("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR TRIM(username) = ''");
     await tursoClient.execute("UPDATE users SET password = '' WHERE password IS NULL");
 
+    const tursoTenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    const tursoEnterpriseResult = await tursoClient.execute("SELECT id FROM enterprises ORDER BY id");
+    const tursoEnterpriseIds = (tursoEnterpriseResult.rows as any[]).map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    const tursoUnscopedCounts: Record<string, number> = {};
+    for (const table of tursoTenantTables) {
+      const result = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${table}" WHERE enterprise_id IS NULL`);
+      tursoUnscopedCounts[table] = Number((result.rows[0] as any)?.count || 0);
+    }
+    const tursoTotalUnscoped = Object.values(tursoUnscopedCounts).reduce((sum, value) => sum + value, 0);
+    if (tursoTotalUnscoped > 0 && tursoEnterpriseIds.length === 1) {
+      for (const table of tursoTenantTables) {
+        if (tursoUnscopedCounts[table] > 0) {
+          await tursoClient.execute({ sql: `UPDATE "${table}" SET enterprise_id = ? WHERE enterprise_id IS NULL`, args: [tursoEnterpriseIds[0]] });
+        }
+      }
+      console.log(`[DB] Turso tenant backfill: ${tursoTotalUnscoped} rows assigned to enterprise ${tursoEnterpriseIds[0]}.`);
+    } else if (tursoTotalUnscoped > 0 && tursoEnterpriseIds.length !== 1) {
+      throw new Error(`[SECURITY] Turso tenant backfill aborted: ${tursoTotalUnscoped} rows without enterprise_id and ${tursoEnterpriseIds.length} enterprises exist.`);
+    }
+
     console.log(
       `[DB] Turso schema verified: ${TABLE_DEFINITIONS.length} table definitions; ${missingMigrations.length} missing-column migrations applied.`,
     );
