@@ -242,6 +242,25 @@ export async function registerRoutes(
       updateAuraContext({ userId: Number(req.user.id), enterpriseId: Number(req.user.enterpriseId) });
       return true;
     }
+
+    const requestedEnterpriseId = Number(req.query?.enterpriseId);
+    const requestedSlug = typeof req.query?.enterpriseSlug === "string" ? req.query.enterpriseSlug.trim() : "";
+    if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0 || requestedSlug) {
+      const filters = [eq(enterprises.status, "active")];
+      if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) {
+        filters.push(eq(enterprises.id, requestedEnterpriseId));
+      } else {
+        filters.push(eq(enterprises.slug, requestedSlug));
+      }
+      const [selected] = await db.select({ id: enterprises.id }).from(enterprises).where(and(...filters)).limit(1);
+      if (!selected) {
+        res.status(404).json({ code: "PUBLIC_TENANT_NOT_FOUND", message: "Estabelecimento público não encontrado." });
+        return false;
+      }
+      updateAuraContext({ enterpriseId: Number(selected.id) });
+      return true;
+    }
+
     const activeEnterprises = await db.select({ id: enterprises.id })
       .from(enterprises)
       .where(eq(enterprises.status, "active"))
@@ -251,7 +270,7 @@ export async function registerRoutes(
         code: "PUBLIC_TENANT_CONTEXT_REQUIRED",
         message: activeEnterprises.length === 0
           ? "Nenhum estabelecimento público está disponível."
-          : "É necessário selecionar o estabelecimento para acessar o autoatendimento.",
+          : "Informe enterpriseId ou enterpriseSlug para selecionar o estabelecimento.",
       });
       return false;
     }
@@ -682,9 +701,9 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/register-employee", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar funcionários." });
 
     const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";
@@ -708,16 +727,16 @@ export async function registerRoutes(
       const newUser = await storage.createUser({
         username,
         password: hashed,
-        role: "barber",
+        role: "employee",
         enterpriseId,
       });
       res.status(201).json(toAdminPublicUser(newUser));
     } catch (err) {
-      res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
+      res.status(500).json({ message: "Erro ao cadastrar funcionário." });
     }
   });
 
-  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
+  // Legacy compatibility: old barber route remains disabled so the current API stays generic.\n  app.post("/api/admin/register-barber", isAuthenticated, (_req, res) => {\n    return res.status(410).json({ code: "LEGACY_STAFF_ROUTE_DISABLED", message: "Endpoint legado de barbeiro desativado. Use /api/admin/register-employee." });\n  });\n\n  // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
   app.get("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const list = await storage.getEnterprisesByOwner(user.id);
@@ -726,15 +745,6 @@ export async function registerRoutes(
 
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
-      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
-      if (existingEnterprises.length > 0) {
-        return res.status(409).json({
-          code: "TENANT_ISOLATION_REQUIRED",
-          message: "A criação de novos estabelecimentos está temporariamente bloqueada até a conclusão do isolamento multiempresa."
-        });
-      }
-    }
     try {
       const { name, businessType, taxId, phone, address, city, state } = req.body;
       if (typeof name !== "string" || !name.trim()) {
@@ -749,7 +759,7 @@ export async function registerRoutes(
       const enterprise = await storage.createAndActivateEnterprise(user.id, {
         ownerId: user.id,
         name: normalizedName,
-        businessType: businessType || "barbearia",
+        businessType: typeof businessType === "string" && businessType.trim() ? businessType.trim() : "geral",
         taxId: taxId || null,
         phone: phone || null,
         address: address || null,
@@ -795,15 +805,6 @@ export async function registerRoutes(
   app.post("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
       return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
-    }
-    if (process.env.AURA_TENANT_ISOLATION_READY !== "true") {
-      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(1);
-      if (existingEnterprises.length > 0) {
-        return res.status(409).json({
-          code: "TENANT_ISOLATION_REQUIRED",
-          message: "A criação de novos estabelecimentos está temporariamente bloqueada até a conclusão do isolamento multiempresa."
-        });
-      }
     }
     try {
       const { name, slug, username, password } = req.body;
