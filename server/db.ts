@@ -830,6 +830,8 @@ export async function setupDatabase() {
     }
   }
 
+  localSqlite.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON users(webauthn_credential_id)").run();
+
   // Tenant boundary migration: operational records receive enterprise_id.
   // Existing single-tenant rows are assigned to the first enterprise only when the
   // table is currently unscoped. New code must always write the authenticated tenant.
@@ -868,6 +870,7 @@ export async function setupDatabase() {
   await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT");
   await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT");
   await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_sign_count INTEGER NOT NULL DEFAULT 0");
+  await neonPool.query("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON public.users(webauthn_credential_id) WHERE webauthn_credential_id IS NOT NULL");
     // Preserve existing whole-unit stock values while enabling fractional kilograms.
     // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
     const stockQuantityColumns = await neonPool.query(`
