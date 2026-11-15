@@ -357,6 +357,13 @@ assert.ok(!productsA.some(item => Number(item.id) === Number(productB.id)), "ten
 await expectStatus(await request(`/api/products/${productB.id}`, { headers: { cookie } }), 404, "tenant-a-product-b-by-id-denied");
 await expectStatus(await request(`/api/products/${productB.id}`, { method: "PUT", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "cross-tenant-write" }) }), 404, "tenant-a-product-b-update-denied");
 await expectStatus(await request(`/api/products/${productB.id}`, { method: "DELETE", headers: { cookie } }), 404, "tenant-a-product-b-delete-denied");
+const transactionB = await expectStatus(await request("/api/transactions", {
+  method: "POST",
+  headers: { cookie: cookieB, "content-type": "application/json" },
+  body: JSON.stringify({ businessType: "barbearia", type: "expense", category: "tenant-b", description: "Tenant B isolated transaction", amount: 777 }),
+}), 201, "tenant-b-transaction-create");
+const transactionsA = await expectStatus(await request("/api/transactions", { headers: { cookie } }), 200, "tenant-a-transactions-isolated");
+assert.ok(!transactionsA.some(item => Number(item.id) === Number(transactionB.id)), "tenant A must not read tenant B transactions");
 const servicesA = await expectStatus(await request("/api/services", { headers: { cookie } }), 200, "tenant-a-services-isolated");
 assert.ok(!servicesA.some(item => Number(item.id) === Number(serviceB.id)), "tenant A must not list tenant B services");
 await expectStatus(await request(`/api/settings?enterpriseId=${sessionUserB.enterpriseId}`, { headers: { cookie } }), 403, "tenant-a-settings-b-denied");
