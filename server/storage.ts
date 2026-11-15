@@ -1052,21 +1052,24 @@ export class DatabaseStorage implements IStorage {
 
   async updateInventory(id: number, quantity: number): Promise<Inventory> {
     this.logAction(`Ajuste manual estoque ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(inventory.id, id))
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)))
       .returning();
     return updated;
   }
 
   async deleteInventoryItem(id: number): Promise<void> {
     this.logAction(`Exclusão item estoque ID:${id}`);
-    await db.delete(inventory).where(eq(inventory.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    await db.delete(inventory).where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)));
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
     this.logAction(`Cadastro/Atualização estoque: ${data.customName || data.itemId}`);
     
+    const enterpriseId = this.currentEnterpriseId();
     const { id, ...itemData } = data;
     const itemToUpsert = {
       ...itemData,
@@ -1077,11 +1080,12 @@ export class DatabaseStorage implements IStorage {
       codigoBalanca: itemData.codigoBalanca || null,
       ncm: itemData.ncm || null,
       cfop: itemData.cfop || null,
+      enterpriseId,
     };
 
     return await dualWrite(async (database) => {
       if (id) {
-        const [existing] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+        const [existing] = await database.select().from(inventory).where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
@@ -1094,7 +1098,7 @@ export class DatabaseStorage implements IStorage {
       if (itemData.itemId && itemData.itemType) {
         const [existing] = await database.select()
           .from(inventory)
-          .where(and(eq(inventory.itemId, itemData.itemId), eq(inventory.itemType, itemData.itemType)))
+          .where(and(eq(inventory.itemId, itemData.itemId), eq(inventory.itemType, itemData.itemType), eq(inventory.enterpriseId, enterpriseId)))
           .limit(1);
           
         if (existing) {
