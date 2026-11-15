@@ -1531,6 +1531,7 @@ export async function registerRoutes(
     let isUnique = false;
     while (!isUnique) {
       const enterpriseId = Number(getAuraContext().enterpriseId || 0);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Estabelecimento público não selecionado." });
       const existing = await db.select().from(tickets).where(and(
         eq(tickets.enterpriseId, enterpriseId),
         eq(tickets.ticketNumber, nextNum),
