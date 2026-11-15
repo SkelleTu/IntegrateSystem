@@ -557,6 +557,26 @@ export async function setupDatabase() {
     "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
     "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE users ADD COLUMN tutorial_completed_at TEXT",
+    "ALTER TABLE services ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE tickets ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE queue_state ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE categories ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE menu_items ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE cash_register ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE sales ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE sale_items ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE payments ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE transactions ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE time_clock ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory_logs ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory_restocks ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE products ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE batches ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE batch_logs ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE stock_snapshots ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE nfce ADD COLUMN enterprise_id INTEGER",
+
   ];
   for (const migration of localMigrations) {
     try {
