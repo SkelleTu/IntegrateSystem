@@ -914,14 +914,15 @@ export async function registerRoutes(
     const requestedEnterpriseId = req.query.enterpriseId !== undefined
       ? Number(req.query.enterpriseId)
       : enterpriseId;
-    if (requestedEnterpriseId !== enterpriseId && !isSystemOwner(user)) {
-      return res.status(403).json({
-        code: "TENANT_ACCESS_DENIED",
-        message: "O usuário não pode consultar configurações de outro estabelecimento.",
-      });
-    }
     if (!Number.isSafeInteger(requestedEnterpriseId) || requestedEnterpriseId <= 0) {
       return res.status(400).json({ code: "INVALID_ENTERPRISE_ID", message: "enterpriseId inválido." });
+    }
+    const ownedEnterprises = await storage.getEnterprisesByOwner(Number(user.id));
+    if (!ownedEnterprises.some((enterprise) => Number(enterprise.id) === requestedEnterpriseId)) {
+      return res.status(403).json({
+        code: "TENANT_ACCESS_DENIED",
+        message: "O usuário não pode consultar configurações de um estabelecimento que não lhe pertence.",
+      });
     }
     const s = await storage.getSettings(requestedEnterpriseId);
     res.json(s);
