@@ -878,9 +878,28 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.get("/api/settings", async (req, res) => {
-    const enterpriseId = req.query.enterpriseId ? Number(req.query.enterpriseId) : undefined;
-    const s = await storage.getSettings(enterpriseId);
+  app.get("/api/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const enterpriseId = Number(user?.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({
+        code: "ENTERPRISE_CONTEXT_REQUIRED",
+        message: "Nenhum estabelecimento ativo está associado ao usuário autenticado.",
+      });
+    }
+    const requestedEnterpriseId = req.query.enterpriseId !== undefined
+      ? Number(req.query.enterpriseId)
+      : enterpriseId;
+    if (requestedEnterpriseId !== enterpriseId && !isSystemOwner(user)) {
+      return res.status(403).json({
+        code: "TENANT_ACCESS_DENIED",
+        message: "O usuário não pode consultar configurações de outro estabelecimento.",
+      });
+    }
+    if (!Number.isSafeInteger(requestedEnterpriseId) || requestedEnterpriseId <= 0) {
+      return res.status(400).json({ code: "INVALID_ENTERPRISE_ID", message: "enterpriseId inválido." });
+    }
+    const s = await storage.getSettings(requestedEnterpriseId);
     res.json(s);
   });
 
