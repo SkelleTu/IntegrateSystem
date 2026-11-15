@@ -1034,22 +1034,24 @@ export class DatabaseStorage implements IStorage {
 
   async getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined> {
     this.logAction(`Busca item por código: ${barcode}`);
-    const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory).where(and(eq(inventory.barcode, barcode), eq(inventory.enterpriseId, enterpriseId))).limit(1);
     return item;
   }
 
   async getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined> {
     this.logAction(`Busca item estoque por código balança: ${codigoBalanca}`);
-    const items = await db.select().from(inventory);
-    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory).where(and(eq(inventory.codigoBalanca, codigoBalanca), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+    return item;
   }
 
   async getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined> {
     this.logAction(`Busca item menu por código balança: ${codigoBalanca}`);
-    const items = await db.select().from(menuItems);
-    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(menuItems).where(and(eq(menuItems.codigoBalanca, codigoBalanca), eq(menuItems.enterpriseId, enterpriseId))).limit(1);
+    return item;
   }
-
 
   async updateInventory(id: number, quantity: number): Promise<Inventory> {
     this.logAction(`Ajuste manual estoque ID:${id}`);
@@ -1118,8 +1120,12 @@ export class DatabaseStorage implements IStorage {
 
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
+    const enterpriseId = this.currentEnterpriseId();
+    const [owned] = await db.select({ id: inventory.id }).from(inventory)
+      .where(and(eq(inventory.id, Number(log.inventoryId)), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+    if (!owned) throw new Error("Item de inventário não encontrado nesta empresa.");
     return await dualWrite(async (database) => {
-      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
+      const [newLog] = await database.insert(inventoryLogs).values({ ...log, enterpriseId } as any).returning();
       return newLog;
     });
   }
@@ -1136,42 +1142,38 @@ export class DatabaseStorage implements IStorage {
 
   async restockInventory(id: number, data: any): Promise<Inventory> {
     this.logAction(`Reposição estoque ID:${id} (+${data.quantity})`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [item] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
-      if (!item) throw new Error("Item de inventário não encontrado");
-
+      const [item] = await database.select().from(inventory)
+        .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+      if (!item) throw new Error("Item de inventário não encontrado nesta empresa.");
       const [updated] = await database.update(inventory)
-        .set({ 
-          quantity: item.quantity + data.quantity,
-          updatedAt: new Date()
-        })
-        .where(eq(inventory.id, id))
-
+        .set({ quantity: Number(item.quantity) + Number(data.quantity), updatedAt: new Date() })
+        .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)));
       await database.insert(inventoryRestocks).values({
-        inventoryId: id,
-        quantity: data.quantity,
-        unit: data.unit || item.unit,
-        itemsPerUnit: data.itemsPerUnit || item.itemsPerUnit,
-        costPrice: data.costPrice || 0,
-        expiryDate: data.expiryDate,
-        createdAt: new Date()
+        enterpriseId, inventoryId: id, quantity: data.quantity, unit: data.unit || item.unit,
+        itemsPerUnit: data.itemsPerUnit || item.itemsPerUnit, costPrice: data.costPrice || 0,
+        expiryDate: data.expiryDate, createdAt: new Date()
       });
-
       return updated;
     });
   }
 
   async updateInventoryItem(id: number, update: any): Promise<Inventory> {
     this.logAction(`Atualização item inventário ID:${id}`);
-    await db.update(inventory).set(update).where(eq(inventory.id, id));
-      const [updated] = await db.select().from(inventory).where(eq(inventory.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(inventory).set(update)
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Item de inventário ${id} não encontrado.`);
     return updated;
   }
 
   async updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem> {
     this.logAction(`Atualização item menu ID:${id}`);
-    await db.update(menuItems).set(update).where(eq(menuItems.id, id));
-      const [updated] = await db.select().from(menuItems).where(eq(menuItems.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(menuItems).set(update)
+      .where(and(eq(menuItems.id, id), eq(menuItems.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Item de menu ${id} não encontrado.`);
     return updated;
   }
 
@@ -1811,43 +1813,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getProductBatches(productId: number): Promise<Batch[]> {
+    const enterpriseId = this.currentEnterpriseId();
     return await db.select().from(batches)
-      .where(eq(batches.productId, productId))
+      .where(and(eq(batches.productId, productId), eq(batches.enterpriseId, enterpriseId)))
       .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
   }
 
   async createBatch(data: InsertBatch): Promise<Batch> {
     this.logAction(`Novo lote produto ID:${data.productId}`);
-    // ── Unicidade: SKU exclusivo por variante ────────────────────────────────
-    if ((data as any).sku && String((data as any).sku).trim()) {
-      const skuTrim = String((data as any).sku).trim();
-      const [dupSku] = await db.select().from(batches).where(eq(batches.sku, skuTrim)).limit(1);
-      if (dupSku) {
-        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
-      }
+    const enterpriseId = this.currentEnterpriseId();
+    const productId = Number((data as any).productId);
+    const [ownedProduct] = await db.select({ id: products.id }).from(products)
+      .where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedProduct) throw new Error("Produto não encontrado nesta empresa.");
+    const skuTrim = String((data as any).sku || "").trim();
+    if (skuTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.sku, skuTrim), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`SKU "${skuTrim}" já está cadastrado nesta empresa.`);
     }
-    // ── Unicidade: código de barras exclusivo por variante ───────────────────
-    if ((data as any).barcode && String((data as any).barcode).trim()) {
-      const bcTrim = String((data as any).barcode).trim();
-      const [dupBc] = await db.select().from(batches).where(eq(batches.barcode, bcTrim)).limit(1);
-      if (dupBc) {
-        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
-      }
+    const bcTrim = String((data as any).barcode || "").trim();
+    if (bcTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.barcode, bcTrim), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`Código de barras "${bcTrim}" já está cadastrado nesta empresa.`);
     }
     const sharedBatchId = await nextSharedId(batches);
     return await dualWrite(async (database) => {
       const now = new Date();
-      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, id: sharedBatchId, createdAt: now }) as any).returning();
+      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, enterpriseId, id: sharedBatchId, createdAt: now }) as any).returning();
       if (!b) throw new Error("Não foi possível obter o lote recém-criado.");
-      // log entry
       await database.insert(batchLogs).values({
-        productId: data.productId,
-        batchId: b.id,
-        type: "in",
-        quantity: data.quantity,
-        reason: "Entrada de lote",
-        userId: (data as any).userId || 0,
-        createdAt: now,
+        enterpriseId, productId, batchId: b.id, type: "in", quantity: data.quantity,
+        reason: "Entrada de lote", userId: (data as any).userId || 0, createdAt: now,
       } as any);
       return b;
     });
@@ -1855,132 +1851,109 @@ export class DatabaseStorage implements IStorage {
 
   async updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch> {
     this.logAction(`Atualização lote ID:${id}`);
-    // ── Unicidade: SKU exclusivo (excluindo o próprio lote) ──────────────────
-    if ((data as any).sku && String((data as any).sku).trim()) {
-      const skuTrim = String((data as any).sku).trim();
-      const [dupSku] = await db.select().from(batches)
-        .where(and(eq(batches.sku, skuTrim), ne(batches.id, id)))
-        .limit(1);
-      if (dupSku) {
-        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
-      }
+    const enterpriseId = this.currentEnterpriseId();
+    const nextData: any = withoutUndefined({ ...data, enterpriseId });
+    const skuTrim = String((data as any).sku || "").trim();
+    if (skuTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.sku, skuTrim), ne(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`SKU "${skuTrim}" já está cadastrado nesta empresa.`);
     }
-    // ── Unicidade: código de barras exclusivo (excluindo o próprio lote) ─────
-    if ((data as any).barcode && String((data as any).barcode).trim()) {
-      const bcTrim = String((data as any).barcode).trim();
-      const [dupBc] = await db.select().from(batches)
-        .where(and(eq(batches.barcode, bcTrim), ne(batches.id, id)))
-        .limit(1);
-      if (dupBc) {
-        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
-      }
+    const bcTrim = String((data as any).barcode || "").trim();
+    if (bcTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.barcode, bcTrim), ne(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`Código de barras "${bcTrim}" já está cadastrado nesta empresa.`);
     }
     return await dualWrite(async (database) => {
-      await database.update(batches).set(withoutUndefined(data as any)).where(eq(batches.id, id));
-      const [b] = await database.select().from(batches).where(eq(batches.id, id));
+      const [existing] = await database.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Lote ${id} não encontrado.`);
+      await database.update(batches).set(nextData).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
+      const [b] = await database.select().from(batches).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
       return b;
     });
   }
 
   async deleteBatch(id: number): Promise<void> {
     this.logAction(`Exclusão lote ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      const [existing] = await database.select({ id: batches.id }).from(batches).where(eq(batches.id, id)).limit(1);
+      const [existing] = await database.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
       if (!existing) throw new Error(`Lote ${id} não encontrado.`);
-      await database.delete(batchLogs).where(eq(batchLogs.batchId, id));
-      await database.delete(batches).where(eq(batches.id, id));
+      await database.delete(batchLogs).where(and(eq(batchLogs.batchId, id), eq(batchLogs.enterpriseId, enterpriseId)));
+      await database.delete(batches).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
     });
   }
 
   async findProductByBarcode(barcode: string) {
-    this.logAction(`Busca por código de barras: ${barcode}`);
-    const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
-    if (matchingBatches.length === 0) return null;
+    const enterpriseId = this.currentEnterpriseId();
+    const matchingBatches = await db.select().from(batches)
+      .where(and(eq(batches.barcode, barcode), eq(batches.enterpriseId, enterpriseId)));
+    if (!matchingBatches.length) return null;
     const productIds = Array.from(new Set(matchingBatches.map((b: any) => b.productId)));
-    const all = await db.select().from(products);
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const matched = all.filter((p: any) => productIds.includes(p.id));
-    if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
-    const result = enriched[0];
-    if (!result) return null;
-    // Return the specific matched batch (variant) so the caller knows which variant was found
-    const matchedBatch = matchingBatches[0];
-    return { ...result, matchedBatch };
+    return enriched[0] ? { ...enriched[0], matchedBatch: matchingBatches[0] } : null;
   }
 
   async searchProducts(q: string) {
-    const all = await db.select().from(products);
-    const allBatchesList = await db.select().from(batches);
+    const enterpriseId = this.currentEnterpriseId();
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
+    const allBatchesList = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
     const norm = (s?: string | null) => (s || "").toLowerCase();
     const qn = norm(q);
-    // Search by barcode, SKU, variant name and supplier code across batches
-    const batchMatchSet = new Set(
-      allBatchesList.filter((b: any) =>
-        norm(b.barcode).includes(qn) ||
-        norm(b.supplierCode).includes(qn) ||
-        norm((b as any).sku).includes(qn) ||
-        norm((b as any).variantName).includes(qn)
-      ).map((b: any) => b.productId)
-    );
+    const batchMatchSet = new Set(allBatchesList.filter((b: any) =>
+      norm(b.barcode).includes(qn) || norm(b.supplierCode).includes(qn) ||
+      norm((b as any).sku).includes(qn) || norm((b as any).variantName).includes(qn)
+    ).map((b: any) => b.productId));
     const matched = all.filter((p: any) =>
-      norm(p.name).includes(qn) ||
-      norm(p.brand).includes(qn) ||
-      norm(p.category).includes(qn) ||
-      norm(p.flavor).includes(qn) ||
-      norm(p.codigoBalanca).includes(qn) ||
-      norm(p.codigoProduto).includes(qn) ||
+      norm(p.name).includes(qn) || norm(p.brand).includes(qn) || norm(p.category).includes(qn) ||
+      norm(p.flavor).includes(qn) || norm(p.codigoBalanca).includes(qn) || norm(p.codigoProduto).includes(qn) ||
       batchMatchSet.has(p.id)
     );
     return this._enrichProducts(matched);
   }
 
   async findProductByVariantSku(sku: string) {
-    this.logAction(`Busca por SKU de variante: ${sku}`);
+    const enterpriseId = this.currentEnterpriseId();
     const norm = (s?: string | null) => (s || "").toLowerCase();
-    const allBatchesList = await db.select().from(batches);
-    const matchingBatches = allBatchesList.filter((b: any) => norm((b as any).sku) === norm(sku));
-    if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set<number>(matchingBatches.map((b: any) => Number(b.productId))));
-    const all: any[] = await db.select().from(products);
+    const matchingBatches = (await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId)))
+      .filter((b: any) => norm(b.sku) === norm(sku));
+    if (!matchingBatches.length) return null;
+    const productIds = Array.from(new Set(matchingBatches.map((b: any) => Number(b.productId))));
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const matched = all.filter((p: any) => productIds.includes(Number(p.id)));
-    if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
-    const result = enriched[0];
-    if (!result) return null;
-    const matchedBatch = matchingBatches[0];
-    return { ...result, matchedBatch };
+    return enriched[0] ? { ...enriched[0], matchedBatch: matchingBatches[0] } : null;
   }
 
   async deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void> {
-    this.logAction(`Baixa FEFO produto ID:${productId} qty:${qty}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      // Load active batches sorted FEFO
       const activeBatches = await database.select().from(batches)
-        .where(and(eq(batches.productId, productId), gte(batches.quantity, 1)))
+        .where(and(eq(batches.productId, productId), eq(batches.enterpriseId, enterpriseId), gte(batches.quantity, 1)))
         .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
-      
       let remaining = qty;
       for (const batch of activeBatches) {
         if (remaining <= 0) break;
-        const deduct = Math.min(remaining, batch.quantity);
-        await database.update(batches).set({ quantity: batch.quantity - deduct }).where(eq(batches.id, batch.id));
+        const deduct = Math.min(remaining, Number(batch.quantity));
+        await database.update(batches).set({ quantity: Number(batch.quantity) - deduct })
+          .where(and(eq(batches.id, batch.id), eq(batches.enterpriseId, enterpriseId)));
         await database.insert(batchLogs).values({
-          productId,
-          batchId: batch.id,
-          type: "out",
-          quantity: deduct,
-          reason,
-          userId,
-          createdAt: new Date(),
+          enterpriseId, productId, batchId: batch.id, type: "out", quantity: deduct,
+          reason, userId, createdAt: new Date(),
         } as any);
         remaining -= deduct;
       }
+      if (remaining > 1e-9) throw new Error("Estoque insuficiente para a baixa FEFO.");
     });
   }
 
   async getBatchLogs(productId: number): Promise<BatchLog[]> {
+    const enterpriseId = this.currentEnterpriseId();
     return await db.select().from(batchLogs)
-      .where(eq(batchLogs.productId, productId))
+      .where(and(eq(batchLogs.productId, productId), eq(batchLogs.enterpriseId, enterpriseId)))
       .orderBy(desc(batchLogs.createdAt));
   }
 
