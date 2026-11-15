@@ -237,6 +237,28 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  async function setPublicTenantContext(req: any, res: any): Promise<boolean> {
+    if (req.isAuthenticated?.() && Number(req.user?.enterpriseId) > 0) {
+      updateAuraContext({ userId: Number(req.user.id), enterpriseId: Number(req.user.enterpriseId) });
+      return true;
+    }
+    const activeEnterprises = await db.select({ id: enterprises.id })
+      .from(enterprises)
+      .where(eq(enterprises.status, "active"))
+      .limit(2);
+    if (activeEnterprises.length !== 1) {
+      res.status(409).json({
+        code: "PUBLIC_TENANT_CONTEXT_REQUIRED",
+        message: activeEnterprises.length === 0
+          ? "Nenhum estabelecimento público está disponível."
+          : "É necessário selecionar o estabelecimento para acessar o autoatendimento.",
+      });
+      return false;
+    }
+    updateAuraContext({ enterpriseId: Number(activeEnterprises[0].id) });
+    return true;
+  }
+
   const isIsolatedQaRuntime = process.env.RENDER_GIT_BRANCH === "fix/aura-system-hardening-qa"
     || process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag"
     || process.env.RENDER_SERVICE_NAME === "integrated-system-qa-aura"
@@ -1449,6 +1471,7 @@ export async function registerRoutes(
   });
 
   app.post(api.queue.createTicket.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-create:" + ip, 15, 60 * 1000)) {
       return res.status(429).json({ message: "Muitas senhas solicitadas. Aguarde um minuto e tente novamente." });
@@ -1487,6 +1510,7 @@ export async function registerRoutes(
 
   // Digital Menu Routes
   app.get("/api/categories", async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const categoriesList = await storage.getCategories();
     res.json(categoriesList);
   });
@@ -1906,6 +1930,7 @@ export async function registerRoutes(
   // ─── Fim Produto → Lotes API ────────────────────────────────────────────────
 
   app.get("/api/menu-items", async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,
       tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []),
@@ -2998,6 +3023,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/tickets/:number", async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
       return res.status(429).json({ message: "Muitas consultas de comanda. Aguarde um minuto e tente novamente." });
