@@ -2605,8 +2605,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.post("/api/sales", isAuthenticated, async (req, res) => {
     try {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
