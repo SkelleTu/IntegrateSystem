@@ -16,16 +16,25 @@ export default function ClientCart() {
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
   const [ticketToken, setTicketToken] = useState("");
   const [cart, setCart] = useState<{ id: number, name: string, price: number, quantity: number }[]>([]);
+  const [enterpriseId, setEnterpriseId] = useState(new URLSearchParams(window.location.search).get("enterpriseId") || "");
   const initialTicketToken = new URLSearchParams(window.location.search).get("ticketToken") || "";
 
+  const { data: publicEnterprises = [] } = useQuery<{ id: number; name: string; slug: string }[]>({
+    queryKey: ["/api/public/enterprises"],
+    enabled: !enterpriseId,
+  });
+
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu-items"],
+    queryKey: [enterpriseId ? `/api/menu-items?enterpriseId=${encodeURIComponent(enterpriseId)}` : "/api/menu-items"],
+    enabled: Boolean(enterpriseId),
   });
 
   const findTicketMutation = useMutation({
     mutationFn: async (number: string) => {
+      if (!enterpriseId) throw new Error("Selecione o estabelecimento.");
       const headers: HeadersInit = initialTicketToken ? { "x-ticket-token": initialTicketToken } : {};
-      const res = await fetch(`/api/tickets/${number}${initialTicketToken ? `?ticketToken=${encodeURIComponent(initialTicketToken)}` : ""}`, { headers });
+      const query = new URLSearchParams({ enterpriseId, ...(initialTicketToken ? { ticketToken: initialTicketToken } : {}) });
+      const res = await fetch(`/api/tickets/${number}?${query.toString()}`, { headers });
       if (!res.ok) throw new Error("Comanda não encontrada");
       return res.json();
     },
@@ -79,6 +88,19 @@ export default function ClientCart() {
             <CardTitle className="text-2xl font-black italic uppercase tracking-tighter text-white">Auto-Atendimento</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase text-white/40 tracking-widest">Estabelecimento</label>
+              <select
+                value={enterpriseId}
+                onChange={e => setEnterpriseId(e.target.value)}
+                className="w-full h-12 rounded-md bg-black border border-white/10 text-white px-3"
+              >
+                <option value="">Selecione o estabelecimento</option>
+                {publicEnterprises.map(enterprise => (
+                  <option key={enterprise.id} value={enterprise.id}>{enterprise.name}</option>
+                ))}
+              </select>
+            </div>
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase text-white/40 tracking-widest">Número da Comanda</label>
               <Input 
