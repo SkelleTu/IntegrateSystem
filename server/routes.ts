@@ -816,7 +816,7 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Erro ao criar estabelecimento:", err);
       const message = err instanceof Error ? err.message : "Falha inesperada ao criar estabelecimento.";
-      const status = message.includes("Limite de 5") ? 400 : 500;
+      const status = /já existe|já cadastrado|Limite/i.test(message) ? 409 : 500;
       res.status(status).json({ message: status === 400 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
     }
   });
@@ -833,7 +833,7 @@ export async function registerRoutes(
   });
 
   // Enterprise administration is restricted to an authenticated system owner.
-  // Public registration must never be able to create an administrator account.
+  // Public registration creates the owner account for its independent establishment.
   const isSystemOwner = (user: any) =>
     String(user?.role || "").trim().toLowerCase() === "owner";
 
