@@ -1209,11 +1209,13 @@ export class DatabaseStorage implements IStorage {
 
   // Time Clock
   async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
-    return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(timeClock).where(and(eq(timeClock.userId, userId), eq(timeClock.enterpriseId, enterpriseId))).orderBy(desc(timeClock.timestamp));
   }
 
   async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
-    const [latest] = await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [latest] = await db.select().from(timeClock).where(and(eq(timeClock.userId, userId), eq(timeClock.enterpriseId, enterpriseId))).orderBy(desc(timeClock.timestamp)).limit(1);
     return latest;
   }
 
@@ -1223,8 +1225,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock> {
-    await db.update(timeClock).set(data).where(eq(timeClock.id, id));
-      const [updated] = await db.select().from(timeClock).where(eq(timeClock.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(timeClock).set(data)
+      .where(and(eq(timeClock.id, id), eq(timeClock.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Registro de ponto ${id} não encontrado.`);
     return updated;
   }
 
@@ -1497,7 +1501,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNfce(id: number): Promise<Nfce | undefined> {
-    const [item] = await db.select().from(nfce).where(eq(nfce.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(nfce).where(and(eq(nfce.id, id), eq(nfce.enterpriseId, enterpriseId)));
     return item;
   }
 
@@ -1520,11 +1525,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks).orderBy(desc(inventoryRestocks.createdAt));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventoryRestocks)
+      .where(eq(inventoryRestocks.enterpriseId, enterpriseId))
+      .orderBy(desc(inventoryRestocks.createdAt));
   }
 
   async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId)).orderBy(desc(inventoryRestocks.createdAt));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventoryRestocks)
+      .where(and(eq(inventoryRestocks.inventoryId, inventoryId), eq(inventoryRestocks.enterpriseId, enterpriseId)))
+      .orderBy(desc(inventoryRestocks.createdAt));
   }
 
   // ─── Produto → Lotes ──────────────────────────────────────────────────────
