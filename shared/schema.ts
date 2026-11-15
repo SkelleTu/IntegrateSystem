@@ -34,6 +34,9 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   role: text("role").notNull().default("employee"), // "admin", "employee", "owner"; "barber" is legacy compatibility
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
+  webauthnCredentialId: text("webauthn_credential_id").unique(),
+  webauthnPublicKey: text("webauthn_public_key"),
+  webauthnSignCount: integer("webauthn_sign_count").notNull().default(0),
   enterpriseId: integer("enterprise_id"),
   tutorialCompletedAt: text("tutorial_completed_at"),
 });
