@@ -29,6 +29,7 @@ import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 import { neonPool } from "./neon-db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
+import { updateAuraContext } from "./aura-request-context";
 
 const uploadStorage = multer.diskStorage({
   destination: (_req: any, _file: any, cb: any) => {
@@ -1099,8 +1100,14 @@ export async function registerRoutes(
   });
 
   function isAuthenticated(req: any, res: any, next: any) {
-    if (req.isAuthenticated()) return next();
-    res.status(401).json({ message: "Unauthorized" });
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const enterpriseId = Number(req.user?.enterpriseId);
+    if (Number.isSafeInteger(enterpriseId) && enterpriseId > 0) {
+      updateAuraContext({ userId: Number(req.user.id), enterpriseId });
+    }
+    return next();
   }
 
   // Fiscal Routes
