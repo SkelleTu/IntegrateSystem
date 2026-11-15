@@ -2891,10 +2891,14 @@ export async function registerRoutes(
       return res.status(400).json({ message: "Identificador de comanda inválido." });
     }
 
+    const authenticatedStaff = Boolean(
+      req.isAuthenticated?.() &&
+      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
+    );
     const suppliedTicketToken = String(
       req.get("x-ticket-token") || req.body?.publicAccessToken || ""
     ).trim();
-    if (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128) {
+    if (!authenticatedStaff && (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128)) {
       return res.status(401).json({ code: "TICKET_POSSESSION_REQUIRED", message: "Token de posse da comanda obrigatório." });
     }
 
@@ -2915,7 +2919,7 @@ export async function registerRoutes(
       const [ticketRecord] = await db.select().from(tickets)
         .where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
       if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
-      if (String((ticketRecord as any).publicAccessToken || "") !== suppliedTicketToken) {
+      if (!authenticatedStaff && String((ticketRecord as any).publicAccessToken || "") !== suppliedTicketToken) {
         return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
       }
       if (ticketRecord.status !== "pending" && ticketRecord.status !== "serving") {
@@ -3045,6 +3049,10 @@ export async function registerRoutes(
 
   app.get("/api/tickets/:number", async (req, res) => {
     if (!(await setPublicTenantContext(req, res))) return;
+    const authenticatedStaff = Boolean(
+      req.isAuthenticated?.() &&
+      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
+    );
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
       return res.status(429).json({ message: "Muitas consultas de comanda. Aguarde um minuto e tente novamente." });
@@ -3053,7 +3061,7 @@ export async function registerRoutes(
     if (!Number.isSafeInteger(ticketNumber) || ticketNumber <= 0) {
       return res.status(400).json({ message: "Número de comanda inválido." });
     }
-    const ticket = await storage.getTicketByNumber(ticketNumber);
+    const ticket = await storage.getTicketByNumber(ticketNumber, !authenticatedStaff);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
     res.json(ticket);
   });
