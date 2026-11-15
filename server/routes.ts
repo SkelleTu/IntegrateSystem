@@ -788,6 +788,9 @@ export async function registerRoutes(
 
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
+    if (!["owner", "tenant_owner"].includes(normalizeRole(user))) {
+      return res.status(403).json({ code: "ESTABLISHMENT_CREATION_FORBIDDEN", message: "Somente o proprietário da conta pode criar estabelecimentos." });
+    }
     try {
       const { name, businessType, taxId, phone, address, city, state } = req.body;
       if (typeof name !== "string" || !name.trim()) {
