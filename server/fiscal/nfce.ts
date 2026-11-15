@@ -30,6 +30,15 @@ export function generateChaveAcesso(settings: any, nNF: number) {
   return base + dv;
 }
 
+function toBrazilFiscalDateTime(date = new Date()): string {
+  const pad = (value: number, size = 2) => String(value).padStart(size, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(offsetMinutes);
+  const offset = `${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${offset}`;
+}
+
 // ─── Geração do XML NF-e 4.00 ─────────────────────────────────────────────────
 export function generateNFCeXML(
   sale: any,
@@ -56,7 +65,7 @@ export function generateNFCeXML(
         mod: "65",
         serie: settings.serieNfce,
         nNF,
-        dhEmi: new Date().toISOString().split(".")[0] + "-03:00",
+        dhEmi: toBrazilFiscalDateTime(),
         tpNF: "1",
         idDest: "1",
         cMunFG: settings.codigoIbge,
