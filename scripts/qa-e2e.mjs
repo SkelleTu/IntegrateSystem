@@ -73,29 +73,29 @@ summary.push({ test: "qa-admin-login", status: 200 });
 const sessionUser = await expectStatus(await request("/api/user", { headers: { cookie } }), 200, "authenticated-session");
 assert.ok(Number(sessionUser.enterpriseId) > 0, "QA administrator must be linked to its isolated enterprise");
 await expectStatus(await request("/api/admin/users", { headers: { cookie } }), 403, "owner-user-list-denied-to-admin");
-const invalidStaff = await request("/api/admin/register-barber", {
+const invalidStaff = await request("/api/admin/register-employee", {
   method: "POST",
   headers: { cookie, "content-type": "application/json" },
   body: JSON.stringify({ username: "x", password: "short" }),
 });
 await expectStatus(invalidStaff, 400, "invalid-staff-account-rejected");
-const staff = await expectStatus(await request("/api/admin/register-barber", {
+const staff = await expectStatus(await request("/api/admin/register-employee", {
   method: "POST",
   headers: { cookie, "content-type": "application/json" },
-  body: JSON.stringify({ username: "qa-barber-ci", password }),
+  body: JSON.stringify({ username: "qa-employee-ci", password }),
 }), 201, "create-enterprise-staff");
-assert.equal(staff.role, "barber");
-const barberLogin = await request("/api/auth/login", {
+assert.equal(staff.role, "employee");
+const employeeLogin = await request("/api/auth/login", {
   method: "POST",
   headers: { "content-type": "application/json" },
-  body: JSON.stringify({ username: "qa-barber-ci", password }),
+  body: JSON.stringify({ username: "qa-employee-ci", password }),
 });
-assert.equal(barberLogin.status, 200);
-const barberCookie = (barberLogin.headers.get("set-cookie") || "").split(";")[0];
-await expectStatus(await request("/api/services", { method: "POST", headers: { cookie: barberCookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Forbidden", price: 100, imageUrl: "https://example.invalid/x.png", isActive: true }) }), 403, "barber-service-create-denied");
-await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie: barberCookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 403, "barber-queue-reset-denied");
-await expectStatus(await request("/api/sales", { headers: { cookie: barberCookie } }), 403, "barber-sales-report-denied");
-await expectStatus(await request("/api/transactions", { headers: { cookie: barberCookie } }), 403, "barber-financial-read-denied");
+assert.equal(employeeLogin.status, 200);
+const employeeCookie = (employeeLogin.headers.get("set-cookie") || "").split(";")[0];
+await expectStatus(await request("/api/services", { method: "POST", headers: { cookie: employeeCookie, "content-type": "application/json" }, body: JSON.stringify({ name: "Forbidden", price: 100, imageUrl: "https://example.invalid/x.png", isActive: true }) }), 403, "employee-service-create-denied");
+await expectStatus(await request("/api/queue/reset", { method: "POST", headers: { cookie: employeeCookie, "content-type": "application/json" }, body: JSON.stringify({ startFrom: 0 }) }), 403, "employee-queue-reset-denied");
+await expectStatus(await request("/api/sales", { headers: { cookie: employeeCookie } }), 403, "employee-sales-report-denied");
+await expectStatus(await request("/api/transactions", { headers: { cookie: employeeCookie } }), 403, "employee-financial-read-denied");
 assert.equal(Number(staff.enterpriseId), Number(sessionUser.enterpriseId), "staff account must inherit the administrator's enterprise");
 // Validate the server-side time-clock state machine in isolated QA.
 const qaCredentialId = "qa-webauthn-credential-id-1234567890";
@@ -420,7 +420,7 @@ assert.ok(!inventorySource.includes("deixe em branco para usar o preço do produ
 assert.ok(reportsSource.includes('new Date(`${dateRange.start}T00:00:00`).toISOString()') && !reportsSource.includes('T00:00:00.000Z'), "reports must filter by local business-day boundaries");
 assert.ok(routesSource.includes('String(user?.role || "").trim().toLowerCase() === "owner";') && !routesSource.includes('String(user?.username || "").trim().toLowerCase() === "skelletu"'), "server owner authorization must rely on the owner role only");
 assert.ok(routesSource.includes('app.get("/api/admin/users"') && routesSource.includes("users.map(toAdminPublicUser)"), "owner user-list endpoint must exist and redact sensitive fields");
-assert.ok(routesSource.includes("enterpriseId,") && routesSource.includes('role: "barber"'), "new staff accounts must inherit the active enterprise");
+assert.ok(routesSource.includes("enterpriseId,") && routesSource.includes('role: "employee"'), "new staff accounts must inherit the active enterprise");
 assert.ok(routesSource.includes("complete: !neonPool && !isRemoteEnabled") && routesSource.includes("if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);"), "backup must not treat a local SQLite snapshot as a complete Neon backup");
 summary.push({ test: "cross-module-read-only-api-coverage", status: "passed", routes: moduleReadRoutes.length });
 summary.push({ test: "requested-ui-contracts", status: "passed" });
