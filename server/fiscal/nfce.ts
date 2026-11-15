@@ -439,8 +439,10 @@ export async function transmitToSefaz(
   xMotivo: string;
   simulado?: boolean;
 }> {
-  const isHomologacao = settings.ambiente !== "producao";
-  const uf = settings.uf?.toUpperCase() || "SP";
+  const isHomologacao = settings.ambiente === "homologacao";
+  if (!isHomologacao && settings.ambiente !== "producao") throw new Error("Ambiente fiscal inválido. Use homologacao ou producao.");
+  const uf = String(settings.uf || "").trim().toUpperCase();
+  if (!uf) throw new Error("UF do estabelecimento é obrigatória para NFC-e.");
 
   // Em produção, ausência de certificado jamais pode resultar em autorização simulada.
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
@@ -607,17 +609,18 @@ export function generateQRCode(chave: string, settings: any): string {
     },
   };
 
-  const urls = urlBases[uf] || urlBases["SP"];
+  const urls = urlBases[uf];
+  if (!urls) throw new Error("UF " + uf + " ainda não possui URL de QR Code NFC-e configurada no Aura System.");
   const urlBase = isHomologacao ? urls.hom : urls.prod;
 
   const csc = String(settings.cscToken || "").trim();
   const configuredCscId = settings.cscId !== undefined && settings.cscId !== null
     ? String(settings.cscId).trim()
     : "";
-  if (!isHomologacao && (!csc || !configuredCscId)) {
+  if (!csc || !configuredCscId) {
     throw new Error("CSC e ID do CSC são obrigatórios para NFC-e em produção.");
   }
-  const cscId = configuredCscId || "000001";
+  const cscId = configuredCscId;
   const tpAmb = isHomologacao ? "2" : "1";
 
   // Hash = SHA1(chave|2|tpAmb|cscId + csc)
