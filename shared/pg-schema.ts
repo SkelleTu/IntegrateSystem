@@ -92,6 +92,7 @@ export const menuItems = pgTable("menu_items", {
   isAvailable: boolean("is_available").default(true).notNull(),
   barcode: text("barcode"), // Código de barras para busca
   codigoProduto: text("codigo_produto"), // Código interno do produto
+  codigoBalanca: text("codigo_balanca"), // Código PLU da balança Urano POP-S
   tags: text("tags"), // Store as JSON string
   ncm: text("ncm"), // Nomenclatura Comum do Mercosul
   cfop: text("cfop"), // Código Fiscal de Operações e Prestações
