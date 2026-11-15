@@ -1635,8 +1635,12 @@ export class DatabaseStorage implements IStorage {
 
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
+    const enterpriseId = this.currentEnterpriseId();
     const result = await dualWrite(async (database) => {
-      const updatedRows = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
+      const updatedRows = await database.update(batches)
+        .set({ quantity: 0 })
+        .where(eq(batches.enterpriseId, enterpriseId))
+        .returning({ id: batches.id });
       return updatedRows.length;
     });
     return result as number;
@@ -1660,9 +1664,9 @@ export class DatabaseStorage implements IStorage {
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
-      await database.delete(batchLogs);
-      await database.delete(batches);
-      await database.delete(products);
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, enterpriseId));
+      await database.delete(batches).where(eq(batches.enterpriseId, enterpriseId));
+      await database.delete(products).where(eq(products.enterpriseId, enterpriseId));
     });
   }
 
