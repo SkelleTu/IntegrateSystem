@@ -905,8 +905,20 @@ export async function registerRoutes(
 
   app.post("/api/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const s = await storage.updateSettings(req.body);
+    if (!isSystemOwner(user) && !hasAdminRole(user)) {
+      return res.status(403).json({ message: "Acesso restrito a administradores." });
+    }
+    const enterpriseId = Number(user?.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({
+        code: "ENTERPRISE_CONTEXT_REQUIRED",
+        message: "Nenhum estabelecimento ativo está associado ao usuário autenticado.",
+      });
+    }
+    const s = await storage.updateSettings({
+      ...req.body,
+      enterpriseId,
+    });
     res.json(s);
   });
 
