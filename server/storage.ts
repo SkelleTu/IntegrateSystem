@@ -661,7 +661,7 @@ export class DatabaseStorage implements IStorage {
           const salePayments = await database
             .select()
             .from(payments)
-            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+            .where(and(eq(payments.saleId, sale.id), eq(payments.enterpriseId, enterpriseId), eq(payments.method, "cash")));
           return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
         })
       );
@@ -748,7 +748,7 @@ export class DatabaseStorage implements IStorage {
         if (batchId !== null) {
           const [batch] = await database.select()
             .from(batches)
-            .where(eq(batches.id, batchId))
+            .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)))
             .limit(1);
 
           if (!batch) {
@@ -1655,7 +1655,7 @@ export class DatabaseStorage implements IStorage {
         productId = requestedId;
       } else {
         const [remoteProduct]: any[] = await db.select().from(products)
-          .where(eq(products.name, String(data.name)))
+          .where(and(eq(products.name, String(data.name)), eq(products.enterpriseId, enterpriseId)))
           .orderBy(desc(products.id))
           .limit(1);
         productId = Number(remoteProduct?.id);
