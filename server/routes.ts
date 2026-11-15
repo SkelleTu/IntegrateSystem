@@ -355,7 +355,7 @@ export async function registerRoutes(
 
   // WebSocket for Label System — authenticated device pairing.
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
-  let windowsClient: WebSocket | null = null;
+  const windowsClients = new Map<number, WebSocket>();
   const labelsWsToken = String(process.env.AURA_LABELS_WS_TOKEN || "").trim();
 
   function isValidLabelsToken(supplied: string): boolean {
@@ -388,34 +388,39 @@ export async function registerRoutes(
   });
 
   wss.on("connection", (ws) => {
-    let registeredWindowsClient = false;
+    let registeredEnterpriseId: number | null = null;
     ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
     ws.on("message", (msg) => {
-      if (registeredWindowsClient) return;
+      if (registeredEnterpriseId !== null) return;
       try {
         const data = JSON.parse(msg.toString());
         if (data?.type !== "WINDOWS_HELLO") {
           ws.close(1008, "Handshake obrigatório");
           return;
         }
-        registeredWindowsClient = true;
-        const previousClient = windowsClient;
-        windowsClient = ws;
+        const enterpriseId = Number(data?.enterpriseId);
+        if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+          ws.close(1008, "Estabelecimento obrigatório");
+          return;
+        }
+        registeredEnterpriseId = enterpriseId;
+        const previousClient = windowsClients.get(enterpriseId);
+        windowsClients.set(enterpriseId, ws);
         if (previousClient && previousClient !== ws && previousClient.readyState === WebSocket.OPEN) {
           previousClient.close(4001, "Substituído por uma conexão autenticada mais recente");
         }
-        ws.send(JSON.stringify({ type: "HELLO_ACK", message: "Dispositivo autenticado e registrado" }));
-        console.log("Windows Label App authenticated and connected");
+        ws.send(JSON.stringify({ type: "HELLO_ACK", enterpriseId, message: "Dispositivo autenticado e registrado" }));
+        console.log(`Windows Label App authenticated and connected for enterprise ${enterpriseId}`);
       } catch {
         ws.close(1008, "Mensagem inválida");
       }
     });
 
     ws.on("close", () => {
-      if (ws === windowsClient) {
-        windowsClient = null;
-        console.log("Windows Label App disconnected");
+      if (registeredEnterpriseId !== null && windowsClients.get(registeredEnterpriseId) === ws) {
+        windowsClients.delete(registeredEnterpriseId);
+        console.log(`Windows Label App disconnected for enterprise ${registeredEnterpriseId}`);
       }
     });
   });
@@ -488,16 +493,21 @@ export async function registerRoutes(
   app.post("/api/labels/print", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (!isSystemOwner(user) && !(isIsolatedQaRuntime && hasAdminRole(user))) {
+    if (!hasAdminRole(user) && !(isIsolatedQaRuntime && hasAdminRole(user))) {
       return res.status(403).json({ error: "Acesso negado" });
     }
-
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const windowsClient = windowsClients.get(enterpriseId);
     if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
-      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+      return res.status(503).json({ error: "APP WINDOWS OFFLINE" });
     }
 
     windowsClient.send(JSON.stringify({
       type: "PRINT_LABEL",
+      enterpriseId,
       payload: req.body
     }));
 
@@ -507,12 +517,17 @@ export async function registerRoutes(
   app.get("/api/labels/status", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (!isSystemOwner(user)) {
+    if (!hasAdminRole(user)) {
       return res.status(403).json({ error: "Acesso negado" });
     }
-
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const windowsClient = windowsClients.get(enterpriseId);
     res.json({
-      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
+      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN,
+      enterpriseId,
     });
   });
 
