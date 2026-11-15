@@ -2896,7 +2896,7 @@ export async function registerRoutes(
 
     const parsedBody = z.object({
       items: z.array(z.string().max(2048)).max(100)
-    }).max(100).safeParse(req.body);
+    }).safeParse(req.body);
     if (!parsedBody.success) {
       return res.status(400).json({ message: "Carrinho inválido. Revise os itens e tente novamente." });
     }
