@@ -1530,7 +1530,9 @@ export async function registerRoutes(
     let nextNum = state.currentNumber + 1;
     let isUnique = false;
     while (!isUnique) {
+      const enterpriseId = Number(getAuraContext().enterpriseId || 0);
       const existing = await db.select().from(tickets).where(and(
+        eq(tickets.enterpriseId, enterpriseId),
         eq(tickets.ticketNumber, nextNum),
         or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
       )).limit(1);
