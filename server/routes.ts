@@ -29,7 +29,7 @@ import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 import { neonPool } from "./neon-db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
-import { updateAuraContext } from "./aura-request-context";
+import { updateAuraContext, getAuraContext } from "./aura-request-context";
 
 const uploadStorage = multer.diskStorage({
   destination: (_req: any, _file: any, cb: any) => {
@@ -2894,7 +2894,7 @@ export async function registerRoutes(
 
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
     );
     const suppliedTicketToken = String(
       req.get("x-ticket-token") || req.body?.publicAccessToken || ""
@@ -2912,11 +2912,9 @@ export async function registerRoutes(
 
     try {
       if (!(await setPublicTenantContext(req, res))) return;
-      const activeEnterprises = await db.select({ id: enterprises.id })
-        .from(enterprises)
-        .where(eq(enterprises.status, "active"))
-        .limit(2);
-      const enterpriseId = Number((req.user as any)?.enterpriseId || activeEnterprises[0]?.id || 0);
+      const enterpriseId = Number(
+        (req.user as any)?.enterpriseId || getAuraContext().enterpriseId || 0
+      );
       const [ticketRecord] = await db.select().from(tickets)
         .where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
       if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
@@ -3052,7 +3050,7 @@ export async function registerRoutes(
     if (!(await setPublicTenantContext(req, res))) return;
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
     );
     const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
     if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
