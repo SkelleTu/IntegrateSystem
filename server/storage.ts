@@ -487,20 +487,20 @@ export class DatabaseStorage implements IStorage {
     const enterpriseId = this.currentEnterpriseId();
     if (!dbRemote || process.env.AURA_RUNTIME_DISABLED === "1") {
       const statement = localSqlite.prepare(
-        "SELECT id, name, price, image_url, is_active, enterprise_id FROM services WHERE enterprise_id = ? AND is_active = 1 ORDER BY id",
+        "SELECT id, name, price, image_url, is_active, enterprise_id FROM services ORDER BY id",
       );
       try {
-        statement.bind([enterpriseId]);
         const rows: any[] = [];
         while (statement.step()) {
           const row = statement.getAsObject();
+          if (Number(row.enterprise_id) !== enterpriseId || Number(row.is_active) !== 1) continue;
           rows.push({
             id: Number(row.id),
             name: String(row.name),
             price: Number(row.price),
             imageUrl: String(row.image_url || ""),
-            isActive: Boolean(Number(row.is_active)),
-            enterpriseId: Number(row.enterprise_id),
+            isActive: true,
+            enterpriseId,
           });
         }
         return rows as Service[];
