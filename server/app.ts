@@ -62,6 +62,34 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    const universalOrigin = String(process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").trim().replace(/\/$/, "");
+    const configuredOrigins = String(process.env.AURA_ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((origin) => origin.trim().replace(/\/$/, ""))
+      .filter(Boolean);
+    const connectOrigins = ["'self'", universalOrigin, ...configuredOrigins].filter(Boolean).join(" ");
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+        "form-action 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data: https:",
+        `connect-src ${connectOrigins} wss:`,
+        "media-src 'self' blob:",
+      ].join("; "),
+    );
+  }
+  next();
+});
 app.set("trust proxy", 1);
 
 // Stable JSON liveness probes must be registered before the SPA/static fallback.
