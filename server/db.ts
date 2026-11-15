@@ -873,6 +873,11 @@ export async function setupDatabase() {
     throw new Error(`[SECURITY] SQLite tenant backfill aborted: ${localTotalUnscoped} rows without enterprise_id and ${localEnterpriseIds.length} enterprises exist.`);
   }
 
+  const localTenantIndexTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  for (const table of localTenantIndexTables) {
+    localSqlite.prepare(`CREATE INDEX IF NOT EXISTS "idx_${table}_enterprise_id" ON "${table}"(enterprise_id)`).run();
+  }
+
   // Tenant boundary migration: operational records receive enterprise_id.
   // Existing single-tenant rows are assigned to the first enterprise only when the
   // table is currently unscoped. New code must always write the authenticated tenant.
@@ -899,6 +904,11 @@ export async function setupDatabase() {
       console.log(`[DB] Backfilled ${totalUnscoped} unscoped operational rows to the only existing enterprise ID ${onlyEnterpriseId}.`);
     } else if (totalUnscoped > 0 && enterpriseIds.length !== 1) {
       throw new Error(`[SECURITY] Tenant backfill aborted: ${totalUnscoped} operational rows have no enterprise_id while the database contains ${enterpriseIds.length} enterprises. Manual reconciliation is required; no row was reassigned automatically.`);
+    }
+    const tenantIndexes = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    for (const table of tenantIndexes) {
+      const indexName = `idx_${table}_enterprise_id`;
+      await neonPool.query(`CREATE INDEX IF NOT EXISTS "${indexName}" ON public."${table}"(enterprise_id)`);
     }
     console.log("[DB] Tenant boundary columns verified for operational tables.");
   }
