@@ -352,6 +352,14 @@ const sessionUserB = await expectStatus(await request("/api/user", { headers: { 
 assert.notEqual(Number(sessionUserB.enterpriseId), Number(sessionUser.enterpriseId), "tenant B must have a distinct enterprise");
 const productB = await expectStatus(await request("/api/products", { method: "POST", headers: { cookie: cookieB, "content-type": "application/json" }, body: JSON.stringify({ name: "QA Tenant B Product", unit: "Unidade", minStock: 1, salePrice: "9.90", category: "QA-B", codigoProduto: "QA-B-001" }) }), 201, "tenant-b-product-create");
 const serviceB = await expectStatus(await request("/api/services", { method: "POST", headers: { cookie: cookieB, "content-type": "application/json" }, body: JSON.stringify({ name: "QA Tenant B Service", price: 990, imageUrl: "https://example.invalid/b.png", isActive: true }) }), 201, "tenant-b-service-create");
+const publicTicketB = await expectStatus(await request(`/api/tickets?enterpriseId=${sessionUserB.enterpriseId}`, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ serviceId: Number(serviceB.id) }),
+}), 201, "public-ticket-tenant-b-create");
+const publicTicketBLookup = await expectStatus(await request(`/api/tickets/${publicTicketB.ticketNumber}?enterpriseId=${sessionUserB.enterpriseId}`), 200, "public-ticket-tenant-b-lookup");
+assert.equal(Number(publicTicketBLookup.id), Number(publicTicketB.id));
+await expectStatus(await request("/api/tickets/1"), 409, "public-ticket-requires-tenant-selection-when-multiple-establishments");
 const productsA = await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "tenant-a-products-isolated");
 assert.ok(!productsA.some(item => Number(item.id) === Number(productB.id)), "tenant A must not list tenant B products");
 await expectStatus(await request(`/api/products/${productB.id}`, { headers: { cookie } }), 404, "tenant-a-product-b-by-id-denied");
