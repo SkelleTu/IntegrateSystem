@@ -811,13 +811,15 @@ export class DatabaseStorage implements IStorage {
 
   async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
     this.logAction("Consulta histórico de vendas");
+    const enterpriseId = this.currentEnterpriseId();
     let conditions = [];
     if (filters.startDate) conditions.push(gte(sales.createdAt, filters.startDate));
     if (filters.endDate) conditions.push(lte(sales.createdAt, filters.endDate));
     
+    conditions.push(eq(sales.enterpriseId, enterpriseId));
     return await db.select()
       .from(sales)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(sales.createdAt));
   }
 
@@ -943,6 +945,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
     this.logAction("Consulta financeiro");
+    const enterpriseId = this.currentEnterpriseId();
     let conditions = [];
     if (filters.startDate) {
       conditions.push(gte(transactions.createdAt, filters.startDate));
@@ -954,21 +957,25 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(transactions.businessType, filters.businessType));
     }
     
+    conditions.push(eq(transactions.enterpriseId, enterpriseId));
     return await db.select()
       .from(transactions)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(transactions.createdAt));
   }
 
   // Inventory
   async getInventory(): Promise<Inventory[]> {
     this.logAction("Consulta estoque completo");
-    return await db.select().from(inventory);
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventory).where(eq(inventory.enterpriseId, enterpriseId));
   }
 
   async getInventoryItem(id: number): Promise<Inventory | undefined> {
     this.logAction(`Busca item estoque ID:${id}`);
-    const [item] = await db.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory)
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
     return item;
   }
 
@@ -1469,14 +1476,27 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  private currentEnterpriseId(): number {
+    const enterpriseId = Number(getAuraContext().enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("Contexto empresarial autenticado ausente.");
+    }
+    return enterpriseId;
+  }
+
   async getProducts() {
     this.logAction("Consulta produtos");
-    const prods = await db.select().from(products).orderBy(asc(products.name));
+    const enterpriseId = this.currentEnterpriseId();
+    const prods = await db.select().from(products)
+      .where(eq(products.enterpriseId, enterpriseId))
+      .orderBy(asc(products.name));
     return this._enrichProducts(prods);
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
-    const [p] = await db.select().from(products).where(eq(products.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [p] = await db.select().from(products)
+      .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
     return p;
   }
 
@@ -1584,21 +1604,30 @@ export class DatabaseStorage implements IStorage {
 
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
     this.logAction(`Atualização produto ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      await database.update(products).set(withoutUndefined({ ...data, updatedAt: new Date() }) as any).where(eq(products.id, id));
-      const [p] = await database.select().from(products).where(eq(products.id, id));
+      const [existing] = await database.select({ id: products.id }).from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Produto ${id} não encontrado.`);
+      await database.update(products)
+        .set(withoutUndefined({ ...data, enterpriseId, updatedAt: new Date() }) as any)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
+      const [p] = await database.select().from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
       return p;
     });
   }
 
   async deleteProduct(id: number): Promise<void> {
     this.logAction(`Exclusão produto ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      const [existing] = await database.select({ id: products.id }).from(products).where(eq(products.id, id)).limit(1);
+      const [existing] = await database.select({ id: products.id }).from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId))).limit(1);
       if (!existing) throw new Error(`Produto ${id} não encontrado.`);
-      await database.delete(batchLogs).where(eq(batchLogs.productId, id));
-      await database.delete(batches).where(eq(batches.productId, id));
-      await database.delete(products).where(eq(products.id, id));
+      await database.delete(batchLogs).where(and(eq(batchLogs.productId, id), eq(batchLogs.enterpriseId, enterpriseId)));
+      await database.delete(batches).where(and(eq(batches.productId, id), eq(batches.enterpriseId, enterpriseId)));
+      await database.delete(products).where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
     });
   }
 
