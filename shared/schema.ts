@@ -32,7 +32,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email"),
   password: text("password").notNull(),
-  role: text("role").notNull().default("employee"), // "admin", "employee", "owner"; "barber" is legacy compatibility
+  role: text("role").notNull().default("employee"), // "admin", "employee", "owner", "tenant_owner"; "barber" is legacy compatibility
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
   webauthnCredentialId: text("webauthn_credential_id").unique(),
   webauthnPublicKey: text("webauthn_public_key"),
