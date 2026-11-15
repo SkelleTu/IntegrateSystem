@@ -433,17 +433,20 @@ export async function transmitToSefaz(
   const isHomologacao = settings.ambiente !== "producao";
   const uf = settings.uf?.toUpperCase() || "SP";
 
-  // Sem certificado → simula resposta (modo desenvolvimento)
+  // Em produção, ausência de certificado jamais pode resultar em autorização simulada.
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
-    console.warn("[FISCAL] Sem certificado — transmissão simulada");
-    return {
-      success: true,
-      protocol: "SIM" + Math.floor(Math.random() * 1000000000),
-      key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "",
-      cStat: "100",
-      xMotivo: "Simulado — sem certificado A1 configurado",
-      simulado: true,
-    };
+    if (isHomologacao) {
+      console.warn("[FISCAL] Sem certificado — transmissão simulada apenas em homologação");
+      return {
+        success: true,
+        protocol: "SIM" + Math.floor(Math.random() * 1000000000),
+        key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "",
+        cStat: "100",
+        xMotivo: "Simulado — sem certificado A1 configurado (homologação)",
+        simulado: true,
+      };
+    }
+    throw new Error("Certificado A1 e senha são obrigatórios para transmissão fiscal em produção.");
   }
 
   const endpoints = SEFAZ_ENDPOINTS[uf];
@@ -598,8 +601,14 @@ export function generateQRCode(chave: string, settings: any): string {
   const urls = urlBases[uf] || urlBases["SP"];
   const urlBase = isHomologacao ? urls.hom : urls.prod;
 
-  const csc = settings.cscToken || "";
-  const cscId = settings.cscId ? settings.cscId.toString().padStart(6, "0") : "000001";
+  const csc = String(settings.cscToken || "").trim();
+  const configuredCscId = settings.cscId !== undefined && settings.cscId !== null
+    ? String(settings.cscId).trim()
+    : "";
+  if (!isHomologacao && (!csc || !configuredCscId)) {
+    throw new Error("CSC e ID do CSC são obrigatórios para NFC-e em produção.");
+  }
+  const cscId = configuredCscId || "000001";
   const tpAmb = isHomologacao ? "2" : "1";
 
   // Hash = SHA1(chave|2|tpAmb|cscId + csc)
