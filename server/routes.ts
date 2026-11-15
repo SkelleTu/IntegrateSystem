@@ -1133,13 +1133,22 @@ export async function registerRoutes(
   }
 
   // Fiscal Routes
-  app.get("/api/download/app", (req, res) => {
-    const filePath = path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe");
-    if (!fs.existsSync(filePath)) {
-      console.error("Arquivo não encontrado em:", filePath);
-      return res.status(404).json({ message: "Arquivo de download não encontrado" });
+  app.get("/api/download/app", (_req, res) => {
+    const candidates = [
+      path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe"),
+      path.join(process.cwd(), "public/attached_assets/dist_windows", "Aura System.exe"),
+      path.join(process.cwd(), "dist", "AuraSystem.exe"),
+      path.join(process.cwd(), "dist", "Aura System.exe"),
+    ];
+    const filePath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!filePath) {
+      console.error("[DOWNLOAD] Artefato AuraSystem.exe não encontrado. Candidatos:", candidates);
+      return res.status(503).json({
+        code: "APP_ARTIFACT_UNAVAILABLE",
+        message: "O instalador do Aura System ainda não está disponível neste deploy.",
+      });
     }
-    res.download(filePath, "AuraSystem.exe");
+    return res.download(filePath, "AuraSystem.exe");
   });
 
   app.get("/api/windows/stream", isAuthenticated, (req, res) => {
