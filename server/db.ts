@@ -910,6 +910,10 @@ export async function setupDatabase() {
       const indexName = `idx_${table}_enterprise_id`;
       await neonPool.query(`CREATE INDEX IF NOT EXISTS "${indexName}" ON public."${table}"(enterprise_id)`);
     }
+    for (const table of tenantTables) {
+      await neonPool.query(`ALTER TABLE public."${table}" ALTER COLUMN enterprise_id SET NOT NULL`);
+    }
+
     console.log("[DB] Tenant boundary columns verified for operational tables.");
   }
 
