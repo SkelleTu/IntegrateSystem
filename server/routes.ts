@@ -137,7 +137,7 @@ function validateWebAuthnAuthenticatorData(authenticatorData: Buffer, rpId: stri
 
 function hasAdminRole(user: any): boolean {
   const role = normalizeRole(user);
-  return role === "admin" || role === "owner";
+  return role === "admin" || role === "owner" || role === "tenant_owner";
 }
 
 const requireAdmin = (req: any, res: any, next: any) => {
@@ -883,7 +883,7 @@ export async function registerRoutes(
       const adminData = {
         username: username.trim(),
         password: hashedPassword,
-        role: "owner",
+        role: "tenant_owner",
       };
 
       const enterprise = await (storage as DatabaseStorage).createEnterprise(enterpriseData, adminData);
@@ -2934,7 +2934,7 @@ export async function registerRoutes(
 
     const authenticatedStaff = Boolean(
       req.isAuthenticated?.() &&
-      ["admin", "owner", "employee", "barber"].includes(normalizeRole(req.user))
+      ["admin", "owner", "tenant_owner", "employee", "barber"].includes(normalizeRole(req.user))
     );
     const suppliedTicketToken = String(
       req.get("x-ticket-token") || req.body?.publicAccessToken || ""
