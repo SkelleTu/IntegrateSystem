@@ -706,7 +706,7 @@ export async function setupDatabase() {
     await tursoClient.execute("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR TRIM(username) = ''");
     await tursoClient.execute("UPDATE users SET password = '' WHERE password IS NULL");
 
-    const tursoTenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    const tursoTenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
     const tursoEnterpriseResult = await tursoClient.execute("SELECT id FROM enterprises ORDER BY id");
     const tursoEnterpriseIds = (tursoEnterpriseResult.rows as any[]).map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
     const tursoUnscopedCounts: Record<string, number> = {};
@@ -853,7 +853,7 @@ export async function setupDatabase() {
   localSqlite.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON users(webauthn_credential_id)").run();
 
   // Tenant boundary migration for the local SQLite mirror.
-  const localTenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  const localTenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
   const localEnterpriseIds = (localSqlite.exec("SELECT id FROM enterprises ORDER BY id")[0]?.values ?? [])
     .map((row: any[]) => Number(row[0])).filter((id: number) => Number.isSafeInteger(id) && id > 0);
   const localUnscopedCounts: Record<string, number> = {};
@@ -873,7 +873,7 @@ export async function setupDatabase() {
     throw new Error(`[SECURITY] SQLite tenant backfill aborted: ${localTotalUnscoped} rows without enterprise_id and ${localEnterpriseIds.length} enterprises exist.`);
   }
 
-  const localTenantIndexTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  const localTenantIndexTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
   for (const table of localTenantIndexTables) {
     localSqlite.prepare(`CREATE INDEX IF NOT EXISTS "idx_${table}_enterprise_id" ON "${table}"(enterprise_id)`).run();
   }
@@ -882,7 +882,7 @@ export async function setupDatabase() {
   // Existing single-tenant rows are assigned to the first enterprise only when the
   // table is currently unscoped. New code must always write the authenticated tenant.
   if (neonPool) {
-    const tenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    const tenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
     for (const table of tenantTables) {
       await neonPool.query(`ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS enterprise_id INTEGER`);
     }
