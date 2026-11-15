@@ -189,7 +189,7 @@ export default function TimeClock() {
                   </p>
                 )}
 
-                {!user.fingerprintId ? (
+                {!user.webauthnCredentialId ? (
                   <Button 
                     size="lg"
                     disabled={timeClockStatus?.webauthnReady === false}
@@ -202,7 +202,7 @@ export default function TimeClock() {
                 ) : (
                   <Button 
                     size="lg"
-                    disabled={!timeClockStatus?.webauthnReady} 
+                    disabled={timeClockStatus?.webauthnReady === false} 
                     className="w-full h-16 md:h-20 bg-primary hover:bg-primary/90 text-white transition-all duration-300 font-black italic text-xl md:text-2xl rounded-2xl md:rounded-3xl shadow-[0_0_40px_-5px_rgba(0,229,255,0.3)] hover:shadow-[0_0_60px_-5px_rgba(0,229,255,0.5)] group overflow-hidden relative"
                     onClick={() => registerClockMutation.mutate(currentAction.type)}
                   >
