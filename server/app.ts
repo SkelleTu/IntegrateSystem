@@ -459,6 +459,34 @@ export async function initApp() {
       }
     });
 
+    // Central error boundary: every uncaught API error gets a stable contract and correlation IDs.
+    app.use((error: any, req: Request, res: Response, next: any) => {
+      if (res.headersSent) return next(error);
+      const rawStatus = Number(error?.statusCode || error?.status);
+      const status = Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
+      const code = status >= 500 ? "INTERNAL_SERVER_ERROR" : String(error?.code || "REQUEST_ERROR");
+      const message = status >= 500 && process.env.NODE_ENV === "production"
+        ? "Erro interno do servidor."
+        : String(error?.message || "Não foi possível concluir a solicitação.");
+      console.error("[HTTP ERROR]", {
+        status,
+        code,
+        path: req.originalUrl,
+        method: req.method,
+        requestId: res.locals.requestId,
+        traceId: res.locals.traceId,
+        userId: (req as any).user?.id ?? null,
+        enterpriseId: (req as any).user?.enterpriseId ?? null,
+        error: error?.stack || String(error),
+      });
+      return res.status(status).json({
+        code,
+        message,
+        requestId: res.locals.requestId || null,
+        traceId: res.locals.traceId || null,
+      });
+    });
+
     appReady = true;
     runtimeEvent("server-ready", "Aplicação pronta após inicialização do banco e das rotas", {
       phase: "server",
