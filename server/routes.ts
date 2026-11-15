@@ -896,7 +896,7 @@ export async function registerRoutes(
       delete enterpriseData.password;
       enterpriseData.name = name.trim();
       enterpriseData.slug = finalSlug;
-      enterpriseData.status = "pending";
+      enterpriseData.status = "active";
 
       const adminData = {
         username: username.trim(),
