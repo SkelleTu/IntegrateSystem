@@ -2545,6 +2545,7 @@ export async function registerRoutes(
 
       const data = insertCashRegisterSchema.parse({
         ...req.body,
+        enterpriseId: Number(user.enterpriseId),
         userId: user.id,
         status: "open",
         openedAt: new Date()
