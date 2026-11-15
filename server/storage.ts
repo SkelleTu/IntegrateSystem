@@ -257,7 +257,7 @@ export class DatabaseStorage implements IStorage {
     const sharedAdminId = adminData ? await nextSharedId(users) : undefined;
 
     return await dualWrite(async (database: any) => {
-      await database.insert(enterprises).values({ ...enterprise, id: sharedEnterpriseId } as any);
+      await database.insert(enterprises).values({ ...enterprise, status: adminData?.role === "tenant_owner" ? "active" : enterprise.status, id: sharedEnterpriseId } as any);
       const [newEnterprise] = await database.select().from(enterprises)
         .where(eq(enterprises.id, sharedEnterpriseId)).limit(1);
       if (!newEnterprise) {
