@@ -1950,6 +1950,7 @@ export async function registerRoutes(
       if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Produto inválido" });
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const payload = insertBatchSchema.parse({
+        enterpriseId: Number(user.enterpriseId),
         productId,
         ...rest,
         quantity: Number(quantity),
