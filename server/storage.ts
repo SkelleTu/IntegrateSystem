@@ -1501,7 +1501,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined> {
-    const all: any[] = await db.select().from(products);
+    const enterpriseId = this.currentEnterpriseId();
+    const all: any[] = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
     const match = all.find((p: any) =>
       norm(p.name) === norm(data.name) &&
@@ -1515,8 +1516,9 @@ export class DatabaseStorage implements IStorage {
 
   async createProduct(data: InsertProduct): Promise<Product> {
     this.logAction(`Novo produto: ${data.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     const now = new Date();
-    const clean = withoutUndefined({ ...data, createdAt: now, updatedAt: now } as any);
+    const clean = withoutUndefined({ ...data, enterpriseId, createdAt: now, updatedAt: now } as any);
 
     // sql.js is used as the local mirror. Its prepared binder is stricter than
     // the remote libSQL driver, so write the local row with primitive SQLite values.
@@ -1644,7 +1646,8 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`LIMPEZA TOTAL DO ESTOQUE por ${clearedBy}`);
 
     // 1. Salva snapshot antes de deletar
-    const allProducts = await db.select().from(products);
+    const enterpriseId = this.currentEnterpriseId();
+    const allProducts = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const allBatches  = await db.select().from(batches);
 
     await db.insert(stockSnapshots).values({
