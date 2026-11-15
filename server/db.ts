@@ -806,6 +806,26 @@ export async function setupDatabase() {
     }
   }
 
+  // Tenant boundary migration: operational records receive enterprise_id.
+  // Existing single-tenant rows are assigned to the first enterprise only when the
+  // table is currently unscoped. New code must always write the authenticated tenant.
+  if (neonPool) {
+    const tenantTables = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    for (const table of tenantTables) {
+      await neonPool.query(`ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS enterprise_id INTEGER`);
+    }
+    const [{ rows: enterpriseRows }] = await Promise.all([
+      neonPool.query("SELECT id FROM public.enterprises ORDER BY id ASC LIMIT 1"),
+    ]);
+    const defaultEnterpriseId = enterpriseRows?.[0]?.id ? Number(enterpriseRows[0].id) : null;
+    if (defaultEnterpriseId) {
+      for (const table of tenantTables) {
+        await neonPool.query(`UPDATE public."${table}" SET enterprise_id = $1 WHERE enterprise_id IS NULL`, [defaultEnterpriseId]);
+      }
+    }
+    console.log("[DB] Tenant boundary columns verified for operational tables.");
+  }
+
   // Neon is authoritative when DATABASE_URL is configured. Validate its real
   // PostgreSQL schema before allowing authentication/routes to start.
   if (neonPool) {
