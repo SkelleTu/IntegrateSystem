@@ -20,6 +20,7 @@ import type {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne, getTableName } from "drizzle-orm";
 import { runtimeEvent } from "./runtimeMonitor";
+import { randomBytes } from "node:crypto";
 
 // sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
 function withoutUndefined<T extends Record<string, any>>(value: T): T {
@@ -506,15 +507,22 @@ export class DatabaseStorage implements IStorage {
 
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
     this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
+    const enterpriseId = this.currentEnterpriseId();
+    const publicAccessToken = randomBytes(24).toString("base64url");
     return await dualWrite(async (database) => {
-      const [newTicket] = await database.insert(tickets).values(ticket).returning();
+      const [newTicket] = await database.insert(tickets)
+        .values({ ...ticket, enterpriseId, publicAccessToken } as any)
+        .returning();
       return newTicket;
     });
   }
 
   async getTicketByNumber(number: number): Promise<Ticket | undefined> {
     this.logAction(`Busca ticket #${number}`);
-    const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [ticket] = await db.select().from(tickets)
+      .where(and(eq(tickets.ticketNumber, number), eq(tickets.enterpriseId, enterpriseId), eq(tickets.status, "pending")))
+      .orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
         (ticket as any).items = JSON.parse(ticket.items);
@@ -529,7 +537,10 @@ export class DatabaseStorage implements IStorage {
 
   async getLatestTicket(): Promise<Ticket | undefined> {
     this.logAction("Consulta último ticket");
-    const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [ticket] = await db.select().from(tickets)
+      .where(eq(tickets.enterpriseId, enterpriseId))
+      .orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
         (ticket as any).items = JSON.parse(ticket.items);
