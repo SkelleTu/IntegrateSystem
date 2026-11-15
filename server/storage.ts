@@ -1323,8 +1323,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {
+    const scopedEnterpriseId = this.currentEnterpriseId();
+    if (Number(enterpriseId) !== scopedEnterpriseId) throw new Error("Tenant fiscal inválido.");
     return await db.select().from(sales)
       .where(and(
+        eq(sales.enterpriseId, scopedEnterpriseId),
         eq(sales.status, "completed"), 
         or(
           eq(sales.fiscalStatus, "authorized"), 
@@ -1344,12 +1347,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSale(id: number): Promise<Sale | undefined> {
-    const [sale] = await db.select().from(sales).where(eq(sales.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [sale] = await db.select().from(sales)
+      .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
     return sale;
   }
 
   async getSaleItems(saleId: number): Promise<SaleItem[]> {
-    return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(saleItems)
+      .where(and(eq(saleItems.saleId, saleId), eq(saleItems.enterpriseId, enterpriseId)));
   }
 
   /** Retorna itens da venda enriquecidos com nome, NCM, CFOP e outros campos fiscais */
@@ -1428,7 +1435,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNfceHistory(enterpriseId: number): Promise<Nfce[]> {
-    return await db.select().from(nfce).orderBy(desc(nfce.dataEmissao));
+    const scopedEnterpriseId = this.currentEnterpriseId();
+    if (Number(enterpriseId) !== scopedEnterpriseId) throw new Error("Tenant fiscal inválido.");
+    return await db.select().from(nfce)
+      .where(eq(nfce.enterpriseId, scopedEnterpriseId))
+      .orderBy(desc(nfce.dataEmissao));
   }
 
   async getNfce(id: number): Promise<Nfce | undefined> {
@@ -1437,7 +1448,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
-    let conditions = [];
+    const enterpriseId = this.currentEnterpriseId();
+    let conditions = [eq(cashRegisters.enterpriseId, enterpriseId)];
     if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
     if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
     
@@ -1448,7 +1460,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
-    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(sales)
+      .where(and(eq(sales.cashRegisterId, registerId), eq(sales.enterpriseId, enterpriseId)));
   }
 
   async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
@@ -1463,7 +1477,8 @@ export class DatabaseStorage implements IStorage {
 
   private async _enrichProducts(prods: Product[]) {
     if (prods.length === 0) return [];
-    const allBatches: any[] = await db.select().from(batches);
+    const enterpriseId = this.currentEnterpriseId();
+    const allBatches: any[] = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
     return prods.map((p: any) => {
       const pb = allBatches.filter((b: any) => b.productId === p.id && b.quantity > 0);
       const allPb = allBatches.filter((b: any) => b.productId === p.id);
