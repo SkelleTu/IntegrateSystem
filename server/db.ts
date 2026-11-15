@@ -559,6 +559,7 @@ export async function setupDatabase() {
     "ALTER TABLE users ADD COLUMN tutorial_completed_at TEXT",
     "ALTER TABLE services ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE tickets ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE tickets ADD COLUMN public_access_token TEXT",
     "ALTER TABLE queue_state ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE categories ADD COLUMN enterprise_id INTEGER",
     "ALTER TABLE menu_items ADD COLUMN enterprise_id INTEGER",
