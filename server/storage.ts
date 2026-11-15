@@ -485,7 +485,7 @@ export class DatabaseStorage implements IStorage {
   async getServices(): Promise<Service[]> {
     this.logAction("Consulta lista de serviços");
     const enterpriseId = this.currentEnterpriseId();
-    if (!dbRemote) {
+    if (!dbRemote || process.env.AURA_RUNTIME_DISABLED === "1") {
       const statement = localSqlite.prepare(
         "SELECT id, name, price, image_url, is_active, enterprise_id FROM services WHERE enterprise_id = ? AND is_active = 1 ORDER BY id",
       );
