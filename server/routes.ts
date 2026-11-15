@@ -3057,7 +3057,7 @@ export async function registerRoutes(
             ? "break_end"
             : "out";
       if (type !== expectedType) return res.status(409).json({ message: "A sequência do ponto está incorreta. Atualize o status e tente novamente.", expectedType });
-      const clock = await storage.createTimeClock({ userId: user.id, type, timestamp: new Date(), fingerprintId: String(user.fingerprintId) });
+      const clock = await storage.createTimeClock({ enterpriseId: Number(user.enterpriseId), userId: user.id, type, timestamp: new Date(), fingerprintId: String(user.fingerprintId) });
       return res.json(clock);
     }
     const credentialId = String(req.body?.credentialId || "").trim();
@@ -3118,6 +3118,7 @@ export async function registerRoutes(
     }
 
     const clock = await storage.createTimeClock({
+      enterpriseId: Number(user.enterpriseId),
       userId: user.id,
       type,
       timestamp: new Date(),
