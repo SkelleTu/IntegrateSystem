@@ -40,7 +40,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   email: text("email"),
   password: text("password").notNull(),
-  role: text("role").notNull().default("barber"), // "admin", "barber", "owner"
+  role: text("role").notNull().default("employee"), // "admin", "employee", "owner"; "barber" is legacy compatibility
   fingerprintId: text("fingerprint_id").unique(), // ID da digital vinculada
   enterpriseId: integer("enterprise_id"),
   tutorialCompletedAt: text("tutorial_completed_at"),
@@ -183,7 +183,7 @@ export const enterprises = pgTable("enterprises", {
   id: serial("id").primaryKey(),
   ownerId: integer("owner_id"), // usuário que criou este estabelecimento
   name: text("name").notNull(),
-  businessType: text("business_type").default("barbearia"), // tipo do negócio
+  businessType: text("business_type").default("geral"), // tipo do negócio, escolhido pelo usuário
   taxId: text("tax_id"), 
   email: text("email"),
   phone: text("phone"),
