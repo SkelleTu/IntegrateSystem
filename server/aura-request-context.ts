@@ -4,6 +4,7 @@ export type AuraRequestContext = {
   traceId?: string | null;
   requestId?: string | null;
   userId?: number | null;
+  enterpriseId?: number | null;
   source?: string | null;
 };
 
