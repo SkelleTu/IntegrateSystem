@@ -412,7 +412,7 @@ export class DatabaseStorage implements IStorage {
           username: user.username,
           email,
           password: user.password,
-          role: user.role || "barber",
+          role: user.role || "employee",
           fingerprint_id: (user as any).fingerprintId ?? null,
           enterprise_id: (user as any).enterpriseId ?? null,
         };
