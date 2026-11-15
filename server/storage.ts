@@ -1403,8 +1403,9 @@ export class DatabaseStorage implements IStorage {
 
   async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
     return await dualWrite(async (database) => {
+      const enterpriseId = this.currentEnterpriseId();
       const [updated] = await database.update(sales).set(update)
-        .where(eq(sales.id, id)).returning();
+        .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId))).returning();
       if (!updated) throw new Error(`Venda ${id} não encontrada ao atualizar o estado fiscal.`);
       return updated;
     });
@@ -1432,43 +1433,26 @@ export class DatabaseStorage implements IStorage {
     icmsOrigem?: number | null;
     icmsSituacaoTributaria?: string | null;
   })[]> {
-    const items: any[] = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    const items: any[] = await db.select().from(saleItems)
+      .where(and(eq(saleItems.saleId, saleId), eq(saleItems.enterpriseId, enterpriseId)));
     if (items.length === 0) return [];
-
-    const ids = Array.from(new Set(items.map((i: any) => Number(i.itemId))));
-
-    // Busca em menuItems e products em paralelo
-    const [menuList, productList] = await Promise.all([
-      db.select().from(menuItems).where(
-        ids.length === 1
-          ? eq(menuItems.id, Number(ids[0]))
-          : sql`${menuItems.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
-      ),
-      db.select().from(products).where(
-        ids.length === 1
-          ? eq(products.id, ids[0])
-          : sql`${products.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
-      ),
-    ]);
-
+    const menuList = await db.select().from(menuItems).where(eq(menuItems.enterpriseId, enterpriseId));
+    const productList = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     return items.map((item: any) => {
       const mi = menuList.find((m: any) => m.id === item.itemId);
       const pr = productList.find((p: any) => p.id === item.itemId);
       const src = mi || pr;
-      return {
-        ...item,
-        name: src?.name || `Produto ${item.itemId}`,
-        barcode: (mi as any)?.barcode ?? null,
-        ncm: (mi as any)?.ncm ?? (pr as any)?.ncm ?? null,
-        cfop: (mi as any)?.cfop ?? (pr as any)?.cfop ?? null,
-        icmsOrigem: (mi as any)?.icmsOrigem ?? 0,
-        icmsSituacaoTributaria: (mi as any)?.icmsSituacaoTributaria ?? "400",
-      };
+      return { ...item, name: src?.name || `Produto ${item.itemId}`, barcode: (mi as any)?.barcode ?? null,
+        ncm: (mi as any)?.ncm ?? (pr as any)?.ncm ?? null, cfop: (mi as any)?.cfop ?? (pr as any)?.cfop ?? null,
+        icmsOrigem: (mi as any)?.icmsOrigem ?? 0, icmsSituacaoTributaria: (mi as any)?.icmsSituacaoTributaria ?? "400" };
     });
   }
 
   async getPayments(saleId: number): Promise<Payment[]> {
-    return await db.select().from(payments).where(eq(payments.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(payments)
+      .where(and(eq(payments.saleId, saleId), eq(payments.enterpriseId, enterpriseId)));
   }
 
   async getNextNfceNumber(enterpriseId: number): Promise<number> {
@@ -1491,8 +1475,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNfce(data: InsertNfce): Promise<Nfce> {
+    const enterpriseId = this.currentEnterpriseId();
+    const [ownedSale] = await db.select({ id: sales.id }).from(sales)
+      .where(and(eq(sales.id, Number(data.saleId)), eq(sales.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedSale) throw new Error("Venda não encontrada nesta empresa.");
     return await dualWrite(async (database) => {
-      const [inserted] = await database.insert(nfce).values(data).returning();
+      const [inserted] = await database.insert(nfce).values({ ...data, enterpriseId } as any).returning();
       if (!inserted) throw new Error("Não foi possível obter o documento fiscal recém-criado.");
       return inserted;
     });
