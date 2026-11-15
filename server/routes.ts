@@ -1502,6 +1502,7 @@ export async function registerRoutes(
 
   // Queue Routes
   app.get(api.queue.state.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const state = await storage.getQueueState();
     res.json(state);
   });
