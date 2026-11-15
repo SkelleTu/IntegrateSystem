@@ -329,8 +329,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEnterprise(id: number): Promise<void> {
     this.logAction(`Exclusão instituição ID:${id}`);
-    await db.delete(settings).where(eq(settings.enterpriseId, id));
-    await db.delete(enterprises).where(eq(enterprises.id, id));
+    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error("Estabelecimento inválido.");
+
+    await dualWriteTransaction(async (database) => {
+      const [enterprise] = await database.select().from(enterprises).where(eq(enterprises.id, id)).limit(1);
+      if (!enterprise) throw new Error("Estabelecimento não encontrado.");
+
+      // Delete tenant-owned children first. The account owner is preserved because
+      // the same user may own other establishments.
+      await database.delete(saleItems).where(eq(saleItems.enterpriseId, id));
+      await database.delete(payments).where(eq(payments.enterpriseId, id));
+      await database.delete(nfce).where(eq(nfce.enterpriseId, id));
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, id));
+      await database.delete(batches).where(eq(batches.enterpriseId, id));
+      await database.delete(inventoryLogs).where(eq(inventoryLogs.enterpriseId, id));
+      await database.delete(inventoryRestocks).where(eq(inventoryRestocks.enterpriseId, id));
+      await database.delete(inventory).where(eq(inventory.enterpriseId, id));
+      await database.delete(sales).where(eq(sales.enterpriseId, id));
+      await database.delete(transactions).where(eq(transactions.enterpriseId, id));
+      await database.delete(cashRegisters).where(eq(cashRegisters.enterpriseId, id));
+      await database.delete(timeClock).where(eq(timeClock.enterpriseId, id));
+      await database.delete(tickets).where(eq(tickets.enterpriseId, id));
+      await database.delete(queueState).where(eq(queueState.enterpriseId, id));
+      await database.delete(menuItems).where(eq(menuItems.enterpriseId, id));
+      await database.delete(categories).where(eq(categories.enterpriseId, id));
+      await database.delete(services).where(eq(services.enterpriseId, id));
+      await database.delete(products).where(eq(products.enterpriseId, id));
+      await database.delete(stockSnapshots).where(eq(stockSnapshots.enterpriseId, id));
+      await database.delete(fiscalSettings).where(eq(fiscalSettings.enterpriseId, id));
+      await database.delete(settings).where(eq(settings.enterpriseId, id));
+
+      await database.delete(users).where(and(
+        eq(users.enterpriseId, id),
+        ne(users.id, Number(enterprise.ownerId || 0)),
+      ));
+
+      const remainingOwned = await database.select({ id: enterprises.id })
+        .from(enterprises)
+        .where(and(eq(enterprises.ownerId, Number(enterprise.ownerId || 0)), ne(enterprises.id, id)))
+        .orderBy(asc(enterprises.id))
+        .limit(1);
+      if (enterprise.ownerId) {
+        await database.update(users)
+          .set({ enterpriseId: remainingOwned[0]?.id ?? null } as any)
+          .where(eq(users.id, Number(enterprise.ownerId)));
+      }
+
+      await database.delete(enterprises).where(eq(enterprises.id, id));
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {
