@@ -14,6 +14,7 @@ export default function ClientCart() {
   const { toast } = useToast();
   const [ticketNumber, setTicketNumber] = useState("");
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
+  const [ticketToken, setTicketToken] = useState("");
   const [cart, setCart] = useState<{ id: number, name: string, price: number, quantity: number }[]>([]);
 
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
@@ -28,6 +29,7 @@ export default function ClientCart() {
     },
     onSuccess: (data) => {
       setCurrentTicket(data);
+      setTicketToken(String(data.publicAccessToken || ""));
       const initialItems = data.items ? data.items.map((i: string) => JSON.parse(i)) : [];
       setCart(initialItems);
       toast({ title: "Bem-vindo", description: `Comanda #${data.ticketNumber} ativa` });
@@ -39,7 +41,7 @@ export default function ClientCart() {
 
   const updateItemsMutation = useMutation({
     mutationFn: async ({ id, items }: { id: number, items: string[] }) => {
-      await apiRequest("POST", `/api/tickets/${id}/items`, { items });
+      await apiRequest("POST", `/api/tickets/${id}/items`, { items }, ticketToken ? { headers: { "x-ticket-token": ticketToken } } : undefined);
     },
     onSuccess: () => {
       toast({ title: "Carrinho Atualizado", description: "Itens salvos na sua comanda" });
