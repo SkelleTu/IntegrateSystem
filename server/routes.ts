@@ -1995,6 +1995,19 @@ export async function registerRoutes(
 
   // ─── Fim Produto → Lotes API ────────────────────────────────────────────────
 
+  app.get("/api/public/enterprises", async (req, res) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("public-enterprises:" + ip, 30, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas consultas. Aguarde um minuto e tente novamente." });
+    }
+    const list = await db.select({
+      id: enterprises.id,
+      name: enterprises.name,
+      slug: enterprises.slug,
+    }).from(enterprises).where(eq(enterprises.status, "active")).orderBy(asc(enterprises.name));
+    return res.json(list);
+  });
+
   app.get("/api/menu-items", async (req, res) => {
     if (!(await setPublicTenantContext(req, res))) return;
     const items = (await storage.getMenuItems()).map(item => ({
