@@ -1773,7 +1773,9 @@ export async function registerRoutes(
       if (!p) return res.status(404).json({ message: "Produto não encontrado." });
       res.json(p);
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao atualizar produto" });
+      const message = String(err?.message || "");
+      if (/Produto .* não encontrado/.test(message)) return res.status(404).json({ message: "Produto não encontrado." });
+      res.status(500).json({ message: message || "Erro ao atualizar produto" });
     }
   });
 
@@ -1901,7 +1903,10 @@ export async function registerRoutes(
       if (!b) return res.status(404).json({ message: "Lote não encontrado." });
       res.json(b);
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao atualizar lote" });
+      const message = String(err?.message || "");
+      if (/Lote .* não encontrado/.test(message)) return res.status(404).json({ message: "Lote não encontrado." });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.issues[0]?.message || "Dados do lote inválidos" });
+      res.status(500).json({ message: message || "Erro ao atualizar lote" });
     }
   });
 
@@ -1912,7 +1917,9 @@ export async function registerRoutes(
       await storage.deleteBatch(id);
       res.status(204).send();
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao excluir lote" });
+      const message = String(err?.message || "");
+      if (/Lote .* não encontrado/.test(message)) return res.status(404).json({ message: "Lote não encontrado." });
+      res.status(500).json({ message: message || "Erro ao excluir lote" });
     }
   });
 
@@ -2869,7 +2876,9 @@ export async function registerRoutes(
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de transação inválido" });
       await storage.deleteTransaction(id);
       res.status(204).send();
-    } catch (err) {
+    } catch (err: any) {
+      const message = String(err?.message || "");
+      if (/Transação .* não encontrada/.test(message)) return res.status(404).json({ message: "Transação não encontrada." });
       res.status(500).json({ message: "Internal server error" });
     }
   });
@@ -2911,7 +2920,10 @@ export async function registerRoutes(
     }
 
     try {
-      const [ticketRecord] = await db.select().from(tickets).where(eq(tickets.id, ticketId)).limit(1);
+      if (!(await setPublicTenantContext(req, res))) return;
+      const enterpriseId = Number((getAuraContextSafe(req) as any)?.enterpriseId || 0);
+      const [ticketRecord] = await db.select().from(tickets)
+        .where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
       if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
       if (String((ticketRecord as any).publicAccessToken || "") !== suppliedTicketToken) {
         return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
