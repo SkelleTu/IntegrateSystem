@@ -883,10 +883,14 @@ export async function registerRoutes(
       const adminData = {
         username: username.trim(),
         password: hashedPassword,
+        role: "owner",
       };
 
       const enterprise = await (storage as DatabaseStorage).createEnterprise(enterpriseData, adminData);
-      res.status(201).json(enterprise);
+      const ownerAccount = await storage.getUserByUsername(username.trim());
+      if (!ownerAccount) throw new Error("Conta proprietária recém-criada não foi localizada.");
+      const ownedEnterprise = await storage.updateEnterprise(Number(enterprise.id), { ownerId: ownerAccount.id } as any);
+      res.status(201).json(ownedEnterprise);
     } catch (err) {
       console.error("Erro ao criar empresa:", err);
       res.status(500).json({ message: "Erro ao criar empresa. Verifique se os dados estão corretos." });
