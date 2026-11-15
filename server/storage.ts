@@ -619,9 +619,10 @@ export class DatabaseStorage implements IStorage {
   // Cashier
   async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
+    const enterpriseId = this.currentEnterpriseId();
     const [register] = await db.select()
       .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+      .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.enterpriseId, enterpriseId), isNull(cashRegisters.closedAt)));
     return register;
   }
 
@@ -1231,7 +1232,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const [clock] = await db.insert(timeClock).values(data).returning();
+    const enterpriseId = this.currentEnterpriseId();
+    const userId = Number(data.userId);
+    if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error("Usuário inválido para registro de ponto.");
+    const [ownedUser] = await db.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, userId), eq(users.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedUser) throw new Error("Usuário não pertence a este estabelecimento.");
+    const [clock] = await db.insert(timeClock).values({ ...data, enterpriseId } as any).returning();
     return clock;
   }
 
@@ -1334,7 +1341,10 @@ export class DatabaseStorage implements IStorage {
   // Fiscal
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
-    const idToUse = enterpriseId || 1;
+    const idToUse = Number(enterpriseId);
+    if (!Number.isSafeInteger(idToUse) || idToUse <= 0) {
+      throw new Error("Contexto empresarial fiscal inválido.");
+    }
     try {
       const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
       return settings || undefined;
@@ -1376,7 +1386,10 @@ export class DatabaseStorage implements IStorage {
 
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
     this.logAction(`Upsert configurações fiscais empresa ID:${settingsData.enterpriseId}`);
-    const enterpriseId = settingsData.enterpriseId || 1;
+    const enterpriseId = Number(settingsData.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("Contexto empresarial fiscal inválido.");
+    }
     const dataToSave = {
       ...settingsData,
       enterpriseId,
@@ -1483,7 +1496,7 @@ export class DatabaseStorage implements IStorage {
     try {
       await db.update(fiscalSettings)
         .set({ ultimoNumeroNfce: nextNumber } as any)
-        .where(eq(fiscalSettings.id, settingsData.id));
+        .where(and(eq(fiscalSettings.id, settingsData.id), eq(fiscalSettings.enterpriseId, enterpriseId)));
     } catch (e) {
       console.warn("Aviso: Não foi possível atualizar ultimoNumeroNfce (coluna ausente?)");
     }
@@ -1691,7 +1704,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     scheduleAutoBackup();
-    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    const [product] = await db.select().from(products).where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId)));
     if (!product) throw new Error(`Produto criado mas não localizado: ID ${productId}`);
     return product;
   }
@@ -1744,15 +1757,16 @@ export class DatabaseStorage implements IStorage {
     // 1. Salva snapshot antes de deletar
     const enterpriseId = this.currentEnterpriseId();
     const allProducts = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
-    const allBatches  = await db.select().from(batches);
+    const allBatches  = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
 
     await db.insert(stockSnapshots).values({
+      enterpriseId,
       createdAt: new Date(),
       createdBy: clearedBy,
       productsJson: JSON.stringify(allProducts),
       batchesJson: JSON.stringify(allBatches),
       productCount: allProducts.length,
-    });
+    } as any);
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
