@@ -875,15 +875,6 @@ export async function registerRoutes(
     if (!["active", "rejected", "pending"].includes(status)) {
       return res.status(400).json({ message: "Status inválido" });
     }
-    if (status === "active" && process.env.AURA_TENANT_ISOLATION_READY !== "true") {
-      const existingEnterprises = await db.select({ id: enterprises.id }).from(enterprises).limit(2);
-      if (existingEnterprises.length > 1) {
-        return res.status(409).json({
-          code: "TENANT_ISOLATION_REQUIRED",
-          message: "A ativação de uma segunda empresa está bloqueada até o isolamento multiempresa ser concluído."
-        });
-      }
-    }
     const enterpriseId = Number(req.params.id);
     if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(400).json({ message: "ID de instituição inválido" });
     // Keep legacy approval fields consistent when they exist in the Turso schema.
