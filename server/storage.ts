@@ -20,6 +20,7 @@ import type {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne, getTableName } from "drizzle-orm";
 import { runtimeEvent } from "./runtimeMonitor";
+import { getAuraContext } from "./aura-request-context";
 import { randomBytes } from "node:crypto";
 
 // sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
