@@ -3027,8 +3027,7 @@ export async function registerRoutes(
   app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const latest = await storage.getLatestTimeClock(user.id);
-    // WebAuthn server-side verification is not implemented yet. Only the isolated
-    // QA runtime may exercise the legacy state machine with synthetic credentials.
+    // WebAuthn registration and assertion are verified cryptographically on the server.
     res.json({ latest, webauthnReady: true, webauthnRegistered: Boolean((user as any).webauthnPublicKey && (user as any).webauthnCredentialId) });
   });
 
