@@ -1693,7 +1693,7 @@ export class DatabaseStorage implements IStorage {
       } catch (localError) {
         // Compensate the remote insert if local mirroring fails, preventing a silent split.
         try {
-          await dbRemote.delete(products).where(eq(products.id, productId));
+          await dbRemote.delete(products).where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId)));
         } catch (rollbackError) {
           console.error("[DB CONSISTENCY] Falha ao reverter produto no Turso após falha local:", rollbackError);
         }
