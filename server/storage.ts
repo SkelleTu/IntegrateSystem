@@ -1154,28 +1154,62 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Settings
-  async getSettings(enterpriseId?: number): Promise<Settings> {
-    let query = db.select().from(settings);
-    if (enterpriseId) {
-      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
+  async getSettings(enterpriseId: number): Promise<Settings> {
+    if (!Number.isSafeInteger(Number(enterpriseId)) || Number(enterpriseId) <= 0) {
+      throw new Error("enterpriseId inválido.");
     }
-    const [s] = await query.limit(1);
+    const [s] = await db.select().from(settings)
+      .where(eq(settings.enterpriseId, Number(enterpriseId)))
+      .limit(1);
     if (!s) {
-      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
-      return newSettings;
+      // GET is read-only. Never create a database row as a side effect of a read.
+      return {
+        id: 0,
+        enterpriseId: Number(enterpriseId),
+        siteName: "Padaria",
+        logoUrl: "",
+        primaryColor: "#00FF66",
+        secondaryColor: "#10b981",
+        accentColor: "#00FF66",
+        backgroundColor: "#0a0a0b",
+        bgImageUrl: "",
+        borderRadius: "1rem",
+        glassOpacity: "0.1",
+      } as Settings;
     }
     return s;
   }
 
   async updateSettings(update: Partial<Settings>): Promise<Settings> {
-    const { enterpriseId, ...rest } = update;
-    let query = db.update(settings).set(rest);
-    if (enterpriseId) {
-      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
+    const enterpriseId = Number(update.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("enterpriseId obrigatório e inválido.");
     }
-    await query;
-    const [updated] = await db.select().from(settings).where(eq(settings.enterpriseId, enterpriseId || 1));
-    return updated;
+    const { enterpriseId: _enterpriseId, id: _id, ...rest } = update;
+    const [existing] = await db.select({ id: settings.id })
+      .from(settings)
+      .where(eq(settings.enterpriseId, enterpriseId))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await dualWrite(async (database) => {
+        const [row] = await database.update(settings)
+          .set(rest)
+          .where(eq(settings.enterpriseId, enterpriseId))
+          .returning();
+        if (!row) throw new Error("Configurações não encontradas para o estabelecimento.");
+        return row;
+      });
+      return updated;
+    }
+
+    const [created] = await dualWrite(async (database) => {
+      return database.insert(settings).values({
+        enterpriseId,
+        ...rest,
+      }).returning();
+    });
+    return created;
   }
 
   // User Sessions
