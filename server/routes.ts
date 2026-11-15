@@ -21,7 +21,7 @@ const MemoryStore = createMemoryStore(session);
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, createHash, verify as verifySignature } from "crypto";
 import { promisify } from "util";
 import multer from "multer";
 import path from "path";
@@ -99,6 +99,40 @@ const scryptAsync = promisify(scrypt);
 
 function normalizeRole(user: any): string {
   return String(user?.role ?? "").trim().toLowerCase();
+}
+
+function webAuthnConfig(req: any) {
+  const configuredOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\/$/, "");
+  const origin = configuredOrigin || `${req.protocol}://${req.get("host")}`;
+  const rpId = new URL(origin).hostname;
+  return { origin, rpId };
+}
+
+function toBase64Url(value: Buffer | Uint8Array): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function fromBase64Url(value: string): Buffer {
+  return Buffer.from(value, "base64url");
+}
+
+function validateWebAuthnClientData(raw: Buffer, expectedType: "webauthn.create" | "webauthn.get", expectedChallenge: string, expectedOrigin: string) {
+  const data = JSON.parse(raw.toString("utf8"));
+  if (data.type !== expectedType) throw new Error("Tipo de operação WebAuthn inválido.");
+  if (data.challenge !== expectedChallenge) throw new Error("Challenge WebAuthn inválido ou expirado.");
+  if (data.origin !== expectedOrigin) throw new Error("Origin WebAuthn não autorizada.");
+  if (data.crossOrigin === true) throw new Error("WebAuthn cross-origin não autorizado.");
+  return data;
+}
+
+function validateWebAuthnAuthenticatorData(authenticatorData: Buffer, rpId: string, requireUserVerification = true) {
+  if (authenticatorData.length < 37) throw new Error("AuthenticatorData WebAuthn inválido.");
+  const expectedRpIdHash = createHash("sha256").update(rpId).digest();
+  if (!timingSafeEqual(authenticatorData.subarray(0, 32), expectedRpIdHash)) throw new Error("RP ID WebAuthn inválido.");
+  const flags = authenticatorData[32];
+  if ((flags & 0x01) === 0) throw new Error("Presença do usuário não foi confirmada pelo autenticador.");
+  if (requireUserVerification && (flags & 0x04) === 0) throw new Error("Verificação do usuário não foi confirmada pelo autenticador.");
+  return { flags, signCount: authenticatorData.readUInt32BE(33) };
 }
 
 function hasAdminRole(user: any): boolean {
@@ -2988,21 +3022,54 @@ export async function registerRoutes(
     res.json({ latest, webauthnReady: isIsolatedQaRuntime });
   });
 
-  app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
-    if (!isIsolatedQaRuntime) {
-      return res.status(503).json({
-        code: "WEBAUTHN_SERVER_VERIFICATION_REQUIRED",
-        message: "Registro de ponto temporariamente bloqueado: o servidor ainda não valida criptograficamente a autenticação WebAuthn."
-      });
-    }
+  app.get("/api/auth/webauthn/assertion/options", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    const { type, fingerprintId } = req.body;
+    const credentialId = String(user.webauthnCredentialId || user.fingerprintId || "").trim();
+    const publicKey = String(user.webauthnPublicKey || "").trim();
+    if (!credentialId || !publicKey) return res.status(409).json({ code: "WEBAUTHN_NOT_REGISTERED", message: "Cadastre sua credencial WebAuthn primeiro." });
+    const challenge = randomBytes(32).toString("base64url");
+    const { origin, rpId } = webAuthnConfig(req);
+    (req.session as any).webauthnAssertionChallenge = { challenge, expiresAt: Date.now() + 5 * 60 * 1000, origin, rpId, userId: Number(user.id) };
+    res.json({ challenge, rpId, allowCredentials: [{ id: credentialId, type: "public-key" }], userVerification: "required", timeout: 60000 });
+  });
 
-    if (!user.fingerprintId) {
-      return res.status(400).json({ message: "Você precisa cadastrar sua digital primeiro!" });
+  app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const credentialId = String(req.body?.credentialId || "").trim();
+    const clientDataJSON = fromBase64Url(String(req.body?.clientDataJSON || ""));
+    const authenticatorData = fromBase64Url(String(req.body?.authenticatorData || ""));
+    const signature = fromBase64Url(String(req.body?.signature || ""));
+    const storedCredentialId = String(user.webauthnCredentialId || user.fingerprintId || "").trim();
+    const storedPublicKey = String(user.webauthnPublicKey || "").trim();
+    if (!storedCredentialId || !storedPublicKey) {
+      return res.status(400).json({ code: "WEBAUTHN_NOT_REGISTERED", message: "Cadastre sua credencial WebAuthn primeiro." });
     }
-    if (fingerprintId !== user.fingerprintId) {
-      return res.status(400).json({ message: "Digital não reconhecida." });
+    if (!credentialId || credentialId !== storedCredentialId || clientDataJSON.length === 0 || authenticatorData.length < 37 || signature.length === 0) {
+      return res.status(401).json({ code: "WEBAUTHN_INVALID_ASSERTION", message: "Resposta WebAuthn inválida." });
+    }
+    try {
+      const pending = (req.session as any).webauthnAssertionChallenge;
+      if (!pending || pending.userId !== Number(user.id) || Date.now() > Number(pending.expiresAt)) {
+        return res.status(409).json({ code: "WEBAUTHN_CHALLENGE_EXPIRED", message: "A solicitação WebAuthn expirou. Tente novamente." });
+      }
+      const { origin, rpId } = webAuthnConfig(req);
+      if (pending.origin !== origin || pending.rpId !== rpId) throw new Error("Contexto WebAuthn inválido.");
+      validateWebAuthnClientData(clientDataJSON, "webauthn.get", pending.challenge, origin);
+      const auth = validateWebAuthnAuthenticatorData(authenticatorData, rpId, true);
+      const clientDataHash = createHash("sha256").update(clientDataJSON).digest();
+      const signedData = Buffer.concat([authenticatorData, clientDataHash]);
+      const publicKey = fromBase64Url(storedPublicKey);
+      const verified = verifySignature("sha256", signedData, { key: publicKey, format: "der", type: "spki" }, signature);
+      if (!verified) return res.status(401).json({ code: "WEBAUTHN_SIGNATURE_INVALID", message: "Assinatura WebAuthn inválida." });
+      const previousCount = Number(user.webauthnSignCount || 0);
+      if (auth.signCount !== 0 && previousCount !== 0 && auth.signCount <= previousCount) {
+        return res.status(401).json({ code: "WEBAUTHN_COUNTER_INVALID", message: "Contador WebAuthn inválido. A credencial pode ter sido clonada." });
+      }
+      await db.update(users).set({ webauthnSignCount: auth.signCount } as any).where(eq(users.id, user.id));
+      delete (req.session as any).webauthnAssertionChallenge;
+    } catch (error: any) {
+      console.error("[WEBAUTHN] Falha na verificação:", error?.message || error);
+      return res.status(401).json({ code: "WEBAUTHN_ASSERTION_REJECTED", message: error?.message || "Autenticação WebAuthn rejeitada." });
     }
 
     const allowedTypes = new Set(["in", "break_start", "break_end", "out"]);
@@ -3033,19 +3100,56 @@ export async function registerRoutes(
     res.json(clock);
   });
 
-  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
-    if (!isIsolatedQaRuntime) {
-      return res.status(503).json({
-        code: "WEBAUTHN_SERVER_VERIFICATION_REQUIRED",
-        message: "Cadastro de credencial temporariamente bloqueado até a validação criptográfica WebAuthn no servidor ser concluída."
-      });
-    }
+  app.get("/api/auth/webauthn/register/options", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    const { fingerprintId } = req.body;
-    if (!fingerprintId) return res.status(400).json({ message: "ID da digital é obrigatório" });
-    
-    await db.update(users).set({ fingerprintId }).where(eq(users.id, user.id));
-    res.json({ message: "Digital vinculada com sucesso" });
+    if (!globalThis.crypto) return res.status(503).json({ code: "WEBAUTHN_UNAVAILABLE", message: "WebAuthn não está disponível neste servidor." });
+    const challenge = randomBytes(32).toString("base64url");
+    const { origin, rpId } = webAuthnConfig(req);
+    (req.session as any).webauthnRegistrationChallenge = { challenge, expiresAt: Date.now() + 5 * 60 * 1000, origin, rpId, userId: Number(user.id) };
+    res.json({
+      challenge,
+      rp: { id: rpId, name: "Aura System" },
+      user: { id: toBase64Url(Buffer.from(String(user.id))), name: String(user.username), displayName: String(user.username) },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { userVerification: "required", residentKey: "preferred" },
+      timeout: 60000,
+      attestation: "none",
+    });
+  });
+
+  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const pending = (req.session as any).webauthnRegistrationChallenge;
+    if (!pending || pending.userId !== Number(user.id) || Date.now() > Number(pending.expiresAt)) {
+      return res.status(409).json({ code: "WEBAUTHN_CHALLENGE_EXPIRED", message: "A solicitação WebAuthn expirou. Inicie o cadastro novamente." });
+    }
+    try {
+      const credentialId = String(req.body?.credentialId || "").trim();
+      const clientDataJSON = fromBase64Url(String(req.body?.clientDataJSON || ""));
+      const authenticatorData = fromBase64Url(String(req.body?.authenticatorData || ""));
+      const publicKeyDer = fromBase64Url(String(req.body?.publicKey || ""));
+      if (!credentialId || clientDataJSON.length === 0 || authenticatorData.length < 37 || publicKeyDer.length === 0) {
+        return res.status(400).json({ code: "WEBAUTHN_INVALID_PAYLOAD", message: "Resposta WebAuthn incompleta." });
+      }
+      validateWebAuthnClientData(clientDataJSON, "webauthn.create", pending.challenge, pending.origin);
+      const auth = validateWebAuthnAuthenticatorData(authenticatorData, pending.rpId, true);
+      const stored = {
+        credentialId,
+        publicKey: toBase64Url(publicKeyDer),
+        signCount: auth.signCount,
+      };
+      await db.update(users).set({
+        webauthnCredentialId: credentialId,
+        webauthnPublicKey: stored.publicKey,
+        webauthnSignCount: stored.signCount,
+        fingerprintId: credentialId,
+      } as any).where(eq(users.id, user.id));
+      delete (req.session as any).webauthnRegistrationChallenge;
+      res.json({ message: "Credencial WebAuthn vinculada com sucesso.", credentialId });
+    } catch (error: any) {
+      console.error("[WEBAUTHN] Falha no registro:", error?.message || error);
+      return res.status(400).json({ code: "WEBAUTHN_REGISTRATION_REJECTED", message: error?.message || "Credencial WebAuthn rejeitada." });
+    }
   });
 
   app.get("/api/tickets/:number", async (req, res) => {
