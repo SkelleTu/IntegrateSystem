@@ -486,27 +486,22 @@ export class DatabaseStorage implements IStorage {
     this.logAction("Consulta lista de serviços");
     const enterpriseId = this.currentEnterpriseId();
     if (!dbRemote || process.env.AURA_RUNTIME_DISABLED === "1") {
-      const statement = localSqlite.prepare(
+      const result = localSqlite.exec(
         "SELECT id, name, price, image_url, is_active, enterprise_id FROM services ORDER BY id",
       );
-      try {
-        const rows: any[] = [];
-        while (statement.step()) {
-          const row = statement.getAsObject();
-          if (Number(row.enterprise_id) !== enterpriseId || Number(row.is_active) !== 1) continue;
-          rows.push({
-            id: Number(row.id),
-            name: String(row.name),
-            price: Number(row.price),
-            imageUrl: String(row.image_url || ""),
-            isActive: true,
-            enterpriseId,
-          });
-        }
-        return rows as Service[];
-      } finally {
-        statement.free();
-      }
+      const columns = result[0]?.columns || [];
+      const rows = result[0]?.values || [];
+      return rows
+        .map((values: any[]) => Object.fromEntries(columns.map((column: string, index: number) => [column, values[index]])))
+        .filter((row: any) => Number(row.enterprise_id) === enterpriseId && Number(row.is_active) === 1)
+        .map((row: any) => ({
+          id: Number(row.id),
+          name: String(row.name),
+          price: Number(row.price),
+          imageUrl: String(row.image_url || ""),
+          isActive: true,
+          enterpriseId,
+        })) as Service[];
     }
     return await db.select().from(services)
       .where(and(eq(services.enterpriseId, enterpriseId), eq(services.isActive, true)));
