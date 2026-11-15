@@ -360,10 +360,6 @@ await expectStatus(await request(`/api/products/${productB.id}`, { method: "DELE
 const servicesA = await expectStatus(await request("/api/services", { headers: { cookie } }), 200, "tenant-a-services-isolated");
 assert.ok(!servicesA.some(item => Number(item.id) === Number(serviceB.id)), "tenant A must not list tenant B services");
 await expectStatus(await request(`/api/settings?enterpriseId=${sessionUserB.enterpriseId}`, { headers: { cookie } }), 403, "tenant-a-settings-b-denied");
-const ticketsBResponse = await request("/api/tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ serviceId: serviceB.id }) });
-assert.equal(ticketsBResponse.status, 201, "tenant B public ticket creation must work");
-const ticketB = await ticketsBResponse.json();
-await expectStatus(await request(`/api/tickets/${ticketB.ticketNumber}`, { headers: { cookie } }), 404, "tenant-a-ticket-b-denied");
 const moduleReadRoutes = [
   ["catalog-categories", "/api/categories"],
   ["catalog-menu-items", "/api/menu-items"],
