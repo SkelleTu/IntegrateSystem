@@ -176,7 +176,7 @@ export const enterprises = pgTable("enterprises", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   ownerId: integer("owner_id"), // usuário que criou este estabelecimento
   name: text("name").notNull(),
-  businessType: text("business_type").default("barbearia"), // tipo do negócio
+  businessType: text("business_type").default("geral"), // tipo do negócio, escolhido pelo usuário
   taxId: text("tax_id"), 
   email: text("email"),
   phone: text("phone"),
