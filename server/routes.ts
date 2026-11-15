@@ -1311,6 +1311,7 @@ export async function registerRoutes(
       
       if (sale.status === "simulation") {
         const nfceData = await storage.createNfce({
+          enterpriseId: activeEnterpriseId,
           saleId,
           numero: Math.floor(Math.random() * 1000000),
           serie: 1,
@@ -1390,6 +1391,7 @@ export async function registerRoutes(
         const fiscalStatus = (settings.simulacaoReal || result.simulado) ? "simulated" : "authorized";
         
         const nfceData = await storage.createNfce({
+          enterpriseId: activeEnterpriseId,
           saleId,
           numero: nNF,
           serie: settings.serieNfce,
@@ -1547,6 +1549,7 @@ export async function registerRoutes(
 
     await storage.updateQueueState({ currentNumber: nextNum });
     const ticket = await storage.createTicket({
+      enterpriseId,
       ticketNumber: nextNum,
       serviceId: input.serviceId,
       status: "pending"
