@@ -762,13 +762,14 @@ export class DatabaseStorage implements IStorage {
 
           await database.update(batches)
             .set({ quantity: Number(batch.quantity) - stockQuantity })
-            .where(eq(batches.id, batchId));
+            .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)));
 
           runtimeEvent("sale-batch-deduction", `Baixa do lote ${batch.id} na venda #${insertedSale.id}`, {
             phase: "inventory", saleId: insertedSale.id, batchId: batch.id,
             productId: batch.productId, quantity: item.quantity,
           });
           await database.insert(batchLogs).values({
+            enterpriseId,
             productId: batch.productId,
             batchId: batch.id,
             type: "out",
@@ -809,12 +810,13 @@ export class DatabaseStorage implements IStorage {
               quantity: Number(inventoryItem.quantity) - stockQuantity,
               updatedAt: new Date()
             })
-            .where(eq(inventory.id, inventoryItem.id));
+            .where(and(eq(inventory.id, inventoryItem.id), eq(inventory.enterpriseId, enterpriseId)));
           
           runtimeEvent("sale-inventory-deduction", `Baixa do estoque ${inventoryItem.id} na venda #${insertedSale.id}`, {
             phase: "inventory", saleId: insertedSale.id, inventoryId: inventoryItem.id, quantity: item.quantity,
           });
           await database.insert(inventoryLogs).values({
+            enterpriseId,
             inventoryId: inventoryItem.id,
             type: "out",
             quantity: stockQuantity,
@@ -1134,11 +1136,14 @@ export class DatabaseStorage implements IStorage {
 
   async updateCashRegisterOpeningAmount(id: number, amount: number) {
     this.logAction(`Ajuste abertura caixa ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      return await database
-        .update(cashRegisters)
+      const [updated] = await database.update(cashRegisters)
         .set({ openingAmount: amount })
-        .where(eq(cashRegisters.id, id));
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)))
+        .returning();
+      if (!updated) throw new Error(`Caixa ${id} não encontrado nesta empresa.`);
+      return updated;
     });
   }
 
