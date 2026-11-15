@@ -80,7 +80,24 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const configuredOrigins = String(process.env.AURA_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\\/$/, ""))
+    .filter(Boolean);
+  const defaultOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\\/$/, "");
+  const allowedOrigins = new Set([defaultOrigin, ...configuredOrigins]);
+  const requestOrigin = String(req.get("origin") || "").trim().replace(/\\/$/, "");
+
+  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+    res.header("Vary", "Origin");
+  } else if (requestOrigin) {
+    if (req.method === "OPTIONS") {
+      return res.status(403).json({ code: "CORS_ORIGIN_DENIED", message: "Origem não autorizada." });
+    }
+    return res.status(403).json({ code: "CORS_ORIGIN_DENIED", message: "Origem não autorizada." });
+  }
+
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
