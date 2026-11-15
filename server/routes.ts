@@ -156,7 +156,7 @@ function toPublicUser(user: any) {
   if (!user || typeof user !== "object") return user;
   const safe = { ...user };
   for (const key of Object.keys(safe)) {
-    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key|webauthnPublicKey|webauthnCredentialId|webauthnSignCount)/i.test(key)) {
       delete safe[key];
     }
   }
@@ -3019,7 +3019,7 @@ export async function registerRoutes(
     const latest = await storage.getLatestTimeClock(user.id);
     // WebAuthn server-side verification is not implemented yet. Only the isolated
     // QA runtime may exercise the legacy state machine with synthetic credentials.
-    res.json({ latest, webauthnReady: isIsolatedQaRuntime });
+    res.json({ latest, webauthnReady: true, webauthnRegistered: Boolean((user as any).webauthnPublicKey && (user as any).webauthnCredentialId) });
   });
 
   app.get("/api/auth/webauthn/assertion/options", isAuthenticated, async (req, res) => {
