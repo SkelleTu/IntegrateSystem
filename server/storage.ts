@@ -1750,38 +1750,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
-    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [row] = await db.select().from(stockSnapshots)
+      .where(eq(stockSnapshots.enterpriseId, enterpriseId))
+      .orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) return null;
-    return {
-      id: row.id,
-      createdAt: row.createdAt,
-      createdBy: row.createdBy,
-      productCount: row.productCount,
-    };
+    return { id: row.id, createdAt: row.createdAt, createdBy: row.createdBy, productCount: row.productCount };
   }
 
   async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
-    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [row] = await db.select().from(stockSnapshots)
+      .where(eq(stockSnapshots.enterpriseId, enterpriseId))
+      .orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
-
     const savedProducts: any[] = JSON.parse(row.products_json);
-    const savedBatches:  any[] = JSON.parse(row.batches_json);
+    const savedBatches: any[] = JSON.parse(row.batches_json);
 
-    // Limpa estoque atual antes de restaurar
     await dualWrite(async (database) => {
-      await database.delete(batchLogs);
-      await database.delete(batches);
-      await database.delete(products);
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, enterpriseId));
+      await database.delete(batches).where(eq(batches.enterpriseId, enterpriseId));
+      await database.delete(products).where(eq(products.enterpriseId, enterpriseId));
     });
 
-    // Reinserir produtos e mapear IDs antigos → novos
     const idMap = new Map<number, number>();
     for (const p of savedProducts) {
-      const oldId = p.id;
-      const { id: _id, ...rest } = p;
+      const oldId = Number(p.id);
+      const { id: _id, enterpriseId: _savedTenant, ...rest } = p;
       const inserted = await dualWrite(async (database) => {
         const [rec] = await database.insert(products).values({
-          ...rest,
+          ...rest, enterpriseId,
           createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           updatedAt: new Date(),
         }).returning();
@@ -1789,25 +1787,20 @@ export class DatabaseStorage implements IStorage {
       });
       idMap.set(oldId, inserted.id);
     }
-
-    // Reinserir lotes com product_id remapeado
     for (const b of savedBatches) {
-      const newProductId = idMap.get(b.productId);
+      const newProductId = idMap.get(Number(b.productId));
       if (!newProductId) continue;
-      const { id: _id, ...rest } = b;
+      const { id: _id, enterpriseId: _savedTenant, ...rest } = b;
       await dualWrite(async (database) => {
-        const [rec] = await database.insert(batches).values({
-          ...rest,
-          productId: newProductId,
+        await database.insert(batches).values({
+          ...rest, enterpriseId, productId: newProductId,
           entryDate: b.entryDate ? new Date(b.entryDate) : new Date(),
           expiryDate: b.expiryDate ? new Date(b.expiryDate) : null,
           manufactureDate: b.manufactureDate ? new Date(b.manufactureDate) : null,
           createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
         }).returning();
-        return rec;
       });
     }
-
     this.logAction(`RESTAURAÇÃO DO ESTOQUE — ${savedProducts.length} produtos`);
     return { productsRestored: savedProducts.length };
   }
@@ -1958,8 +1951,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
+    const enterpriseId = this.currentEnterpriseId();
+    const productId = Number(data.productId);
+    const [ownedProduct] = await db.select({ id: products.id }).from(products)
+      .where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedProduct) throw new Error("Produto não encontrado nesta empresa.");
+    if (data.batchId) {
+      const [ownedBatch] = await db.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, Number(data.batchId)), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (!ownedBatch) throw new Error("Lote não encontrado nesta empresa.");
+    }
     return await dualWrite(async (database) => {
-      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
+      const [log] = await database.insert(batchLogs)
+        .values({ ...data, enterpriseId, createdAt: new Date() } as any).returning();
       return log;
     });
   }
