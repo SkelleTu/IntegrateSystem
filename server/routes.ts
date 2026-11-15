@@ -820,7 +820,7 @@ export async function registerRoutes(
       console.error("Erro ao criar estabelecimento:", err);
       const message = err instanceof Error ? err.message : "Falha inesperada ao criar estabelecimento.";
       const status = /já existe|já cadastrado|Limite/i.test(message) ? 409 : 500;
-      res.status(status).json({ message: status === 400 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
+      res.status(status).json({ message: status === 409 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
     }
   });
 
@@ -3095,8 +3095,9 @@ export async function registerRoutes(
       return res.status(401).json({ code: "WEBAUTHN_ASSERTION_REJECTED", message: error?.message || "Autenticação WebAuthn rejeitada." });
     }
 
+    const type = String(req.body?.type || "");
     const allowedTypes = new Set(["in", "break_start", "break_end", "out"]);
-    if (!allowedTypes.has(String(type))) {
+    if (!allowedTypes.has(type)) {
       return res.status(400).json({ message: "Tipo de registro de ponto inválido." });
     }
 
@@ -3118,7 +3119,7 @@ export async function registerRoutes(
       userId: user.id,
       type,
       timestamp: new Date(),
-      fingerprintId
+      fingerprintId: credentialId
     });
     res.json(clock);
   });
