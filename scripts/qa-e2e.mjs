@@ -336,6 +336,34 @@ await expectStatus(await request(`/api/products/${productId}`, {
 }), 204, "delete-label-product");
 
 // Read-only coverage across the remaining operational modules.
+// Cross-tenant isolation: create a second disposable tenant and prove horizontal isolation.
+const registrationB = await request("/api/public/register", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ name: "Aura QA Tenant B", taxId: "98765432000188", email: "qa-tenant-b@example.invalid", phone: "11988880000", address: "Rua de Teste B, 200, Araras/SP", slug: "aura-qa-tenant-b", username: "qa-admin-b-ci", password }),
+});
+const registrationBData = await expectStatus(registrationB, 201, "public-registration-tenant-b");
+assert.equal(registrationBData.ok, true);
+const loginB = await request("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: "qa-admin-b-ci", password }) });
+assert.equal(loginB.status, 200, "tenant B login must work");
+const setCookiesB = typeof loginB.headers.getSetCookie === "function" ? loginB.headers.getSetCookie() : [loginB.headers.get("set-cookie")].filter(Boolean);
+const cookieB = setCookiesB.map(value => value.split(";")[0]).join("; ");
+const sessionUserB = await expectStatus(await request("/api/user", { headers: { cookie: cookieB } }), 200, "tenant-b-session");
+assert.notEqual(Number(sessionUserB.enterpriseId), Number(sessionUser.enterpriseId), "tenant B must have a distinct enterprise");
+const productB = await expectStatus(await request("/api/products", { method: "POST", headers: { cookie: cookieB, "content-type": "application/json" }, body: JSON.stringify({ name: "QA Tenant B Product", unit: "Unidade", minStock: 1, salePrice: "9.90", category: "QA-B", codigoProduto: "QA-B-001" }) }), 201, "tenant-b-product-create");
+const serviceB = await expectStatus(await request("/api/services", { method: "POST", headers: { cookie: cookieB, "content-type": "application/json" }, body: JSON.stringify({ name: "QA Tenant B Service", price: 990, imageUrl: "https://example.invalid/b.png", isActive: true }) }), 201, "tenant-b-service-create");
+const productsA = await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "tenant-a-products-isolated");
+assert.ok(!productsA.some(item => Number(item.id) === Number(productB.id)), "tenant A must not list tenant B products");
+await expectStatus(await request(`/api/products/${productB.id}`, { headers: { cookie } }), 404, "tenant-a-product-b-by-id-denied");
+await expectStatus(await request(`/api/products/${productB.id}`, { method: "PUT", headers: { cookie, "content-type": "application/json" }, body: JSON.stringify({ name: "cross-tenant-write" }) }), 404, "tenant-a-product-b-update-denied");
+await expectStatus(await request(`/api/products/${productB.id}`, { method: "DELETE", headers: { cookie } }), 404, "tenant-a-product-b-delete-denied");
+const servicesA = await expectStatus(await request("/api/services", { headers: { cookie } }), 200, "tenant-a-services-isolated");
+assert.ok(!servicesA.some(item => Number(item.id) === Number(serviceB.id)), "tenant A must not list tenant B services");
+await expectStatus(await request(`/api/settings?enterpriseId=${sessionUserB.enterpriseId}`, { headers: { cookie } }), 403, "tenant-a-settings-b-denied");
+const ticketsBResponse = await request("/api/tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ serviceId: serviceB.id }) });
+assert.equal(ticketsBResponse.status, 201, "tenant B public ticket creation must work");
+const ticketB = await ticketsBResponse.json();
+await expectStatus(await request(`/api/tickets/${ticketB.ticketNumber}`, { headers: { cookie } }), 404, "tenant-a-ticket-b-denied");
 const moduleReadRoutes = [
   ["catalog-categories", "/api/categories"],
   ["catalog-menu-items", "/api/menu-items"],
