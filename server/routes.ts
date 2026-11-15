@@ -2921,7 +2921,11 @@ export async function registerRoutes(
 
     try {
       if (!(await setPublicTenantContext(req, res))) return;
-      const enterpriseId = Number((getAuraContextSafe(req) as any)?.enterpriseId || 0);
+      const activeEnterprises = await db.select({ id: enterprises.id })
+        .from(enterprises)
+        .where(eq(enterprises.status, "active"))
+        .limit(2);
+      const enterpriseId = Number((req.user as any)?.enterpriseId || activeEnterprises[0]?.id || 0);
       const [ticketRecord] = await db.select().from(tickets)
         .where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
       if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
