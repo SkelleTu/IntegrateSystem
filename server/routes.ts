@@ -1472,7 +1472,7 @@ export async function registerRoutes(
 
   app.post(api.services.create.path, isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const input = api.services.create.input.parse(req.body);
+      const input = api.services.create.input.parse({ ...req.body, enterpriseId: Number((req.user as any).enterpriseId) });
       const service = await storage.createService(input);
       res.status(201).json(service);
     } catch (err) {
