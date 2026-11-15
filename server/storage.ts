@@ -441,36 +441,46 @@ export class DatabaseStorage implements IStorage {
 
   async getServices(): Promise<Service[]> {
     this.logAction("Consulta lista de serviços");
-    return await db.select().from(services).where(eq(services.isActive, true));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(services)
+      .where(and(eq(services.enterpriseId, enterpriseId), eq(services.isActive, true)));
   }
 
   async getService(id: number): Promise<Service | undefined> {
     this.logAction(`Consulta serviço ID:${id}`);
-    const [service] = await db.select().from(services).where(eq(services.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [service] = await db.select().from(services)
+      .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
     return service;
   }
 
   async createService(service: InsertService): Promise<Service> {
     this.logAction(`Criação de serviço: ${service.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newService] = await database.insert(services).values(service).returning();
+      const [newService] = await database.insert(services).values({ ...service, enterpriseId } as any).returning();
       return newService;
     });
   }
 
   async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
     this.logAction(`Atualização serviço ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      await database.update(services).set(update).where(eq(services.id, id));
-      const [updated] = await database.select().from(services).where(eq(services.id, id));
+      await database.update(services).set(update)
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
+      const [updated] = await database.select().from(services)
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
       return updated;
     });
   }
 
   async deleteService(id: number): Promise<void> {
     this.logAction(`Desativação serviço ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      await database.update(services).set({ isActive: false }).where(eq(services.id, id));
+      await database.update(services).set({ isActive: false })
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
     });
   }
 
@@ -485,23 +495,30 @@ export class DatabaseStorage implements IStorage {
   }
   async getQueueState(): Promise<QueueState> {
     this.logAction("Consulta estado da fila");
-    let [state] = await db.select().from(queueState);
+    const enterpriseId = this.currentEnterpriseId();
+    let [state] = await db.select().from(queueState).where(eq(queueState.enterpriseId, enterpriseId));
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      [state] = await db.insert(queueState)
+        .values({ currentNumber: 0, servingNumber: 0, enterpriseId } as any)
+        .returning();
     }
     return state;
   }
 
   async updateQueueState(update: Partial<QueueState>): Promise<QueueState> {
     this.logAction("Atualização da fila");
-    let [state] = await db.select().from(queueState);
+    const enterpriseId = this.currentEnterpriseId();
+    let [state] = await db.select().from(queueState).where(eq(queueState.enterpriseId, enterpriseId));
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      [state] = await db.insert(queueState)
+        .values({ currentNumber: 0, servingNumber: 0, enterpriseId } as any)
+        .returning();
     }
     await db.update(queueState)
-      .set(update)
-      .where(eq(queueState.id, state.id));
-    const [updated] = await db.select().from(queueState).where(eq(queueState.id, state.id));
+      .set(update as any)
+      .where(and(eq(queueState.id, state.id), eq(queueState.enterpriseId, enterpriseId)));
+    const [updated] = await db.select().from(queueState)
+      .where(and(eq(queueState.id, state.id), eq(queueState.enterpriseId, enterpriseId)));
     return updated;
   }
 
@@ -555,32 +572,42 @@ export class DatabaseStorage implements IStorage {
 
   async getCategories(): Promise<Category[]> {
     this.logAction("Consulta categorias menu");
-    return await db.select().from(categories).orderBy(asc(categories.order));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(categories)
+      .where(eq(categories.enterpriseId, enterpriseId))
+      .orderBy(asc(categories.order));
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
     this.logAction(`Nova categoria: ${category.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newCategory] = await database.insert(categories).values(category).returning();
+      const [newCategory] = await database.insert(categories).values({ ...category, enterpriseId } as any).returning();
       return newCategory;
     });
   }
 
   async getMenuItems(): Promise<MenuItem[]> {
     this.logAction("Consulta itens menu");
-    const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
+    const enterpriseId = this.currentEnterpriseId();
+    const items = await db.select().from(menuItems)
+      .where(and(eq(menuItems.enterpriseId, enterpriseId), eq(menuItems.isAvailable, true)));
     return items;
   }
 
   async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {
     this.logAction(`Busca itens categoria ID:${categoryId}`);
-    return await db.select().from(menuItems).where(eq(menuItems.categoryId, categoryId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(menuItems)
+      .where(and(eq(menuItems.categoryId, categoryId), eq(menuItems.enterpriseId, enterpriseId)));
   }
 
   async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
     this.logAction(`Novo item menu: ${item.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     const itemToInsert = {
       ...item,
+      enterpriseId,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
     };
     const [newItem] = await db.insert(menuItems).values(itemToInsert).returning();
