@@ -83,7 +83,7 @@ app.use((req, res, next) => {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data: https:",
-        `connect-src ${connectOrigins} wss:`,
+        `connect-src ${connectOrigins} wss://integrated-system-1c86.onrender.com`,
         "media-src 'self' blob:",
       ].join("; "),
     );
