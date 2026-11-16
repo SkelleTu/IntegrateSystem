@@ -455,6 +455,21 @@ export async function registerRoutes(
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Establish the authenticated tenant in AsyncLocalStorage before any storage method runs.
+  // Storage never trusts a tenant ID supplied by the client.
+  app.use((req, _res, next) => {
+    const user = req.user as any;
+    if (user?.id) {
+      updateAuraContext({
+        userId: Number(user.id),
+        enterpriseId: Number.isSafeInteger(Number(user.enterpriseId)) && Number(user.enterpriseId) > 0
+          ? Number(user.enterpriseId)
+          : null,
+      });
+    }
+    next();
+  });
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
