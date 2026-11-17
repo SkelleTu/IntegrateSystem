@@ -921,41 +921,98 @@ export async function registerRoutes(
     const actor = req.user as any;
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
     if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
-    const parsed = z.object({ username: z.string().trim().min(3).max(32) }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Informe o nome de usuário da conta subordinada." });
+
+    const parsed = z.object({
+      username: z.string().trim().min(3).max(32),
+    }).safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Informe o nome de usuário da conta subordinada." });
+    }
+
     try {
       const enterpriseId = Number(actor.enterpriseId);
       if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
         return res.status(409).json({ message: "A conta master precisa estar vinculada a um estabelecimento." });
       }
-      const enterprise = await storage.getEnterprise(enterpriseId);
-      if (!enterprise || enterprise.status !== "active") {
+
+      const enterpriseResult = await neonPool.query(
+        "SELECT id,status FROM enterprises WHERE id=$1 LIMIT 1",
+        [enterpriseId],
+      );
+      const enterprise = enterpriseResult.rows[0];
+      if (!enterprise || String(enterprise.status).toLowerCase() !== "active") {
         return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
       }
-      const username = parsed.data.username.toLowerCase();
-      const targetResult = await neonPool.query("SELECT id,username,role,enterprise_id FROM users WHERE LOWER(username)=LOWER($1) LIMIT 1",[username]);
+
+      const username = parsed.data.username.trim().toLowerCase();
+      const targetResult = await neonPool.query(
+        "SELECT id,username,role,enterprise_id AS \"enterpriseId\" FROM users WHERE LOWER(username)=LOWER($1) LIMIT 1",
+        [username],
+      );
       const target = targetResult.rows[0];
+
       if (!target) return res.status(404).json({ message: "Conta não encontrada." });
-      if (Number(target.id) === Number(actor.id)) return res.status(400).json({ message: "A conta master autenticada não pode ser vinculada como subordinada." });
-      if (String(target.username).toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema não pode ser vinculada como subordinada." });
-      if (String(target.role).toLowerCase() === "owner") return res.status(400).json({ message: "Outra conta master deve ser gerenciada como master, não vinculada como subordinada." });
-      if (target.enterprise_id && Number(target.enterprise_id) !== enterpriseId) {
+      if (Number(target.id) === Number(actor.id)) {
+        return res.status(400).json({ message: "A conta master autenticada não pode ser vinculada como subordinada." });
+      }
+      if (String(target.username).trim().toLowerCase() === "skelletu") {
+        return res.status(403).json({ message: "A conta raiz do sistema não pode ser vinculada como subordinada." });
+      }
+      if (String(target.role).trim().toLowerCase() === "owner") {
+        return res.status(400).json({ message: "Outra conta master deve ser gerenciada como master, não vinculada como subordinada." });
+      }
+      if (target.enterpriseId !== null && target.enterpriseId !== undefined && Number(target.enterpriseId) !== enterpriseId) {
         return res.status(409).json({ message: "Esta conta já pertence a outro estabelecimento." });
       }
-      await storage.updateUser(Number(target.id), { enterpriseId } as any);
-      await neonPool.query("INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3) ON CONFLICT (user_id) DO UPDATE SET updated_by=EXCLUDED.updated_by,updated_at=NOW()",[
-        Number(target.id),
-        JSON.stringify({
-          dashboard:{view:true,create:false,edit:false,delete:false,approve:false,administer:false},
-          cashier:{view:true,create:true,edit:true,delete:false,approve:false,administer:false},
-          timeclock:{view:true,create:true,edit:false,delete:false,approve:false,administer:false},
-        }),
-        Number(actor.id),
-      ]);
-      await auditAccountAction(req, Number(target.id), "account.linked_existing", { username: target.username, enterpriseId, linkedBy: actor.id });
-      return res.json({ ok:true, accountId:Number(target.id), enterpriseId });
+
+      // Write directly to the authoritative Neon database. This avoids the generic
+      // multi-database writer from touching legacy mirrors during account linking.
+      await neonPool.query(
+        "UPDATE users SET enterprise_id=$1 WHERE id=$2",
+        [enterpriseId, Number(target.id)],
+      );
+
+      const permissions = {
+        dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false },
+        cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false },
+        timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false },
+      };
+
+      await neonPool.query(
+        `INSERT INTO aura_account_controls (user_id,status,permissions,updated_by)
+         VALUES ($1,'active',$2::jsonb,$3)
+         ON CONFLICT (user_id) DO UPDATE
+         SET status='active',permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()`,
+        [Number(target.id), JSON.stringify(permissions), Number(actor.id)],
+      );
+
+      try {
+        await auditAccountAction(req, Number(target.id), "account.linked_existing", {
+          username: target.username,
+          enterpriseId,
+          linkedBy: actor.id,
+        });
+      } catch (auditError: any) {
+        console.error("[ACCOUNT-BRANCHES] link audit failed after successful link:", auditError?.message || auditError);
+      }
+
+      const verify = await neonPool.query(
+        "SELECT id,enterprise_id AS \"enterpriseId\" FROM users WHERE id=$1 LIMIT 1",
+        [Number(target.id)],
+      );
+
+      if (Number(verify.rows[0]?.enterpriseId) !== enterpriseId) {
+        throw new Error("Vinculação não foi confirmada no banco PostgreSQL.");
+      }
+
+      return res.json({
+        ok: true,
+        accountId: Number(target.id),
+        enterpriseId,
+      });
     } catch (error: any) {
-      console.error("[ACCOUNT-BRANCHES] existing account link failed:", error?.message || error);
+      console.error("[ACCOUNT-BRANCHES] existing account link failed:", error?.stack || error?.message || error);
       return res.status(500).json({ message: "Não foi possível vincular a conta existente." });
     }
   });
