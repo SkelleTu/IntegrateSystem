@@ -890,6 +890,7 @@ export async function registerRoutes(
       email: z.string().email().optional().or(z.literal("")),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Dados inválidos. Usuário deve ter 3–32 caracteres e senha, no mínimo, 12." });
+    let createdAccountId: number | null = null;
     try {
       const username = parsed.data.username.toLowerCase();
       if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Nome de usuário já utilizado." });
@@ -906,6 +907,7 @@ export async function registerRoutes(
         enterpriseId,
         email: parsed.data.email || null,
       } as any);
+      createdAccountId = Number(created.id);
       await neonPool.query(
         "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3)",
         [created.id, JSON.stringify(permissions), Number(actor.id)],
@@ -913,6 +915,10 @@ export async function registerRoutes(
       await auditAccountAction(req, Number(created.id), "account.created", { username, accountType: parsed.data.accountType, enterpriseId });
       return res.status(201).json({ account: toPublicUser(created), status:"active", permissions });
     } catch (error: any) {
+      if (createdAccountId) {
+        try { await storage.deleteUser(createdAccountId); }
+        catch (cleanupError: any) { console.error("[ACCOUNT-BRANCHES] create rollback failed:", cleanupError?.message || cleanupError); }
+      }
       console.error("[ACCOUNT-BRANCHES] create failed:", error?.message || error);
       return res.status(500).json({ message: "Não foi possível criar a conta. Verifique o cadastro e tente novamente." });
     }
