@@ -390,11 +390,11 @@ export async function registerRoutes(
     });
   });
 
-  wss.on("connection", (ws, _request, connectionToken: string) => {
+  wss.on("connection", (ws: WebSocket, _request: any, connectionToken: string) => {
     let registeredEnterpriseId: number | null = null;
     ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
-    ws.on("message", async (msg) => {
+    ws.on("message", async (msg: any) => {
       if (registeredEnterpriseId !== null) return;
       try {
         const data = JSON.parse(msg.toString());
