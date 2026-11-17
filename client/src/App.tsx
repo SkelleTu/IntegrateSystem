@@ -107,7 +107,9 @@ function Router() {
       setLocation("/login?redirect=" + encodeURIComponent(window.location.pathname));
       return;
     }
-    // Usuário logado mas sem estabelecimento → forçar setup
+    // Somente contas que podem criar/selecionar estabelecimento devem entrar no setup.
+    // Contas subordinadas sem vínculo são bloqueadas em modo de recuperação, sem permitir
+    // que o fluxo tente criar um estabelecimento próprio.
     if (!isLoading && user && !user.enterpriseId && location !== "/setup") {
       setLocation("/setup");
     }
