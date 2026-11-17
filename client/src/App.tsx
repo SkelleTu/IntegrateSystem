@@ -60,6 +60,7 @@ const TimeClock = lazy(() => import("@/pages/TimeClock"));
 const FiscalConfig = lazy(() => import("@/pages/fiscal/FiscalConfig"));
 const LabelSystem = lazy(() => import("@/pages/LabelSystem"));
 const MasterControl = lazy(() => import("./pages/MasterControl"));
+const AccountBranches = lazy(() => import("./pages/AccountBranches"));
 const Monitoring = lazy(() => import("./pages/Monitoring"));
 const WindowsAppRunner = lazy(() => import("./pages/admin/WindowsAppRunner"));
 const AuraWindows = lazy(() => import("./pages/AuraWindows"));
@@ -168,6 +169,7 @@ function Router() {
             <Route path="/admin/monitoring" component={Monitoring} />
             <Route path="/cart" component={ClientCart} />
             <Route path="/admin/master" component={MasterControl} />
+            <Route path="/admin/account-branches" component={AccountBranches} />
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
             <Route path="/backup" component={Backup} />
