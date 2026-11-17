@@ -836,7 +836,7 @@ export async function registerRoutes(
         WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
       `, [Number((req.user as any).enterpriseId)]);
-      const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit ORDER BY created_at DESC LIMIT 150");
+      const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit WHERE target_user_id IN (SELECT id FROM users WHERE enterprise_id=$1) OR actor_user_id IN (SELECT id FROM users WHERE enterprise_id=$1) ORDER BY created_at DESC LIMIT 150",[Number((req.user as any).enterpriseId)]);
       return res.json({ accounts: result.rows, audit: audit.rows, modules: accountModules, actions: ["view","create","edit","delete","approve","administer"] });
     } catch (error: any) {
       console.error("[ACCOUNT-BRANCHES] list failed:", error?.message || error);
@@ -2427,7 +2427,7 @@ export async function registerRoutes(
   });
 
   // Cashier API
-  app.get("/api/cash-register/open", async (req, res) => {
+  app.get("/api/cash-register/open", isAuthenticated, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
@@ -2435,7 +2435,7 @@ export async function registerRoutes(
     res.json(register);
   });
 
-  app.post("/api/cash-register/open", async (req, res) => {
+  app.post("/api/cash-register/open", isAuthenticated, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const user = req.user as any;
@@ -2469,7 +2469,7 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.post("/api/cash-register/close", async (req, res) => {
+  app.post("/api/cash-register/close", isAuthenticated, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
       const user = req.user as any;
@@ -2492,7 +2492,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales", async (req, res) => {
+  app.post("/api/sales", isAuthenticated, async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     try {
     const user = req.user as any;
