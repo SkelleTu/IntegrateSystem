@@ -537,6 +537,13 @@ export async function registerRoutes(
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) return res.status(500).json({ message: "Login failed." });
       if (!user) {
+        if (neonPool) {
+          const failedAccount = attemptedUsername ? await storage.getUserByUsername(attemptedUsername).catch(() => undefined) : undefined;
+          await neonPool.query(
+            "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES (NULL,$1,'account.login_failed',$2::jsonb,$3,$4)",
+            [failedAccount?.id || null, JSON.stringify({ username:attemptedUsername, reason:info?.message === "ACCOUNT_SUSPENDED" ? "suspended" : "invalid_credentials" }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
+          );
+        }
         if (info?.message === "ACCOUNT_PENDING_APPROVAL") {
           return res.status(403).json({ message: "Cadastro recebido. Sua instituição ainda aguarda aprovação do administrador." });
         }
@@ -856,7 +863,10 @@ export async function registerRoutes(
           COALESCE(c.status,'active') AS status,
           COALESCE(c.permissions,'{}'::jsonb) AS permissions,
           c.updated_at AS "updatedAt",
-          (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin"
+          (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin",
+          (SELECT COUNT(*) FROM aura_sessions s WHERE (s.sess::jsonb #>> '{passport,user}')=u.id::text AND s.expire > EXTRACT(EPOCH FROM NOW())::bigint) AS "activeSessions",
+          (SELECT s.ip_address FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastIp",
+          (SELECT s.user_agent FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastDevice"
         FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id
         WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
