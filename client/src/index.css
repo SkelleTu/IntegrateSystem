@@ -231,3 +231,47 @@
 .tour-spotlight-border {
   animation: tour-pulse 2s ease-in-out infinite;
 }
+/* Cashier responsive layout: portrait tablets must not force two full-height flex children into one viewport. */
+@media (max-width: 1023px) and (orientation: portrait) {
+  .cashier-shell {
+    position: fixed;
+    inset: 0;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+  }
+
+  .cashier-layout {
+    flex: none !important;
+    min-height: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-top: 64px !important;
+  }
+
+  .cashier-products {
+    flex: none !important;
+    min-height: 0 !important;
+    height: 54vh !important;
+    overflow: hidden !important;
+  }
+
+  .cashier-sidebar {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+    border-left: 0 !important;
+    border-top: 1px solid rgba(255,255,255,0.10);
+  }
+
+  .cashier-sidebar > div {
+    min-height: 0 !important;
+  }
+}
+
+@media (max-width: 767px) and (orientation: portrait) {
+  .cashier-products {
+    height: 50vh !important;
+    padding: 12px !important;
+  }
+}
