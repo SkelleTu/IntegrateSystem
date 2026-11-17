@@ -535,7 +535,7 @@ export async function registerRoutes(
       || (attemptedUsername && !allowPublicAction("login-user:" + attemptedUsername, 10, 15 * 60 * 1000))) {
       return res.status(429).json({ message: "Muitas tentativas de login. Aguarde antes de tentar novamente." });
     }
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) return res.status(500).json({ message: "Login failed." });
       if (!user) {
         if (neonPool) {
@@ -550,7 +550,7 @@ export async function registerRoutes(
         }
         return res.status(401).json({ message: "Incorrect username or password." });
       }
-      req.login(user, (loginErr: any) => {
+      req.login(user, async (loginErr: any) => {
         if (loginErr) {
           return res.status(500).json({ message: "Login failed." });
         }
