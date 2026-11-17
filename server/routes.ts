@@ -1326,7 +1326,10 @@ export async function registerRoutes(
   async function isAuthenticated(req: any, res: any, next: any) {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const user = req.user as any;
-    if (isSystemOwner(user)) return next();
+    if (isSystemOwner(user)) {
+      if (req.method !== "GET" && typeof auditAccountAction === "function") await auditAccountAction(req, Number(user.id), "module.master.mutation", { path:String(req.path || "") });
+      return next();
+    }
 
     const path = String(req.path || "");
     const method = String(req.method || "GET").toUpperCase();
@@ -1361,6 +1364,7 @@ export async function registerRoutes(
         else if (role === "barber") allowed = (module === "dashboard" && action === "view") || (module === "cashier" && ["view","create"].includes(action)) || (module === "timeclock" && ["view","create"].includes(action));
       }
       if (!allowed) return res.status(403).json({ message: "Ação não autorizada para esta conta. Solicite a liberação à conta master.", module, action });
+      if (method !== "GET") await auditAccountAction(req, Number(user.id), `module.${module}.${action}`, { path });
       return next();
     } catch (error: any) {
       console.error("[RBAC] permission check failed:", error?.message || error);
