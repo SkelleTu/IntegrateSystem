@@ -20,6 +20,8 @@ export default function AccountBranches() {
   const [editEmail,setEditEmail] = useState("");
   const [editPassword,setEditPassword] = useState("");
   const [message,setMessage] = useState("");
+  const [linkUsername,setLinkUsername] = useState("");
+  const [linking,setLinking] = useState(false);
   const {data,isLoading,error} = useQuery<{accounts:Account[];audit:any[];modules:string[]}>({queryKey:["/api/admin/account-branches"],refetchInterval:10000});
   const accounts = data?.accounts || [];
   const activeAccount = accounts.find(a=>a.id===selected) || null;
@@ -27,6 +29,7 @@ export default function AccountBranches() {
   const create = useMutation({mutationFn:()=>apiRequest("POST","/api/admin/account-branches",{username,password,email,accountType}),onSuccess:()=>{setUsername("");setPassword("");setEmail("");setMessage("Conta criada e vinculada ao estabelecimento master.");qc.invalidateQueries({queryKey:["/api/admin/account-branches"]});},onError:(e:any)=>setMessage(e.message||"Falha ao criar conta.")});
   const update = useMutation({mutationFn:(payload:any)=>apiRequest("PATCH",`/api/admin/account-branches/${selected}`,payload),onSuccess:()=>{setMessage("Alterações salvas.");setSelected(null);setEditPassword("");qc.invalidateQueries({queryKey:["/api/admin/account-branches"]});},onError:(e:any)=>setMessage(e.message||"Falha ao salvar.")});
   const remove = useMutation({mutationFn:(id:number)=>apiRequest("DELETE",`/api/admin/account-branches/${id}`),onSuccess:()=>{setMessage("Conta removida.");setSelected(null);qc.invalidateQueries({queryKey:["/api/admin/account-branches"]});},onError:(e:any)=>setMessage(e.message||"Falha ao remover.")});
+  const linkExisting = useMutation({mutationFn:()=>apiRequest("POST","/api/admin/account-branches/link-existing",{username:linkUsername}),onSuccess:()=>{setLinkUsername("");setMessage("Conta subordinada vinculada ao estabelecimento desta conta master.");qc.invalidateQueries({queryKey:["/api/admin/account-branches"]});},onError:(e:any)=>setMessage(e.message||"Falha ao vincular a conta.")});
   const modules = useMemo(()=>data?.modules||Object.keys(moduleLabels),[data]);
   const toggle = (module:string,action:Action,value:boolean)=>setDraft(old=>({...old,[module]:{...(old[module]||activeAccount?.permissions?.[module]||{}),[action]:value}}));
   const openEditor = (account:Account)=>{setSelected(account.id);setEditUsername(account.username);setEditEmail(account.email||"");setEditPassword("");setDraft(JSON.parse(JSON.stringify(account.permissions||{})));setMessage("");};
@@ -46,6 +49,16 @@ export default function AccountBranches() {
         </div>
         <button disabled={create.isPending||username.length<3||password.length<12} onClick={()=>create.mutate()} className="rounded-lg bg-cyan-500 px-5 py-3 font-bold text-black disabled:opacity-40">{create.isPending?"Criando…":"Criar conta vinculada"}</button>
         <p className="text-xs text-zinc-500">A empresa é herdada no servidor da conta master autenticada. Nenhuma conta subordinada precisa cadastrar outro estabelecimento.</p>
+      </section>
+      <section className="rounded-2xl border border-amber-500/20 bg-amber-500/[.03] p-5 space-y-3">
+        <div>
+          <h2 className="font-bold">Vincular conta subordinada existente</h2>
+          <p className="text-xs text-zinc-500 mt-1">Use apenas para contas antigas que ainda aparecem sem estabelecimento. O vínculo sempre usa o estabelecimento da master autenticada.</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <input value={linkUsername} onChange={e=>setLinkUsername(e.target.value)} placeholder="Nome de usuário da conta subordinada" className="flex-1 min-w-[240px] rounded-lg bg-black border border-white/15 p-3"/>
+          <button disabled={linking||linkExisting.isPending||linkUsername.trim().length<3} onClick={()=>linkExisting.mutate()} className="rounded-lg border border-amber-400/30 px-5 py-3 font-bold text-amber-300 disabled:opacity-40">{linkExisting.isPending?"Vinculando…":"Vincular ao estabelecimento"}</button>
+        </div>
       </section>
       <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5">
         <h2 className="font-bold mb-4">Contas cadastradas ({accounts.length})</h2>
