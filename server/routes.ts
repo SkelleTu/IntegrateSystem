@@ -386,11 +386,11 @@ export async function registerRoutes(
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
+      wss.emit("connection", ws, request, suppliedToken);
     });
   });
 
-  wss.on("connection", (ws) => {
+  wss.on("connection", (ws, _request, connectionToken: string) => {
     let registeredEnterpriseId: number | null = null;
     ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
@@ -417,7 +417,7 @@ export async function registerRoutes(
             ws.close(1011, "Configuração de autenticação inválida");
             return;
           }
-          if (!isValidLabelsTokenFor(tenantToken, suppliedToken)) {
+          if (!isValidLabelsTokenFor(tenantToken, connectionToken)) {
             ws.close(1008, "Token do estabelecimento inválido");
             return;
           }
