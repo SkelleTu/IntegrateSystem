@@ -897,7 +897,7 @@ export async function registerRoutes(
             }
           } else {
             permissions.dashboard = { view:true,create:false,edit:false,delete:false,approve:false,administer:false };
-            permissions.cashier = { view:true,create:true,edit:false,delete:false,approve:false,administer:false };
+            permissions.cashier = { view:true,create:true,edit:true,delete:false,approve:false,administer:false };
             permissions.timeclock = { view:true,create:true,edit:false,delete:false,approve:false,administer:false };
           }
           await neonPool.query(
