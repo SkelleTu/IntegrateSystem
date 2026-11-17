@@ -951,7 +951,7 @@ export async function registerRoutes(
         "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3)",
         [created.id, JSON.stringify(permissions), Number(actor.id)],
       );
-      await auditAccountAction(req, Number(created.id), "account.created", { username, accountType: parsed.data.accountType, enterpriseId });
+      await auditAccountAction(req, Number(created.id), "account.created", { username, accountType: parsed.data.accountType, enterpriseId, permissions });
       return res.status(201).json({ account: toPublicUser(created), status:"active", permissions });
     } catch (error: any) {
       if (createdAccountId) {
@@ -1018,7 +1018,7 @@ export async function registerRoutes(
         : parsed.data.status === "active" ? "account.reactivated"
         : parsed.data.permissions ? "account.permissions_updated"
         : "account.updated";
-      await auditAccountAction(req,targetId,auditAction,{ status:currentStatus,role:parsed.data.role,usernameChanged:!!parsed.data.username,emailChanged:parsed.data.email!==undefined,permissionsChanged:!!parsed.data.permissions,passwordChanged:!!parsed.data.password });
+      await auditAccountAction(req,targetId,auditAction,{ status:currentStatus,role:parsed.data.role,usernameChanged:!!parsed.data.username,emailChanged:parsed.data.email!==undefined,permissionsChanged:!!parsed.data.permissions,permissionSnapshot:parsed.data.permissions || null,passwordChanged:!!parsed.data.password });
       return res.json({ ok:true,status:currentStatus,permissions:currentPermissions });
     } catch (error: any) {
       console.error("[ACCOUNT-BRANCHES] update failed:", error?.message || error);
