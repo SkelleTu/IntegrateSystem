@@ -875,6 +875,7 @@ export async function registerRoutes(
         SELECT u.id,u.username,u.email,u.role,u.enterprise_id AS "enterpriseId",
           COALESCE(c.status,'active') AS status,
           COALESCE(c.permissions,'{}'::jsonb) AS permissions,
+          c.user_id AS "controlId",
           c.updated_at AS "updatedAt",
           (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin",
           (SELECT COUNT(*) FROM aura_sessions s WHERE (s.sess::jsonb #>> '{passport,user}')=u.id::text AND s.expire > (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint) AS "activeSessions",
@@ -884,6 +885,28 @@ export async function registerRoutes(
         WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
       `, [Number((req.user as any).enterpriseId)]);
+      for (const account of result.rows) {
+        if (!account.controlId) {
+          const permissions: any = JSON.parse(JSON.stringify(defaultAccountPermissions));
+          if (String(account.role).toLowerCase() === "owner") {
+            for (const module of accountModules) permissions[module] = { view:true,create:true,edit:true,delete:true,approve:true,administer:true };
+          } else if (String(account.role).toLowerCase() === "admin") {
+            for (const module of accountModules.filter((name) => !["master","account_branches"].includes(name))) {
+              permissions[module] = { view:true,create:true,edit:true,delete:true,approve:true,administer:false };
+            }
+          } else {
+            permissions.dashboard = { view:true,create:false,edit:false,delete:false,approve:false,administer:false };
+            permissions.cashier = { view:true,create:true,edit:false,delete:false,approve:false,administer:false };
+            permissions.timeclock = { view:true,create:true,edit:false,delete:false,approve:false,administer:false };
+          }
+          await neonPool.query(
+            "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3) ON CONFLICT (user_id) DO NOTHING",
+            [Number(account.id),JSON.stringify(permissions),Number((req.user as any).id)],
+          );
+          account.status = "active";
+          account.permissions = permissions;
+        }
+      }
       const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit WHERE target_user_id IN (SELECT id FROM users WHERE enterprise_id=$1) OR actor_user_id IN (SELECT id FROM users WHERE enterprise_id=$1) ORDER BY created_at DESC LIMIT 150",[Number((req.user as any).enterpriseId)]);
       return res.json({ accounts: result.rows, audit: audit.rows, modules: accountModules, actions: ["view","create","edit","delete","approve","administer"] });
     } catch (error: any) {
