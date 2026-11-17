@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface MasterPasswordGuardProps {
   open: boolean;
@@ -33,8 +33,17 @@ export function MasterPasswordGuard({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isMasterAccount =
-    user?.role === "owner" ||
+    String(user?.role || "").trim().toLowerCase() === "owner" ||
     String(user?.username || "").trim().toLowerCase() === "skelletu";
+
+  // Master accounts must never see the authorization dialog.
+  // Release the pending action as soon as the authenticated role is available.
+  useEffect(() => {
+    if (open && isMasterAccount) {
+      onSuccess();
+      onOpenChange(false);
+    }
+  }, [open, isMasterAccount, onSuccess, onOpenChange]);
 
   const handleConfirm = async () => {
     if (isMasterAccount) {
@@ -85,6 +94,8 @@ export function MasterPasswordGuard({
       setIsSubmitting(false);
     }
   };
+
+  if (isMasterAccount) return null;
 
   return (
     <AlertDialog
