@@ -358,7 +358,11 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     // Rotas liberadas para todos sem senha master
     const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
     
-    if (user?.username === "SkelleTu" || freeRoutes.includes(url)) {
+    const isMasterAccount =
+      user?.role === "owner" ||
+      String(user?.username || "").trim().toLowerCase() === "skelletu";
+
+    if (isMasterAccount || freeRoutes.includes(url)) {
       setLocation(url);
       setOpen(false);
     } else {
