@@ -36,10 +36,11 @@ export function Navbar() {
 
   if (!user) return null;
 
+  const isMasterAccount =
+    String(user.role || "").trim().toLowerCase() === "owner" ||
+    String(user.username || "").trim().toLowerCase() === "skelletu";
+
   const handleNavigation = (url: string) => {
-    const isMasterAccount =
-      String(user.role || "").trim().toLowerCase() === "owner" ||
-      String(user.username || "").trim().toLowerCase() === "skelletu";
     const moduleByUrl: Record<string,string> = {
       "/app":"dashboard", "/caixa":"cashier", "/financeiro":"finance",
       "/relatorios":"reports", "/inventory":"inventory", "/fiscal":"fiscal",
