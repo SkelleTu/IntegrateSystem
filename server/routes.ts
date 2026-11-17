@@ -559,8 +559,8 @@ export async function registerRoutes(
   app.get("/api/labels/status", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (!hasAdminRole(user)) {
-      return res.status(403).json({ error: "Acesso negado" });
+    if (!hasOwnerRole(user)) {
+      return res.status(403).json({ error: "Acesso restrito ao proprietário do sistema." });
     }
     const enterpriseId = Number(user.enterpriseId);
     if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
