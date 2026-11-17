@@ -1050,6 +1050,7 @@ export class DatabaseStorage implements IStorage {
 
         const businessType = await getBusinessTypeForUser(transaction, sale.userId);
         await transaction.insert(transactions).values({
+          enterpriseId,
           businessType,
           type: "expense",
           category: "vendas",
