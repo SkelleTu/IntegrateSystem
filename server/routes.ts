@@ -780,6 +780,7 @@ export async function registerRoutes(
 
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
+    if (!isSystemOwner(user)) return res.status(403).json({ message: "Contas subordinadas não podem criar estabelecimentos. Elas devem utilizar o vínculo herdado da conta master." });
     try {
       const { name, businessType, taxId, phone, address, city, state } = req.body;
       if (typeof name !== "string" || !name.trim()) {
@@ -1151,8 +1152,10 @@ export async function registerRoutes(
 
   app.post("/api/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const s = await storage.updateSettings(req.body);
+    const requestedEnterpriseId = Number(req.body?.enterpriseId || user.enterpriseId);
+    const enterpriseId = isSystemOwner(user) ? requestedEnterpriseId : Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ message: "Conta sem estabelecimento vinculado." });
+    const s = await storage.updateSettings({ ...req.body, enterpriseId });
     res.json(s);
   });
 
