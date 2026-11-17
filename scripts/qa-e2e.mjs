@@ -358,7 +358,7 @@ const publicTicketB = await expectStatus(await request(`/api/tickets?enterpriseI
   headers: { "content-type": "application/json" },
   body: JSON.stringify({ serviceId: Number(serviceB.id) }),
 }), 201, "public-ticket-tenant-b-create");
-const publicTicketBLookup = await expectStatus(await request(`/api/tickets/${publicTicketB.ticketNumber}?enterpriseId=${sessionUserB.enterpriseId}`), 200, "public-ticket-tenant-b-lookup");
+const publicTicketBLookup = await expectStatus(await request(`/api/tickets/${publicTicketB.ticketNumber}?enterpriseId=${sessionUserB.enterpriseId}&ticketToken=${encodeURIComponent(String(publicTicketB.publicAccessToken || ""))}`), 200, "public-ticket-tenant-b-lookup");
 assert.equal(Number(publicTicketBLookup.id), Number(publicTicketB.id));
 await expectStatus(await request("/api/tickets/1"), 409, "public-ticket-requires-tenant-selection-when-multiple-establishments");
 const productsA = await expectStatus(await request("/api/products", { headers: { cookie } }), 200, "tenant-a-products-isolated");
