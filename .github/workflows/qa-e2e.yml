@@ -2,6 +2,16 @@
 name: Aura isolated operational E2E
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "server/**"
+      - "client/src/**"
+      - "shared/**"
+      - "package.json"
+      - "package-lock.json"
+      - "scripts/qa-e2e.mjs"
+      - ".github/workflows/qa-e2e.yml"
   pull_request:
     branches: [main]
     paths:
