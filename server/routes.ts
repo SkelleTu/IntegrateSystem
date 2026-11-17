@@ -907,6 +907,8 @@ export async function registerRoutes(
       status: z.enum(["active","suspended"]).optional(),
       permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
       role: z.enum(["barber","admin","owner"]).optional(),
+      username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/).optional(),
+      email: z.string().email().optional().or(z.literal("")),
       password: z.string().min(12).max(128).optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Alteração inválida." });
@@ -914,9 +916,18 @@ export async function registerRoutes(
       const target = await storage.getUser(targetId);
       if (!target) return res.status(404).json({ message: "Conta não encontrada." });
       if (Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(403).json({ message: "A conta pertence a outro estabelecimento." });
+      if (target.username.toLowerCase() === "skelletu" && (parsed.data.role || parsed.data.username || parsed.data.password)) return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
       if (parsed.data.role === "owner" && !isSystemOwner(actor)) return res.status(403).json({ message: "Somente master pode conceder privilégio master." });
-      if (parsed.data.role) await storage.updateUser(targetId, { role: parsed.data.role } as any);
-      if (parsed.data.password) await storage.updateUser(targetId, { password: await hashPassword(parsed.data.password) } as any);
+      if (parsed.data.username) {
+        const duplicate = await storage.getUserByUsername(parsed.data.username.toLowerCase());
+        if (duplicate && Number(duplicate.id) !== targetId) return res.status(409).json({ message: "Nome de usuário já utilizado." });
+      }
+      const userChanges: any = {};
+      if (parsed.data.role) userChanges.role = parsed.data.role;
+      if (parsed.data.username) userChanges.username = parsed.data.username.toLowerCase();
+      if (parsed.data.email !== undefined) userChanges.email = parsed.data.email || null;
+      if (parsed.data.password) userChanges.password = await hashPassword(parsed.data.password);
+      if (Object.keys(userChanges).length) await storage.updateUser(targetId, userChanges);
       const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
       const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
       const currentPermissions = parsed.data.permissions || prior.rows[0]?.permissions || defaultAccountPermissions;
@@ -1255,7 +1266,7 @@ export async function registerRoutes(
       : null;
     if (!module || !neonPool) return next();
 
-    const action = method === "GET" ? "view" : method === "POST" ? "create" : method === "DELETE" ? "delete" : "edit";
+    const action = method === "GET" ? "view" : method === "DELETE" ? "delete" : /\\/(cancel|emit-fiscal|approve)(\\/|$)/.test(path) ? "approve" : method === "POST" && /\\/(close|adjust|deduct|restock|swap-codigo|zero-quantities)(\\/|$)/.test(path) ? "edit" : method === "POST" ? "create" : "edit";
     try {
       const result = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
       const control = result.rows[0];
