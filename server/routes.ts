@@ -833,6 +833,7 @@ export async function registerRoutes(
           c.updated_at AS "updatedAt",
           (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin"
         FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id
+        WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
       `);
       const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit ORDER BY created_at DESC LIMIT 150");
@@ -1221,9 +1222,46 @@ export async function registerRoutes(
     });
   });
 
-  function isAuthenticated(req: any, res: any, next: any) {
-    if (req.isAuthenticated()) return next();
-    res.status(401).json({ message: "Unauthorized" });
+  async function isAuthenticated(req: any, res: any, next: any) {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
+    const user = req.user as any;
+    if (isSystemOwner(user)) return next();
+
+    const path = String(req.path || "");
+    const method = String(req.method || "GET").toUpperCase();
+    const module = path.startsWith("/api/admin/monitoring") ? "monitoring"
+      : path.startsWith("/api/admin/account-branches") || path.startsWith("/api/admin/register-barber") ? "account_branches"
+      : path.startsWith("/api/admin/time-clock") || path.startsWith("/api/time-clock") || path.startsWith("/api/auth/register-fingerprint") ? "timeclock"
+      : path.startsWith("/api/fiscal") ? "fiscal"
+      : path.startsWith("/api/inventory") || path.startsWith("/api/products") || path.startsWith("/api/batches") ? "inventory"
+      : path.startsWith("/api/cash-register") || path.startsWith("/api/sales") ? "cashier"
+      : path.startsWith("/api/transactions") ? "finance"
+      : path.startsWith("/api/labels") ? "labels"
+      : path.startsWith("/api/my-enterprises") || path.startsWith("/api/settings") || path.startsWith("/api/backup") || path.startsWith("/api/windows") ? "settings"
+      : path.startsWith("/api/services") || path.startsWith("/api/queue") ? "dashboard"
+      : null;
+    if (!module || !neonPool) return next();
+
+    const action = method === "GET" ? "view" : method === "POST" ? "create" : method === "DELETE" ? "delete" : "edit";
+    try {
+      const result = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
+      const control = result.rows[0];
+      if (control?.status === "suspended") return res.status(403).json({ message: "Conta suspensa. Procure o administrador." });
+      let allowed = false;
+      if (control?.permissions) {
+        const grant = control.permissions[module] || {};
+        allowed = grant.administer === true || grant[action] === true;
+      } else {
+        const role = String(user.role || "").toLowerCase();
+        if (role === "admin") allowed = !["master","account_branches"].includes(module);
+        else if (role === "barber") allowed = (module === "dashboard" && action === "view") || (module === "cashier" && ["view","create"].includes(action)) || (module === "timeclock" && ["view","create"].includes(action));
+      }
+      if (!allowed) return res.status(403).json({ message: "Ação não autorizada para esta conta. Solicite a liberação à conta master.", module, action });
+      return next();
+    } catch (error: any) {
+      console.error("[RBAC] permission check failed:", error?.message || error);
+      return res.status(503).json({ message: "Não foi possível validar as permissões da conta." });
+    }
   }
 
   // Fiscal Routes
