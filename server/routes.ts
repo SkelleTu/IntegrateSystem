@@ -964,20 +964,23 @@ export async function registerRoutes(
         const duplicate = await neonPool.query("SELECT id FROM users WHERE LOWER(username)=LOWER($1) AND id<>$2 LIMIT 1",[parsed.data.username.toLowerCase(),targetId]);
         if (duplicate.rows.length) return res.status(409).json({ message: "Nome de usuário já utilizado." });
       }
+      const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
+      const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
+      const currentPermissions = parsed.data.permissions || (target.role === "owner" && parsed.data.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
+      for (const [module, actions] of Object.entries(currentPermissions)) {
+        if (!accountModules.includes(module) || !actions || Object.keys(actions).some((action) => !["view","create","edit","delete","approve","administer"].includes(action))) {
+          return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
+        }
+      }
+      if (parsed.data.role && parsed.data.role !== "owner" && (currentPermissions.master?.view || currentPermissions.master?.administer || currentPermissions.account_branches?.view || currentPermissions.account_branches?.administer)) {
+        return res.status(400).json({ message: "Módulos master e ramificação de contas são exclusivos de contas master." });
+      }
       const userChanges: any = {};
       if (parsed.data.role) userChanges.role = parsed.data.role;
       if (parsed.data.username) userChanges.username = parsed.data.username.toLowerCase();
       if (parsed.data.email !== undefined) userChanges.email = parsed.data.email || null;
       if (parsed.data.password) userChanges.password = await hashPassword(parsed.data.password);
       if (Object.keys(userChanges).length) await storage.updateUser(targetId, userChanges);
-      const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
-      const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
-      const currentPermissions = parsed.data.permissions || prior.rows[0]?.permissions || defaultAccountPermissions;
-      for (const [module, actions] of Object.entries(currentPermissions)) {
-        if (!accountModules.includes(module) || !actions || Object.keys(actions).some((action) => !["view","create","edit","delete","approve","administer"].includes(action))) {
-          return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
-        }
-      }
       await neonPool.query(`
         INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
         VALUES ($1,$2,$3::jsonb,$4,NOW())
