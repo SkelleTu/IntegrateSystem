@@ -989,7 +989,7 @@ export async function registerRoutes(
       }
       const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
       const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
-      const currentPermissions = parsed.data.permissions || (target.role === "owner" && parsed.data.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
+      const currentPermissions = parsed.data.permissions || (parsed.data.role && parsed.data.role !== target.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
       for (const [module, actions] of Object.entries(currentPermissions)) {
         if (!accountModules.includes(module) || !actions || Object.keys(actions).some((action) => !["view","create","edit","delete","approve","administer"].includes(action))) {
           return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
