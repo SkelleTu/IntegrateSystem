@@ -2748,6 +2748,7 @@ export async function registerRoutes(
         unitPrice: authoritativePrice,
         totalPrice: expectedTotal,
         unitType: authoritativeUnitType,
+        enterpriseId: Number(user.enterpriseId),
       });
     }
 
@@ -2769,6 +2770,7 @@ export async function registerRoutes(
 
     const parsedSale = insertSaleSchema.parse({ 
       ...sale, 
+      enterpriseId: Number(user.enterpriseId),
       cashRegisterId: register.id, 
       userId: user.id,
       fiscalStatus: sale.customerTaxId ? "pending" : "none",
@@ -2776,7 +2778,7 @@ export async function registerRoutes(
       createdAt: new Date()
     });
     const parsedItems = authoritativeItems.map((item: any) => insertSaleItemSchema.parse(item));
-    const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse(p));
+    const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse({ ...p, enterpriseId: Number(user.enterpriseId) }));
 
     const newSale = await storage.createSale(
       parsedSale,
