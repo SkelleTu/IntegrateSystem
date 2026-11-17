@@ -15,17 +15,14 @@ try {
   const defaultEnterpriseId = String(process.env.AURA_DEFAULT_ENTERPRISE_ID || "").trim();
   const client = await pool.connect();
   try {
-    await client.query("BEGIN");
     if (defaultEnterpriseId) {
       if (!/^\\d+$/.test(defaultEnterpriseId) || Number(defaultEnterpriseId) <= 0) {
         throw new Error("AURA_DEFAULT_ENTERPRISE_ID must be a positive integer");
       }
-      await client.query("SELECT set_config('app.default_enterprise_id', $1, true)", [defaultEnterpriseId]);
+      await client.query("SELECT set_config('app.default_enterprise_id', $1, false)", [defaultEnterpriseId]);
     }
     await client.query(sql);
-    await client.query("COMMIT");
   } catch (error) {
-    await client.query("ROLLBACK");
     throw error;
   } finally {
     client.release();
