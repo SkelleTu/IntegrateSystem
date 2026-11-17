@@ -17,6 +17,7 @@ import {
   Fingerprint,
   Users,
   ChevronDown,
+  Network,
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -64,6 +65,7 @@ export function Navbar() {
     { title: "Fiscal",    url: "/fiscal",            icon: FileText },
     { title: "Etiquetas", url: "/admin/labels",      icon: Tag },
     { title: "Monitor",   url: "/admin/monitoring",  icon: Activity },
+    ...(isMasterAccount ? [{ title: "Ramificação de contas", url: "/admin/account-branches", icon: Network }] : []),
   ];
 
   const funcionariosItems = [
