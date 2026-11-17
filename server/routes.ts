@@ -938,7 +938,7 @@ export async function registerRoutes(
       if (!enterprise || enterprise.status !== "active") return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
       const permissions = parsed.data.accountType === "master"
         ? Object.fromEntries(accountModules.map((module) => [module, { view:true,create:true,edit:true,delete:true,approve:true,administer:true }]))
-        : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:false,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
+        : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
       const created = await storage.createUser({
         username, password: await hashPassword(parsed.data.password),
         role: parsed.data.accountType === "master" ? "owner" : "barber",
