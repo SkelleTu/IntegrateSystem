@@ -564,7 +564,13 @@ export async function registerRoutes(
           "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.login',$2::jsonb,$3,$4)",
           [Number(user.id), JSON.stringify({ username:user.username }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
         );
-        res.json(toPublicUser(user));
+        const publicUser: any = toPublicUser(user);
+        if (neonPool && !isMasterAccount(user)) {
+          const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
+          publicUser.accountStatus = control.rows[0]?.status || "active";
+          publicUser.permissions = control.rows[0]?.permissions || {};
+        }
+        res.json(publicUser);
       });
     })(req, res, next);
   });
@@ -699,9 +705,15 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.auth.me.path, (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
-    res.json(toPublicUser(req.user));
+  app.get(api.auth.me.path, isAuthenticated, async (req, res) => {
+    const user: any = req.user;
+    const publicUser: any = toPublicUser(user);
+    if (neonPool && !isMasterAccount(user)) {
+      const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
+      publicUser.accountStatus = control.rows[0]?.status || "active";
+      publicUser.permissions = control.rows[0]?.permissions || {};
+    }
+    return res.json(publicUser);
   });
 
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
