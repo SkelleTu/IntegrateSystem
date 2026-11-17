@@ -1851,8 +1851,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(stockSnapshots.enterpriseId, enterpriseId))
       .orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
-    const savedProducts: any[] = JSON.parse(row.products_json);
-    const savedBatches: any[] = JSON.parse(row.batches_json);
+    const savedProducts: any[] = JSON.parse(String((row as any).productsJson ?? (row as any).products_json ?? "[]"));
+    const savedBatches: any[] = JSON.parse(String((row as any).batchesJson ?? (row as any).batches_json ?? "[]"));
 
     await dualWrite(async (database) => {
       await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, enterpriseId));
