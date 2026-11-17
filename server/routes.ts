@@ -906,7 +906,8 @@ export async function registerRoutes(
     let createdAccountId: number | null = null;
     try {
       const username = parsed.data.username.toLowerCase();
-      if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Nome de usuário já utilizado." });
+      const duplicateUsername = await neonPool.query("SELECT id FROM users WHERE LOWER(username)=LOWER($1) LIMIT 1",[username]);
+      if (duplicateUsername.rows.length) return res.status(409).json({ message: "Nome de usuário já utilizado." });
       const enterpriseId = Number(actor.enterpriseId);
       if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ message: "A conta master precisa estar vinculada a um estabelecimento." });
       const enterprise = await storage.getEnterprise(enterpriseId);
@@ -960,8 +961,8 @@ export async function registerRoutes(
       if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
       if (parsed.data.role === "owner" && !isSystemOwner(actor)) return res.status(403).json({ message: "Somente master pode conceder privilégio master." });
       if (parsed.data.username) {
-        const duplicate = await storage.getUserByUsername(parsed.data.username.toLowerCase());
-        if (duplicate && Number(duplicate.id) !== targetId) return res.status(409).json({ message: "Nome de usuário já utilizado." });
+        const duplicate = await neonPool.query("SELECT id FROM users WHERE LOWER(username)=LOWER($1) AND id<>$2 LIMIT 1",[parsed.data.username.toLowerCase(),targetId]);
+        if (duplicate.rows.length) return res.status(409).json({ message: "Nome de usuário já utilizado." });
       }
       const userChanges: any = {};
       if (parsed.data.role) userChanges.role = parsed.data.role;
