@@ -4,8 +4,22 @@ DO $$
 DECLARE active_count integer; default_enterprise integer;
 BEGIN
   SELECT count(*), min(id) INTO active_count, default_enterprise FROM enterprises WHERE status = 'active';
-  IF active_count = 0 THEN RAISE EXCEPTION 'TENANT MIGRATION: no active enterprise exists'; END IF;
-  IF active_count > 1 THEN RAISE EXCEPTION 'TENANT MIGRATION: multiple active enterprises require explicit backfill mapping'; END IF;
+  IF active_count = 0 THEN
+    SELECT count(*), min(id) INTO active_count, default_enterprise FROM enterprises WHERE status <> 'deleted';
+  END IF;
+  IF active_count > 1 THEN
+    BEGIN
+      default_enterprise := NULLIF(current_setting('app.default_enterprise_id', true), '')::integer;
+    EXCEPTION WHEN others THEN
+      default_enterprise := NULL;
+    END;
+    IF default_enterprise IS NULL OR NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id = default_enterprise) THEN
+      RAISE EXCEPTION 'TENANT MIGRATION: multiple enterprises require app.default_enterprise_id or explicit backfill mapping';
+    END IF;
+  END IF;
+  IF active_count = 0 OR default_enterprise IS NULL THEN
+    RAISE EXCEPTION 'TENANT MIGRATION: no enterprise available for tenant backfill';
+  END IF;
   ALTER TABLE services ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE tickets ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE queue_state ADD COLUMN IF NOT EXISTS enterprise_id integer;
@@ -75,6 +89,51 @@ BEGIN
   ALTER TABLE stock_snapshots ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE fiscal_settings ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE nfce ALTER COLUMN enterprise_id SET NOT NULL;
+
+  -- Validate all tenant references before installing FK constraints.
+  IF EXISTS (SELECT 1 FROM services s WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=s.enterprise_id))
+     OR EXISTS (SELECT 1 FROM tickets t WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=t.enterprise_id))
+     OR EXISTS (SELECT 1 FROM queue_state q WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=q.enterprise_id))
+     OR EXISTS (SELECT 1 FROM categories c WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=c.enterprise_id))
+     OR EXISTS (SELECT 1 FROM menu_items m WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=m.enterprise_id))
+     OR EXISTS (SELECT 1 FROM cash_register cr WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=cr.enterprise_id))
+     OR EXISTS (SELECT 1 FROM sales s WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=s.enterprise_id))
+     OR EXISTS (SELECT 1 FROM sale_items si WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=si.enterprise_id))
+     OR EXISTS (SELECT 1 FROM payments p WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=p.enterprise_id))
+     OR EXISTS (SELECT 1 FROM transactions t WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=t.enterprise_id))
+     OR EXISTS (SELECT 1 FROM time_clock tc WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=tc.enterprise_id))
+     OR EXISTS (SELECT 1 FROM settings s WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=s.enterprise_id))
+     OR EXISTS (SELECT 1 FROM inventory i WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=i.enterprise_id))
+     OR EXISTS (SELECT 1 FROM inventory_logs il WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=il.enterprise_id))
+     OR EXISTS (SELECT 1 FROM inventory_restocks ir WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=ir.enterprise_id))
+     OR EXISTS (SELECT 1 FROM products p WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=p.enterprise_id))
+     OR EXISTS (SELECT 1 FROM batches b WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=b.enterprise_id))
+     OR EXISTS (SELECT 1 FROM batch_logs bl WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=bl.enterprise_id))
+     OR EXISTS (SELECT 1 FROM stock_snapshots ss WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=ss.enterprise_id))
+     OR EXISTS (SELECT 1 FROM fiscal_settings fs WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=fs.enterprise_id))
+     OR EXISTS (SELECT 1 FROM nfce n WHERE NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=n.enterprise_id))
+  THEN RAISE EXCEPTION 'TENANT MIGRATION: invalid enterprise references remain'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='services_enterprise_id_fkey') THEN ALTER TABLE services ADD CONSTRAINT services_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='tickets_enterprise_id_fkey') THEN ALTER TABLE tickets ADD CONSTRAINT tickets_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='queue_state_enterprise_id_fkey') THEN ALTER TABLE queue_state ADD CONSTRAINT queue_state_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='categories_enterprise_id_fkey') THEN ALTER TABLE categories ADD CONSTRAINT categories_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='menu_items_enterprise_id_fkey') THEN ALTER TABLE menu_items ADD CONSTRAINT menu_items_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='cash_register_enterprise_id_fkey') THEN ALTER TABLE cash_register ADD CONSTRAINT cash_register_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='sales_enterprise_id_fkey') THEN ALTER TABLE sales ADD CONSTRAINT sales_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='sale_items_enterprise_id_fkey') THEN ALTER TABLE sale_items ADD CONSTRAINT sale_items_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='payments_enterprise_id_fkey') THEN ALTER TABLE payments ADD CONSTRAINT payments_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='transactions_enterprise_id_fkey') THEN ALTER TABLE transactions ADD CONSTRAINT transactions_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='time_clock_enterprise_id_fkey') THEN ALTER TABLE time_clock ADD CONSTRAINT time_clock_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='settings_enterprise_id_fkey') THEN ALTER TABLE settings ADD CONSTRAINT settings_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='inventory_enterprise_id_fkey') THEN ALTER TABLE inventory ADD CONSTRAINT inventory_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='inventory_logs_enterprise_id_fkey') THEN ALTER TABLE inventory_logs ADD CONSTRAINT inventory_logs_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='inventory_restocks_enterprise_id_fkey') THEN ALTER TABLE inventory_restocks ADD CONSTRAINT inventory_restocks_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='products_enterprise_id_fkey') THEN ALTER TABLE products ADD CONSTRAINT products_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='batches_enterprise_id_fkey') THEN ALTER TABLE batches ADD CONSTRAINT batches_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='batch_logs_enterprise_id_fkey') THEN ALTER TABLE batch_logs ADD CONSTRAINT batch_logs_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='stock_snapshots_enterprise_id_fkey') THEN ALTER TABLE stock_snapshots ADD CONSTRAINT stock_snapshots_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fiscal_settings_enterprise_id_fkey') THEN ALTER TABLE fiscal_settings ADD CONSTRAINT fiscal_settings_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='nfce_enterprise_id_fkey') THEN ALTER TABLE nfce ADD CONSTRAINT nfce_enterprise_id_fkey FOREIGN KEY (enterprise_id) REFERENCES enterprises(id) ON DELETE RESTRICT; END IF;
   CREATE INDEX IF NOT EXISTS services_enterprise_id_idx ON services(enterprise_id);
   CREATE INDEX IF NOT EXISTS tickets_enterprise_id_idx ON tickets(enterprise_id);
   CREATE INDEX IF NOT EXISTS queue_state_enterprise_id_idx ON queue_state(enterprise_id);
