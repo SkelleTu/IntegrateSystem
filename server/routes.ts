@@ -990,6 +990,7 @@ export async function registerRoutes(
       if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
       if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema não pode ser removida." });
       await auditAccountAction(req,targetId,"account.deleted",{ username:target.username,role:target.role });
+      if (neonPool) await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
       await storage.deleteUser(targetId);
       return res.status(204).send();
     } catch (error: any) {
