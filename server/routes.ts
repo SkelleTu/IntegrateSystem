@@ -378,7 +378,8 @@ export async function registerRoutes(
 
   // Suspensions revoke access immediately, including endpoints that also serve public workflows.
   app.use(async (req: any, res: any, next: any) => {
-    if (!req.isAuthenticated?.() || !req.user || !neonPool) return next();
+    if (!req.isAuthenticated?.() || !req.user) return next();
+    if (!neonPool) return process.env.NODE_ENV === "production" && !isMasterAccount(req.user) ? res.status(503).json({ message: "Controle de contas indisponível; acesso bloqueado por segurança." }) : next();
     try {
       const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(req.user.id)]);
       if (control.rows[0]?.status === "suspended") return res.status(403).json({ message: "Conta suspensa. Procure a conta master." });
@@ -1297,7 +1298,8 @@ export async function registerRoutes(
       : path.startsWith("/api/my-enterprises") || path.startsWith("/api/settings") || path.startsWith("/api/backup") || path.startsWith("/api/windows") ? "settings"
       : path.startsWith("/api/services") || path.startsWith("/api/queue") ? "dashboard"
       : null;
-    if (!module || !neonPool) return next();
+    if (!module) return next();
+    if (!neonPool) return process.env.NODE_ENV === "production" ? res.status(503).json({ message: "Validação de permissões indisponível; acesso bloqueado por segurança." }) : next();
 
     const action = method === "GET" ? "view" : method === "DELETE" ? "delete" : /\\/(cancel|emit-fiscal|approve)(\\/|$)/.test(path) ? "approve" : method === "POST" && /\\/(close|adjust|deduct|restock|swap-codigo|zero-quantities)(\\/|$)/.test(path) ? "edit" : method === "POST" ? "create" : "edit";
     try {
