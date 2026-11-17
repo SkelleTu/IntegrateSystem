@@ -1350,8 +1350,8 @@ export async function registerRoutes(
     if (!module) return next();
     if (!neonPool) return process.env.NODE_ENV === "production" && !isIsolatedQaRuntime ? res.status(503).json({ message: "Validação de permissões indisponível; acesso bloqueado por segurança." }) : next();
 
-    const isApprovalAction = ["/cancel", "/emit-fiscal", "/approve"].some((part) => path.includes(part));
-    const isPostEditAction = ["/close", "/adjust", "/deduct", "/restock", "/swap-codigo", "/zero-quantities"].some((part) => path.includes(part));
+    const isApprovalAction = ["/cancel", "/emit-fiscal", "/emitir", "/approve", "/restore"].some((part) => path.includes(part));
+    const isPostEditAction = ["/close", "/adjust", "/deduct", "/restock", "/swap-codigo", "/zero-quantities", "/settings"].some((part) => path.includes(part));
     const action = method === "GET" ? "view" : method === "DELETE" ? "delete" : isApprovalAction ? "approve" : method === "POST" && isPostEditAction ? "edit" : method === "POST" ? "create" : "edit";
     try {
       const result = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
