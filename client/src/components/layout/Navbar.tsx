@@ -41,7 +41,13 @@ export function Navbar() {
 
   const handleNavigation = (url: string) => {
     const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
-    if (user.username === "SkelleTu" || freeRoutes.includes(url)) {
+    const isMasterAccount =
+      String(user.role || "").trim().toLowerCase() === "owner" ||
+      String(user.username || "").trim().toLowerCase() === "skelletu";
+
+    if (isMasterAccount || freeRoutes.includes(url)) {
+      setPendingUrl(null);
+      setGuardOpen(false);
       setLocation(url);
     } else {
       setPendingUrl(url);
