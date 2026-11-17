@@ -62,6 +62,34 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false }));
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+    const universalOrigin = String(process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").trim().replace(/\/$/, "");
+    const configuredOrigins = String(process.env.AURA_ALLOWED_ORIGINS || "")
+      .split(",")
+      .map((origin) => origin.trim().replace(/\/$/, ""))
+      .filter(Boolean);
+    const connectOrigins = ["'self'", universalOrigin, ...configuredOrigins].filter(Boolean).join(" ");
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'self'",
+        "form-action 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob: https:",
+        "font-src 'self' data: https:",
+        `connect-src ${connectOrigins} wss://integrated-system-1c86.onrender.com`,
+        "media-src 'self' blob:",
+      ].join("; "),
+    );
+  }
+  next();
+});
 app.set("trust proxy", 1);
 
 // Stable JSON liveness probes must be registered before the SPA/static fallback.
@@ -80,7 +108,24 @@ app.get("/api/health", (_req: Request, res: Response) => {
 });
 
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const configuredOrigins = String(process.env.AURA_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+  const defaultOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\/$/, "");
+  const allowedOrigins = new Set([defaultOrigin, ...configuredOrigins]);
+  const requestOrigin = String(req.get("origin") || "").trim().replace(/\/$/, "");
+
+  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+    res.header("Access-Control-Allow-Origin", requestOrigin);
+    res.header("Vary", "Origin");
+  } else if (requestOrigin) {
+    if (req.method === "OPTIONS") {
+      return res.status(403).json({ code: "CORS_ORIGIN_DENIED", message: "Origem não autorizada." });
+    }
+    return res.status(403).json({ code: "CORS_ORIGIN_DENIED", message: "Origem não autorizada." });
+  }
+
   res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
@@ -328,9 +373,12 @@ export async function initApp() {
       progress: 55,
     });
 
-    app.get("/api/google-drive/status", (_req: Request, res: Response) => {
+    app.get("/api/google-drive/status", (req: Request, res: Response) => {
+      if (!(req as any).isAuthenticated?.()) {
+        return res.status(401).json({ code: "UNAUTHORIZED", message: "Autenticação obrigatória." });
+      }
       const status = getGoogleDriveBackupStatus();
-      res.json(status);
+      return res.json(status);
     });
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -379,6 +427,9 @@ export async function initApp() {
 
     const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\/$/, "");
     app.get("/api/universal/status", async (req: Request, res: Response) => {
+      if (!(req as any).isAuthenticated?.()) {
+        return res.status(401).json({ code: "UNAUTHORIZED", message: "Autenticação obrigatória." });
+      }
       const startedAt = Date.now();
       try {
         const response = await fetch(universalServerUrl + "/api/healthz", {
@@ -412,6 +463,34 @@ export async function initApp() {
           error: error?.message || String(error),
         });
       }
+    });
+
+    // Central error boundary: every uncaught API error gets a stable contract and correlation IDs.
+    app.use((error: any, req: Request, res: Response, next: any) => {
+      if (res.headersSent) return next(error);
+      const rawStatus = Number(error?.statusCode || error?.status);
+      const status = Number.isInteger(rawStatus) && rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
+      const code = status >= 500 ? "INTERNAL_SERVER_ERROR" : String(error?.code || "REQUEST_ERROR");
+      const message = status >= 500 && process.env.NODE_ENV === "production"
+        ? "Erro interno do servidor."
+        : String(error?.message || "Não foi possível concluir a solicitação.");
+      console.error("[HTTP ERROR]", {
+        status,
+        code,
+        path: req.originalUrl,
+        method: req.method,
+        requestId: res.locals.requestId,
+        traceId: res.locals.traceId,
+        userId: (req as any).user?.id ?? null,
+        enterpriseId: (req as any).user?.enterpriseId ?? null,
+        error: error?.stack || String(error),
+      });
+      return res.status(status).json({
+        code,
+        message,
+        requestId: res.locals.requestId || null,
+        traceId: res.locals.traceId || null,
+      });
     });
 
     appReady = true;

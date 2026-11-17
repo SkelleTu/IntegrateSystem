@@ -682,7 +682,7 @@ export default function FiscalConfig() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ManualField label="CSC Token" value={formData?.cscToken || ""} onChange={v => set("cscToken", v)}
                   placeholder="Ex: 0123456789ABCDEF"
-                  help='Gerado no portal da SEFAZ do seu estado ao credenciar o CNPJ para NFC-e. Pesquise: "credenciamento CSC NFC-e [seu estado]" ou acesse o portal nacional:'
+                  help={formData?.cscTokenConfigured ? "Já existe um CSC Token salvo com segurança. Deixe em branco para manter o atual ou informe outro para substituí-lo." : "Gerado no portal da SEFAZ do seu estado ao credenciar o CNPJ para NFC-e. Pesquise: credenciamento CSC NFC-e [seu estado] ou acesse o portal nacional:"}
                   link="https://www.nfe.fazenda.gov.br/portal/principal.aspx"
                   linkLabel="Portal NF-e Nacional" />
                 <ManualField label="CSC ID" value={formData?.cscId || ""} onChange={v => set("cscId", v)}

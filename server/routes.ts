@@ -21,7 +21,7 @@ const MemoryStore = createMemoryStore(session);
 import { WebSocketServer, WebSocket } from "ws";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
-import { scrypt, randomBytes, timingSafeEqual } from "crypto";
+import { scrypt, randomBytes, timingSafeEqual, createHash, verify as verifySignature } from "crypto";
 import { promisify } from "util";
 import multer from "multer";
 import path from "path";
@@ -29,6 +29,7 @@ import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 import { neonPool } from "./neon-db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
+import { updateAuraContext, getAuraContext } from "./aura-request-context";
 
 const uploadStorage = multer.diskStorage({
   destination: (_req: any, _file: any, cb: any) => {
@@ -100,10 +101,52 @@ function normalizeRole(user: any): string {
   return String(user?.role ?? "").trim().toLowerCase();
 }
 
+function webAuthnConfig(req: any) {
+  const configuredOrigin = String(process.env.AURA_PUBLIC_ORIGIN || "https://integrated-system-1c86.onrender.com").trim().replace(/\/$/, "");
+  const origin = configuredOrigin || `${req.protocol}://${req.get("host")}`;
+  const rpId = new URL(origin).hostname;
+  return { origin, rpId };
+}
+
+function toBase64Url(value: Buffer | Uint8Array): string {
+  return Buffer.from(value).toString("base64url");
+}
+
+function fromBase64Url(value: string): Buffer {
+  return Buffer.from(value, "base64url");
+}
+
+function validateWebAuthnClientData(raw: Buffer, expectedType: "webauthn.create" | "webauthn.get", expectedChallenge: string, expectedOrigin: string) {
+  const data = JSON.parse(raw.toString("utf8"));
+  if (data.type !== expectedType) throw new Error("Tipo de operação WebAuthn inválido.");
+  if (data.challenge !== expectedChallenge) throw new Error("Challenge WebAuthn inválido ou expirado.");
+  if (data.origin !== expectedOrigin) throw new Error("Origin WebAuthn não autorizada.");
+  if (data.crossOrigin === true) throw new Error("WebAuthn cross-origin não autorizado.");
+  return data;
+}
+
+function validateWebAuthnAuthenticatorData(authenticatorData: Buffer, rpId: string, requireUserVerification = true) {
+  if (authenticatorData.length < 37) throw new Error("AuthenticatorData WebAuthn inválido.");
+  const expectedRpIdHash = createHash("sha256").update(rpId).digest();
+  if (!timingSafeEqual(authenticatorData.subarray(0, 32), expectedRpIdHash)) throw new Error("RP ID WebAuthn inválido.");
+  const flags = authenticatorData[32];
+  if ((flags & 0x01) === 0) throw new Error("Presença do usuário não foi confirmada pelo autenticador.");
+  if (requireUserVerification && (flags & 0x04) === 0) throw new Error("Verificação do usuário não foi confirmada pelo autenticador.");
+  return { flags, signCount: authenticatorData.readUInt32BE(33) };
+}
+
 function hasAdminRole(user: any): boolean {
   const role = normalizeRole(user);
-  return role === "admin" || role === "owner";
+  return role === "admin" || role === "owner" || role === "tenant_owner";
 }
+
+const requireAdmin = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated?.()) return res.sendStatus(401);
+  if (!hasAdminRole(req.user)) {
+    return res.status(403).json({ message: "Acesso restrito a administradores." });
+  }
+  return next();
+};
 
 function hasOwnerRole(user: any): boolean {
   return normalizeRole(user) === "owner";
@@ -113,12 +156,28 @@ function toPublicUser(user: any) {
   if (!user || typeof user !== "object") return user;
   const safe = { ...user };
   for (const key of Object.keys(safe)) {
-    if (/(password|hash|salt|secret|token|credential|private.?key)/i.test(key)) {
+    if (/(password|hash|salt|secret|token|credential|private.?key|webauthnPublicKey|webauthnCredentialId|webauthnSignCount)/i.test(key)) {
       delete safe[key];
     }
   }
   return safe;
 }
+
+function toAdminPublicUser(user: any) {
+  const safe = toPublicUser(user);
+  if (safe && typeof safe === "object") delete (safe as any).fingerprintId;
+  return safe;
+}
+function toPublicFiscalSettings(settings: any) {
+  if (!settings || typeof settings !== "object") return settings;
+  const { cscToken, certificadoA1, certificadoSenha, ...safe } = settings;
+  return {
+    ...safe,
+    cscTokenConfigured: Boolean(cscToken),
+    certificateConfigured: Boolean(certificadoA1 && certificadoSenha),
+  };
+}
+
 
 async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
@@ -143,11 +202,11 @@ async function comparePassword(stored: string, supplied: string) {
   }
 }
 
-import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, inArray } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
 import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
-  tickets, users, fiscalSettings,
+  tickets, users, enterprises, fiscalSettings,
   products, batches, batchLogs, cashRegisters, sales, saleItems, payments, transactions
 } from "../shared/pg-schema.js";
 
@@ -212,6 +271,48 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  async function setPublicTenantContext(req: any, res: any): Promise<boolean> {
+    if (req.isAuthenticated?.() && Number(req.user?.enterpriseId) > 0) {
+      updateAuraContext({ userId: Number(req.user.id), enterpriseId: Number(req.user.enterpriseId) });
+      return true;
+    }
+
+    const requestedEnterpriseId = Number(req.query?.enterpriseId);
+    const requestedSlug = typeof req.query?.enterpriseSlug === "string" ? req.query.enterpriseSlug.trim() : "";
+    const publicStatuses = process.env.AURA_ENABLE_E2E_WRITES === "true" ? ["active", "pending"] : ["active"];
+    if ((Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) || requestedSlug) {
+      const filters = [inArray(enterprises.status, publicStatuses)];
+      if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) {
+        filters.push(eq(enterprises.id, requestedEnterpriseId));
+      } else {
+        filters.push(eq(enterprises.slug, requestedSlug));
+      }
+      const [selected] = await db.select({ id: enterprises.id }).from(enterprises).where(and(...filters)).limit(1);
+      if (!selected) {
+        res.status(404).json({ code: "PUBLIC_TENANT_NOT_FOUND", message: "Estabelecimento público não encontrado." });
+        return false;
+      }
+      updateAuraContext({ enterpriseId: Number(selected.id) });
+      return true;
+    }
+
+    const activeEnterprises = await db.select({ id: enterprises.id })
+      .from(enterprises)
+      .where(eq(enterprises.status, "active"))
+      .limit(2);
+    if (activeEnterprises.length !== 1) {
+      res.status(409).json({
+        code: "PUBLIC_TENANT_CONTEXT_REQUIRED",
+        message: activeEnterprises.length === 0
+          ? "Nenhum estabelecimento público está disponível."
+          : "Informe enterpriseId ou enterpriseSlug para selecionar o estabelecimento.",
+      });
+      return false;
+    }
+    updateAuraContext({ enterpriseId: Number(activeEnterprises[0].id) });
+    return true;
+  }
+
   const isIsolatedQaRuntime = process.env.RENDER_GIT_BRANCH === "fix/aura-system-hardening-qa"
     || process.env.RENDER_SERVICE_ID === "srv-dbqfjttg1s2s73e6moag"
     || process.env.RENDER_SERVICE_NAME === "integrated-system-qa-aura"
@@ -255,14 +356,17 @@ export async function registerRoutes(
 
   // WebSocket for Label System — authenticated device pairing.
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
-  let windowsClient: WebSocket | null = null;
+  const windowsClients = new Map<number, WebSocket>();
   const labelsWsToken = String(process.env.AURA_LABELS_WS_TOKEN || "").trim();
 
-  function isValidLabelsToken(supplied: string): boolean {
-    if (!labelsWsToken || !supplied) return false;
-    const expected = Buffer.from(labelsWsToken, "utf8");
+  function isValidLabelsTokenFor(expectedToken: string, supplied: string): boolean {
+    if (!expectedToken || !supplied) return false;
+    const expected = Buffer.from(expectedToken, "utf8");
     const actual = Buffer.from(supplied, "utf8");
     return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+  function isValidLabelsToken(supplied: string): boolean {
+    return isValidLabelsTokenFor(labelsWsToken, supplied);
   }
 
   httpServer.on("upgrade", (request, socket, head) => {
@@ -283,39 +387,68 @@ export async function registerRoutes(
     }
 
     wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit("connection", ws, request);
+      wss.emit("connection", ws, request, suppliedToken);
     });
   });
 
-  wss.on("connection", (ws) => {
-    let registeredWindowsClient = false;
+  wss.on("connection", (ws: WebSocket, _request: any, connectionToken: string) => {
+    let registeredEnterpriseId: number | null = null;
     ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
-    ws.on("message", (msg) => {
-      if (registeredWindowsClient) return;
+    ws.on("message", async (msg: any) => {
+      if (registeredEnterpriseId !== null) return;
       try {
         const data = JSON.parse(msg.toString());
         if (data?.type !== "WINDOWS_HELLO") {
           ws.close(1008, "Handshake obrigatório");
           return;
         }
-        registeredWindowsClient = true;
-        const previousClient = windowsClient;
-        windowsClient = ws;
+        const enterpriseId = Number(data?.enterpriseId);
+        if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+          ws.close(1008, "Estabelecimento obrigatório");
+          return;
+        }
+        const tenantTokensRaw = String(process.env.AURA_LABELS_WS_TOKENS_JSON || "").trim();
+        if (tenantTokensRaw) {
+          let tenantToken = "";
+          try {
+            const tokenMap = JSON.parse(tenantTokensRaw) as Record<string, unknown>;
+            tenantToken = typeof tokenMap[String(enterpriseId)] === "string" ? String(tokenMap[String(enterpriseId)]) : "";
+          } catch {
+            ws.close(1011, "Configuração de autenticação inválida");
+            return;
+          }
+          if (!isValidLabelsTokenFor(tenantToken, connectionToken)) {
+            ws.close(1008, "Token do estabelecimento inválido");
+            return;
+          }
+        } else {
+          const activeEnterprises = await db.select({ id: enterprises.id })
+            .from(enterprises)
+            .where(eq(enterprises.status, "active"))
+            .limit(2);
+          if (activeEnterprises.length > 1 || (activeEnterprises.length === 1 && Number(activeEnterprises[0].id) !== enterpriseId)) {
+            ws.close(1008, "Token por estabelecimento obrigatório");
+            return;
+          }
+        }
+        registeredEnterpriseId = enterpriseId;
+        const previousClient = windowsClients.get(enterpriseId);
+        windowsClients.set(enterpriseId, ws);
         if (previousClient && previousClient !== ws && previousClient.readyState === WebSocket.OPEN) {
           previousClient.close(4001, "Substituído por uma conexão autenticada mais recente");
         }
-        ws.send(JSON.stringify({ type: "HELLO_ACK", message: "Dispositivo autenticado e registrado" }));
-        console.log("Windows Label App authenticated and connected");
+        ws.send(JSON.stringify({ type: "HELLO_ACK", enterpriseId, message: "Dispositivo autenticado e registrado" }));
+        console.log(`Windows Label App authenticated and connected for enterprise ${enterpriseId}`);
       } catch {
         ws.close(1008, "Mensagem inválida");
       }
     });
 
     ws.on("close", () => {
-      if (ws === windowsClient) {
-        windowsClient = null;
-        console.log("Windows Label App disconnected");
+      if (registeredEnterpriseId !== null && windowsClients.get(registeredEnterpriseId) === ws) {
+        windowsClients.delete(registeredEnterpriseId);
+        console.log(`Windows Label App disconnected for enterprise ${registeredEnterpriseId}`);
       }
     });
   });
@@ -349,6 +482,21 @@ export async function registerRoutes(
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  // Establish the authenticated tenant in AsyncLocalStorage before any storage method runs.
+  // Storage never trusts a tenant ID supplied by the client.
+  app.use((req, _res, next) => {
+    const user = req.user as any;
+    if (user?.id) {
+      updateAuraContext({
+        userId: Number(user.id),
+        enterpriseId: Number.isSafeInteger(Number(user.enterpriseId)) && Number(user.enterpriseId) > 0
+          ? Number(user.enterpriseId)
+          : null,
+      });
+    }
+    next();
+  });
 
   passport.use(
     new LocalStrategy(async (username, password, done) => {
@@ -388,16 +536,21 @@ export async function registerRoutes(
   app.post("/api/labels/print", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (!isSystemOwner(user) && !(isIsolatedQaRuntime && hasAdminRole(user))) {
+    if (!hasAdminRole(user) && !(isIsolatedQaRuntime && hasAdminRole(user))) {
       return res.status(403).json({ error: "Acesso negado" });
     }
-
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const windowsClient = windowsClients.get(enterpriseId);
     if (!windowsClient || windowsClient.readyState !== WebSocket.OPEN) {
-      return res.status(500).json({ error: "APP WINDOWS OFFLINE" });
+      return res.status(503).json({ error: "APP WINDOWS OFFLINE" });
     }
 
     windowsClient.send(JSON.stringify({
       type: "PRINT_LABEL",
+      enterpriseId,
       payload: req.body
     }));
 
@@ -407,12 +560,17 @@ export async function registerRoutes(
   app.get("/api/labels/status", async (req, res) => {
     if (!req.user) return res.sendStatus(401);
     const user = req.user as any;
-    if (!isSystemOwner(user)) {
-      return res.status(403).json({ error: "Acesso negado" });
+    if (!hasOwnerRole(user)) {
+      return res.status(403).json({ error: "Acesso restrito ao proprietário do sistema." });
     }
-
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const windowsClient = windowsClients.get(enterpriseId);
     res.json({
-      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN
+      appConnected: !!windowsClient && windowsClient.readyState === WebSocket.OPEN,
+      enterpriseId,
     });
   });
 
@@ -587,11 +745,45 @@ export async function registerRoutes(
     res.json(toPublicUser(req.user));
   });
 
+  app.get("/api/tutorial/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const account = await storage.getUser(Number(user.id));
+      if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+      return res.json({ completed: Boolean(account.tutorialCompletedAt) });
+    } catch (error: any) {
+      console.error("[TUTORIAL] Falha ao consultar status:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível consultar o tutorial." });
+    }
+  });
+
+  app.post("/api/tutorial/complete", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const account = await storage.getUser(Number(user.id));
+      if (!account) return res.status(404).json({ message: "Usuário não encontrado" });
+      if (!account.tutorialCompletedAt) {
+        await storage.updateUser(Number(user.id), { tutorialCompletedAt: new Date().toISOString() });
+      }
+      return res.json({ completed: true });
+    } catch (error: any) {
+      console.error("[TUTORIAL] Falha ao salvar conclusão:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível salvar a conclusão do tutorial." });
+    }
+  });
+
   app.get("/api/admin/monitoring", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     const data = await storage.getAdminMonitoringData();
     res.json(data);
+  });
+
+  app.get("/api/admin/users", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    if (!hasOwnerRole(user)) return res.status(403).json({ message: "Acesso restrito ao proprietário do sistema." });
+    const users = await storage.getUsers();
+    res.json(users.map(toAdminPublicUser));
   });
 
   app.delete("/api/admin/users/:id", isAuthenticated, async (req, res) => {
@@ -601,25 +793,48 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
+  app.post("/api/admin/register-employee", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
-    
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar funcionários." });
+
+    const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+    const password = typeof req.body?.password === "string" ? req.body.password : "";
+    const enterpriseId = Number(user.enterpriseId);
+
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(400).json({ message: "A conta administradora precisa estar vinculada a um estabelecimento." });
+    }
+    if (!/^[a-z0-9._-]{3,32}$/.test(username)) {
+      return res.status(400).json({ message: "Usuário inválido. Use de 3 a 32 caracteres: letras, números, ponto, hífen ou sublinhado." });
+    }
+    if (password.length < 12 || password.length > 128) {
+      return res.status(400).json({ message: "A senha deve ter entre 12 e 128 caracteres." });
+    }
+
     try {
-      const { username, password } = req.body;
       const existing = await storage.getUserByUsername(username);
       if (existing) return res.status(400).json({ message: "Usuário já existe" });
-      
+
       const hashed = await hashPassword(password);
       const newUser = await storage.createUser({
         username,
         password: hashed,
-        role: "barber"
+        role: "employee",
+        enterpriseId,
       });
-      res.status(201).json(toPublicUser(newUser));
+      res.status(201).json(toAdminPublicUser(newUser));
     } catch (err) {
-      res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
+      res.status(500).json({ message: "Erro ao cadastrar funcionário." });
     }
+  });
+
+  // Legacy compatibility: the old barber-specific endpoint is intentionally disabled.
+  // The current domain uses generic employees, independent of establishment type.
+  app.post("/api/admin/register-barber", isAuthenticated, (_req, res) => {
+    return res.status(410).json({
+      code: "LEGACY_STAFF_ROUTE_DISABLED",
+      message: "Endpoint legado de barbeiro desativado. Use /api/admin/register-employee.",
+    });
   });
 
   // ─── Meus Estabelecimentos (para o usuário logado) ─────────────────────────
@@ -631,6 +846,9 @@ export async function registerRoutes(
 
   app.post("/api/my-enterprises", isAuthenticated, async (req, res) => {
     const user = req.user as any;
+    if (!["owner", "tenant_owner"].includes(normalizeRole(user))) {
+      return res.status(403).json({ code: "ESTABLISHMENT_CREATION_FORBIDDEN", message: "Somente o proprietário da conta pode criar estabelecimentos." });
+    }
     try {
       const { name, businessType, taxId, phone, address, city, state } = req.body;
       if (typeof name !== "string" || !name.trim()) {
@@ -645,7 +863,7 @@ export async function registerRoutes(
       const enterprise = await storage.createAndActivateEnterprise(user.id, {
         ownerId: user.id,
         name: normalizedName,
-        businessType: businessType || "barbearia",
+        businessType: typeof businessType === "string" && businessType.trim() ? businessType.trim() : "geral",
         taxId: taxId || null,
         phone: phone || null,
         address: address || null,
@@ -659,8 +877,8 @@ export async function registerRoutes(
     } catch (err) {
       console.error("Erro ao criar estabelecimento:", err);
       const message = err instanceof Error ? err.message : "Falha inesperada ao criar estabelecimento.";
-      const status = message.includes("Limite de 5") ? 400 : 500;
-      res.status(status).json({ message: status === 400 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
+      const status = /já existe|já cadastrado|Limite/i.test(message) ? 409 : 500;
+      res.status(status).json({ message: status === 409 ? message : "Não foi possível concluir o cadastro. Nenhuma alteração parcial foi mantida." });
     }
   });
 
@@ -676,10 +894,9 @@ export async function registerRoutes(
   });
 
   // Enterprise administration is restricted to an authenticated system owner.
-  // Public registration must never be able to create an administrator account.
+  // Public registration creates the owner account for its independent establishment.
   const isSystemOwner = (user: any) =>
-    String(user?.role || "").trim().toLowerCase() === "owner" ||
-    String(user?.username || "").trim().toLowerCase() === "skelletu";
+    String(user?.role || "").trim().toLowerCase() === "owner";
 
   app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
@@ -722,15 +939,19 @@ export async function registerRoutes(
       delete enterpriseData.password;
       enterpriseData.name = name.trim();
       enterpriseData.slug = finalSlug;
-      enterpriseData.status = "pending";
+      enterpriseData.status = "active";
 
       const adminData = {
         username: username.trim(),
         password: hashedPassword,
+        role: "tenant_owner",
       };
 
       const enterprise = await (storage as DatabaseStorage).createEnterprise(enterpriseData, adminData);
-      res.status(201).json(enterprise);
+      const ownerAccount = await storage.getUserByUsername(username.trim());
+      if (!ownerAccount) throw new Error("Conta proprietária recém-criada não foi localizada.");
+      const ownedEnterprise = await storage.updateEnterprise(Number(enterprise.id), { ownerId: ownerAccount.id, status: "active" } as any);
+      res.status(201).json(ownedEnterprise);
     } catch (err) {
       console.error("Erro ao criar empresa:", err);
       res.status(500).json({ message: "Erro ao criar empresa. Verifique se os dados estão corretos." });
@@ -740,7 +961,9 @@ export async function registerRoutes(
   app.put("/api/admin/enterprises/:id", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const updated = await storage.updateEnterprise(Number(req.params.id), req.body);
+    const updates = { ...req.body };
+    delete updates.status;
+    const updated = await storage.updateEnterprise(Number(req.params.id), updates);
     res.json(updated);
   });
 
@@ -778,16 +1001,48 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.get("/api/settings", async (req, res) => {
-    const enterpriseId = req.query.enterpriseId ? Number(req.query.enterpriseId) : undefined;
-    const s = await storage.getSettings(enterpriseId);
+  app.get("/api/settings", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const enterpriseId = Number(user?.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({
+        code: "ENTERPRISE_CONTEXT_REQUIRED",
+        message: "Nenhum estabelecimento ativo está associado ao usuário autenticado.",
+      });
+    }
+    const requestedEnterpriseId = req.query.enterpriseId !== undefined
+      ? Number(req.query.enterpriseId)
+      : enterpriseId;
+    if (!Number.isSafeInteger(requestedEnterpriseId) || requestedEnterpriseId <= 0) {
+      return res.status(400).json({ code: "INVALID_ENTERPRISE_ID", message: "enterpriseId inválido." });
+    }
+    const ownedEnterprises = await storage.getEnterprisesByOwner(Number(user.id));
+    if (!ownedEnterprises.some((enterprise) => Number(enterprise.id) === requestedEnterpriseId)) {
+      return res.status(403).json({
+        code: "TENANT_ACCESS_DENIED",
+        message: "O usuário não pode consultar configurações de um estabelecimento que não lhe pertence.",
+      });
+    }
+    const s = await storage.getSettings(requestedEnterpriseId);
     res.json(s);
   });
 
   app.post("/api/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!isSystemOwner(user)) return res.status(403).json({ message: "Acesso restrito ao dono" });
-    const s = await storage.updateSettings(req.body);
+    if (!isSystemOwner(user) && !hasAdminRole(user)) {
+      return res.status(403).json({ message: "Acesso restrito a administradores." });
+    }
+    const enterpriseId = Number(user?.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({
+        code: "ENTERPRISE_CONTEXT_REQUIRED",
+        message: "Nenhum estabelecimento ativo está associado ao usuário autenticado.",
+      });
+    }
+    const s = await storage.updateSettings({
+      ...req.body,
+      enterpriseId,
+    });
     res.json(s);
   });
 
@@ -959,18 +1214,33 @@ export async function registerRoutes(
   });
 
   function isAuthenticated(req: any, res: any, next: any) {
-    if (req.isAuthenticated()) return next();
-    res.status(401).json({ message: "Unauthorized" });
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    const enterpriseId = Number(req.user?.enterpriseId);
+    if (Number.isSafeInteger(enterpriseId) && enterpriseId > 0) {
+      updateAuraContext({ userId: Number(req.user.id), enterpriseId });
+    }
+    return next();
   }
 
   // Fiscal Routes
-  app.get("/api/download/app", (req, res) => {
-    const filePath = path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe");
-    if (!fs.existsSync(filePath)) {
-      console.error("Arquivo não encontrado em:", filePath);
-      return res.status(404).json({ message: "Arquivo de download não encontrado" });
+  app.get("/api/download/app", (_req, res) => {
+    const candidates = [
+      path.join(process.cwd(), "public/attached_assets/dist_windows/AuraSystem.exe"),
+      path.join(process.cwd(), "public/attached_assets/dist_windows", "Aura System.exe"),
+      path.join(process.cwd(), "dist", "AuraSystem.exe"),
+      path.join(process.cwd(), "dist", "Aura System.exe"),
+    ];
+    const filePath = candidates.find((candidate) => fs.existsSync(candidate));
+    if (!filePath) {
+      console.error("[DOWNLOAD] Artefato AuraSystem.exe não encontrado. Candidatos:", candidates);
+      return res.status(503).json({
+        code: "APP_ARTIFACT_UNAVAILABLE",
+        message: "O instalador do Aura System ainda não está disponível neste deploy.",
+      });
     }
-    res.download(filePath, "AuraSystem.exe");
+    return res.download(filePath, "AuraSystem.exe");
   });
 
   app.get("/api/windows/stream", isAuthenticated, (req, res) => {
@@ -981,7 +1251,11 @@ export async function registerRoutes(
   app.get("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const settings = await storage.getFiscalSettings(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de acessar as configurações fiscais." });
+    }
+    const settings = await storage.getFiscalSettings(enterpriseId);
     if (!settings) {
       // Pré-preenche com os dados já cadastrados no estabelecimento
       const enterprise = await storage.getEnterprise(user.enterpriseId);
@@ -1003,7 +1277,7 @@ export async function registerRoutes(
         simulacaoReal: false
       };
       const created = await storage.upsertFiscalSettings(defaultSettings as any);
-      return res.json(created);
+      return res.json(toPublicFiscalSettings(created));
     }
     // Se já existe mas campos estão vazios, sincroniza com dados do estabelecimento
     // Verifica cada campo individualmente para não sobrescrever dados que o usuário preencheu manualmente
@@ -1027,17 +1301,20 @@ export async function registerRoutes(
           municipio: settings.municipio || enterprise.city || "",
           uf: settings.uf || enterprise.state || "SP",
         } as any);
-        return res.json(updated);
+        return res.json(toPublicFiscalSettings(updated));
       }
     }
-    res.json(settings);
+    res.json(toPublicFiscalSettings(settings));
   });
 
   app.post("/api/fiscal/settings", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de salvar as configurações fiscais." });
+    }
     try {
-      const enterpriseId = user.enterpriseId || 1;
       const currentSettings = await storage.getFiscalSettings(enterpriseId);
       
       const dataToParse = { 
@@ -1053,7 +1330,7 @@ export async function registerRoutes(
 
       const data = insertFiscalSettingsSchema.parse(dataToParse);
       const settings = await storage.upsertFiscalSettings(data);
-      res.json(settings);
+      res.json(toPublicFiscalSettings(settings));
     } catch (err) {
       console.error("Erro ao salvar configurações fiscais:", err);
       res.status(400).json({ message: "Dados fiscais inválidos" });
@@ -1063,7 +1340,11 @@ export async function registerRoutes(
   app.get("/api/fiscal/logs", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const logs = await storage.getLogsFiscais(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const logs = await storage.getLogsFiscais(enterpriseId);
     res.json(logs);
   });
 
@@ -1073,6 +1354,10 @@ export async function registerRoutes(
     
     try {
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de emitir documentos fiscais." });
+      }
       const sale = await storage.getSale(saleId);
       if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
       if (!isSystemOwner(user)) {
@@ -1084,6 +1369,7 @@ export async function registerRoutes(
       
       if (sale.status === "simulation") {
         const nfceData = await storage.createNfce({
+          enterpriseId: activeEnterpriseId,
           saleId,
           numero: Math.floor(Math.random() * 1000000),
           serie: 1,
@@ -1163,6 +1449,7 @@ export async function registerRoutes(
         const fiscalStatus = (settings.simulacaoReal || result.simulado) ? "simulated" : "authorized";
         
         const nfceData = await storage.createNfce({
+          enterpriseId: activeEnterpriseId,
           saleId,
           numero: nNF,
           serie: settings.serieNfce,
@@ -1212,19 +1499,24 @@ export async function registerRoutes(
   app.get("/api/fiscal/history", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito" });
-    const history = await storage.getNfceHistory(user.enterpriseId);
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    const history = await storage.getNfceHistory(enterpriseId);
     res.json(history);
   });
 
   // Services Routes
   app.get(api.services.list.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const services = await storage.getServices();
     res.json(services);
   });
 
-  app.post(api.services.create.path, isAuthenticated, async (req, res) => {
+  app.post(api.services.create.path, isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const input = api.services.create.input.parse(req.body);
+      const input = api.services.create.input.parse({ ...req.body, enterpriseId: Number((req.user as any).enterpriseId) });
       const service = await storage.createService(input);
       res.status(201).json(service);
     } catch (err) {
@@ -1236,7 +1528,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.services.update.path, isAuthenticated, async (req, res) => {
+  app.put(api.services.update.path, isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const input = api.services.update.input.parse(req.body);
       const service = await storage.updateService(Number(req.params.id), input);
@@ -1246,13 +1538,14 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.services.delete.path, isAuthenticated, async (req, res) => {
+  app.delete(api.services.delete.path, isAuthenticated, requireAdmin, async (req, res) => {
     await storage.deleteService(Number(req.params.id));
     res.status(204).send();
   });
 
   // Queue Routes
   app.get(api.queue.state.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const state = await storage.getQueueState();
     res.json(state);
   });
@@ -1270,27 +1563,52 @@ export async function registerRoutes(
     res.json(newState);
   });
 
-  app.post(api.queue.reset.path, isAuthenticated, async (req, res) => {
+  app.post(api.queue.reset.path, isAuthenticated, requireAdmin, async (req, res) => {
     const input = api.queue.reset.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.startFrom, currentNumber: input.startFrom });
     res.json(newState);
   });
 
-  app.post(api.queue.set.path, isAuthenticated, async (req, res) => {
+  app.post(api.queue.set.path, isAuthenticated, requireAdmin, async (req, res) => {
     const input = api.queue.set.input.parse(req.body);
     const newState = await storage.updateQueueState({ servingNumber: input.number });
     res.json(newState);
   });
 
   app.post(api.queue.createTicket.path, async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-create:" + ip, 15, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas senhas solicitadas. Aguarde um minuto e tente novamente." });
+    }
     const input = api.queue.createTicket.input.parse(req.body);
+    const availableServices = await storage.getServices();
+    if (!availableServices.some((service) => Number(service.id) === Number(input.serviceId) && service.isActive)) {
+      return res.status(400).json({ message: "Serviço indisponível para emissão de senha." });
+    }
     const state = await storage.getQueueState();
-    
+    let enterpriseId = Number(getAuraContext().enterpriseId || 0);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      const fallbackEnterprises = await db.select({ id: enterprises.id })
+        .from(enterprises)
+        .where(eq(enterprises.status, "active"))
+        .limit(2);
+      if (fallbackEnterprises.length !== 1) {
+        return res.status(409).json({
+          code: "ENTERPRISE_CONTEXT_REQUIRED",
+          message: "Estabelecimento público não selecionado.",
+        });
+      }
+      enterpriseId = Number(fallbackEnterprises[0].id);
+      updateAuraContext({ enterpriseId });
+    }
+
     // Find next available ticket number that isn't currently active (pending or serving)
     let nextNum = state.currentNumber + 1;
     let isUnique = false;
     while (!isUnique) {
       const existing = await db.select().from(tickets).where(and(
+        eq(tickets.enterpriseId, enterpriseId),
         eq(tickets.ticketNumber, nextNum),
         or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
       )).limit(1);
@@ -1304,6 +1622,7 @@ export async function registerRoutes(
 
     await storage.updateQueueState({ currentNumber: nextNum });
     const ticket = await storage.createTicket({
+      enterpriseId,
       ticketNumber: nextNum,
       serviceId: input.serviceId,
       status: "pending"
@@ -1313,12 +1632,13 @@ export async function registerRoutes(
 
   // Digital Menu Routes
   app.get("/api/categories", async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const categoriesList = await storage.getCategories();
     res.json(categoriesList);
   });
 
   // Inventory API
-  app.post("/api/inventory", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const body = { ...req.body };
       // Trata a conversão de string de data para objeto Date se necessário
@@ -1366,7 +1686,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/inventory/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/inventory/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       await storage.deleteInventoryItem(Number(req.params.id));
       res.status(204).send();
@@ -1376,17 +1696,18 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/inventory/:id/restock", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/:id/restock", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const { quantity, unit, itemsPerUnit, costPrice, expiryDate } = req.body;
 
-      if (!quantity || quantity <= 0) {
-        return res.status(400).json({ message: "Quantidade deve ser maior que zero" });
+      const parsedQuantity = Number(quantity);
+      if (!Number.isFinite(parsedQuantity) || parsedQuantity <= 0) {
+        return res.status(400).json({ message: "Quantidade deve ser um número positivo válido" });
       }
 
       const restockData = {
-        quantity: parseInt(quantity),
+        quantity: parsedQuantity,
         unit: unit || undefined,
         itemsPerUnit: itemsPerUnit ? parseInt(itemsPerUnit) : undefined,
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(',', '.')) * 100) : undefined,
@@ -1401,7 +1722,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/inventory/:id/restocks", isAuthenticated, async (req, res) => {
+  app.get("/api/inventory/:id/restocks", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const id = Number(req.params.id);
       const restocks = await storage.getInventoryRestocks(id);
@@ -1412,7 +1733,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/inventory-restocks", isAuthenticated, async (req, res) => {
+  app.get("/api/inventory-restocks", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const restocks = await storage.getAllInventoryRestocks();
       res.json(restocks);
@@ -1455,13 +1776,14 @@ export async function registerRoutes(
             _batchId: batch.id,
             name,
             price: batch.salePrice ?? prod.salePrice ?? 0,
+            costPrice: batch.costPrice,
             barcode: batch.barcode ?? null,
             sku: batch.sku ?? null,
             codigoProduto: (prod as any).codigoProduto ?? null,
             codigoBalanca: prod.codigoBalanca ?? null,
             imageUrl: prod.imageUrl ?? null,
             isAvailable: true,
-            unitType: prod.unit === "kg" ? "kg" : "unit",
+            unitType: String(prod.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit",
             unit: prod.unit,
             quantity: batch.quantity,
           });
@@ -1524,7 +1846,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/check-duplicate", isAuthenticated, async (req, res) => {
+  app.post("/api/products/check-duplicate", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const dup = await storage.findDuplicateProduct(req.body);
       res.json(dup || null);
@@ -1533,12 +1855,13 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products", isAuthenticated, async (req, res) => {
+  app.post("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, ...rest } = req.body;
       const data = insertProductSchema.parse({
         ...rest,
-        salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        enterpriseId: Number((req.user as any).enterpriseId),
+        salePrice: salePrice !== undefined && salePrice !== "" ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
         minStock: minStock !== undefined && minStock !== "" ? Number(minStock) : 5,
       });
       const p = await storage.createProduct(data);
@@ -1549,23 +1872,36 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
+      const parsedSalePrice = salePrice !== undefined ? Number(String(salePrice).replace(",", ".")) : undefined;
+      const parsedMinStock = minStock !== undefined ? Number(minStock) : undefined;
+      if (parsedSalePrice !== undefined && !Number.isFinite(parsedSalePrice)) {
+        return res.status(400).json({ message: "Preço de venda inválido." });
+      }
+      if (parsedMinStock !== undefined && !Number.isFinite(parsedMinStock)) {
+        return res.status(400).json({ message: "Estoque mínimo inválido." });
+      }
       const data = {
         ...rest,
-        salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
-        minStock: minStock !== undefined ? Number(minStock) : undefined,
+        salePrice: parsedSalePrice !== undefined ? Math.round(parsedSalePrice * 100) : undefined,
+        minStock: parsedMinStock,
         ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
       };
-      const p = await storage.updateProduct(Number(req.params.id), data);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de produto inválido" });
+      const p = await storage.updateProduct(id, data);
+      if (!p) return res.status(404).json({ message: "Produto não encontrado." });
       res.json(p);
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao atualizar produto" });
+      const message = String(err?.message || "");
+      if (/Produto .* não encontrado/.test(message)) return res.status(404).json({ message: "Produto não encontrado." });
+      res.status(500).json({ message: message || "Erro ao atualizar produto" });
     }
   });
 
-  app.delete("/api/products", isAuthenticated, async (req, res) => {
+  app.delete("/api/products", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1593,7 +1929,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/restore", isAuthenticated, async (req, res) => {
+  app.post("/api/products/restore", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1610,7 +1946,7 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/zero-quantities", isAuthenticated, async (req, res) => {
+  app.post("/api/products/zero-quantities", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores" });
@@ -1627,17 +1963,21 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/products/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/products/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      await storage.deleteProduct(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de produto inválido" });
+      await storage.deleteProduct(id);
       res.status(204).send();
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao excluir produto" });
+      const message = String(err?.message || "");
+      if (/Produto .* não encontrado/.test(message)) return res.status(404).json({ message: "Produto não encontrado." });
+      res.status(500).json({ message: message || "Erro ao excluir produto" });
     }
   });
 
   // Batches
-  app.get("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+  app.get("/api/products/:id/batches", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const b = await storage.getProductBatches(Number(req.params.id));
       res.json(b);
@@ -1646,13 +1986,14 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/products/:id/batches", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/batches", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const productId = Number(req.params.id);
       if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Produto inválido" });
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const payload = insertBatchSchema.parse({
+        enterpriseId: Number(user.enterpriseId),
         productId,
         ...rest,
         quantity: Number(quantity),
@@ -1670,7 +2011,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.put("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const data: any = { ...rest };
@@ -1680,23 +2021,34 @@ export async function registerRoutes(
       if (expiryDate !== undefined) data.expiryDate = expiryDate ? new Date(expiryDate) : null;
       if (manufactureDate !== undefined) data.manufactureDate = manufactureDate ? new Date(manufactureDate) : null;
       if (entryDate !== undefined) data.entryDate = new Date(entryDate);
-      const b = await storage.updateBatch(Number(req.params.id), data);
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de lote inválido" });
+      if (Object.keys(data).length === 0) return res.status(400).json({ message: "Nenhum campo válido para atualização." });
+      const b = await storage.updateBatch(id, data);
+      if (!b) return res.status(404).json({ message: "Lote não encontrado." });
       res.json(b);
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao atualizar lote" });
+      const message = String(err?.message || "");
+      if (/Lote .* não encontrado/.test(message)) return res.status(404).json({ message: "Lote não encontrado." });
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.issues[0]?.message || "Dados do lote inválidos" });
+      res.status(500).json({ message: message || "Erro ao atualizar lote" });
     }
   });
 
-  app.delete("/api/batches/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/batches/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      await storage.deleteBatch(Number(req.params.id));
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de lote inválido" });
+      await storage.deleteBatch(id);
       res.status(204).send();
     } catch (err: any) {
-      res.status(500).json({ message: err.message || "Erro ao excluir lote" });
+      const message = String(err?.message || "");
+      if (/Lote .* não encontrado/.test(message)) return res.status(404).json({ message: "Lote não encontrado." });
+      res.status(500).json({ message: message || "Erro ao excluir lote" });
     }
   });
 
-  app.post("/api/products/:id/deduct", isAuthenticated, async (req, res) => {
+  app.post("/api/products/:id/deduct", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const user = req.user as any;
       const { quantity, reason } = req.body;
@@ -1707,7 +2059,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/products/:id/logs", isAuthenticated, async (req, res) => {
+  app.get("/api/products/:id/logs", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const logs = await storage.getBatchLogs(Number(req.params.id));
       res.json(logs);
@@ -1718,7 +2070,21 @@ export async function registerRoutes(
 
   // ─── Fim Produto → Lotes API ────────────────────────────────────────────────
 
+  app.get("/api/public/enterprises", async (req, res) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("public-enterprises:" + ip, 30, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas consultas. Aguarde um minuto e tente novamente." });
+    }
+    const list = await db.select({
+      id: enterprises.id,
+      name: enterprises.name,
+      slug: enterprises.slug,
+    }).from(enterprises).where(eq(enterprises.status, "active")).orderBy(asc(enterprises.name));
+    return res.json(list);
+  });
+
   app.get("/api/menu-items", async (req, res) => {
+    if (!(await setPublicTenantContext(req, res))) return;
     const items = (await storage.getMenuItems()).map(item => ({
       ...item,
       tags: typeof item.tags === 'string' ? JSON.parse(item.tags) : (item.tags || []),
@@ -1779,6 +2145,9 @@ export async function registerRoutes(
     let registerOpenedAt: Date | null = null;
     let saleId: number | null = null;
     let secondSaleId: number | null = null;
+    let weightedProductId: number | null = null;
+    let weightedBatchId: number | null = null;
+    let weightedSaleId: number | null = null;
     let step = "init";
 
     const cleanup = async () => {
@@ -1820,14 +2189,14 @@ export async function registerRoutes(
 
           const localBatches: any[] = await database.select({ id: batches.id })
             .from(batches)
-            .where(eq(batches.batchNumber, marker));
+            .where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")));
           for (const localBatch of localBatches) {
             await database.delete(batchLogs).where(eq(batchLogs.batchId, Number(localBatch.id)));
             await database.delete(batches).where(eq(batches.id, Number(localBatch.id)));
           }
 
-          await database.delete(products).where(eq(products.codigoProduto, marker));
-          await database.delete(products).where(eq(products.name, marker));
+          await database.delete(products).where(or(eq(products.codigoProduto, marker), eq(products.codigoProduto, marker + "_KG")));
+          await database.delete(products).where(or(eq(products.name, marker), eq(products.name, marker + "_KG")));
           if (registerId) {
             // Fallback is constrained to the test user's register created in this run.
             await database.delete(cashRegisters).where(and(
@@ -2008,6 +2377,80 @@ export async function registerRoutes(
         throw new Error("E2E PIX financial reversal transaction missing");
       }
 
+      step = "createWeightedProduct";
+      const weightedProduct = await storage.createProduct({
+        name: marker + "_KG",
+        unit: "kg",
+        minStock: 0,
+        salePrice: 1000,
+        codigoProduto: marker + "_KG",
+      } as any);
+      weightedProductId = weightedProduct.id;
+
+      const weightedBatch = await storage.createBatch({
+        productId: weightedProductId,
+        quantity: 1.5,
+        sku: null,
+        variantName: "E2E WEIGHTED",
+        barcode: null,
+        batchNumber: marker + "_KG",
+        supplierCode: null,
+        supplier: null,
+        manufactureDate: null,
+        expiryDate: null,
+        costPrice: 500,
+        salePrice: 1000,
+        userId: testUserId,
+      } as any);
+      weightedBatchId = weightedBatch.id;
+
+      step = "createWeightedSale";
+      const weightedSale = await storage.createSale(
+        {
+          cashRegisterId: registerId,
+          userId: testUserId,
+          totalAmount: 375,
+          customerName: marker,
+          fiscalStatus: "none",
+          fiscalType: "NFCe",
+          status: "completed",
+        } as any,
+        [{
+          itemType: "product",
+          itemId: 500000 + weightedBatchId,
+          quantity: 375,
+          unitPrice: 1000,
+          totalPrice: 375,
+          unitType: "kg",
+        }] as any,
+        [{
+          method: "cash",
+          amount: 375,
+          createdAt: new Date(),
+        }] as any,
+      );
+      weightedSaleId = weightedSale.id;
+      const weightedItems: any[] = await storage.getSaleItems(weightedSaleId);
+      if (!weightedItems.some((item: any) => Number(item.quantity) === 375 && item.unitType === "kg")) {
+        throw new Error("E2E weighted sale quantity/unit persistence failed");
+      }
+      const weightedStockAfterSale = await storage.getProductBatches(weightedProductId);
+      const weightedRemaining = Number(weightedStockAfterSale.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRemaining - 1.125) > 0.000001) {
+        throw new Error("E2E weighted stock deduction failed: expected 1.500 -> 1.125 kg");
+      }
+
+      step = "cancelWeightedSale";
+      const weightedCancelled = await storage.cancelSale(weightedSaleId);
+      if (weightedCancelled.status !== "cancelled") {
+        throw new Error("E2E weighted sale cancellation failed");
+      }
+      const weightedStockAfterCancel = await storage.getProductBatches(weightedProductId);
+      const weightedRestored = Number(weightedStockAfterCancel.find((batch: any) => batch.id === weightedBatchId)?.quantity);
+      if (Math.abs(weightedRestored - 1.5) > 0.000001) {
+        throw new Error("E2E weighted stock reversal failed: expected 1.125 -> 1.500 kg");
+      }
+
       step = "cancelSale";
       const cancelled = await storage.cancelSale(saleId);
       if (cancelled.status !== "cancelled") {
@@ -2057,6 +2500,7 @@ export async function registerRoutes(
           "financial income for both sales",
           "cancel both sales",
           "stock 0 -> 1 -> 2",
+          "weighted sale 0.375 kg: stock 1.500 -> 1.125 -> 1.500 kg",
           "financial reversal for both sales",
           "cash close",
           "cash history",
@@ -2103,13 +2547,14 @@ export async function registerRoutes(
         const remainingRegisters = registerOpenedAt
           ? await database.select().from(cashRegisters).where(and(eq(cashRegisters.userId, testUserId), eq(cashRegisters.openedAt, registerOpenedAt)))
           : [];
-        const remainingBatchLogs = batchId
-          ? await database.select().from(batchLogs).where(eq(batchLogs.batchId, batchId))
+        const trackedBatchIds = [batchId, weightedBatchId].filter((id): id is number => typeof id === "number");
+        const remainingBatchLogs = trackedBatchIds.length
+          ? await database.select().from(batchLogs).where(or(...trackedBatchIds.map((id) => eq(batchLogs.batchId, id))))
           : [];
         return {
-          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker)))).length,
+          products: (await database.select().from(products).where(or(eq(products.codigoProduto, marker), eq(products.name, marker), eq(products.codigoProduto, marker + "_KG"), eq(products.name, marker + "_KG")))).length,
           sales: (await database.select().from(sales).where(eq(sales.customerName, marker))).length,
-          batches: (await database.select().from(batches).where(eq(batches.batchNumber, marker))).length,
+          batches: (await database.select().from(batches).where(or(eq(batches.batchNumber, marker), eq(batches.batchNumber, marker + "_KG")))).length,
           payments: dependentPayments.length,
           saleItems: dependentSaleItems.length,
           transactions: remainingTransactions.length,
@@ -2126,16 +2571,14 @@ export async function registerRoutes(
   });
 
   // Cashier API
-  app.get("/api/cash-register/open", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.get("/api/cash-register/open", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(404).json({ message: "No open register" });
     res.json(register);
   });
 
-  app.post("/api/cash-register/open", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.post("/api/cash-register/open", isAuthenticated, async (req, res) => {
     try {
       const user = req.user as any;
       const existing = await storage.getOpenCashRegister(user.id);
@@ -2143,6 +2586,7 @@ export async function registerRoutes(
 
       const data = insertCashRegisterSchema.parse({
         ...req.body,
+        enterpriseId: Number(user.enterpriseId),
         userId: user.id,
         status: "open",
         openedAt: new Date()
@@ -2163,8 +2607,21 @@ export async function registerRoutes(
     if (!hasAdminRole(user)) {
       return res.status(403).json({ message: "Acesso restrito ao proprietário" });
     }
-    const { id, amount } = req.body;
-    const updated = await storage.updateCashRegisterOpeningAmount(id, amount);
+    const enterpriseId = Number(user.enterpriseId);
+    const registerId = Number(req.body?.id);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
+    if (!Number.isSafeInteger(registerId) || registerId <= 0) {
+      return res.status(400).json({ message: "Identificador de caixa inválido." });
+    }
+    const [ownedRegister] = await db.select({ id: cashRegisters.id })
+      .from(cashRegisters)
+      .innerJoin(users, eq(cashRegisters.userId, users.id))
+      .where(and(eq(cashRegisters.id, registerId), eq(users.enterpriseId, enterpriseId)))
+      .limit(1);
+    if (!ownedRegister) return res.status(404).json({ message: "Caixa não encontrado nesta empresa." });
+    const updated = await storage.updateCashRegisterOpeningAmount(registerId, req.body.amount);
     res.json(updated);
   });
 
@@ -2191,38 +2648,114 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales", async (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
+  app.post("/api/sales", isAuthenticated, async (req, res) => {
     try {
     const user = req.user as any;
     const register = await storage.getOpenCashRegister(user.id);
     if (!register) return res.status(400).json({ message: "Register must be open to make a sale" });
 
     const { sale, items, payments, ticketId } = req.body;
+    let normalizedTicketId: number | undefined;
+    if (ticketId !== undefined && ticketId !== null) {
+      normalizedTicketId = Number(ticketId);
+      if (!Number.isSafeInteger(normalizedTicketId) || normalizedTicketId <= 0) {
+        return res.status(400).json({ message: "Identificador de comanda inválido." });
+      }
+    }
 
     // Fail closed before any database write: malformed lines or payment totals must
     // never create a sale that cannot be reconciled against stock and the cash register.
     if (!sale || !Array.isArray(items) || items.length === 0 || !Array.isArray(payments) || payments.length === 0) {
       return res.status(400).json({ message: "Venda exige dados, ao menos um item e ao menos um pagamento." });
     }
-    const totalAmount = Number(sale.totalAmount);
-    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0) {
-      return res.status(400).json({ message: "Total da venda deve ser um valor positivo em centavos." });
+    if (sale.status === "simulation" && !isIsolatedQaRuntime) {
+      return res.status(403).json({ code: "SIMULATION_SALE_QA_ONLY", message: "Vendas de simulação estão disponíveis somente no ambiente isolado de QA." });
     }
+    const menuCatalog = await storage.getMenuItems();
+    const authoritativeItems: any[] = [];
+    let itemsTotal = 0;
+
     for (const [index, item] of items.entries()) {
       const quantity = Number(item?.quantity);
-      const unitPrice = Number(item?.unitPrice);
-      const totalPrice = Number(item?.totalPrice);
-      if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
-          !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
-          !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
-          totalPrice !== quantity * unitPrice) {
-        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+      if (!Number.isSafeInteger(quantity) || quantity <= 0) {
+        return res.status(400).json({ message: "Quantidade inválida no item " + (index + 1) + "." });
       }
+
+      const sourceType = String(item?.sourceType || "");
+      const sourceId = Number(item?.sourceId);
+      if (!Number.isSafeInteger(sourceId) || sourceId <= 0) {
+        return res.status(400).json({ message: "Origem do item " + (index + 1) + " inválida." });
+      }
+
+      let authoritativePrice = 0;
+      let authoritativeUnitType: "kg" | "unit" = "unit";
+      let authoritativeItemId = 0;
+
+      if (sourceType === "menu") {
+        const menuItem = menuCatalog.find((candidate) => Number(candidate.id) === sourceId);
+        if (!menuItem) return res.status(409).json({ message: "Um item do cardápio não está mais disponível. Atualize o caixa." });
+        authoritativePrice = Number(menuItem.price);
+        authoritativeUnitType = String((menuItem as any).unitType || "unit").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = Number(menuItem.id);
+      } else if (sourceType === "inventory") {
+        const inventoryItem = await storage.getInventoryItem(sourceId);
+        if (!inventoryItem) return res.status(409).json({ message: "Um item do estoque não existe mais. Atualize o caixa." });
+        const configuredSalePrice = Number(inventoryItem.salePrice || 0);
+        authoritativePrice = configuredSalePrice > 0
+          ? configuredSalePrice
+          : Math.round(Number(inventoryItem.costPrice || 0) * 1.3);
+        authoritativeUnitType = String(inventoryItem.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = 10000 + Number(inventoryItem.id);
+      } else if (sourceType === "batch") {
+        const [batch] = await db.select().from(batches).where(and(eq(batches.id, sourceId), eq(batches.enterpriseId, Number(user.enterpriseId)))).limit(1);
+        if (!batch) return res.status(409).json({ message: "Um lote do produto não existe mais. Atualize o caixa." });
+        const product = await storage.getProduct(Number(batch.productId));
+        if (!product) return res.status(409).json({ message: "O produto do lote não existe mais. Atualize o caixa." });
+        authoritativePrice = Number(batch.salePrice ?? product.salePrice ?? 0);
+        authoritativeUnitType = String(product.unit || "").trim().toLowerCase() === "kg" ? "kg" : "unit";
+        authoritativeItemId = 500000 + Number(batch.id);
+      } else {
+        return res.status(400).json({ message: "Origem do item " + (index + 1) + " não reconhecida." });
+      }
+
+      if (!Number.isSafeInteger(authoritativePrice) || authoritativePrice <= 0) {
+        return res.status(409).json({ message: "Um produto está sem preço de venda válido. Corrija o cadastro antes de vender." });
+      }
+      if (String(item?.unitType) !== authoritativeUnitType) {
+        return res.status(409).json({ message: "A unidade de um item mudou. Atualize o caixa antes de finalizar." });
+      }
+      if (Number(item?.unitPrice) !== authoritativePrice) {
+        return res.status(409).json({ message: "O preço de um item foi atualizado. Atualize o caixa antes de finalizar." });
+      }
+
+      const expectedTotal = authoritativeUnitType === "kg"
+        ? Math.round(quantity * authoritativePrice / 1000)
+        : quantity * authoritativePrice;
+      if (!Number.isSafeInteger(expectedTotal) || expectedTotal <= 0 ||
+          Number(item?.totalPrice) !== expectedTotal) {
+        return res.status(409).json({ message: "O subtotal de um item não corresponde ao preço oficial do catálogo." });
+      }
+
+      itemsTotal += expectedTotal;
+      if (!Number.isSafeInteger(itemsTotal)) {
+        return res.status(400).json({ message: "Total dos itens excede o limite permitido." });
+      }
+
+      authoritativeItems.push({
+        ...item,
+        itemType: "product",
+        itemId: authoritativeItemId,
+        quantity,
+        unitPrice: authoritativePrice,
+        totalPrice: expectedTotal,
+        unitType: authoritativeUnitType,
+        enterpriseId: Number(user.enterpriseId),
+      });
     }
-    const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
-    if (!Number.isSafeInteger(itemsTotal) || itemsTotal !== totalAmount) {
-      return res.status(400).json({ message: "A soma dos itens deve corresponder ao total da venda." });
+
+    const totalAmount = Number(sale.totalAmount);
+    if (!Number.isSafeInteger(totalAmount) || totalAmount <= 0 || itemsTotal !== totalAmount) {
+      return res.status(400).json({ message: "O total informado deve corresponder exatamente aos preços oficiais e às quantidades dos itens." });
     }
     const validPaymentMethods = new Set(["cash", "card", "pix"]);
     for (const [index, payment] of payments.entries()) {
@@ -2238,24 +2771,22 @@ export async function registerRoutes(
 
     const parsedSale = insertSaleSchema.parse({ 
       ...sale, 
+      enterpriseId: Number(user.enterpriseId),
       cashRegisterId: register.id, 
       userId: user.id,
       fiscalStatus: sale.customerTaxId ? "pending" : "none",
+      status: isIsolatedQaRuntime && sale.status === "simulation" ? "simulation" : "completed",
       createdAt: new Date()
     });
-    const parsedItems = items.map((item: any) => insertSaleItemSchema.parse(item));
-    const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse(p));
+    const parsedItems = authoritativeItems.map((item: any) => insertSaleItemSchema.parse(item));
+    const parsedPayments = payments.map((p: any) => insertPaymentSchema.parse({ ...p, enterpriseId: Number(user.enterpriseId) }));
 
     const newSale = await storage.createSale(
       parsedSale,
       parsedItems,
-      parsedPayments
+      parsedPayments,
+      normalizedTicketId
     );
-
-    if (ticketId) {
-      // Mark ticket as completed when sale is finalized
-      await db.update(tickets).set({ status: "completed" }).where(eq(tickets.id, ticketId));
-    }
 
     // Notificação Webhook Simples (Ex: para o dono receber via celular)
     const WEBHOOK_URL = process.env.NOTIFICATION_WEBHOOK_URL;
@@ -2274,22 +2805,33 @@ export async function registerRoutes(
     return res.json(newSale);
     } catch (err: any) {
       console.error("[SALE_CREATE] Falha ao registrar venda:", err);
-      return res.status(500).json({
-        message: "Não foi possível concluir a venda. Consulte vendas, estoque e financeiro antes de repetir a operação.",
-        code: "SALE_CREATE_FAILED"
+      const message = String(err?.message || "");
+      const conflict = /estoque insuficiente|lote .*não encontrado|item de estoque .*não encontrado|comanda .*não está mais ativa|comanda foi alterada|caixa aberto/i.test(message);
+      const notFound = /comanda não encontrada/i.test(message);
+      return res.status(notFound ? 404 : conflict ? 409 : 500).json({
+        message: "Não foi possível concluir a venda. " + (message || "Consulte vendas, estoque e financeiro antes de repetir a operação."),
+        code: notFound ? "TICKET_NOT_FOUND" : conflict ? "SALE_CONFLICT" : "SALE_CREATE_FAILED"
       });
     }
   });
 
-  app.get("/api/cash-registers/history", isAuthenticated, async (req, res) => {
+  app.get("/api/cash-registers/history", isAuthenticated, requireAdmin, async (req, res) => {
     try {
       const { start, end } = req.query;
       const filters: any = {};
       if (start) filters.startDate = new Date(start as string);
       if (end) filters.endDate = new Date(end as string);
 
-      const registers = await storage.getCashRegisters(filters);
-      
+      const user = req.user as any;
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const enterpriseUsers = await db.select({ id: users.id }).from(users).where(eq(users.enterpriseId, enterpriseId));
+      const allowedUserIds = new Set(enterpriseUsers.map((entry: any) => Number(entry.id)));
+      const allRegisters = await storage.getCashRegisters(filters);
+      const registers = allRegisters.filter((register) => allowedUserIds.has(Number(register.userId)));
+
       // For each register, fetch its sales with items
       const enrichedRegisters = await Promise.all(registers.map(async (reg) => {
         const regSales = await storage.getSalesByRegisterId(reg.id);
@@ -2308,27 +2850,32 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/sales", isAuthenticated, async (req, res) => {
-    const { start, end } = req.query;
-    
-    let startDate: Date | undefined;
-    let endDate: Date | undefined;
+  app.get("/api/sales", isAuthenticated, requireAdmin, async (req, res) => {
+    const user = req.user as any;
+    const enterpriseId = Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+    }
 
+    const { start, end } = req.query;
+    const conditions: any[] = [eq(users.enterpriseId, enterpriseId)];
     const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
 
     if (start && start !== "undefined" && start !== "") {
       const date = new Date(start as string);
-      if (isValidDate(date)) startDate = date;
+      if (isValidDate(date)) conditions.push(gte(sales.createdAt, date));
     }
-
     if (end && end !== "undefined" && end !== "") {
       const date = new Date(end as string);
-      if (isValidDate(date)) endDate = date;
+      if (isValidDate(date)) conditions.push(lte(sales.createdAt, date));
     }
 
-    const filters = { startDate, endDate };
-    const salesList = await storage.getSales(filters);
-    res.json(salesList);
+    const rows = await db.select({ sale: sales })
+      .from(sales)
+      .innerJoin(users, eq(sales.userId, users.id))
+      .where(and(...conditions))
+      .orderBy(desc(sales.createdAt));
+    res.json(rows.map((row: any) => row.sale));
   });
 
   app.post("/api/sales/:id/cancel", isAuthenticated, async (req, res) => {
@@ -2343,6 +2890,16 @@ export async function registerRoutes(
         return res.status(400).json({ message: "ID de venda inválido" });
       }
 
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const [ownedSale] = await db.select({ id: sales.id })
+        .from(sales)
+        .innerJoin(users, eq(sales.userId, users.id))
+        .where(and(eq(sales.id, id), eq(users.enterpriseId, enterpriseId)))
+        .limit(1);
+      if (!ownedSale) return res.status(404).json({ message: "Venda não encontrada nesta empresa." });
       const cancelledSale = await storage.cancelSale(id);
       res.json(cancelledSale);
     } catch (err: any) {
@@ -2353,117 +2910,38 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/sales/:id/emit-fiscal", isAuthenticated, async (req, res) => {
-    const user = req.user as any;
-    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito a administradores." });
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "ID de venda inválido." });
-      const sale = await storage.getSale(id);
-      
-      if (!sale) return res.status(404).json({ message: "Venda não encontrada" });
-      if (!isSystemOwner(user)) {
-        const saleOwner = sale.userId ? await storage.getUser(Number(sale.userId)) : undefined;
-        if (!saleOwner || Number(saleOwner.enterpriseId) !== Number(user.enterpriseId)) {
-          return res.status(404).json({ message: "Venda não encontrada" });
-        }
-      }
-      if (!sale.customerTaxId) return res.status(400).json({ message: "CPF necessário para emissão" });
-
-      // Simulação de emissão (Estrutura completa NF-e / NFC-e)
-      const isNFCe = sale.fiscalType === "NFCe";
-      const mod = isNFCe ? "65" : "55";
-      const simulatedKey = `35240100000000000191${mod}001${String(sale.id).padStart(9, '0')}123456789`;
-      
-      const simulatedXml = `<?xml version="1.0" encoding="UTF-8"?>
-<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
-  <NFe>
-    <infNFe Id="NFe${simulatedKey}" versao="4.00">
-      <ide>
-        <cUF>35</cUF>
-        <natOp>Venda de Mercadoria</natOp>
-        <mod>${mod}</mod>
-        <serie>1</serie>
-        <nNF>${sale.id}</nNF>
-        <dhEmi>${new Date().toISOString()}</dhEmi>
-        <tpImp>${isNFCe ? '4' : '1'}</tpImp>
-      </ide>
-      <emit>
-        <CNPJ>00000000000191</CNPJ>
-        <xNome>Barbearia &amp; Padaria SkelleTu</xNome>
-        <enderEmit>
-          <xLgr>Rua Exemplo</xLgr><nro>123</nro><xBairro>Centro</xBairro><cMun>3550308</cMun><xMun>SAO PAULO</xMun><UF>SP</UF>
-        </enderEmit>
-        <CRT>1</CRT>
-      </emit>
-      <dest>
-        <CPF>${sale.customerTaxId}</CPF>
-        <xNome>${sale.customerName || 'Consumidor Final'}</xNome>
-        ${!isNFCe ? `<enderDest><xLgr>${sale.customerAddress || ''}</xLgr><nro>SN</nro><xBairro>Bairro</xBairro><cMun>3550308</cMun><xMun>${sale.customerCity || ''}</xMun><UF>${sale.customerState || ''}</UF></enderDest>` : ''}
-      </dest>
-      <det nItem="1">
-        <prod>
-          <cProd>001</cProd>
-          <xProd>Serviço/Produto Geral</xProd>
-          <NCM>00000000</NCM>
-          <CFOP>${isNFCe ? '5102' : '5101'}</CFOP>
-          <uCom>UN</uCom>
-          <qCom>1.0000</qCom>
-          <vUnCom>${(sale.totalAmount/100).toFixed(2)}</vUnCom>
-          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd>
-        </prod>
-        <imposto>
-          <vTotTrib>${(sale.totalAmount * 0.1345 / 100).toFixed(2)}</vTotTrib>
-          <ICMS><ICMS00><orig>0</orig><CST>00</CST><modBC>3</modBC><vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><pICMS>18.00</pICMS><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS></ICMS00></ICMS>
-        </imposto>
-      </det>
-      <total>
-        <ICMSTot>
-          <vBC>${(sale.totalAmount/100).toFixed(2)}</vBC><vICMS>${(sale.totalAmount * 0.18 / 100).toFixed(2)}</vICMS>
-          <vProd>${(sale.totalAmount/100).toFixed(2)}</vProd><vNF>${(sale.totalAmount/100).toFixed(2)}</vNF>
-        </ICMSTot>
-      </total>
-      <transp><modFrete>9</modFrete></transp>
-      <pag>
-        <detPag><tPag>01</tPag><vPag>${(sale.totalAmount/100).toFixed(2)}</vPag></detPag>
-      </pag>
-    </infNFe>
-    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>...</Signature>
-  </NFe>
-</nfeProc>`;
-      
-      const updatedSale = await storage.updateSaleFiscal(sale.id, {
-        fiscalStatus: "issued",
-        fiscalKey: simulatedKey,
-        fiscalXml: simulatedXml
-      });
-
-      res.json({ 
-        message: "Simulação de emissão concluída", 
-        key: simulatedKey,
-        status: "issued",
-        sale: updatedSale
-      });
-    } catch (err) {
-      res.status(500).json({ message: "Erro na simulação fiscal" });
-    }
+  // Legacy endpoint intentionally fails closed: its former implementation generated
+  // hard-coded, unsigned sample XML and marked a sale as issued without SEFAZ proof.
+  // Real fiscal issuance is handled only by /api/fiscal/emitir/:saleId.
+  app.post("/api/sales/:id/emit-fiscal", isAuthenticated, requireAdmin, async (_req, res) => {
+    return res.status(410).json({
+      code: "LEGACY_FISCAL_SIMULATION_DISABLED",
+      message: "Este endpoint legado gerava documento fictício. Use o fluxo fiscal configurado em /api/fiscal/emitir/:saleId; nenhuma venda foi alterada."
+    });
   });
-
-  app.get("/api/transactions", isAuthenticated, async (req, res) => {
+  app.get("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const { start, end, businessType } = req.query;
-      console.log('API Request - GET /api/transactions:', { start, end, businessType });
-      
+      const user = req.user as any;
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const [activeEnterprise] = await db.select({
+        id: enterprises.id,
+        businessType: enterprises.businessType
+      }).from(enterprises).where(eq(enterprises.id, activeEnterpriseId)).limit(1);
+      if (!activeEnterprise && !isSystemOwner(user)) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+
+      const { start, end } = req.query;
       let startDate: Date | undefined;
       let endDate: Date | undefined;
-
       const isValidDate = (date: any) => date instanceof Date && !isNaN(date.getTime());
-
       if (start && start !== "undefined" && start !== "") {
         const date = new Date(start as string);
         if (isValidDate(date)) startDate = date;
       }
-
       if (end && end !== "undefined" && end !== "") {
         const date = new Date(end as string);
         if (isValidDate(date)) endDate = date;
@@ -2472,20 +2950,35 @@ export async function registerRoutes(
       const filters = {
         startDate,
         endDate,
-        businessType: businessType as string,
+        businessType: activeEnterprise?.businessType || undefined,
       };
       const list = await storage.getTransactions(filters);
-      console.log('Storage returned transactions count:', list.length);
       res.json(list);
     } catch (err) {
-      console.error('Error in GET /api/transactions:', err);
+      console.error("Error in GET /api/transactions:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
-  app.post("/api/transactions", isAuthenticated, async (req, res) => {
+  app.post("/api/transactions", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const input = insertTransactionSchema.parse(req.body);
+      const user = req.user as any;
+      const activeEnterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(activeEnterpriseId) || activeEnterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de lançar uma transação." });
+      }
+      const [activeEnterprise] = await db.select({
+        id: enterprises.id,
+        businessType: enterprises.businessType
+      }).from(enterprises).where(eq(enterprises.id, activeEnterpriseId)).limit(1);
+      if (!activeEnterprise) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo antes de lançar uma transação." });
+      }
+      const input = insertTransactionSchema.parse({
+        ...req.body,
+        enterpriseId: activeEnterpriseId,
+        businessType: activeEnterprise.businessType,
+      });
       const transaction = await storage.createTransaction(input);
       res.status(201).json(transaction);
     } catch (err) {
@@ -2497,18 +2990,26 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/transactions/:id", isAuthenticated, async (req, res) => {
+  app.delete("/api/transactions/:id", isAuthenticated, requireAdmin, async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
+      const user = req.user as any;
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ code: "ENTERPRISE_CONTEXT_REQUIRED", message: "Selecione um estabelecimento ativo." });
+      }
+      const id = Number(req.params.id);
+      if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de transação inválido" });
       await storage.deleteTransaction(id);
-      res.status(200).json({ message: "Transaction deleted" });
-    } catch (err) {
+      res.status(200).json({ ok: true });
+    } catch (err: any) {
+      const message = String(err?.message || "");
+      if (/Transação .* não encontrada/.test(message)) return res.status(404).json({ message: "Transação não encontrada." });
       res.status(500).json({ message: "Internal server error" });
     }
   });
 
   // Inventory API
-  app.post("/api/inventory/log", isAuthenticated, async (req, res) => {
+  app.post("/api/inventory/log", isAuthenticated, requireAdmin, async (req, res) => {
     const user = req.user as any;
     const log = await storage.createInventoryLog({ ...req.body, userId: user.id });
     const inv = await storage.getInventoryItem(log.inventoryId);
@@ -2519,12 +3020,85 @@ export async function registerRoutes(
     res.json(log);
   });
   app.post("/api/tickets/:id/items", async (req, res) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-items:" + ip, 20, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas atualizações de comanda. Aguarde um minuto e tente novamente." });
+    }
+
+    const ticketId = Number(req.params.id);
+    if (!Number.isSafeInteger(ticketId) || ticketId <= 0) {
+      return res.status(400).json({ message: "Identificador de comanda inválido." });
+    }
+
+    const authenticatedStaff = Boolean(
+      req.isAuthenticated?.() &&
+      ["admin", "owner", "tenant_owner", "employee", "barber"].includes(normalizeRole(req.user))
+    );
+    const suppliedTicketToken = String(
+      req.get("x-ticket-token") || req.body?.publicAccessToken || ""
+    ).trim();
+    if (!authenticatedStaff && (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128)) {
+      return res.status(401).json({ code: "TICKET_POSSESSION_REQUIRED", message: "Token de posse da comanda obrigatório." });
+    }
+
+    const parsedBody = z.object({
+      items: z.array(z.string().max(2048)).max(100)
+    }).safeParse(req.body);
+    if (!parsedBody.success) {
+      return res.status(400).json({ message: "Carrinho inválido. Revise os itens e tente novamente." });
+    }
+
     try {
-      const { items } = req.body;
-      const ticket = await storage.updateTicketItems(Number(req.params.id), items);
-      res.json(ticket);
-    } catch (err) {
-      res.status(500).json({ message: "Erro ao atualizar comanda" });
+      if (!(await setPublicTenantContext(req, res))) return;
+      const enterpriseId = Number(
+        (req.user as any)?.enterpriseId || getAuraContext().enterpriseId || 0
+      );
+      const [ticketRecord] = await db.select().from(tickets)
+        .where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
+      if (!ticketRecord) return res.status(404).json({ message: "Comanda não encontrada." });
+      if (!authenticatedStaff && String((ticketRecord as any).publicAccessToken || "") !== suppliedTicketToken) {
+        return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+      }
+      if (ticketRecord.status !== "pending" && ticketRecord.status !== "serving") {
+        return res.status(409).json({ message: "Esta comanda já foi finalizada e não pode mais ser alterada." });
+      }
+
+      const requestedItems = parsedBody.data.items.map((raw) => {
+        let value: unknown;
+        try { value = JSON.parse(raw); } catch { throw new Error("ITEM_INVALIDO"); }
+        const parsed = z.object({
+          id: z.number().int().positive(),
+          quantity: z.number().int().min(1).max(100)
+        }).passthrough().safeParse(value);
+        if (!parsed.success) throw new Error("ITEM_INVALIDO");
+        return parsed.data;
+      });
+
+      const availableMenuItems = await storage.getMenuItems();
+      const menuById = new Map(availableMenuItems.map((item) => [Number(item.id), item]));
+      const normalizedItems = requestedItems.map((item) => {
+        const catalogItem = menuById.get(item.id);
+        if (!catalogItem) throw new Error("ITEM_INDISPONIVEL");
+        return JSON.stringify({
+          id: Number(catalogItem.id),
+          name: catalogItem.name,
+          price: Number(catalogItem.price),
+          quantity: item.quantity
+        });
+      });
+
+      const ticket = await storage.updateTicketItems(ticketId, normalizedItems);
+      if (!ticket) return res.status(404).json({ message: "Comanda não encontrada." });
+      return res.json(ticket);
+    } catch (err: any) {
+      if (err?.message === "ITEM_INVALIDO") {
+        return res.status(400).json({ message: "Um ou mais itens do carrinho estão inválidos." });
+      }
+      if (err?.message === "ITEM_INDISPONIVEL") {
+        return res.status(409).json({ message: "Um ou mais produtos não estão mais disponíveis." });
+      }
+      console.error("[TICKET] Falha ao atualizar itens:", err);
+      return res.status(500).json({ message: "Erro ao atualizar comanda." });
     }
   });
 
@@ -2545,42 +3119,189 @@ export async function registerRoutes(
   app.get("/api/time-clock/status", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     const latest = await storage.getLatestTimeClock(user.id);
-    res.json({ latest });
+    // WebAuthn registration and assertion are verified cryptographically on the server.
+    res.json({ latest, webauthnReady: true, webauthnRegistered: Boolean((user as any).webauthnPublicKey && (user as any).webauthnCredentialId) });
+  });
+
+  app.get("/api/auth/webauthn/assertion/options", isAuthenticated, async (req, res) => {
+    const user = req.user as any;
+    const credentialId = String(user.webauthnCredentialId || user.fingerprintId || "").trim();
+    const publicKey = String(user.webauthnPublicKey || "").trim();
+    if (!credentialId || !publicKey) return res.status(409).json({ code: "WEBAUTHN_NOT_REGISTERED", message: "Cadastre sua credencial WebAuthn primeiro." });
+    const challenge = randomBytes(32).toString("base64url");
+    const { origin, rpId } = webAuthnConfig(req);
+    (req.session as any).webauthnAssertionChallenge = { challenge, expiresAt: Date.now() + 5 * 60 * 1000, origin, rpId, userId: Number(user.id) };
+    res.json({ challenge, rpId, allowCredentials: [{ id: credentialId, type: "public-key" }], userVerification: "required", timeout: 60000 });
   });
 
   app.post("/api/time-clock/register", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    const { type, fingerprintId } = req.body;
-    
-    if (!user.fingerprintId) {
-      return res.status(400).json({ message: "Você precisa cadastrar sua digital primeiro!" });
+    if (isIsolatedQaRuntime && typeof req.body?.fingerprintId === "string" && req.body.fingerprintId === String(user.fingerprintId || "")) {
+      const type = String(req.body?.type || "");
+      const allowedTypes = new Set(["in", "break_start", "break_end", "out"]);
+      if (!allowedTypes.has(type)) return res.status(400).json({ message: "Tipo de registro de ponto inválido." });
+      const latest = await storage.getLatestTimeClock(user.id);
+      const expectedType = !latest || latest.type === "out"
+        ? "in"
+        : latest.type === "in"
+          ? "break_start"
+          : latest.type === "break_start"
+            ? "break_end"
+            : "out";
+      if (type !== expectedType) return res.status(409).json({ message: "A sequência do ponto está incorreta. Atualize o status e tente novamente.", expectedType });
+      const clock = await storage.createTimeClock({ enterpriseId: Number(user.enterpriseId), userId: user.id, type, timestamp: new Date(), fingerprintId: String(user.fingerprintId) });
+      return res.json(clock);
+    }
+    const credentialId = String(req.body?.credentialId || "").trim();
+    const clientDataJSON = fromBase64Url(String(req.body?.clientDataJSON || ""));
+    const authenticatorData = fromBase64Url(String(req.body?.authenticatorData || ""));
+    const signature = fromBase64Url(String(req.body?.signature || ""));
+    const storedCredentialId = String(user.webauthnCredentialId || user.fingerprintId || "").trim();
+    const storedPublicKey = String(user.webauthnPublicKey || "").trim();
+    if (!storedCredentialId || !storedPublicKey) {
+      return res.status(400).json({ code: "WEBAUTHN_NOT_REGISTERED", message: "Cadastre sua credencial WebAuthn primeiro." });
+    }
+    if (!credentialId || credentialId !== storedCredentialId || clientDataJSON.length === 0 || authenticatorData.length < 37 || signature.length === 0) {
+      return res.status(401).json({ code: "WEBAUTHN_INVALID_ASSERTION", message: "Resposta WebAuthn inválida." });
+    }
+    try {
+      const pending = (req.session as any).webauthnAssertionChallenge;
+      if (!pending || pending.userId !== Number(user.id) || Date.now() > Number(pending.expiresAt)) {
+        return res.status(409).json({ code: "WEBAUTHN_CHALLENGE_EXPIRED", message: "A solicitação WebAuthn expirou. Tente novamente." });
+      }
+      const { origin, rpId } = webAuthnConfig(req);
+      if (pending.origin !== origin || pending.rpId !== rpId) throw new Error("Contexto WebAuthn inválido.");
+      validateWebAuthnClientData(clientDataJSON, "webauthn.get", pending.challenge, origin);
+      const auth = validateWebAuthnAuthenticatorData(authenticatorData, rpId, true);
+      const clientDataHash = createHash("sha256").update(clientDataJSON).digest();
+      const signedData = Buffer.concat([authenticatorData, clientDataHash]);
+      const publicKey = fromBase64Url(storedPublicKey);
+      const verified = verifySignature("sha256", signedData, { key: publicKey, format: "der", type: "spki" }, signature);
+      if (!verified) return res.status(401).json({ code: "WEBAUTHN_SIGNATURE_INVALID", message: "Assinatura WebAuthn inválida." });
+      const previousCount = Number(user.webauthnSignCount || 0);
+      if (auth.signCount !== 0 && previousCount !== 0 && auth.signCount <= previousCount) {
+        return res.status(401).json({ code: "WEBAUTHN_COUNTER_INVALID", message: "Contador WebAuthn inválido. A credencial pode ter sido clonada." });
+      }
+      await db.update(users).set({ webauthnSignCount: auth.signCount } as any).where(eq(users.id, user.id));
+      delete (req.session as any).webauthnAssertionChallenge;
+    } catch (error: any) {
+      console.error("[WEBAUTHN] Falha na verificação:", error?.message || error);
+      return res.status(401).json({ code: "WEBAUTHN_ASSERTION_REJECTED", message: error?.message || "Autenticação WebAuthn rejeitada." });
     }
 
-    if (fingerprintId !== user.fingerprintId) {
-      return res.status(400).json({ message: "Digital não reconhecida." });
+    const type = String(req.body?.type || "");
+    const allowedTypes = new Set(["in", "break_start", "break_end", "out"]);
+    if (!allowedTypes.has(type)) {
+      return res.status(400).json({ message: "Tipo de registro de ponto inválido." });
     }
-    
+
+    const latest = await storage.getLatestTimeClock(user.id);
+    const expectedType = !latest || latest.type === "out"
+      ? "in"
+      : latest.type === "in"
+        ? "break_start"
+        : latest.type === "break_start"
+          ? "break_end"
+          : latest.type === "break_end"
+            ? "out"
+            : "in";
+    if (type !== expectedType) {
+      return res.status(409).json({ message: "A sequência do ponto está incorreta. Atualize o status e tente novamente.", expectedType });
+    }
+
     const clock = await storage.createTimeClock({
+      enterpriseId: Number(user.enterpriseId),
       userId: user.id,
-      type, // "in", "break_start", "break_end", "out"
+      type,
       timestamp: new Date(),
-      fingerprintId
+      fingerprintId: credentialId
     });
     res.json(clock);
   });
 
-  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+  app.get("/api/auth/webauthn/register/options", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    const { fingerprintId } = req.body;
-    if (!fingerprintId) return res.status(400).json({ message: "ID da digital é obrigatório" });
-    
-    await db.update(users).set({ fingerprintId }).where(eq(users.id, user.id));
-    res.json({ message: "Digital vinculada com sucesso" });
+    if (!globalThis.crypto) return res.status(503).json({ code: "WEBAUTHN_UNAVAILABLE", message: "WebAuthn não está disponível neste servidor." });
+    const challenge = randomBytes(32).toString("base64url");
+    const { origin, rpId } = webAuthnConfig(req);
+    (req.session as any).webauthnRegistrationChallenge = { challenge, expiresAt: Date.now() + 5 * 60 * 1000, origin, rpId, userId: Number(user.id) };
+    res.json({
+      challenge,
+      rp: { id: rpId, name: "Aura System" },
+      user: { id: toBase64Url(Buffer.from(String(user.id))), name: String(user.username), displayName: String(user.username) },
+      pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }],
+      authenticatorSelection: { userVerification: "required", residentKey: "preferred" },
+      timeout: 60000,
+      attestation: "none",
+    });
+  });
+
+  app.post("/api/auth/register-fingerprint", isAuthenticated, async (req, res) => {
+    if (isIsolatedQaRuntime && typeof req.body?.fingerprintId === "string" && req.body.fingerprintId.trim()) {
+      const user = req.user as any;
+      await db.update(users).set({ fingerprintId: req.body.fingerprintId.trim() } as any).where(eq(users.id, user.id));
+      return res.json({ message: "Credencial QA vinculada." });
+    }
+    const user = req.user as any;
+    const pending = (req.session as any).webauthnRegistrationChallenge;
+    if (!pending || pending.userId !== Number(user.id) || Date.now() > Number(pending.expiresAt)) {
+      return res.status(409).json({ code: "WEBAUTHN_CHALLENGE_EXPIRED", message: "A solicitação WebAuthn expirou. Inicie o cadastro novamente." });
+    }
+    try {
+      const credentialId = String(req.body?.credentialId || "").trim();
+      const clientDataJSON = fromBase64Url(String(req.body?.clientDataJSON || ""));
+      const authenticatorData = fromBase64Url(String(req.body?.authenticatorData || ""));
+      const publicKeyDer = fromBase64Url(String(req.body?.publicKey || ""));
+      if (!credentialId || clientDataJSON.length === 0 || authenticatorData.length < 37 || publicKeyDer.length === 0) {
+        return res.status(400).json({ code: "WEBAUTHN_INVALID_PAYLOAD", message: "Resposta WebAuthn incompleta." });
+      }
+      validateWebAuthnClientData(clientDataJSON, "webauthn.create", pending.challenge, pending.origin);
+      const auth = validateWebAuthnAuthenticatorData(authenticatorData, pending.rpId, true);
+      const stored = {
+        credentialId,
+        publicKey: toBase64Url(publicKeyDer),
+        signCount: auth.signCount,
+      };
+      await db.update(users).set({
+        webauthnCredentialId: credentialId,
+        webauthnPublicKey: stored.publicKey,
+        webauthnSignCount: stored.signCount,
+        fingerprintId: credentialId,
+      } as any).where(eq(users.id, user.id));
+      delete (req.session as any).webauthnRegistrationChallenge;
+      res.json({ message: "Credencial WebAuthn vinculada com sucesso.", credentialId });
+    } catch (error: any) {
+      console.error("[WEBAUTHN] Falha no registro:", error?.message || error);
+      return res.status(400).json({ code: "WEBAUTHN_REGISTRATION_REJECTED", message: error?.message || "Credencial WebAuthn rejeitada." });
+    }
   });
 
   app.get("/api/tickets/:number", async (req, res) => {
-    const ticket = await storage.getTicketByNumber(Number(req.params.number));
+    if (!(await setPublicTenantContext(req, res))) return;
+    const authenticatedStaff = Boolean(
+      req.isAuthenticated?.() &&
+      ["admin", "owner", "tenant_owner", "employee", "barber"].includes(normalizeRole(req.user))
+    );
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    if (!allowPublicAction("ticket-lookup:" + ip, 30, 60 * 1000)) {
+      return res.status(429).json({ message: "Muitas consultas de comanda. Aguarde um minuto e tente novamente." });
+    }
+    const ticketNumber = Number(req.params.number);
+    if (!Number.isSafeInteger(ticketNumber) || ticketNumber <= 0) {
+      return res.status(400).json({ message: "Número de comanda inválido." });
+    }
+    const suppliedTicketToken = String(req.get("x-ticket-token") || req.query?.ticketToken || "").trim();
+    const ticket = await storage.getTicketByNumber(ticketNumber, !authenticatedStaff);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
+    if (!authenticatedStaff) {
+      if (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128) {
+        return res.status(401).json({ code: "TICKET_POSSESSION_REQUIRED", message: "Token de posse da comanda obrigatório." });
+      }
+      if (String((ticket as any).publicAccessToken || "") !== suppliedTicketToken) {
+        return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+      }
+    }
+    delete (ticket as any).publicAccessToken;
     res.json(ticket);
   });
   // Reconcile the owner account independently in each active database.
@@ -2769,9 +3490,9 @@ export async function registerRoutes(
   app.get("/api/backup/status", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
     res.json({
-      autoBackup: isRemoteEnabled ? { exists: false } : getAutoBackupInfo(),
+      autoBackup: (neonPool || isRemoteEnabled) ? { exists: false } : getAutoBackupInfo(),
       backup: {
-        complete: !isRemoteEnabled,
+        complete: !neonPool && !isRemoteEnabled,
         authoritativeSource: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
         message: neonPool
           ? "O banco primário é Neon PostgreSQL. O backup remoto verificado ainda não está configurado; snapshots locais não são cópia completa da produção."
@@ -2794,7 +3515,7 @@ export async function registerRoutes(
   // GET /api/backup/export — baixa snapshot JSON completo
   app.get("/api/backup/export", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const snapshot = exportAllDataSync();
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -2812,7 +3533,7 @@ export async function registerRoutes(
   // POST /api/backup/save — salva snapshot nomeado em arquivo
   app.post("/api/backup/save", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const { name } = req.body;
       const filepath = saveBackupToFile(name || undefined);
@@ -2826,7 +3547,7 @@ export async function registerRoutes(
   // GET /api/backup/list — lista backups salvos
   app.get("/api/backup/list", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.json([]);
+    if (neonPool || isRemoteEnabled) return res.json([]);
     try {
       res.json(listBackups());
     } catch (e: any) {
@@ -2837,7 +3558,7 @@ export async function registerRoutes(
   // GET /api/backup/download/:filename — baixa arquivo de backup específico
   app.get("/api/backup/download/:filename", (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     const { filename } = req.params;
     // segurança: só permite nomes simples sem paths
     if (filename.includes("..") || filename.includes("/")) {
@@ -2853,7 +3574,7 @@ export async function registerRoutes(
   // POST /api/backup/import — restaura a partir de JSON enviado no body
   app.post("/api/backup/import", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const snapshot = req.body;
       if (!snapshot || typeof snapshot !== "object") {
@@ -2869,7 +3590,7 @@ export async function registerRoutes(
   // POST /api/backup/restore/:filename — restaura a partir de arquivo salvo
   app.post("/api/backup/restore/:filename", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     const { filename } = req.params;
     if (filename.includes("..") || filename.includes("/")) {
       return res.status(400).json({ message: "Nome inválido" });
@@ -2885,7 +3606,7 @@ export async function registerRoutes(
   // POST /api/backup/restore-auto — restaura a partir do auto-backup
   app.post("/api/backup/restore-auto", async (req: any, res: any) => {
     if (!requireBackupOwner(req, res)) return;
-    if (isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
+    if (neonPool || isRemoteEnabled) return res.status(409).json(remoteBackupUnavailable);
     try {
       const result = await restoreFromFile("auto-backup");
       res.json({ ok: true, ...result, message: "Auto-backup restaurado com sucesso" });

@@ -30,6 +30,15 @@ export function generateChaveAcesso(settings: any, nNF: number) {
   return base + dv;
 }
 
+function toBrazilFiscalDateTime(date = new Date()): string {
+  const pad = (value: number, size = 2) => String(value).padStart(size, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absolute = Math.abs(offsetMinutes);
+  const offset = `${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${offset}`;
+}
+
 // ─── Geração do XML NF-e 4.00 ─────────────────────────────────────────────────
 export function generateNFCeXML(
   sale: any,
@@ -56,7 +65,7 @@ export function generateNFCeXML(
         mod: "65",
         serie: settings.serieNfce,
         nNF,
-        dhEmi: new Date().toISOString().split(".")[0] + "-03:00",
+        dhEmi: toBrazilFiscalDateTime(),
         tpNF: "1",
         idDest: "1",
         cMunFG: settings.codigoIbge,
@@ -390,7 +399,7 @@ function httpsPost(
       },
       key: options.key,
       cert: options.cert,
-      rejectUnauthorized: options.rejectUnauthorized ?? false,
+      rejectUnauthorized: options.rejectUnauthorized ?? true,
       timeout: 30000,
     };
 
@@ -398,7 +407,13 @@ function httpsPost(
       let data = "";
       res.setEncoding("utf8");
       res.on("data", (chunk) => (data += chunk));
-      res.on("end", () => resolve(data));
+      res.on("end", () => {
+        const statusCode = Number(res.statusCode || 0);
+        if (statusCode < 200 || statusCode >= 300) {
+          return reject(new Error("SEFAZ respondeu HTTP " + statusCode + ": " + data.slice(0, 500)));
+        }
+        resolve(data);
+      });
     });
 
     req.on("error", reject);
@@ -424,23 +439,31 @@ export async function transmitToSefaz(
   xMotivo: string;
   simulado?: boolean;
 }> {
-  const isHomologacao = settings.ambiente !== "producao";
-  const uf = settings.uf?.toUpperCase() || "SP";
+  const isHomologacao = settings.ambiente === "homologacao";
+  if (!isHomologacao && settings.ambiente !== "producao") throw new Error("Ambiente fiscal inválido. Use homologacao ou producao.");
+  const uf = String(settings.uf || "").trim().toUpperCase();
+  if (!uf) throw new Error("UF do estabelecimento é obrigatória para NFC-e.");
 
-  // Sem certificado → simula resposta (modo desenvolvimento)
+  // Em produção, ausência de certificado jamais pode resultar em autorização simulada.
   if (!settings.certificadoA1 || !settings.certificadoSenha) {
-    console.warn("[FISCAL] Sem certificado — transmissão simulada");
-    return {
-      success: true,
-      protocol: "SIM" + Math.floor(Math.random() * 1000000000),
-      key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "",
-      cStat: "100",
-      xMotivo: "Simulado — sem certificado A1 configurado",
-      simulado: true,
-    };
+    if (isHomologacao) {
+      console.warn("[FISCAL] Sem certificado — transmissão simulada apenas em homologação");
+      return {
+        success: true,
+        protocol: "SIM" + Math.floor(Math.random() * 1000000000),
+        key: xmlSigned.match(/Id="NFe(\d+)"/)?.[1] || "",
+        cStat: "100",
+        xMotivo: "Simulado — sem certificado A1 configurado (homologação)",
+        simulado: true,
+      };
+    }
+    throw new Error("Certificado A1 e senha são obrigatórios para transmissão fiscal em produção.");
   }
 
-  const endpoints = SEFAZ_ENDPOINTS[uf] || SEFAZ_ENDPOINTS["SP"];
+  const endpoints = SEFAZ_ENDPOINTS[uf];
+  if (!endpoints) {
+    throw new Error("UF " + uf + " ainda não possui endpoint NFC-e homologado no Aura System. A transmissão foi interrompida para evitar envio ao estado incorreto.");
+  }
   const url = isHomologacao ? endpoints.hom : endpoints.prod;
 
   console.log(`[FISCAL] Transmitindo para SEFAZ-${uf} (${settings.ambiente}): ${url}`);
@@ -460,6 +483,9 @@ export async function transmitToSefaz(
 
     const privateKeyPem = keyBag?.key ? forge.pki.privateKeyToPem(keyBag.key) : undefined;
     const certPem = certBag?.cert ? forge.pki.certificateToPem(certBag.cert) : undefined;
+    if (!privateKeyPem || !certPem) {
+      throw new Error("O certificado A1 não contém chave privada e certificado público válidos.");
+    }
 
     // Monta envelope SOAP 1.2
     const cUF = settings.codigoIbge?.substring(0, 2) || "35";
@@ -489,7 +515,7 @@ export async function transmitToSefaz(
     const responseXml = await httpsPost(url, soapEnvelope, {
       key: privateKeyPem,
       cert: certPem,
-      rejectUnauthorized: false,
+      rejectUnauthorized: true,
     });
 
     console.log("[FISCAL] Resposta SEFAZ recebida");
@@ -556,8 +582,10 @@ export async function transmitToSefaz(
 
 // ─── QR Code URL (SHA1 conforme manual SEFAZ) ────────────────────────────────
 export function generateQRCode(chave: string, settings: any): string {
-  const isHomologacao = settings.ambiente !== "producao";
-  const uf = settings.uf?.toUpperCase() || "SP";
+  const isHomologacao = settings.ambiente === "homologacao";
+  if (!isHomologacao && settings.ambiente !== "producao") throw new Error("Ambiente fiscal inválido. Use homologacao ou producao.");
+  const uf = String(settings.uf || "").trim().toUpperCase();
+  if (!uf) throw new Error("UF do estabelecimento é obrigatória para NFC-e.");
 
   // URL base por UF
   const urlBases: Record<string, { hom: string; prod: string }> = {
@@ -583,11 +611,18 @@ export function generateQRCode(chave: string, settings: any): string {
     },
   };
 
-  const urls = urlBases[uf] || urlBases["SP"];
+  const urls = urlBases[uf];
+  if (!urls) throw new Error("UF " + uf + " ainda não possui URL de QR Code NFC-e configurada no Aura System.");
   const urlBase = isHomologacao ? urls.hom : urls.prod;
 
-  const csc = settings.cscToken || "";
-  const cscId = settings.cscId ? settings.cscId.toString().padStart(6, "0") : "000001";
+  const csc = String(settings.cscToken || "").trim();
+  const configuredCscId = settings.cscId !== undefined && settings.cscId !== null
+    ? String(settings.cscId).trim()
+    : "";
+  if (!csc || !configuredCscId) {
+    throw new Error("CSC e ID do CSC são obrigatórios para NFC-e em produção.");
+  }
+  const cscId = configuredCscId;
   const tpAmb = isHomologacao ? "2" : "1";
 
   // Hash = SHA1(chave|2|tpAmb|cscId + csc)

@@ -124,7 +124,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   const { data: enterprisesList, refetch: refetchEnterprises } = useQuery<any[]>({
     queryKey: ["/api/admin/enterprises"],
-    enabled: enterprisesOpen && user?.username === "SkelleTu"
+    enabled: enterprisesOpen && String(user?.role ?? "").trim().toLowerCase() === "owner"
   });
 
   const createEnterpriseMutation = useMutation({
@@ -174,7 +174,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
 
   const { data: usersList, refetch: refetchUsers } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
-    enabled: adminPanelOpen && user?.username === "SkelleTu"
+    enabled: adminPanelOpen && String(user?.role ?? "").trim().toLowerCase() === "owner"
   });
 
   const registerBarberMutation = useMutation({
@@ -358,7 +358,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     // Rotas liberadas para todos sem senha master
     const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
     
-    if (user?.username === "SkelleTu" || freeRoutes.includes(url)) {
+    if (String(user?.role ?? "").trim().toLowerCase() === "owner" || freeRoutes.includes(url)) {
       setLocation(url);
       setOpen(false);
     } else {
@@ -382,7 +382,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       collapsible="icon" 
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
-      className={user?.username === "SkelleTu" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}
+      className={String(user?.role ?? "").trim().toLowerCase() === "owner" ? "bg-floating-icons z-[100]" : "bg-zinc-950 z-[100]"}
     >
       <div className="md:hidden flex items-center justify-between p-4 border-b border-white/5 bg-black/50">
         <div className="flex items-center justify-center">

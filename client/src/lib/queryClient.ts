@@ -33,12 +33,16 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
+  options?: RequestInit,
 ): Promise<Response> {
+  const headers = new Headers(options?.headers);
+  if (data !== undefined) headers.set("Content-Type", "application/json");
   const res = await fetch(url, {
+    ...options,
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
+    headers,
+    body: data !== undefined ? JSON.stringify(data) : options?.body,
+    credentials: options?.credentials ?? "include",
   });
 
   await throwIfResNotOk(res);

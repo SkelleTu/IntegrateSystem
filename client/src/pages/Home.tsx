@@ -6,37 +6,58 @@ import {
   Clock, Star, Shield, Download, BookOpen, Power,
 } from "lucide-react";
 import { motion } from "framer-motion";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MenuItem, Category } from "@shared/schema";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/tour/TourContext";
-
-function getTutorialKey(userId: number | string) {
-  return `aura_tutorial_done_${userId}`;
-}
 
 export default function Home() {
   const [, setLocation] = useLocation();
   const { user, logout } = useAuth() as any;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { active, openModeSelect, stop } = useTour();
 
-  // ── First-time detection ───────────────────────────────────────────────────
+  const tutorialWasActive = useRef(false);
+  const { data: tutorialStatus, isLoading: isTutorialStatusLoading } = useQuery<{ completed: boolean }>({
+    queryKey: ["/api/tutorial/status"],
+    enabled: !!user,
+    queryFn: async () => {
+      const response = await fetch("/api/tutorial/status", { credentials: "include" });
+      if (!response.ok) throw new Error("Não foi possível consultar o tutorial.");
+      return response.json();
+    },
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+  });
+
+  // Abre automaticamente somente quando o servidor confirma que ainda não foi concluído/pulado.
   useEffect(() => {
-    if (!user) return;
-    const key = getTutorialKey(user.id);
-    const done = localStorage.getItem(key);
-    if (!done) {
-      // Mark as seen immediately so it won't auto-open again on next visit
-      localStorage.setItem(key, "1");
-      // Slight delay so the dashboard renders first
-      const t = setTimeout(() => openModeSelect(true), 600);
-      return () => clearTimeout(t);
+    if (!user || isTutorialStatusLoading || tutorialStatus?.completed !== false || active) return;
+    const timer = setTimeout(() => openModeSelect(true), 600);
+    return () => clearTimeout(timer);
+  }, [user?.id, isTutorialStatusLoading, tutorialStatus?.completed, active, openModeSelect]);
+
+  // A conclusão e o botão Pular são persistidos no banco, por conta autenticada.
+  useEffect(() => {
+    if (active) {
+      tutorialWasActive.current = true;
+      return;
     }
-  }, [user]);          // eslint-disable-line react-hooks/exhaustive-deps
+    if (tutorialWasActive.current && user) {
+      tutorialWasActive.current = false;
+      void fetch("/api/tutorial/complete", {
+        method: "POST",
+        credentials: "include",
+      }).then((response) => {
+        if (!response.ok) throw new Error("Não foi possível salvar a conclusão do tutorial.");
+        queryClient.setQueryData(["/api/tutorial/status"], { completed: true });
+      }).catch((error) => console.error("[TUTORIAL] Falha ao salvar conclusão:", error));
+    }
+  }, [active, user?.id, queryClient]);
 
   const handleNavigation = (url: string, adminOnly?: boolean) => {
     if (!user) { setLocation("/login"); return; }
@@ -91,8 +112,8 @@ export default function Home() {
             />
           </div>
           <div className="relative z-10">
-            <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-3 md:mb-5">
-              <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
+            <div className="inline-block px-4 py-1.5 rounded-full border border-white/40 bg-primary/5 backdrop-blur-md mb-3 md:mb-5">
+              <p className="text-white text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
                 Plataforma Multi-Serviços
               </p>
             </div>
@@ -125,7 +146,7 @@ export default function Home() {
             <div className={`relative bg-white/10 backdrop-blur-xl rounded-[1.5rem] p-6 md:p-8 flex flex-col items-center text-center border border-white/10 transition-all duration-500 w-full h-full justify-center shadow-none ${item.locked ? "" : "cursor-pointer hover:border-primary/40"}`}>
               {item.locked && <Lock className="absolute top-4 right-4 w-4 h-4 text-white/40" />}
               <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/10 group-hover:border-primary/40 transition-all duration-500">
-                <item.icon className="w-8 h-8 md:w-10 md:h-10 text-primary" strokeWidth={1.5} />
+                <item.icon className="w-8 h-8 md:w-10 md:h-10 text-white" strokeWidth={1.5} />
               </div>
               <h2 className="text-xl md:text-2xl font-black text-white mb-2 uppercase tracking-tighter italic">{item.title}</h2>
               <div className="h-1 w-10 bg-primary/30 rounded-full mb-3 group-hover:w-16 group-hover:bg-primary transition-all duration-500" />
@@ -146,7 +167,7 @@ export default function Home() {
           { icon: Shield, title: "Tradição",          desc: "O ambiente clássico com tecnologia moderna." },
         ].map((b, i) => (
           <div key={i} className="text-center">
-            <b.icon className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4" strokeWidth={1.5} />
+            <b.icon className="w-10 h-10 md:w-12 md:h-12 text-white mx-auto mb-4" strokeWidth={1.5} />
             <h3 className="text-lg md:text-xl font-black text-white uppercase mb-2 italic">{b.title}</h3>
             <p className="text-white/60 text-xs md:text-sm font-medium">{b.desc}</p>
           </div>

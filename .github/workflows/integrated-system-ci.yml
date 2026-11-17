@@ -1,0 +1,63 @@
+name: Integrated System CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aura
+          POSTGRES_PASSWORD: aura-ci-only
+          POSTGRES_DB: aura_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aura -d aura_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://aura:aura-ci-only@localhost:5432/aura_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Verify fractional stock migration on PostgreSQL
+        run: |
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE TABLE public.users (id INTEGER PRIMARY KEY);
+          CREATE TABLE public.batches (quantity INTEGER NOT NULL DEFAULT 0);
+          CREATE TABLE public.batch_logs (quantity INTEGER NOT NULL);
+          CREATE TABLE public.inventory (quantity INTEGER NOT NULL DEFAULT 0);
+          CREATE TABLE public.inventory_logs (quantity INTEGER NOT NULL);
+          CREATE TABLE public.inventory_restocks (quantity INTEGER NOT NULL);
+          INSERT INTO public.batches VALUES (10);
+          INSERT INTO public.batch_logs VALUES (3);
+          INSERT INTO public.inventory VALUES (4);
+          INSERT INTO public.inventory_logs VALUES (2);
+          INSERT INTO public.inventory_restocks VALUES (6);
+          SQL
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/pg/0002_fractional_stock_quantities.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/pg/0003_tutorial_completion.sql
+          numeric_columns=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('batches','batch_logs','inventory','inventory_logs','inventory_restocks') AND column_name='quantity' AND data_type='numeric' AND numeric_scale=3")
+          test "$numeric_columns" = "5"
+          preserved_value=$(psql "$DATABASE_URL" -Atc "SELECT quantity::text FROM public.batches")
+          test "$preserved_value" = "10.000"
+          tutorial_column=$(psql "$DATABASE_URL" -Atc "SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='tutorial_completed_at' AND data_type='text'")
+          test "$tutorial_column" = "1"
+      - run: npm run check
+      - run: npm run build

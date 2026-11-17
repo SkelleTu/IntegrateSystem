@@ -25,6 +25,7 @@ jobs:
       RENDER_GIT_BRANCH: fix/aura-system-hardening-qa
       AURA_ENABLE_E2E_WRITES: "true"
       AURA_RUNTIME_DISABLED: "1"
+      AURA_TENANT_ISOLATION_READY: "true"
       SESSION_SECRET: "ci-only-aura-qa-session-secret-not-for-production"
       SESSION_COOKIE_SECURE: "false"
       PORT: "5010"
@@ -75,4 +76,8 @@ jobs:
         run: |
           if [ -f /tmp/aura-qa-server.pid ]; then
             kill "$(cat /tmp/aura-qa-server.pid)" 2>/dev/null || true
+          fi
+          if [ -f /tmp/aura-qa-server.log ]; then
+            echo "----- Isolated QA server log -----"
+            cat /tmp/aura-qa-server.log
           fi

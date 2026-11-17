@@ -32,6 +32,8 @@ export default function Reports() {
     end: format(new Date(), "yyyy-MM-dd"),
   });
 
+  const dateRangeValid = dateRange.start <= dateRange.end;
+
   const [saleToCancel, setSaleToCancel] = useState<number | null>(null);
   const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin";
   const [expandedRegister, setExpandedRegister] = useState<number | null>(null);
@@ -39,18 +41,27 @@ export default function Reports() {
   const { data: sales, isLoading: isLoadingSales } = useQuery<Sale[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const start = dateRange.start ? `${dateRange.start}T00:00:00.000Z` : "";
-      const end = dateRange.end ? `${dateRange.end}T23:59:59.999Z` : "";
-      const res = await fetch(`/api/sales?start=${start}&end=${end}`);
+      const start = dateRange.start ? new Date(`${dateRange.start}T00:00:00`).toISOString() : "";
+      const end = dateRange.end ? new Date(`${dateRange.end}T23:59:59.999`).toISOString() : "";
+      const params = new URLSearchParams();
+      if (start) params.set("start", start);
+      if (end) params.set("end", end);
+      const res = await fetch(`/api/sales?${params.toString()}`);
       if (!res.ok) return [];
       return res.json();
-    }
+    },
+    enabled: dateRangeValid,
   });
 
   const { data: registers, isLoading: isLoadingRegisters } = useQuery<(CashRegister & { sales?: (Sale & { items: SaleItem[], payments: Payment[] })[] })[]>({
     queryKey: ["/api/cash-registers/history", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const res = await fetch(`/api/cash-registers/history?start=${dateRange.start}&end=${dateRange.end}`);
+      const start = dateRange.start ? new Date(`${dateRange.start}T00:00:00`).toISOString() : "";
+      const end = dateRange.end ? new Date(`${dateRange.end}T23:59:59.999`).toISOString() : "";
+      const params = new URLSearchParams();
+      if (start) params.set("start", start);
+      if (end) params.set("end", end);
+      const res = await fetch(`/api/cash-registers/history?${params.toString()}`);
       if (!res.ok) return [];
       return res.json();
     }
@@ -137,7 +148,7 @@ export default function Reports() {
             <Landmark className="w-12 h-12 text-primary" />
           </div>
           <CardHeader className="pb-2">
-            <CardTitle className="text-white/40 text-[10px] font-black uppercase tracking-widest">Total Líquido</CardTitle>
+            <CardTitle className="text-white/40 text-[10px] font-black uppercase tracking-widest">Vendas Concluídas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-primary text-4xl font-black italic tracking-tighter">

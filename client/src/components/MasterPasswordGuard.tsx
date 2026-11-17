@@ -65,7 +65,7 @@ export function MasterPasswordGuard({ open, onOpenChange, onSuccess, title = "Ac
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
-            className="bg-primary text-black font-black uppercase italic tracking-tighter"
+            className="bg-primary text-white border border-white/30 font-black uppercase italic tracking-tighter hover:bg-primary/90"
           >
             Autorizar Acesso
           </AlertDialogAction>

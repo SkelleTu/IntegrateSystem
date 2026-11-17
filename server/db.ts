@@ -231,9 +231,10 @@ const TABLE_DEFINITIONS = [
     username TEXT NOT NULL UNIQUE,
     email TEXT,
     password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'barber',
+    role TEXT NOT NULL DEFAULT 'employee',
     fingerprint_id TEXT UNIQUE,
-    enterprise_id INTEGER
+    enterprise_id INTEGER,
+    tutorial_completed_at TEXT
   )`,
   `CREATE TABLE IF NOT EXISTS services (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -525,7 +526,7 @@ export async function setupDatabase() {
   const localMigrations = [
     "ALTER TABLE users ADD COLUMN email TEXT",
     "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
-    "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
+    "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'geral'",
     "ALTER TABLE enterprises ADD COLUMN city TEXT",
     "ALTER TABLE enterprises ADD COLUMN state TEXT",
     "ALTER TABLE fiscal_settings ADD COLUMN ultimo_numero_nfce INTEGER DEFAULT 0",
@@ -552,9 +553,34 @@ export async function setupDatabase() {
     // Legacy Turso databases may have a users table created before auth columns existed.
     "ALTER TABLE users ADD COLUMN username TEXT",
     "ALTER TABLE users ADD COLUMN password TEXT",
-    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'barber'",
+    "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'employee'",
     "ALTER TABLE users ADD COLUMN fingerprint_id TEXT",
     "ALTER TABLE users ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE users ADD COLUMN tutorial_completed_at TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_credential_id TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_public_key TEXT",
+    "ALTER TABLE users ADD COLUMN webauthn_sign_count INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE services ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE tickets ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE tickets ADD COLUMN public_access_token TEXT",
+    "ALTER TABLE queue_state ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE categories ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE menu_items ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE cash_register ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE sales ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE sale_items ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE payments ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE transactions ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE time_clock ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory_logs ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE inventory_restocks ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE products ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE batches ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE batch_logs ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE stock_snapshots ADD COLUMN enterprise_id INTEGER",
+    "ALTER TABLE nfce ADD COLUMN enterprise_id INTEGER",
+
   ];
   for (const migration of localMigrations) {
     try {
@@ -680,6 +706,26 @@ export async function setupDatabase() {
     await tursoClient.execute("UPDATE users SET username = 'legacy_user_' || id WHERE username IS NULL OR TRIM(username) = ''");
     await tursoClient.execute("UPDATE users SET password = '' WHERE password IS NULL");
 
+    const tursoTenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    const tursoEnterpriseResult = await tursoClient.execute("SELECT id FROM enterprises ORDER BY id");
+    const tursoEnterpriseIds = (tursoEnterpriseResult.rows as any[]).map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    const tursoUnscopedCounts: Record<string, number> = {};
+    for (const table of tursoTenantTables) {
+      const result = await tursoClient.execute(`SELECT COUNT(*) AS count FROM "${table}" WHERE enterprise_id IS NULL`);
+      tursoUnscopedCounts[table] = Number((result.rows[0] as any)?.count || 0);
+    }
+    const tursoTotalUnscoped = Object.values(tursoUnscopedCounts).reduce((sum, value) => sum + value, 0);
+    if (tursoTotalUnscoped > 0 && tursoEnterpriseIds.length === 1) {
+      for (const table of tursoTenantTables) {
+        if (tursoUnscopedCounts[table] > 0) {
+          await tursoClient.execute({ sql: `UPDATE "${table}" SET enterprise_id = ? WHERE enterprise_id IS NULL`, args: [tursoEnterpriseIds[0]] });
+        }
+      }
+      console.log(`[DB] Turso tenant backfill: ${tursoTotalUnscoped} rows assigned to enterprise ${tursoEnterpriseIds[0]}.`);
+    } else if (tursoTotalUnscoped > 0 && tursoEnterpriseIds.length !== 1) {
+      throw new Error(`[SECURITY] Turso tenant backfill aborted: ${tursoTotalUnscoped} rows without enterprise_id and ${tursoEnterpriseIds.length} enterprises exist.`);
+    }
+
     console.log(
       `[DB] Turso schema verified: ${TABLE_DEFINITIONS.length} table definitions; ${missingMigrations.length} missing-column migrations applied.`,
     );
@@ -804,10 +850,101 @@ export async function setupDatabase() {
     }
   }
 
+  localSqlite.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON users(webauthn_credential_id)").run();
+
+  // Tenant boundary migration for the local SQLite mirror.
+  const localTenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  const localEnterpriseIds = (localSqlite.exec("SELECT id FROM enterprises ORDER BY id")[0]?.values ?? [])
+    .map((row: any[]) => Number(row[0])).filter((id: number) => Number.isSafeInteger(id) && id > 0);
+  const localUnscopedCounts: Record<string, number> = {};
+  for (const table of localTenantTables) {
+    const row = localSqlite.prepare(`SELECT COUNT(*) AS count FROM "${table}" WHERE enterprise_id IS NULL`).get() as any;
+    localUnscopedCounts[table] = Number(row?.count || 0);
+  }
+  const localTotalUnscoped = Object.values(localUnscopedCounts).reduce((sum, value) => sum + value, 0);
+  if (localTotalUnscoped > 0 && localEnterpriseIds.length === 1) {
+    for (const table of localTenantTables) {
+      if (localUnscopedCounts[table] > 0) {
+        localSqlite.prepare(`UPDATE "${table}" SET enterprise_id = ? WHERE enterprise_id IS NULL`).run(localEnterpriseIds[0]);
+      }
+    }
+    console.log(`[DB] SQLite tenant backfill: ${localTotalUnscoped} rows assigned to enterprise ${localEnterpriseIds[0]}.`);
+  } else if (localTotalUnscoped > 0 && localEnterpriseIds.length !== 1) {
+    throw new Error(`[SECURITY] SQLite tenant backfill aborted: ${localTotalUnscoped} rows without enterprise_id and ${localEnterpriseIds.length} enterprises exist.`);
+  }
+
+  const localTenantIndexTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+  for (const table of localTenantIndexTables) {
+    localSqlite.prepare(`CREATE INDEX IF NOT EXISTS "idx_${table}_enterprise_id" ON "${table}"(enterprise_id)`).run();
+  }
+
+  // Tenant boundary migration: operational records receive enterprise_id.
+  // Existing single-tenant rows are assigned to the first enterprise only when the
+  // table is currently unscoped. New code must always write the authenticated tenant.
+  if (neonPool) {
+    const tenantTables = ["settings","services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    for (const table of tenantTables) {
+      await neonPool.query(`ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS enterprise_id INTEGER`);
+    }
+    const enterpriseResult = await neonPool.query("SELECT id FROM public.enterprises ORDER BY id ASC");
+    const enterpriseIds = (enterpriseResult.rows as any[]).map((row) => Number(row.id)).filter((id) => Number.isSafeInteger(id) && id > 0);
+    const unscopedCounts: Record<string, number> = {};
+    for (const table of tenantTables) {
+      const result = await neonPool.query(`SELECT count(*)::int AS count FROM public."${table}" WHERE enterprise_id IS NULL`);
+      unscopedCounts[table] = Number(result.rows[0]?.count || 0);
+    }
+    const totalUnscoped = Object.values(unscopedCounts).reduce((sum, value) => sum + value, 0);
+    if (totalUnscoped > 0 && enterpriseIds.length === 1) {
+      const onlyEnterpriseId = enterpriseIds[0];
+      for (const table of tenantTables) {
+        if (unscopedCounts[table] > 0) {
+          await neonPool.query(`UPDATE public."${table}" SET enterprise_id = $1 WHERE enterprise_id IS NULL`, [onlyEnterpriseId]);
+        }
+      }
+      console.log(`[DB] Backfilled ${totalUnscoped} unscoped operational rows to the only existing enterprise ID ${onlyEnterpriseId}.`);
+    } else if (totalUnscoped > 0 && enterpriseIds.length !== 1) {
+      throw new Error(`[SECURITY] Tenant backfill aborted: ${totalUnscoped} operational rows have no enterprise_id while the database contains ${enterpriseIds.length} enterprises. Manual reconciliation is required; no row was reassigned automatically.`);
+    }
+    const tenantIndexes = ["services","tickets","queue_state","categories","menu_items","cash_register","sales","sale_items","payments","transactions","time_clock","inventory","inventory_logs","inventory_restocks","products","batches","batch_logs","stock_snapshots","nfce"];
+    for (const table of tenantIndexes) {
+      const indexName = `idx_${table}_enterprise_id`;
+      await neonPool.query(`CREATE INDEX IF NOT EXISTS "${indexName}" ON public."${table}"(enterprise_id)`);
+    }
+    for (const table of tenantTables) {
+      await neonPool.query(`ALTER TABLE public."${table}" ALTER COLUMN enterprise_id SET NOT NULL`);
+    }
+
+    console.log("[DB] Tenant boundary columns verified for operational tables.");
+  }
+
   // Neon is authoritative when DATABASE_URL is configured. Validate its real
   // PostgreSQL schema before allowing authentication/routes to start.
   if (neonPool) {
     await verifyNeonConnection();
+    await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS tutorial_completed_at TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_credential_id TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_public_key TEXT");
+  await neonPool.query("ALTER TABLE public.users ADD COLUMN IF NOT EXISTS webauthn_sign_count INTEGER NOT NULL DEFAULT 0");
+  await neonPool.query("CREATE UNIQUE INDEX IF NOT EXISTS users_webauthn_credential_idx ON public.users(webauthn_credential_id) WHERE webauthn_credential_id IS NOT NULL");
+    // Preserve existing whole-unit stock values while enabling fractional kilograms.
+    // Check the live column shape first so normal restarts do not rewrite/lock stock tables.
+    const stockQuantityColumns = await neonPool.query(`
+      SELECT table_name, data_type, numeric_precision, numeric_scale
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND column_name = 'quantity'
+        AND table_name = ANY($1::text[])
+    `, [["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]]);
+    const stockQuantityShape = new Map((stockQuantityColumns.rows as any[]).map((row) => [String(row.table_name), row]));
+    for (const table of ["batches", "batch_logs", "inventory", "inventory_logs", "inventory_restocks"]) {
+      const column = stockQuantityShape.get(table) as any;
+      if (!column || column.data_type !== "numeric" ||
+          Number(column.numeric_precision) !== 14 || Number(column.numeric_scale) !== 3) {
+        await neonPool.query(
+          `ALTER TABLE public."${table}" ALTER COLUMN quantity TYPE NUMERIC(14,3) USING quantity::numeric`
+        );
+      }
+    }
     const report = await auditDatabaseParity();
     if (!report.ok) {
       throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
@@ -836,11 +973,12 @@ export async function auditDatabaseParity() {
         table: config.name,
         columns: config.columns.map((column) => ({
           name: column.name,
-          type: column.getSQLType().toLowerCase() === "serial"
-            ? "integer"
-            : column.getSQLType().toLowerCase() === "timestamp"
-              ? "timestamp without time zone"
-              : column.getSQLType().toLowerCase(),
+          type: (() => {
+          const sqlType = column.getSQLType().toLowerCase();
+          if (sqlType === "serial") return "integer";
+          if (sqlType === "timestamp") return "timestamp without time zone";
+          return sqlType.replace(/\([^)]*\)/g, "");
+        })(),
           notNull: column.notNull,
         })),
       };

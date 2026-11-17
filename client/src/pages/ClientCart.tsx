@@ -14,20 +14,33 @@ export default function ClientCart() {
   const { toast } = useToast();
   const [ticketNumber, setTicketNumber] = useState("");
   const [currentTicket, setCurrentTicket] = useState<Ticket | null>(null);
+  const [ticketToken, setTicketToken] = useState("");
   const [cart, setCart] = useState<{ id: number, name: string, price: number, quantity: number }[]>([]);
+  const [enterpriseId, setEnterpriseId] = useState(new URLSearchParams(window.location.search).get("enterpriseId") || "");
+  const initialTicketToken = new URLSearchParams(window.location.search).get("ticketToken") || "";
+
+  const { data: publicEnterprises = [] } = useQuery<{ id: number; name: string; slug: string }[]>({
+    queryKey: ["/api/public/enterprises"],
+    enabled: !enterpriseId,
+  });
 
   const { data: menuItems = [] } = useQuery<MenuItem[]>({
-    queryKey: ["/api/menu-items"],
+    queryKey: [enterpriseId ? `/api/menu-items?enterpriseId=${encodeURIComponent(enterpriseId)}` : "/api/menu-items"],
+    enabled: Boolean(enterpriseId),
   });
 
   const findTicketMutation = useMutation({
     mutationFn: async (number: string) => {
-      const res = await fetch(`/api/tickets/${number}`);
+      if (!enterpriseId) throw new Error("Selecione o estabelecimento.");
+      const headers: HeadersInit = initialTicketToken ? { "x-ticket-token": initialTicketToken } : {};
+      const query = new URLSearchParams({ enterpriseId, ...(initialTicketToken ? { ticketToken: initialTicketToken } : {}) });
+      const res = await fetch(`/api/tickets/${number}?${query.toString()}`, { headers });
       if (!res.ok) throw new Error("Comanda não encontrada");
       return res.json();
     },
     onSuccess: (data) => {
       setCurrentTicket(data);
+      setTicketToken(initialTicketToken);
       const initialItems = data.items ? data.items.map((i: string) => JSON.parse(i)) : [];
       setCart(initialItems);
       toast({ title: "Bem-vindo", description: `Comanda #${data.ticketNumber} ativa` });
@@ -39,7 +52,7 @@ export default function ClientCart() {
 
   const updateItemsMutation = useMutation({
     mutationFn: async ({ id, items }: { id: number, items: string[] }) => {
-      await apiRequest("POST", `/api/tickets/${id}/items`, { items });
+      await apiRequest("POST", `/api/tickets/${id}/items`, { items }, ticketToken ? { headers: { "x-ticket-token": ticketToken } } : undefined);
     },
     onSuccess: () => {
       toast({ title: "Carrinho Atualizado", description: "Itens salvos na sua comanda" });
@@ -76,6 +89,19 @@ export default function ClientCart() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <label className="text-xs font-bold uppercase text-white/40 tracking-widest">Estabelecimento</label>
+              <select
+                value={enterpriseId}
+                onChange={e => setEnterpriseId(e.target.value)}
+                className="w-full h-12 rounded-md bg-black border border-white/10 text-white px-3"
+              >
+                <option value="">Selecione o estabelecimento</option>
+                {publicEnterprises.map(enterprise => (
+                  <option key={enterprise.id} value={enterprise.id}>{enterprise.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2">
               <label className="text-xs font-bold uppercase text-white/40 tracking-widest">Número da Comanda</label>
               <Input 
                 type="number" 
@@ -88,7 +114,7 @@ export default function ClientCart() {
             <Button 
               className="w-full h-12 font-black italic uppercase tracking-tighter text-lg text-white"
               onClick={() => findTicketMutation.mutate(ticketNumber)}
-              disabled={findTicketMutation.isPending}
+              disabled={findTicketMutation.isPending || !enterpriseId}
             >
               {findTicketMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Pedido"}
             </Button>
@@ -160,7 +186,7 @@ export default function ClientCart() {
                   <Button 
                     className="w-full h-12 font-black italic uppercase tracking-tighter text-lg text-white"
                     onClick={saveCart}
-                    disabled={updateItemsMutation.isPending}
+                    disabled={updateItemsMutation.isPending || !ticketToken}
                   >
                     {updateItemsMutation.isPending ? <Loader2 className="animate-spin" /> : "Confirmar Pedido"}
                   </Button>

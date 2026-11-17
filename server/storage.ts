@@ -20,6 +20,8 @@ import type {
 } from "../shared/schema.js";
 import { eq, desc, asc, and, isNull, gte, lte, or, sql, like, gt, ne, getTableName } from "drizzle-orm";
 import { runtimeEvent } from "./runtimeMonitor";
+import { getAuraContext } from "./aura-request-context";
+import { randomBytes } from "node:crypto";
 
 // sql.js rejects undefined bind values. Remove only undefined optional fields before writes.
 function withoutUndefined<T extends Record<string, any>>(value: T): T {
@@ -108,7 +110,7 @@ export interface IStorage {
   getQueueState(): Promise<QueueState>;
   updateQueueState(state: Partial<QueueState>): Promise<QueueState>;
   createTicket(ticket: InsertTicket): Promise<Ticket>;
-  getTicketByNumber(number: number): Promise<Ticket | undefined>;
+  getTicketByNumber(number: number, includePublicAccessToken?: boolean): Promise<Ticket | undefined>;
   getLatestTicket(): Promise<Ticket | undefined>;
 
   // Digital Menu
@@ -122,7 +124,7 @@ export interface IStorage {
   getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
   openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
   closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
-  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
+  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], ticketId?: number): Promise<Sale>;
   getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
   cancelSale(id: number): Promise<Sale>;
 
@@ -241,7 +243,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateUser(id: number, update: Partial<User>): Promise<User> {
     this.logAction(`Atualização usuário ID:${id}`);
-    const [updated] = await dualWrite(async (database: any) => {
+    const updated = await dualWrite(async (database: any) => {
       await database.update(users).set(update).where(eq(users.id, id));
       const [rec] = await database.select().from(users).where(eq(users.id, id));
       return rec;
@@ -255,7 +257,7 @@ export class DatabaseStorage implements IStorage {
     const sharedAdminId = adminData ? await nextSharedId(users) : undefined;
 
     return await dualWrite(async (database: any) => {
-      await database.insert(enterprises).values({ ...enterprise, id: sharedEnterpriseId } as any);
+      await database.insert(enterprises).values({ ...enterprise, status: adminData?.role === "tenant_owner" ? "active" : enterprise.status, id: sharedEnterpriseId } as any);
       const [newEnterprise] = await database.select().from(enterprises)
         .where(eq(enterprises.id, sharedEnterpriseId)).limit(1);
       if (!newEnterprise) {
@@ -268,7 +270,7 @@ export class DatabaseStorage implements IStorage {
           ...adminData,
           id: sharedAdminId,
           enterpriseId: newEnterprise.id,
-          role: "admin",
+          role: adminData.role || "admin",
         } as any);
       }
       return newEnterprise;
@@ -295,10 +297,6 @@ export class DatabaseStorage implements IStorage {
         await database.update(users).set({ enterpriseId: existing.id }).where(eq(users.id, ownerId));
         return existing;
       }
-
-      const owned = await database.select({ id: enterprises.id }).from(enterprises)
-        .where(eq(enterprises.ownerId, ownerId));
-      if (owned.length >= 5) throw new Error("Limite de 5 estabelecimentos por conta atingido.");
 
       const baseSlug = enterprise.slug;
       let slug = baseSlug;
@@ -331,8 +329,54 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEnterprise(id: number): Promise<void> {
     this.logAction(`Exclusão instituição ID:${id}`);
-    await db.delete(settings).where(eq(settings.enterpriseId, id));
-    await db.delete(enterprises).where(eq(enterprises.id, id));
+    if (!Number.isSafeInteger(Number(id)) || Number(id) <= 0) throw new Error("Estabelecimento inválido.");
+
+    await dualWriteTransaction(async (database) => {
+      const [enterprise] = await database.select().from(enterprises).where(eq(enterprises.id, id)).limit(1);
+      if (!enterprise) throw new Error("Estabelecimento não encontrado.");
+
+      // Delete tenant-owned children first. The account owner is preserved because
+      // the same user may own other establishments.
+      await database.delete(saleItems).where(eq(saleItems.enterpriseId, id));
+      await database.delete(payments).where(eq(payments.enterpriseId, id));
+      await database.delete(nfce).where(eq(nfce.enterpriseId, id));
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, id));
+      await database.delete(batches).where(eq(batches.enterpriseId, id));
+      await database.delete(inventoryLogs).where(eq(inventoryLogs.enterpriseId, id));
+      await database.delete(inventoryRestocks).where(eq(inventoryRestocks.enterpriseId, id));
+      await database.delete(inventory).where(eq(inventory.enterpriseId, id));
+      await database.delete(sales).where(eq(sales.enterpriseId, id));
+      await database.delete(transactions).where(eq(transactions.enterpriseId, id));
+      await database.delete(cashRegisters).where(eq(cashRegisters.enterpriseId, id));
+      await database.delete(timeClock).where(eq(timeClock.enterpriseId, id));
+      await database.delete(tickets).where(eq(tickets.enterpriseId, id));
+      await database.delete(queueState).where(eq(queueState.enterpriseId, id));
+      await database.delete(menuItems).where(eq(menuItems.enterpriseId, id));
+      await database.delete(categories).where(eq(categories.enterpriseId, id));
+      await database.delete(services).where(eq(services.enterpriseId, id));
+      await database.delete(products).where(eq(products.enterpriseId, id));
+      await database.delete(stockSnapshots).where(eq(stockSnapshots.enterpriseId, id));
+      await database.delete(fiscalSettings).where(eq(fiscalSettings.enterpriseId, id));
+      await database.delete(settings).where(eq(settings.enterpriseId, id));
+
+      await database.delete(users).where(and(
+        eq(users.enterpriseId, id),
+        ne(users.id, Number(enterprise.ownerId || 0)),
+      ));
+
+      const remainingOwned = await database.select({ id: enterprises.id })
+        .from(enterprises)
+        .where(and(eq(enterprises.ownerId, Number(enterprise.ownerId || 0)), ne(enterprises.id, id)))
+        .orderBy(asc(enterprises.id))
+        .limit(1);
+      if (enterprise.ownerId) {
+        await database.update(users)
+          .set({ enterpriseId: remainingOwned[0]?.id ?? null } as any)
+          .where(eq(users.id, Number(enterprise.ownerId)));
+      }
+
+      await database.delete(enterprises).where(eq(enterprises.id, id));
+    });
   }
 
   async getUser(id: number): Promise<User | undefined> {
@@ -368,7 +412,7 @@ export class DatabaseStorage implements IStorage {
           username: user.username,
           email,
           password: user.password,
-          role: user.role || "barber",
+          role: user.role || "employee",
           fingerprint_id: (user as any).fingerprintId ?? null,
           enterprise_id: (user as any).enterpriseId ?? null,
         };
@@ -440,36 +484,64 @@ export class DatabaseStorage implements IStorage {
 
   async getServices(): Promise<Service[]> {
     this.logAction("Consulta lista de serviços");
-    return await db.select().from(services).where(eq(services.isActive, true));
+    const enterpriseId = this.currentEnterpriseId();
+    if (!dbRemote || process.env.AURA_RUNTIME_DISABLED === "1") {
+      const result = localSqlite.exec(
+        "SELECT id, name, price, image_url, is_active, enterprise_id FROM services ORDER BY id",
+      );
+      const columns = result[0]?.columns || [];
+      const rows = result[0]?.values || [];
+      return rows
+        .map((values: any[]) => Object.fromEntries(columns.map((column: string, index: number) => [column, values[index]])))
+        .filter((row: any) => Number(row.enterprise_id) === enterpriseId && Number(row.is_active) === 1)
+        .map((row: any) => ({
+          id: Number(row.id),
+          name: String(row.name),
+          price: Number(row.price),
+          imageUrl: String(row.image_url || ""),
+          isActive: true,
+          enterpriseId,
+        })) as Service[];
+    }
+    return await db.select().from(services)
+      .where(and(eq(services.enterpriseId, enterpriseId), eq(services.isActive, true)));
   }
 
   async getService(id: number): Promise<Service | undefined> {
     this.logAction(`Consulta serviço ID:${id}`);
-    const [service] = await db.select().from(services).where(eq(services.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [service] = await db.select().from(services)
+      .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
     return service;
   }
 
   async createService(service: InsertService): Promise<Service> {
     this.logAction(`Criação de serviço: ${service.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newService] = await database.insert(services).values(service).returning();
+      const [newService] = await database.insert(services).values({ ...service, enterpriseId } as any).returning();
       return newService;
     });
   }
 
   async updateService(id: number, update: UpdateServiceRequest): Promise<Service> {
     this.logAction(`Atualização serviço ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      await database.update(services).set(update).where(eq(services.id, id));
-      const [updated] = await database.select().from(services).where(eq(services.id, id));
+      await database.update(services).set(update)
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
+      const [updated] = await database.select().from(services)
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
       return updated;
     });
   }
 
   async deleteService(id: number): Promise<void> {
     this.logAction(`Desativação serviço ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      await database.update(services).set({ isActive: false }).where(eq(services.id, id));
+      await database.update(services).set({ isActive: false })
+        .where(and(eq(services.id, id), eq(services.enterpriseId, enterpriseId)));
     });
   }
 
@@ -484,37 +556,51 @@ export class DatabaseStorage implements IStorage {
   }
   async getQueueState(): Promise<QueueState> {
     this.logAction("Consulta estado da fila");
-    let [state] = await db.select().from(queueState);
+    const enterpriseId = this.currentEnterpriseId();
+    let [state] = await db.select().from(queueState).where(eq(queueState.enterpriseId, enterpriseId));
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      [state] = await db.insert(queueState)
+        .values({ currentNumber: 0, servingNumber: 0, enterpriseId } as any)
+        .returning();
     }
     return state;
   }
 
   async updateQueueState(update: Partial<QueueState>): Promise<QueueState> {
     this.logAction("Atualização da fila");
-    let [state] = await db.select().from(queueState);
+    const enterpriseId = this.currentEnterpriseId();
+    let [state] = await db.select().from(queueState).where(eq(queueState.enterpriseId, enterpriseId));
     if (!state) {
-      [state] = await db.insert(queueState).values({ currentNumber: 0, servingNumber: 0 }).returning();
+      [state] = await db.insert(queueState)
+        .values({ currentNumber: 0, servingNumber: 0, enterpriseId } as any)
+        .returning();
     }
     await db.update(queueState)
-      .set(update)
-      .where(eq(queueState.id, state.id));
-    const [updated] = await db.select().from(queueState).where(eq(queueState.id, state.id));
+      .set(update as any)
+      .where(and(eq(queueState.id, state.id), eq(queueState.enterpriseId, enterpriseId)));
+    const [updated] = await db.select().from(queueState)
+      .where(and(eq(queueState.id, state.id), eq(queueState.enterpriseId, enterpriseId)));
     return updated;
   }
 
   async createTicket(ticket: InsertTicket): Promise<Ticket> {
     this.logAction(`Novo ticket gerado: #${ticket.ticketNumber}`);
+    const enterpriseId = this.currentEnterpriseId();
+    const publicAccessToken = randomBytes(24).toString("base64url");
     return await dualWrite(async (database) => {
-      const [newTicket] = await database.insert(tickets).values(ticket).returning();
+      const [newTicket] = await database.insert(tickets)
+        .values({ ...ticket, enterpriseId, publicAccessToken } as any)
+        .returning();
       return newTicket;
     });
   }
 
-  async getTicketByNumber(number: number): Promise<Ticket | undefined> {
+  async getTicketByNumber(number: number, includePublicAccessToken = false): Promise<Ticket | undefined> {
     this.logAction(`Busca ticket #${number}`);
-    const [ticket] = await db.select().from(tickets).where(and(eq(tickets.ticketNumber, number), eq(tickets.status, "pending"))).orderBy(desc(tickets.createdAt)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [ticket] = await db.select().from(tickets)
+      .where(and(eq(tickets.ticketNumber, number), eq(tickets.enterpriseId, enterpriseId), eq(tickets.status, "pending")))
+      .orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
         (ticket as any).items = JSON.parse(ticket.items);
@@ -524,12 +610,16 @@ export class DatabaseStorage implements IStorage {
     } else if (ticket && !ticket.items) {
       (ticket as any).items = [];
     }
+    if (ticket && !includePublicAccessToken) delete (ticket as any).publicAccessToken;
     return ticket;
   }
 
   async getLatestTicket(): Promise<Ticket | undefined> {
     this.logAction("Consulta último ticket");
-    const [ticket] = await db.select().from(tickets).orderBy(desc(tickets.createdAt)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [ticket] = await db.select().from(tickets)
+      .where(eq(tickets.enterpriseId, enterpriseId))
+      .orderBy(desc(tickets.createdAt)).limit(1);
     if (ticket && typeof ticket.items === 'string') {
       try {
         (ticket as any).items = JSON.parse(ticket.items);
@@ -544,32 +634,42 @@ export class DatabaseStorage implements IStorage {
 
   async getCategories(): Promise<Category[]> {
     this.logAction("Consulta categorias menu");
-    return await db.select().from(categories).orderBy(asc(categories.order));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(categories)
+      .where(eq(categories.enterpriseId, enterpriseId))
+      .orderBy(asc(categories.order));
   }
 
   async createCategory(category: InsertCategory): Promise<Category> {
     this.logAction(`Nova categoria: ${category.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newCategory] = await database.insert(categories).values(category).returning();
+      const [newCategory] = await database.insert(categories).values({ ...category, enterpriseId } as any).returning();
       return newCategory;
     });
   }
 
   async getMenuItems(): Promise<MenuItem[]> {
     this.logAction("Consulta itens menu");
-    const items = await db.select().from(menuItems).where(eq(menuItems.isAvailable, true));
+    const enterpriseId = this.currentEnterpriseId();
+    const items = await db.select().from(menuItems)
+      .where(and(eq(menuItems.enterpriseId, enterpriseId), eq(menuItems.isAvailable, true)));
     return items;
   }
 
   async getMenuItemsByCategory(categoryId: number): Promise<MenuItem[]> {
     this.logAction(`Busca itens categoria ID:${categoryId}`);
-    return await db.select().from(menuItems).where(eq(menuItems.categoryId, categoryId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(menuItems)
+      .where(and(eq(menuItems.categoryId, categoryId), eq(menuItems.enterpriseId, enterpriseId)));
   }
 
   async createMenuItem(item: InsertMenuItem): Promise<MenuItem> {
     this.logAction(`Novo item menu: ${item.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     const itemToInsert = {
       ...item,
+      enterpriseId,
       tags: Array.isArray(item.tags) ? JSON.stringify(item.tags) : item.tags
     };
     const [newItem] = await db.insert(menuItems).values(itemToInsert).returning();
@@ -579,20 +679,22 @@ export class DatabaseStorage implements IStorage {
   // Cashier
   async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
+    const enterpriseId = this.currentEnterpriseId();
     const [register] = await db.select()
       .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+      .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.enterpriseId, enterpriseId), isNull(cashRegisters.closedAt)));
     return register;
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
     this.logAction(`Abertura de caixa usuário ID:${register.userId}`);
+    const enterpriseId = this.currentEnterpriseId();
     const sharedRegisterId = await nextSharedId(cashRegisters);
     return await dualWriteTransaction(async (database) => {
       const [existingRegister] = await database.select().from(cashRegisters)
-        .where(and(eq(cashRegisters.userId, register.userId), isNull(cashRegisters.closedAt))).limit(1);
+        .where(and(eq(cashRegisters.userId, register.userId), eq(cashRegisters.enterpriseId, enterpriseId), isNull(cashRegisters.closedAt))).limit(1);
       if (existingRegister) throw new Error("Já existe um caixa aberto para este usuário.");
-      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, id: sharedRegisterId } as any).returning();
+      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, enterpriseId, id: sharedRegisterId } as any).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
@@ -606,19 +708,22 @@ export class DatabaseStorage implements IStorage {
 
   async closeCashRegister(id: number, closingAmount: number): Promise<CashRegister> {
     this.logAction(`Fechamento de caixa ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWriteTransaction(async (database) => {
-      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id));
+      const [register] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)));
       if (!register) throw new Error("Caixa não encontrado");
       if (register.status === "closed" || register.closedAt) return register;
 
-      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const salesList = await database.select().from(sales)
+        .where(and(eq(sales.cashRegisterId, id), eq(sales.enterpriseId, enterpriseId)));
       const completedSales = salesList.filter((s: any) => s.status === "completed");
       const cashPayments = await Promise.all(
         completedSales.map(async (sale: any) => {
           const salePayments = await database
             .select()
             .from(payments)
-            .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+            .where(and(eq(payments.saleId, sale.id), eq(payments.enterpriseId, enterpriseId), eq(payments.method, "cash")));
           return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
         })
       );
@@ -633,8 +738,9 @@ export class DatabaseStorage implements IStorage {
           closedAt: new Date(),
           status: "closed"
         })
-        .where(eq(cashRegisters.id, id));
-      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)));
+      const [updated] = await database.select().from(cashRegisters)
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId))).limit(1);
 
       // Closing cash is a physical count, not a second income entry.
 
@@ -645,39 +751,48 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale> {
+  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], ticketId?: number): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
+    const enterpriseId = this.currentEnterpriseId();
     const sharedSaleId = await nextSharedId(sales);
     return await dualWriteTransaction(async (database) => {
       if (!items.length || !paymentsData.length) throw new Error("Venda exige itens e pagamentos.");
       const paymentTotal = paymentsData.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
       if (!Number.isSafeInteger(paymentTotal) || paymentTotal !== Number(sale.totalAmount)) throw new Error("A soma dos pagamentos deve corresponder exatamente ao total da venda.");
       if (sale.cashRegisterId) {
-        const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, sale.cashRegisterId)).limit(1);
+        const [register] = await database.select().from(cashRegisters).where(and(eq(cashRegisters.id, sale.cashRegisterId), eq(cashRegisters.enterpriseId, enterpriseId))).limit(1);
         if (!register || register.status !== "open" || register.closedAt) throw new Error("A venda exige um caixa aberto.");
+      }
+      if (ticketId !== undefined) {
+        const [ticket] = await database.select().from(tickets).where(and(eq(tickets.id, ticketId), eq(tickets.enterpriseId, enterpriseId))).limit(1);
+        if (!ticket) throw new Error("Comanda não encontrada.");
+        if (ticket.status !== "pending" && ticket.status !== "serving") {
+          throw new Error("A comanda não está mais ativa para finalização.");
+        }
       }
       for (const item of items) {
         const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
         if (batchId !== null) {
-          const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
+          const [batch] = await database.select().from(batches).where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId))).limit(1);
           if (!batch) throw new Error(`Lote ${batchId} não encontrado para a venda.`);
-          if (Number(batch.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`);
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(batch.quantity) + 1e-9 < stockQuantity) throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${stockQuantity}`);
         }
       }
-      const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, id: sharedSaleId } as any).returning();
+      const [insertedSale]: any[] = await database.insert(sales).values({ ...sale, enterpriseId, id: sharedSaleId } as any).returning();
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
         userId: sale.userId ?? null, totalAmount: insertedSale.totalAmount,
       });
       
-      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
+      const itemsWithSaleId = items.map(item => ({ ...item, enterpriseId, saleId: insertedSale.id } as any));
       await database.insert(saleItems).values(itemsWithSaleId);
       runtimeEvent("sale-items-created", `Itens da venda #${insertedSale.id} gravados`, {
         phase: "sale", saleId: insertedSale.id, itemCount: itemsWithSaleId.length,
       });
       
-      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, saleId: insertedSale.id }));
+      const paymentsWithSaleId = paymentsData.map(payment => ({ ...payment, enterpriseId, saleId: insertedSale.id } as any));
       await database.insert(payments).values(paymentsWithSaleId);
       runtimeEvent("sale-payments-created", `Pagamentos da venda #${insertedSale.id} gravados`, {
         phase: "finance", saleId: insertedSale.id, paymentCount: paymentsWithSaleId.length,
@@ -695,32 +810,32 @@ export class DatabaseStorage implements IStorage {
         if (batchId !== null) {
           const [batch] = await database.select()
             .from(batches)
-            .where(eq(batches.id, batchId))
+            .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)))
             .limit(1);
 
           if (!batch) {
             throw new Error(`Lote ${batchId} não encontrado para a venda #${insertedSale.id}`);
           }
 
-          if (batch.quantity < item.quantity) {
-            throw new Error(
-              `Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${item.quantity}`
-            );
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(batch.quantity) + 1e-9 < stockQuantity) {
+            throw new Error(`Estoque insuficiente para o lote ${batchId}: disponível ${batch.quantity}, solicitado ${stockQuantity}`);
           }
 
           await database.update(batches)
-            .set({ quantity: batch.quantity - item.quantity })
-            .where(eq(batches.id, batchId));
+            .set({ quantity: Number(batch.quantity) - stockQuantity })
+            .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)));
 
           runtimeEvent("sale-batch-deduction", `Baixa do lote ${batch.id} na venda #${insertedSale.id}`, {
             phase: "inventory", saleId: insertedSale.id, batchId: batch.id,
             productId: batch.productId, quantity: item.quantity,
           });
           await database.insert(batchLogs).values({
+            enterpriseId,
             productId: batch.productId,
             batchId: batch.id,
             type: "out",
-            quantity: item.quantity,
+            quantity: stockQuantity,
             reason: `Venda #${insertedSale.id}`,
             userId: sale.userId || 0,
             createdAt: new Date(),
@@ -735,13 +850,14 @@ export class DatabaseStorage implements IStorage {
           : null;
         const [inventoryItem] = await database.select()
           .from(inventory)
-          .where(
+          .where(and(
+            eq(inventory.enterpriseId, enterpriseId),
             legacyInventoryId !== null
               ? eq(inventory.id, legacyInventoryId)
               : item.itemType === 'product'
               ? eq(inventory.itemId, item.itemId)
               : eq(inventory.customName, item.itemId.toString())
-          )
+          ))
           .limit(1);
 
         if (legacyInventoryId !== null && !inventoryItem) {
@@ -749,21 +865,23 @@ export class DatabaseStorage implements IStorage {
         }
 
         if (inventoryItem) {
-          if (Number(inventoryItem.quantity) < Number(item.quantity)) throw new Error(`Estoque insuficiente para o item ${inventoryItem.id}: disponível ${inventoryItem.quantity}, solicitado ${item.quantity}`);
+          const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
+          if (Number(inventoryItem.quantity) + 1e-9 < stockQuantity) throw new Error(`Estoque insuficiente para o item ${inventoryItem.id}: disponível ${inventoryItem.quantity}, solicitado ${stockQuantity}`);
           await database.update(inventory)
             .set({ 
-              quantity: inventoryItem.quantity - item.quantity,
+              quantity: Number(inventoryItem.quantity) - stockQuantity,
               updatedAt: new Date()
             })
-            .where(eq(inventory.id, inventoryItem.id));
+            .where(and(eq(inventory.id, inventoryItem.id), eq(inventory.enterpriseId, enterpriseId)));
           
           runtimeEvent("sale-inventory-deduction", `Baixa do estoque ${inventoryItem.id} na venda #${insertedSale.id}`, {
             phase: "inventory", saleId: insertedSale.id, inventoryId: inventoryItem.id, quantity: item.quantity,
           });
           await database.insert(inventoryLogs).values({
+            enterpriseId,
             inventoryId: inventoryItem.id,
             type: "out",
-            quantity: item.quantity,
+            quantity: stockQuantity,
             reason: `Venda #${insertedSale.id}`,
             userId: sale.userId || 0,
             createdAt: new Date()
@@ -773,6 +891,7 @@ export class DatabaseStorage implements IStorage {
 
       const businessType = await getBusinessTypeForUser(database, sale.userId);
       await database.insert(transactions).values({
+        enterpriseId,
         businessType,
         type: "income",
         category: "vendas",
@@ -787,33 +906,49 @@ export class DatabaseStorage implements IStorage {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
         totalAmount: insertedSale.totalAmount,
       });
+      if (ticketId !== undefined) {
+        const [completedTicket] = await database.update(tickets)
+          .set({ status: "completed" })
+          .where(and(
+            eq(tickets.id, ticketId),
+            eq(tickets.enterpriseId, enterpriseId),
+            or(eq(tickets.status, "pending"), eq(tickets.status, "serving"))
+          ))
+          .returning();
+        if (!completedTicket) throw new Error("A comanda foi alterada durante a venda. A transação foi revertida.");
+      }
       return insertedSale;
     });
   }
 
   async getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]> {
     this.logAction("Consulta histórico de vendas");
+    const enterpriseId = this.currentEnterpriseId();
     let conditions = [];
     if (filters.startDate) conditions.push(gte(sales.createdAt, filters.startDate));
     if (filters.endDate) conditions.push(lte(sales.createdAt, filters.endDate));
     
+    conditions.push(eq(sales.enterpriseId, enterpriseId));
     return await db.select()
       .from(sales)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(sales.createdAt));
   }
 
   async cancelSale(id: number): Promise<Sale> {
     this.logAction(`Cancelamento venda ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWriteTransaction(async (database) => {
       // A reversão é feita em uma transação para não deixar a venda cancelada
       // sem o estoque/financeiro correspondente se algum item estiver inválido.
       const transaction = database;
-        const [sale] = await transaction.select().from(sales).where(eq(sales.id, id));
+        const [sale] = await transaction.select().from(sales)
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
         if (!sale) throw new Error("Venda não encontrada");
         if (sale.status === "cancelled") return sale;
 
-        const items = await transaction.select().from(saleItems).where(eq(saleItems.saleId, id));
+        const items = await transaction.select().from(saleItems)
+          .where(and(eq(saleItems.saleId, id), eq(saleItems.enterpriseId, enterpriseId)));
         const stockReversals: Array<
           | { kind: "batch"; item: SaleItem; stock: Batch }
           | { kind: "inventory"; item: SaleItem; stock: Inventory }
@@ -829,7 +964,7 @@ export class DatabaseStorage implements IStorage {
           if (batchId !== null) {
             const [batch] = await transaction.select()
               .from(batches)
-              .where(eq(batches.id, batchId))
+              .where(and(eq(batches.id, batchId), eq(batches.enterpriseId, enterpriseId)))
               .limit(1);
             if (!batch) {
               throw new Error(`Lote ${batchId} não encontrado para estornar a venda #${id}`);
@@ -845,10 +980,14 @@ export class DatabaseStorage implements IStorage {
             .from(inventory)
             .where(
               legacyInventoryId !== null
-                ? eq(inventory.id, legacyInventoryId)
+                ? and(
+                    eq(inventory.id, legacyInventoryId),
+                    eq(inventory.enterpriseId, enterpriseId)
+                  )
                 : and(
                     eq(inventory.itemId, item.itemId),
-                    eq(inventory.itemType, item.itemType === "product" ? "product" : "service")
+                    eq(inventory.itemType, item.itemType === "product" ? "product" : "service"),
+                    eq(inventory.enterpriseId, enterpriseId)
                   )
             )
             .limit(1);
@@ -867,21 +1006,24 @@ export class DatabaseStorage implements IStorage {
 
         await transaction.update(sales)
           .set({ status: "cancelled" })
-          .where(eq(sales.id, id));
-        const [updatedSale] = await transaction.select().from(sales).where(eq(sales.id, id)).limit(1);
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
+        const [updatedSale] = await transaction.select().from(sales)
+          .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId))).limit(1);
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
           if (reversal.kind === "batch") {
+            const stockQuantity = item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity);
             await transaction.update(batches)
-              .set({ quantity: stock.quantity + item.quantity })
-              .where(eq(batches.id, stock.id));
+              .set({ quantity: Number(stock.quantity) + stockQuantity })
+              .where(and(eq(batches.id, stock.id), eq(batches.enterpriseId, enterpriseId)));
 
             await transaction.insert(batchLogs).values({
+              enterpriseId,
               productId: (stock as Batch).productId,
               batchId: stock.id,
               type: "cancel",
-              quantity: item.quantity,
+              quantity: item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity),
               reason: `Estorno Venda Cancelada #${id}`,
               userId: sale.userId || 0,
               createdAt: new Date(),
@@ -889,15 +1031,16 @@ export class DatabaseStorage implements IStorage {
           } else {
             await transaction.update(inventory)
               .set({
-                quantity: stock.quantity + item.quantity,
+                quantity: Number(stock.quantity) + (item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity)),
                 updatedAt: new Date()
               })
-              .where(eq(inventory.id, stock.id));
+              .where(and(eq(inventory.id, stock.id), eq(inventory.enterpriseId, enterpriseId)));
 
             await transaction.insert(inventoryLogs).values({
+              enterpriseId,
               inventoryId: stock.id,
               type: "in",
-              quantity: item.quantity,
+              quantity: item.unitType === "kg" ? Number(item.quantity) / 1000 : Number(item.quantity),
               reason: `Estorno Venda Cancelada #${id}`,
               userId: sale.userId || 0,
               createdAt: new Date()
@@ -907,6 +1050,7 @@ export class DatabaseStorage implements IStorage {
 
         const businessType = await getBusinessTypeForUser(transaction, sale.userId);
         await transaction.insert(transactions).values({
+          enterpriseId,
           businessType,
           type: "expense",
           category: "vendas",
@@ -924,6 +1068,7 @@ export class DatabaseStorage implements IStorage {
 
   async getTransactions(filters: { startDate?: Date; endDate?: Date; businessType?: string }): Promise<Transaction[]> {
     this.logAction("Consulta financeiro");
+    const enterpriseId = this.currentEnterpriseId();
     let conditions = [];
     if (filters.startDate) {
       conditions.push(gte(transactions.createdAt, filters.startDate));
@@ -935,60 +1080,69 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(transactions.businessType, filters.businessType));
     }
     
+    conditions.push(eq(transactions.enterpriseId, enterpriseId));
     return await db.select()
       .from(transactions)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .where(and(...conditions))
       .orderBy(desc(transactions.createdAt));
   }
 
   // Inventory
   async getInventory(): Promise<Inventory[]> {
     this.logAction("Consulta estoque completo");
-    return await db.select().from(inventory);
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventory).where(eq(inventory.enterpriseId, enterpriseId));
   }
 
   async getInventoryItem(id: number): Promise<Inventory | undefined> {
     this.logAction(`Busca item estoque ID:${id}`);
-    const [item] = await db.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory)
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
     return item;
   }
 
   async getInventoryItemByBarcode(barcode: string): Promise<Inventory | undefined> {
     this.logAction(`Busca item por código: ${barcode}`);
-    const [item] = await db.select().from(inventory).where(eq(inventory.barcode, barcode)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory).where(and(eq(inventory.barcode, barcode), eq(inventory.enterpriseId, enterpriseId))).limit(1);
     return item;
   }
 
   async getInventoryItemByCodigoBalanca(codigoBalanca: string): Promise<Inventory | undefined> {
     this.logAction(`Busca item estoque por código balança: ${codigoBalanca}`);
-    const items = await db.select().from(inventory);
-    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(inventory).where(and(eq(inventory.codigoBalanca, codigoBalanca), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+    return item;
   }
 
   async getMenuItemByCodigoBalanca(codigoBalanca: string): Promise<MenuItem | undefined> {
     this.logAction(`Busca item menu por código balança: ${codigoBalanca}`);
-    const items = await db.select().from(menuItems);
-    return (items as any[]).find((item: any) => item.codigoBalanca === codigoBalanca);
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(menuItems).where(and(eq(menuItems.codigoBalanca, codigoBalanca), eq(menuItems.enterpriseId, enterpriseId))).limit(1);
+    return item;
   }
-
 
   async updateInventory(id: number, quantity: number): Promise<Inventory> {
     this.logAction(`Ajuste manual estoque ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     const [updated] = await db.update(inventory)
       .set({ quantity, updatedAt: new Date() })
-      .where(eq(inventory.id, id))
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)))
       .returning();
     return updated;
   }
 
   async deleteInventoryItem(id: number): Promise<void> {
     this.logAction(`Exclusão item estoque ID:${id}`);
-    await db.delete(inventory).where(eq(inventory.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    await db.delete(inventory).where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)));
   }
 
   async upsertInventory(data: any): Promise<Inventory> {
     this.logAction(`Cadastro/Atualização estoque: ${data.customName || data.itemId}`);
     
+    const enterpriseId = this.currentEnterpriseId();
     const { id, ...itemData } = data;
     const itemToUpsert = {
       ...itemData,
@@ -999,11 +1153,12 @@ export class DatabaseStorage implements IStorage {
       codigoBalanca: itemData.codigoBalanca || null,
       ncm: itemData.ncm || null,
       cfop: itemData.cfop || null,
+      enterpriseId,
     };
 
     return await dualWrite(async (database) => {
       if (id) {
-        const [existing] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
+        const [existing] = await database.select().from(inventory).where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
@@ -1016,13 +1171,13 @@ export class DatabaseStorage implements IStorage {
       if (itemData.itemId && itemData.itemType) {
         const [existing] = await database.select()
           .from(inventory)
-          .where(and(eq(inventory.itemId, itemData.itemId), eq(inventory.itemType, itemData.itemType)))
+          .where(and(eq(inventory.itemId, itemData.itemId), eq(inventory.itemType, itemData.itemType), eq(inventory.enterpriseId, enterpriseId)))
           .limit(1);
           
         if (existing) {
           const [updated] = await database.update(inventory)
             .set(itemToUpsert)
-            .where(eq(inventory.id, existing.id))
+            .where(and(eq(inventory.id, existing.id), eq(inventory.enterpriseId, enterpriseId)))
           return updated;
         }
       }
@@ -1035,128 +1190,184 @@ export class DatabaseStorage implements IStorage {
 
   async createInventoryLog(log: InsertInventoryLog): Promise<InventoryLog> {
     this.logAction(`Log movimento estoque ID:${log.inventoryId}`);
+    const enterpriseId = this.currentEnterpriseId();
+    const [owned] = await db.select({ id: inventory.id }).from(inventory)
+      .where(and(eq(inventory.id, Number(log.inventoryId)), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+    if (!owned) throw new Error("Item de inventário não encontrado nesta empresa.");
     return await dualWrite(async (database) => {
-      const [newLog] = await database.insert(inventoryLogs).values(log).returning();
+      const [newLog] = await database.insert(inventoryLogs).values({ ...log, enterpriseId } as any).returning();
       return newLog;
     });
   }
 
   async updateCashRegisterOpeningAmount(id: number, amount: number) {
     this.logAction(`Ajuste abertura caixa ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      return await database
-        .update(cashRegisters)
+      const [updated] = await database.update(cashRegisters)
         .set({ openingAmount: amount })
-        .where(eq(cashRegisters.id, id));
+        .where(and(eq(cashRegisters.id, id), eq(cashRegisters.enterpriseId, enterpriseId)))
+        .returning();
+      if (!updated) throw new Error(`Caixa ${id} não encontrado nesta empresa.`);
+      return updated;
     });
   }
 
   async restockInventory(id: number, data: any): Promise<Inventory> {
     this.logAction(`Reposição estoque ID:${id} (+${data.quantity})`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [item] = await database.select().from(inventory).where(eq(inventory.id, id)).limit(1);
-      if (!item) throw new Error("Item de inventário não encontrado");
-
+      const [item] = await database.select().from(inventory)
+        .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).limit(1);
+      if (!item) throw new Error("Item de inventário não encontrado nesta empresa.");
       const [updated] = await database.update(inventory)
-        .set({ 
-          quantity: item.quantity + data.quantity,
-          updatedAt: new Date()
-        })
-        .where(eq(inventory.id, id))
-
+        .set({ quantity: Number(item.quantity) + Number(data.quantity), updatedAt: new Date() })
+        .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId)));
       await database.insert(inventoryRestocks).values({
-        inventoryId: id,
-        quantity: data.quantity,
-        unit: data.unit || item.unit,
-        itemsPerUnit: data.itemsPerUnit || item.itemsPerUnit,
-        costPrice: data.costPrice || 0,
-        expiryDate: data.expiryDate,
-        createdAt: new Date()
+        enterpriseId, inventoryId: id, quantity: data.quantity, unit: data.unit || item.unit,
+        itemsPerUnit: data.itemsPerUnit || item.itemsPerUnit, costPrice: data.costPrice || 0,
+        expiryDate: data.expiryDate, createdAt: new Date()
       });
-
       return updated;
     });
   }
 
   async updateInventoryItem(id: number, update: any): Promise<Inventory> {
     this.logAction(`Atualização item inventário ID:${id}`);
-    await db.update(inventory).set(update).where(eq(inventory.id, id));
-      const [updated] = await db.select().from(inventory).where(eq(inventory.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(inventory).set(update)
+      .where(and(eq(inventory.id, id), eq(inventory.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Item de inventário ${id} não encontrado.`);
     return updated;
   }
 
   async updateMenuItem(id: number, update: Partial<MenuItem>): Promise<MenuItem> {
     this.logAction(`Atualização item menu ID:${id}`);
-    await db.update(menuItems).set(update).where(eq(menuItems.id, id));
-      const [updated] = await db.select().from(menuItems).where(eq(menuItems.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(menuItems).set(update)
+      .where(and(eq(menuItems.id, id), eq(menuItems.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Item de menu ${id} não encontrado.`);
     return updated;
   }
 
   async createTransaction(transaction: any): Promise<Transaction> {
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      const [newTransaction] = await database.insert(transactions).values(transaction).returning();
+      const [newTransaction] = await database.insert(transactions)
+        .values({ ...transaction, enterpriseId } as any)
+        .returning();
       return newTransaction;
     });
   }
 
   async deleteTransaction(id: number): Promise<void> {
     await dualWrite(async (database) => {
-      await database.delete(transactions).where(eq(transactions.id, id));
+      const enterpriseId = this.currentEnterpriseId();
+      const [existing] = await database.select({ id: transactions.id }).from(transactions)
+        .where(and(eq(transactions.id, id), eq(transactions.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Transação ${id} não encontrada.`);
+      await database.delete(transactions).where(and(eq(transactions.id, id), eq(transactions.enterpriseId, enterpriseId)));
     });
   }
 
   async updateTicketItems(id: number, items: string[]): Promise<Ticket> {
+    const enterpriseId = this.currentEnterpriseId();
     const [updated] = await db.update(tickets)
       .set({ items: JSON.stringify(items) })
-      .where(eq(tickets.id, id))
+      .where(and(eq(tickets.id, id), eq(tickets.enterpriseId, enterpriseId)))
       .returning();
+    if (!updated) throw new Error("Comanda não encontrada nesta empresa.");
     return updated;
   }
 
   // Time Clock
   async getTimeClockHistory(userId: number): Promise<TimeClock[]> {
-    return await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(timeClock).where(and(eq(timeClock.userId, userId), eq(timeClock.enterpriseId, enterpriseId))).orderBy(desc(timeClock.timestamp));
   }
 
   async getLatestTimeClock(userId: number): Promise<TimeClock | undefined> {
-    const [latest] = await db.select().from(timeClock).where(eq(timeClock.userId, userId)).orderBy(desc(timeClock.timestamp)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [latest] = await db.select().from(timeClock).where(and(eq(timeClock.userId, userId), eq(timeClock.enterpriseId, enterpriseId))).orderBy(desc(timeClock.timestamp)).limit(1);
     return latest;
   }
 
   async createTimeClock(data: InsertTimeClock): Promise<TimeClock> {
-    const [clock] = await db.insert(timeClock).values(data).returning();
+    const enterpriseId = this.currentEnterpriseId();
+    const userId = Number(data.userId);
+    if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error("Usuário inválido para registro de ponto.");
+    const [ownedUser] = await db.select({ id: users.id }).from(users)
+      .where(and(eq(users.id, userId), eq(users.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedUser) throw new Error("Usuário não pertence a este estabelecimento.");
+    const [clock] = await db.insert(timeClock).values({ ...data, enterpriseId } as any).returning();
     return clock;
   }
 
   async updateTimeClock(id: number, data: Partial<TimeClock>): Promise<TimeClock> {
-    await db.update(timeClock).set(data).where(eq(timeClock.id, id));
-      const [updated] = await db.select().from(timeClock).where(eq(timeClock.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [updated] = await db.update(timeClock).set(data)
+      .where(and(eq(timeClock.id, id), eq(timeClock.enterpriseId, enterpriseId))).returning();
+    if (!updated) throw new Error(`Registro de ponto ${id} não encontrado.`);
     return updated;
   }
 
   // Settings
-  async getSettings(enterpriseId?: number): Promise<Settings> {
-    let query = db.select().from(settings);
-    if (enterpriseId) {
-      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
+  async getSettings(enterpriseId: number): Promise<Settings> {
+    if (!Number.isSafeInteger(Number(enterpriseId)) || Number(enterpriseId) <= 0) {
+      throw new Error("enterpriseId inválido.");
     }
-    const [s] = await query.limit(1);
+    const [s] = await db.select().from(settings)
+      .where(eq(settings.enterpriseId, Number(enterpriseId)))
+      .limit(1);
     if (!s) {
-      const [newSettings] = await db.insert(settings).values({ enterpriseId }).returning();
-      return newSettings;
+      // GET is read-only. Never create a database row as a side effect of a read.
+      return {
+        id: 0,
+        enterpriseId: Number(enterpriseId),
+        siteName: "Padaria",
+        logoUrl: "",
+        primaryColor: "#00FF66",
+        secondaryColor: "#10b981",
+        accentColor: "#00FF66",
+        backgroundColor: "#0a0a0b",
+        bgImageUrl: "",
+        borderRadius: "1rem",
+        glassOpacity: "0.1",
+      } as Settings;
     }
     return s;
   }
 
   async updateSettings(update: Partial<Settings>): Promise<Settings> {
-    const { enterpriseId, ...rest } = update;
-    let query = db.update(settings).set(rest);
-    if (enterpriseId) {
-      query = query.where(eq(settings.enterpriseId, enterpriseId)) as any;
+    const enterpriseId = Number(update.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("enterpriseId obrigatório e inválido.");
     }
-    await query;
-    const [updated] = await db.select().from(settings).where(eq(settings.enterpriseId, enterpriseId || 1));
-    return updated;
+    const { enterpriseId: _enterpriseId, id: _id, ...rest } = update;
+    const [existing] = await db.select({ id: settings.id })
+      .from(settings)
+      .where(eq(settings.enterpriseId, enterpriseId))
+      .limit(1);
+
+    if (existing) {
+      const [updated] = await dualWrite(async (database) => {
+        const [row] = await database.update(settings)
+          .set(rest)
+          .where(eq(settings.enterpriseId, enterpriseId))
+          .returning();
+        if (!row) throw new Error("Configurações não encontradas para o estabelecimento.");
+        return row;
+      });
+      return updated;
+    }
+
+    const [created] = await dualWrite(async (database) => {
+      return database.insert(settings).values({
+        enterpriseId,
+        ...rest,
+      }).returning();
+    });
+    return created;
   }
 
   // User Sessions
@@ -1191,7 +1402,10 @@ export class DatabaseStorage implements IStorage {
   // Fiscal
   async getFiscalSettings(enterpriseId: number): Promise<FiscalSettings | undefined> {
     this.logAction(`Consulta configurações fiscais empresa ID:${enterpriseId}`);
-    const idToUse = enterpriseId || 1;
+    const idToUse = Number(enterpriseId);
+    if (!Number.isSafeInteger(idToUse) || idToUse <= 0) {
+      throw new Error("Contexto empresarial fiscal inválido.");
+    }
     try {
       const [settings] = await db.select().from(fiscalSettings).where(eq(fiscalSettings.enterpriseId, idToUse)).limit(1);
       return settings || undefined;
@@ -1233,7 +1447,10 @@ export class DatabaseStorage implements IStorage {
 
   async upsertFiscalSettings(settingsData: InsertFiscalSettings): Promise<FiscalSettings> {
     this.logAction(`Upsert configurações fiscais empresa ID:${settingsData.enterpriseId}`);
-    const enterpriseId = settingsData.enterpriseId || 1;
+    const enterpriseId = Number(settingsData.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("Contexto empresarial fiscal inválido.");
+    }
     const dataToSave = {
       ...settingsData,
       enterpriseId,
@@ -1261,8 +1478,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getLogsFiscais(enterpriseId: number): Promise<any[]> {
+    const scopedEnterpriseId = this.currentEnterpriseId();
+    if (Number(enterpriseId) !== scopedEnterpriseId) throw new Error("Tenant fiscal inválido.");
     return await db.select().from(sales)
       .where(and(
+        eq(sales.enterpriseId, scopedEnterpriseId),
         eq(sales.status, "completed"), 
         or(
           eq(sales.fiscalStatus, "authorized"), 
@@ -1274,20 +1494,25 @@ export class DatabaseStorage implements IStorage {
 
   async updateSaleFiscal(id: number, update: Partial<Pick<Sale, 'fiscalStatus' | 'fiscalKey' | 'fiscalXml' | 'fiscalError' | 'fiscalType'>>): Promise<Sale> {
     return await dualWrite(async (database) => {
+      const enterpriseId = this.currentEnterpriseId();
       const [updated] = await database.update(sales).set(update)
-        .where(eq(sales.id, id)).returning();
+        .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId))).returning();
       if (!updated) throw new Error(`Venda ${id} não encontrada ao atualizar o estado fiscal.`);
       return updated;
     });
   }
 
   async getSale(id: number): Promise<Sale | undefined> {
-    const [sale] = await db.select().from(sales).where(eq(sales.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [sale] = await db.select().from(sales)
+      .where(and(eq(sales.id, id), eq(sales.enterpriseId, enterpriseId)));
     return sale;
   }
 
   async getSaleItems(saleId: number): Promise<SaleItem[]> {
-    return await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(saleItems)
+      .where(and(eq(saleItems.saleId, saleId), eq(saleItems.enterpriseId, enterpriseId)));
   }
 
   /** Retorna itens da venda enriquecidos com nome, NCM, CFOP e outros campos fiscais */
@@ -1299,43 +1524,26 @@ export class DatabaseStorage implements IStorage {
     icmsOrigem?: number | null;
     icmsSituacaoTributaria?: string | null;
   })[]> {
-    const items: any[] = await db.select().from(saleItems).where(eq(saleItems.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    const items: any[] = await db.select().from(saleItems)
+      .where(and(eq(saleItems.saleId, saleId), eq(saleItems.enterpriseId, enterpriseId)));
     if (items.length === 0) return [];
-
-    const ids = Array.from(new Set(items.map((i: any) => Number(i.itemId))));
-
-    // Busca em menuItems e products em paralelo
-    const [menuList, productList] = await Promise.all([
-      db.select().from(menuItems).where(
-        ids.length === 1
-          ? eq(menuItems.id, Number(ids[0]))
-          : sql`${menuItems.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
-      ),
-      db.select().from(products).where(
-        ids.length === 1
-          ? eq(products.id, ids[0])
-          : sql`${products.id} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`
-      ),
-    ]);
-
+    const menuList = await db.select().from(menuItems).where(eq(menuItems.enterpriseId, enterpriseId));
+    const productList = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     return items.map((item: any) => {
       const mi = menuList.find((m: any) => m.id === item.itemId);
       const pr = productList.find((p: any) => p.id === item.itemId);
       const src = mi || pr;
-      return {
-        ...item,
-        name: src?.name || `Produto ${item.itemId}`,
-        barcode: (mi as any)?.barcode ?? null,
-        ncm: (mi as any)?.ncm ?? (pr as any)?.ncm ?? null,
-        cfop: (mi as any)?.cfop ?? (pr as any)?.cfop ?? null,
-        icmsOrigem: (mi as any)?.icmsOrigem ?? 0,
-        icmsSituacaoTributaria: (mi as any)?.icmsSituacaoTributaria ?? "400",
-      };
+      return { ...item, name: src?.name || `Produto ${item.itemId}`, barcode: (mi as any)?.barcode ?? null,
+        ncm: (mi as any)?.ncm ?? (pr as any)?.ncm ?? null, cfop: (mi as any)?.cfop ?? (pr as any)?.cfop ?? null,
+        icmsOrigem: (mi as any)?.icmsOrigem ?? 0, icmsSituacaoTributaria: (mi as any)?.icmsSituacaoTributaria ?? "400" };
     });
   }
 
   async getPayments(saleId: number): Promise<Payment[]> {
-    return await db.select().from(payments).where(eq(payments.saleId, saleId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(payments)
+      .where(and(eq(payments.saleId, saleId), eq(payments.enterpriseId, enterpriseId)));
   }
 
   async getNextNfceNumber(enterpriseId: number): Promise<number> {
@@ -1349,7 +1557,7 @@ export class DatabaseStorage implements IStorage {
     try {
       await db.update(fiscalSettings)
         .set({ ultimoNumeroNfce: nextNumber } as any)
-        .where(eq(fiscalSettings.id, settingsData.id));
+        .where(and(eq(fiscalSettings.id, settingsData.id), eq(fiscalSettings.enterpriseId, enterpriseId)));
     } catch (e) {
       console.warn("Aviso: Não foi possível atualizar ultimoNumeroNfce (coluna ausente?)");
     }
@@ -1358,24 +1566,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createNfce(data: InsertNfce): Promise<Nfce> {
+    const enterpriseId = this.currentEnterpriseId();
+    const [ownedSale] = await db.select({ id: sales.id }).from(sales)
+      .where(and(eq(sales.id, Number(data.saleId)), eq(sales.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedSale) throw new Error("Venda não encontrada nesta empresa.");
     return await dualWrite(async (database) => {
-      const [inserted] = await database.insert(nfce).values(data).returning();
+      const [inserted] = await database.insert(nfce).values({ ...data, enterpriseId } as any).returning();
       if (!inserted) throw new Error("Não foi possível obter o documento fiscal recém-criado.");
       return inserted;
     });
   }
 
   async getNfceHistory(enterpriseId: number): Promise<Nfce[]> {
-    return await db.select().from(nfce).orderBy(desc(nfce.dataEmissao));
+    const scopedEnterpriseId = this.currentEnterpriseId();
+    if (Number(enterpriseId) !== scopedEnterpriseId) throw new Error("Tenant fiscal inválido.");
+    return await db.select().from(nfce)
+      .where(eq(nfce.enterpriseId, scopedEnterpriseId))
+      .orderBy(desc(nfce.dataEmissao));
   }
 
   async getNfce(id: number): Promise<Nfce | undefined> {
-    const [item] = await db.select().from(nfce).where(eq(nfce.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [item] = await db.select().from(nfce).where(and(eq(nfce.id, id), eq(nfce.enterpriseId, enterpriseId)));
     return item;
   }
 
   async getCashRegisters(filters: { startDate?: Date; endDate?: Date }): Promise<CashRegister[]> {
-    let conditions = [];
+    const enterpriseId = this.currentEnterpriseId();
+    let conditions = [eq(cashRegisters.enterpriseId, enterpriseId)];
     if (filters.startDate) conditions.push(gte(cashRegisters.openedAt, filters.startDate));
     if (filters.endDate) conditions.push(lte(cashRegisters.openedAt, filters.endDate));
     
@@ -1386,22 +1604,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSalesByRegisterId(registerId: number): Promise<Sale[]> {
-    return await db.select().from(sales).where(eq(sales.cashRegisterId, registerId));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(sales)
+      .where(and(eq(sales.cashRegisterId, registerId), eq(sales.enterpriseId, enterpriseId)));
   }
 
   async getAllInventoryRestocks(): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks).orderBy(desc(inventoryRestocks.createdAt));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventoryRestocks)
+      .where(eq(inventoryRestocks.enterpriseId, enterpriseId))
+      .orderBy(desc(inventoryRestocks.createdAt));
   }
 
   async getInventoryRestocks(inventoryId: number): Promise<InventoryRestock[]> {
-    return await db.select().from(inventoryRestocks).where(eq(inventoryRestocks.inventoryId, inventoryId)).orderBy(desc(inventoryRestocks.createdAt));
+    const enterpriseId = this.currentEnterpriseId();
+    return await db.select().from(inventoryRestocks)
+      .where(and(eq(inventoryRestocks.inventoryId, inventoryId), eq(inventoryRestocks.enterpriseId, enterpriseId)))
+      .orderBy(desc(inventoryRestocks.createdAt));
   }
 
   // ─── Produto → Lotes ──────────────────────────────────────────────────────
 
   private async _enrichProducts(prods: Product[]) {
     if (prods.length === 0) return [];
-    const allBatches: any[] = await db.select().from(batches);
+    const enterpriseId = this.currentEnterpriseId();
+    const allBatches: any[] = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
     return prods.map((p: any) => {
       const pb = allBatches.filter((b: any) => b.productId === p.id && b.quantity > 0);
       const allPb = allBatches.filter((b: any) => b.productId === p.id);
@@ -1414,19 +1641,33 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  private currentEnterpriseId(): number {
+    const enterpriseId = Number(getAuraContext().enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      throw new Error("Contexto empresarial autenticado ausente.");
+    }
+    return enterpriseId;
+  }
+
   async getProducts() {
     this.logAction("Consulta produtos");
-    const prods = await db.select().from(products).orderBy(asc(products.name));
+    const enterpriseId = this.currentEnterpriseId();
+    const prods = await db.select().from(products)
+      .where(eq(products.enterpriseId, enterpriseId))
+      .orderBy(asc(products.name));
     return this._enrichProducts(prods);
   }
 
   async getProduct(id: number): Promise<Product | undefined> {
-    const [p] = await db.select().from(products).where(eq(products.id, id));
+    const enterpriseId = this.currentEnterpriseId();
+    const [p] = await db.select().from(products)
+      .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
     return p;
   }
 
   async findDuplicateProduct(data: { name: string; brand?: string; flavor?: string; weight?: string; category?: string }): Promise<Product | undefined> {
-    const all: any[] = await db.select().from(products);
+    const enterpriseId = this.currentEnterpriseId();
+    const all: any[] = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const norm = (s?: string | null) => (s || "").trim().toLowerCase();
     const match = all.find((p: any) =>
       norm(p.name) === norm(data.name) &&
@@ -1440,8 +1681,9 @@ export class DatabaseStorage implements IStorage {
 
   async createProduct(data: InsertProduct): Promise<Product> {
     this.logAction(`Novo produto: ${data.name}`);
+    const enterpriseId = this.currentEnterpriseId();
     const now = new Date();
-    const clean = withoutUndefined({ ...data, createdAt: now, updatedAt: now } as any);
+    const clean = withoutUndefined({ ...data, enterpriseId, createdAt: now, updatedAt: now } as any);
 
     // sql.js is used as the local mirror. Its prepared binder is stricter than
     // the remote libSQL driver, so write the local row with primitive SQLite values.
@@ -1451,8 +1693,8 @@ export class DatabaseStorage implements IStorage {
         `INSERT INTO products
           (id, name, brand, category, flavor, unit, weight, description, image_url,
            min_stock, sale_price, em_liquidacao, ncm, cfop, codigo_balanca,
-           codigo_produto, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+           codigo_produto, enterprise_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run([
         forcedId ?? null,
         String(data.name),
@@ -1470,6 +1712,7 @@ export class DatabaseStorage implements IStorage {
         data.cfop ?? null,
         data.codigoBalanca ?? null,
         data.codigoProduto ?? null,
+        enterpriseId,
         nowSec,
         nowSec
       ]);
@@ -1498,7 +1741,7 @@ export class DatabaseStorage implements IStorage {
         productId = requestedId;
       } else {
         const [remoteProduct]: any[] = await db.select().from(products)
-          .where(eq(products.name, String(data.name)))
+          .where(and(eq(products.name, String(data.name)), eq(products.enterpriseId, enterpriseId)))
           .orderBy(desc(products.id))
           .limit(1);
         productId = Number(remoteProduct?.id);
@@ -1511,7 +1754,7 @@ export class DatabaseStorage implements IStorage {
       } catch (localError) {
         // Compensate the remote insert if local mirroring fails, preventing a silent split.
         try {
-          await dbRemote.delete(products).where(eq(products.id, productId));
+          await dbRemote.delete(products).where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId)));
         } catch (rollbackError) {
           console.error("[DB CONSISTENCY] Falha ao reverter produto no Turso após falha local:", rollbackError);
         }
@@ -1522,33 +1765,48 @@ export class DatabaseStorage implements IStorage {
     }
 
     scheduleAutoBackup();
-    const [product] = await db.select().from(products).where(eq(products.id, productId));
+    const [product] = await db.select().from(products).where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId)));
     if (!product) throw new Error(`Produto criado mas não localizado: ID ${productId}`);
     return product;
   }
 
   async updateProduct(id: number, data: Partial<InsertProduct>): Promise<Product> {
     this.logAction(`Atualização produto ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     return await dualWrite(async (database) => {
-      await database.update(products).set(withoutUndefined({ ...data, updatedAt: new Date() }) as any).where(eq(products.id, id));
-      const [p] = await database.select().from(products).where(eq(products.id, id));
+      const [existing] = await database.select({ id: products.id }).from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Produto ${id} não encontrado.`);
+      await database.update(products)
+        .set(withoutUndefined({ ...data, enterpriseId, updatedAt: new Date() }) as any)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
+      const [p] = await database.select().from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
       return p;
     });
   }
 
   async deleteProduct(id: number): Promise<void> {
     this.logAction(`Exclusão produto ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      await database.delete(batchLogs).where(eq(batchLogs.productId, id));
-      await database.delete(batches).where(eq(batches.productId, id));
-      await database.delete(products).where(eq(products.id, id));
+      const [existing] = await database.select({ id: products.id }).from(products)
+        .where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Produto ${id} não encontrado.`);
+      await database.delete(batchLogs).where(and(eq(batchLogs.productId, id), eq(batchLogs.enterpriseId, enterpriseId)));
+      await database.delete(batches).where(and(eq(batches.productId, id), eq(batches.enterpriseId, enterpriseId)));
+      await database.delete(products).where(and(eq(products.id, id), eq(products.enterpriseId, enterpriseId)));
     });
   }
 
   async zeroAllBatchQuantities(zeroedBy: string): Promise<number> {
     this.logAction(`ZERAGEM DE QUANTIDADES DO ESTOQUE por ${zeroedBy}`);
+    const enterpriseId = this.currentEnterpriseId();
     const result = await dualWrite(async (database) => {
-      const updatedRows = await database.update(batches).set({ quantity: 0 }).returning({ id: batches.id });
+      const updatedRows = await database.update(batches)
+        .set({ quantity: 0 })
+        .where(eq(batches.enterpriseId, enterpriseId))
+        .returning({ id: batches.id });
       return updatedRows.length;
     });
     return result as number;
@@ -1558,58 +1816,58 @@ export class DatabaseStorage implements IStorage {
     this.logAction(`LIMPEZA TOTAL DO ESTOQUE por ${clearedBy}`);
 
     // 1. Salva snapshot antes de deletar
-    const allProducts = await db.select().from(products);
-    const allBatches  = await db.select().from(batches);
+    const enterpriseId = this.currentEnterpriseId();
+    const allProducts = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
+    const allBatches  = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
 
     await db.insert(stockSnapshots).values({
+      enterpriseId,
       createdAt: new Date(),
       createdBy: clearedBy,
       productsJson: JSON.stringify(allProducts),
       batchesJson: JSON.stringify(allBatches),
       productCount: allProducts.length,
-    });
+    } as any);
 
     // 2. Deleta tudo
     await dualWrite(async (database) => {
-      await database.delete(batchLogs);
-      await database.delete(batches);
-      await database.delete(products);
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, enterpriseId));
+      await database.delete(batches).where(eq(batches.enterpriseId, enterpriseId));
+      await database.delete(products).where(eq(products.enterpriseId, enterpriseId));
     });
   }
 
   async getLatestStockSnapshot(): Promise<{ id: number; createdAt: Date; createdBy: string; productCount: number } | null> {
-    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [row] = await db.select().from(stockSnapshots)
+      .where(eq(stockSnapshots.enterpriseId, enterpriseId))
+      .orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) return null;
-    return {
-      id: row.id,
-      createdAt: row.createdAt,
-      createdBy: row.createdBy,
-      productCount: row.productCount,
-    };
+    return { id: row.id, createdAt: row.createdAt, createdBy: row.createdBy, productCount: row.productCount };
   }
 
   async restoreStockSnapshot(): Promise<{ productsRestored: number }> {
-    const [row] = await db.select().from(stockSnapshots).orderBy(desc(stockSnapshots.id)).limit(1);
+    const enterpriseId = this.currentEnterpriseId();
+    const [row] = await db.select().from(stockSnapshots)
+      .where(eq(stockSnapshots.enterpriseId, enterpriseId))
+      .orderBy(desc(stockSnapshots.id)).limit(1);
     if (!row) throw new Error("Nenhum snapshot encontrado para restaurar.");
+    const savedProducts: any[] = JSON.parse(String((row as any).productsJson ?? (row as any).products_json ?? "[]"));
+    const savedBatches: any[] = JSON.parse(String((row as any).batchesJson ?? (row as any).batches_json ?? "[]"));
 
-    const savedProducts: any[] = JSON.parse(row.products_json);
-    const savedBatches:  any[] = JSON.parse(row.batches_json);
-
-    // Limpa estoque atual antes de restaurar
     await dualWrite(async (database) => {
-      await database.delete(batchLogs);
-      await database.delete(batches);
-      await database.delete(products);
+      await database.delete(batchLogs).where(eq(batchLogs.enterpriseId, enterpriseId));
+      await database.delete(batches).where(eq(batches.enterpriseId, enterpriseId));
+      await database.delete(products).where(eq(products.enterpriseId, enterpriseId));
     });
 
-    // Reinserir produtos e mapear IDs antigos → novos
     const idMap = new Map<number, number>();
     for (const p of savedProducts) {
-      const oldId = p.id;
-      const { id: _id, ...rest } = p;
+      const oldId = Number(p.id);
+      const { id: _id, enterpriseId: _savedTenant, ...rest } = p;
       const inserted = await dualWrite(async (database) => {
         const [rec] = await database.insert(products).values({
-          ...rest,
+          ...rest, enterpriseId,
           createdAt: p.createdAt ? new Date(p.createdAt) : new Date(),
           updatedAt: new Date(),
         }).returning();
@@ -1617,67 +1875,56 @@ export class DatabaseStorage implements IStorage {
       });
       idMap.set(oldId, inserted.id);
     }
-
-    // Reinserir lotes com product_id remapeado
     for (const b of savedBatches) {
-      const newProductId = idMap.get(b.productId);
+      const newProductId = idMap.get(Number(b.productId));
       if (!newProductId) continue;
-      const { id: _id, ...rest } = b;
+      const { id: _id, enterpriseId: _savedTenant, ...rest } = b;
       await dualWrite(async (database) => {
-        const [rec] = await database.insert(batches).values({
-          ...rest,
-          productId: newProductId,
+        await database.insert(batches).values({
+          ...rest, enterpriseId, productId: newProductId,
           entryDate: b.entryDate ? new Date(b.entryDate) : new Date(),
           expiryDate: b.expiryDate ? new Date(b.expiryDate) : null,
           manufactureDate: b.manufactureDate ? new Date(b.manufactureDate) : null,
           createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
         }).returning();
-        return rec;
       });
     }
-
     this.logAction(`RESTAURAÇÃO DO ESTOQUE — ${savedProducts.length} produtos`);
     return { productsRestored: savedProducts.length };
   }
 
   async getProductBatches(productId: number): Promise<Batch[]> {
+    const enterpriseId = this.currentEnterpriseId();
     return await db.select().from(batches)
-      .where(eq(batches.productId, productId))
+      .where(and(eq(batches.productId, productId), eq(batches.enterpriseId, enterpriseId)))
       .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
   }
 
   async createBatch(data: InsertBatch): Promise<Batch> {
     this.logAction(`Novo lote produto ID:${data.productId}`);
-    // ── Unicidade: SKU exclusivo por variante ────────────────────────────────
-    if ((data as any).sku && String((data as any).sku).trim()) {
-      const skuTrim = String((data as any).sku).trim();
-      const [dupSku] = await db.select().from(batches).where(eq(batches.sku, skuTrim)).limit(1);
-      if (dupSku) {
-        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
-      }
+    const enterpriseId = this.currentEnterpriseId();
+    const productId = Number((data as any).productId);
+    const [ownedProduct] = await db.select({ id: products.id }).from(products)
+      .where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedProduct) throw new Error("Produto não encontrado nesta empresa.");
+    const skuTrim = String((data as any).sku || "").trim();
+    if (skuTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.sku, skuTrim), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`SKU "${skuTrim}" já está cadastrado nesta empresa.`);
     }
-    // ── Unicidade: código de barras exclusivo por variante ───────────────────
-    if ((data as any).barcode && String((data as any).barcode).trim()) {
-      const bcTrim = String((data as any).barcode).trim();
-      const [dupBc] = await db.select().from(batches).where(eq(batches.barcode, bcTrim)).limit(1);
-      if (dupBc) {
-        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
-      }
+    const bcTrim = String((data as any).barcode || "").trim();
+    if (bcTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.barcode, bcTrim), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`Código de barras "${bcTrim}" já está cadastrado nesta empresa.`);
     }
     const sharedBatchId = await nextSharedId(batches);
     return await dualWrite(async (database) => {
       const now = new Date();
-      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, id: sharedBatchId, createdAt: now }) as any).returning();
+      const [b]: any[] = await database.insert(batches).values(withoutUndefined({ ...data, enterpriseId, id: sharedBatchId, createdAt: now }) as any).returning();
       if (!b) throw new Error("Não foi possível obter o lote recém-criado.");
-      // log entry
       await database.insert(batchLogs).values({
-        productId: data.productId,
-        batchId: b.id,
-        type: "in",
-        quantity: data.quantity,
-        reason: "Entrada de lote",
-        userId: (data as any).userId || 0,
-        createdAt: now,
+        enterpriseId, productId, batchId: b.id, type: "in", quantity: data.quantity,
+        reason: "Entrada de lote", userId: (data as any).userId || 0, createdAt: now,
       } as any);
       return b;
     });
@@ -1685,136 +1932,126 @@ export class DatabaseStorage implements IStorage {
 
   async updateBatch(id: number, data: Partial<InsertBatch>): Promise<Batch> {
     this.logAction(`Atualização lote ID:${id}`);
-    // ── Unicidade: SKU exclusivo (excluindo o próprio lote) ──────────────────
-    if ((data as any).sku && String((data as any).sku).trim()) {
-      const skuTrim = String((data as any).sku).trim();
-      const [dupSku] = await db.select().from(batches)
-        .where(and(eq(batches.sku, skuTrim), ne(batches.id, id)))
-        .limit(1);
-      if (dupSku) {
-        throw new Error(`SKU "${skuTrim}" já está sendo utilizado pela variante #${dupSku.id} (produto ID ${dupSku.productId}). Cada variante deve ter um código interno exclusivo.`);
-      }
+    const enterpriseId = this.currentEnterpriseId();
+    const nextData: any = withoutUndefined({ ...data, enterpriseId });
+    const skuTrim = String((data as any).sku || "").trim();
+    if (skuTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.sku, skuTrim), ne(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`SKU "${skuTrim}" já está cadastrado nesta empresa.`);
     }
-    // ── Unicidade: código de barras exclusivo (excluindo o próprio lote) ─────
-    if ((data as any).barcode && String((data as any).barcode).trim()) {
-      const bcTrim = String((data as any).barcode).trim();
-      const [dupBc] = await db.select().from(batches)
-        .where(and(eq(batches.barcode, bcTrim), ne(batches.id, id)))
-        .limit(1);
-      if (dupBc) {
-        throw new Error(`Código de barras "${bcTrim}" já está cadastrado na variante #${dupBc.id} (produto ID ${dupBc.productId}). Cada variante deve ter um EAN/GTIN exclusivo.`);
-      }
+    const bcTrim = String((data as any).barcode || "").trim();
+    if (bcTrim) {
+      const [dup] = await db.select().from(batches).where(and(eq(batches.barcode, bcTrim), ne(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (dup) throw new Error(`Código de barras "${bcTrim}" já está cadastrado nesta empresa.`);
     }
     return await dualWrite(async (database) => {
-      await database.update(batches).set(withoutUndefined(data as any)).where(eq(batches.id, id));
-      const [b] = await database.select().from(batches).where(eq(batches.id, id));
+      const [existing] = await database.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Lote ${id} não encontrado.`);
+      await database.update(batches).set(nextData).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
+      const [b] = await database.select().from(batches).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
       return b;
     });
   }
 
   async deleteBatch(id: number): Promise<void> {
     this.logAction(`Exclusão lote ID:${id}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      await database.delete(batchLogs).where(eq(batchLogs.batchId, id));
-      await database.delete(batches).where(eq(batches.id, id));
+      const [existing] = await database.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (!existing) throw new Error(`Lote ${id} não encontrado.`);
+      await database.delete(batchLogs).where(and(eq(batchLogs.batchId, id), eq(batchLogs.enterpriseId, enterpriseId)));
+      await database.delete(batches).where(and(eq(batches.id, id), eq(batches.enterpriseId, enterpriseId)));
     });
   }
 
   async findProductByBarcode(barcode: string) {
-    this.logAction(`Busca por código de barras: ${barcode}`);
-    const matchingBatches = await db.select().from(batches).where(eq(batches.barcode, barcode));
-    if (matchingBatches.length === 0) return null;
+    const enterpriseId = this.currentEnterpriseId();
+    const matchingBatches = await db.select().from(batches)
+      .where(and(eq(batches.barcode, barcode), eq(batches.enterpriseId, enterpriseId)));
+    if (!matchingBatches.length) return null;
     const productIds = Array.from(new Set(matchingBatches.map((b: any) => b.productId)));
-    const all = await db.select().from(products);
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const matched = all.filter((p: any) => productIds.includes(p.id));
-    if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
-    const result = enriched[0];
-    if (!result) return null;
-    // Return the specific matched batch (variant) so the caller knows which variant was found
-    const matchedBatch = matchingBatches[0];
-    return { ...result, matchedBatch };
+    return enriched[0] ? { ...enriched[0], matchedBatch: matchingBatches[0] } : null;
   }
 
   async searchProducts(q: string) {
-    const all = await db.select().from(products);
-    const allBatchesList = await db.select().from(batches);
+    const enterpriseId = this.currentEnterpriseId();
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
+    const allBatchesList = await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId));
     const norm = (s?: string | null) => (s || "").toLowerCase();
     const qn = norm(q);
-    // Search by barcode, SKU, variant name and supplier code across batches
-    const batchMatchSet = new Set(
-      allBatchesList.filter((b: any) =>
-        norm(b.barcode).includes(qn) ||
-        norm(b.supplierCode).includes(qn) ||
-        norm((b as any).sku).includes(qn) ||
-        norm((b as any).variantName).includes(qn)
-      ).map((b: any) => b.productId)
-    );
+    const batchMatchSet = new Set(allBatchesList.filter((b: any) =>
+      norm(b.barcode).includes(qn) || norm(b.supplierCode).includes(qn) ||
+      norm((b as any).sku).includes(qn) || norm((b as any).variantName).includes(qn)
+    ).map((b: any) => b.productId));
     const matched = all.filter((p: any) =>
-      norm(p.name).includes(qn) ||
-      norm(p.brand).includes(qn) ||
-      norm(p.category).includes(qn) ||
-      norm(p.flavor).includes(qn) ||
-      norm(p.codigoBalanca).includes(qn) ||
-      norm(p.codigoProduto).includes(qn) ||
+      norm(p.name).includes(qn) || norm(p.brand).includes(qn) || norm(p.category).includes(qn) ||
+      norm(p.flavor).includes(qn) || norm(p.codigoBalanca).includes(qn) || norm(p.codigoProduto).includes(qn) ||
       batchMatchSet.has(p.id)
     );
     return this._enrichProducts(matched);
   }
 
   async findProductByVariantSku(sku: string) {
-    this.logAction(`Busca por SKU de variante: ${sku}`);
+    const enterpriseId = this.currentEnterpriseId();
     const norm = (s?: string | null) => (s || "").toLowerCase();
-    const allBatchesList = await db.select().from(batches);
-    const matchingBatches = allBatchesList.filter((b: any) => norm((b as any).sku) === norm(sku));
-    if (matchingBatches.length === 0) return null;
-    const productIds = Array.from(new Set<number>(matchingBatches.map((b: any) => Number(b.productId))));
-    const all: any[] = await db.select().from(products);
+    const matchingBatches = (await db.select().from(batches).where(eq(batches.enterpriseId, enterpriseId)))
+      .filter((b: any) => norm(b.sku) === norm(sku));
+    if (!matchingBatches.length) return null;
+    const productIds = Array.from(new Set(matchingBatches.map((b: any) => Number(b.productId))));
+    const all = await db.select().from(products).where(eq(products.enterpriseId, enterpriseId));
     const matched = all.filter((p: any) => productIds.includes(Number(p.id)));
-    if (matched.length === 0) return null;
     const enriched = await this._enrichProducts(matched);
-    const result = enriched[0];
-    if (!result) return null;
-    const matchedBatch = matchingBatches[0];
-    return { ...result, matchedBatch };
+    return enriched[0] ? { ...enriched[0], matchedBatch: matchingBatches[0] } : null;
   }
 
   async deductBatchesFefo(productId: number, qty: number, userId: number, reason: string): Promise<void> {
-    this.logAction(`Baixa FEFO produto ID:${productId} qty:${qty}`);
+    const enterpriseId = this.currentEnterpriseId();
     await dualWrite(async (database) => {
-      // Load active batches sorted FEFO
       const activeBatches = await database.select().from(batches)
-        .where(and(eq(batches.productId, productId), gte(batches.quantity, 1)))
+        .where(and(eq(batches.productId, productId), eq(batches.enterpriseId, enterpriseId), gte(batches.quantity, 1)))
         .orderBy(asc(batches.expiryDate), asc(batches.entryDate));
-      
       let remaining = qty;
       for (const batch of activeBatches) {
         if (remaining <= 0) break;
-        const deduct = Math.min(remaining, batch.quantity);
-        await database.update(batches).set({ quantity: batch.quantity - deduct }).where(eq(batches.id, batch.id));
+        const deduct = Math.min(remaining, Number(batch.quantity));
+        await database.update(batches).set({ quantity: Number(batch.quantity) - deduct })
+          .where(and(eq(batches.id, batch.id), eq(batches.enterpriseId, enterpriseId)));
         await database.insert(batchLogs).values({
-          productId,
-          batchId: batch.id,
-          type: "out",
-          quantity: deduct,
-          reason,
-          userId,
-          createdAt: new Date(),
+          enterpriseId, productId, batchId: batch.id, type: "out", quantity: deduct,
+          reason, userId, createdAt: new Date(),
         } as any);
         remaining -= deduct;
       }
+      if (remaining > 1e-9) throw new Error("Estoque insuficiente para a baixa FEFO.");
     });
   }
 
   async getBatchLogs(productId: number): Promise<BatchLog[]> {
+    const enterpriseId = this.currentEnterpriseId();
     return await db.select().from(batchLogs)
-      .where(eq(batchLogs.productId, productId))
+      .where(and(eq(batchLogs.productId, productId), eq(batchLogs.enterpriseId, enterpriseId)))
       .orderBy(desc(batchLogs.createdAt));
   }
 
   async createBatchLog(data: InsertBatchLog): Promise<BatchLog> {
+    const enterpriseId = this.currentEnterpriseId();
+    const productId = Number(data.productId);
+    const [ownedProduct] = await db.select({ id: products.id }).from(products)
+      .where(and(eq(products.id, productId), eq(products.enterpriseId, enterpriseId))).limit(1);
+    if (!ownedProduct) throw new Error("Produto não encontrado nesta empresa.");
+    if (data.batchId) {
+      const [ownedBatch] = await db.select({ id: batches.id }).from(batches)
+        .where(and(eq(batches.id, Number(data.batchId)), eq(batches.enterpriseId, enterpriseId))).limit(1);
+      if (!ownedBatch) throw new Error("Lote não encontrado nesta empresa.");
+    }
     return await dualWrite(async (database) => {
-      const [log] = await database.insert(batchLogs).values({ ...data, createdAt: new Date() } as any).returning();
+      const [log] = await database.insert(batchLogs)
+        .values({ ...data, enterpriseId, createdAt: new Date() } as any).returning();
       return log;
     });
   }
