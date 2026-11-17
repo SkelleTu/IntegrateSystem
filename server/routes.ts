@@ -683,22 +683,42 @@ export async function registerRoutes(
 
   app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
     const user = req.user as any;
-    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar barbeiros" });
-    
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar funcionários." });
+
     try {
-      const { username, password } = req.body;
+      const schema = z.object({
+        username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
+        password: z.string().min(12).max(128),
+      });
+      const parsed = schema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ message: "Informe usuário válido e senha com pelo menos 12 caracteres." });
+
+      // A conta subordinada sempre herda o estabelecimento da sessão autenticada.
+      // Nunca aceite enterpriseId/role enviados pelo navegador.
+      const enterpriseId = Number(user.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+        return res.status(409).json({ message: "Sua conta ainda não está vinculada a um estabelecimento. Solicite ao proprietário que conclua o vínculo antes de criar funcionários." });
+      }
+      const enterprise = await storage.getEnterprise(enterpriseId);
+      if (!enterprise || enterprise.status !== "active") {
+        return res.status(403).json({ message: "O estabelecimento vinculado não está ativo. Não é possível criar contas subordinadas." });
+      }
+
+      const username = parsed.data.username.toLowerCase();
       const existing = await storage.getUserByUsername(username);
-      if (existing) return res.status(400).json({ message: "Usuário já existe" });
-      
-      const hashed = await hashPassword(password);
+      if (existing) return res.status(409).json({ message: "Este nome de usuário já está em uso." });
+
+      const hashed = await hashPassword(parsed.data.password);
       const newUser = await storage.createUser({
         username,
         password: hashed,
-        role: "barber"
-      });
-      res.status(201).json(toPublicUser(newUser));
-    } catch (err) {
-      res.status(500).json({ message: "Erro ao cadastrar barbeiro" });
+        role: "barber",
+        enterpriseId,
+      } as any);
+      return res.status(201).json(toPublicUser(newUser));
+    } catch (err: any) {
+      console.error("[ACCOUNT-BRANCHES] Employee creation failed:", err?.message || err);
+      return res.status(500).json({ message: "Não foi possível criar a conta subordinada." });
     }
   });
 
