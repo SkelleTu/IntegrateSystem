@@ -879,7 +879,7 @@ export async function registerRoutes(
           c.user_id AS "controlId",
           c.updated_at AS "updatedAt",
           (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin",
-          (SELECT MAX(a.created_at) FROM aura_account_audit a WHERE a.actor_user_id=u.id) AS "lastActivity",
+          (SELECT MAX(a.created_at) FROM aura_account_audit a WHERE a.actor_user_id=u.id OR a.target_user_id=u.id) AS "lastActivity",
           (SELECT COUNT(*) FROM aura_sessions s WHERE (s.sess::jsonb #>> '{passport,user}')=u.id::text AND s.expire > (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint) AS "activeSessions",
           (SELECT s.ip_address FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastIp",
           (SELECT s.user_agent FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastDevice"
