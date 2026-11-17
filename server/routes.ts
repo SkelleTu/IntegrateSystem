@@ -916,7 +916,7 @@ export async function registerRoutes(
       const target = await storage.getUser(targetId);
       if (!target) return res.status(404).json({ message: "Conta não encontrada." });
       if (Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(403).json({ message: "A conta pertence a outro estabelecimento." });
-      if (target.username.toLowerCase() === "skelletu" && (parsed.data.role || parsed.data.username || parsed.data.password)) return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
+      if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
       if (parsed.data.role === "owner" && !isSystemOwner(actor)) return res.status(403).json({ message: "Somente master pode conceder privilégio master." });
       if (parsed.data.username) {
         const duplicate = await storage.getUserByUsername(parsed.data.username.toLowerCase());
@@ -960,6 +960,7 @@ export async function registerRoutes(
     try {
       const target = await storage.getUser(targetId);
       if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
+      if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema não pode ser removida." });
       await auditAccountAction(req,targetId,"account.deleted",{ username:target.username,role:target.role });
       await storage.deleteUser(targetId);
       return res.status(204).send();
@@ -1066,7 +1067,7 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", isAuthenticated, async (req, res) => {
     const enterpriseId = req.query.enterpriseId ? Number(req.query.enterpriseId) : undefined;
     const s = await storage.getSettings(enterpriseId);
     res.json(s);
