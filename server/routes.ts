@@ -950,7 +950,49 @@ export async function registerRoutes(
         "SELECT id,username,role,enterprise_id AS \"enterpriseId\" FROM users WHERE LOWER(username)=LOWER($1) LIMIT 1",
         [username],
       );
-      const target = targetResult.rows[0];
+      let target = targetResult.rows[0];
+
+      // Contas antigas podem existir somente no banco legado. Recupera a conta
+      // pelo storage e faz a migração mínima para o PostgreSQL autoritativo antes
+      // de aplicar o vínculo. Isso evita o falso 404 para contas já existentes.
+      if (!target) {
+        const legacyTarget: any = await storage.getUserByUsername(username);
+        if (legacyTarget) {
+          const legacyId = Number(legacyTarget.id);
+          if (!Number.isSafeInteger(legacyId) || legacyId <= 0) {
+            return res.status(409).json({ message: "A conta encontrada possui um ID inválido." });
+          }
+
+          const idCollision = await neonPool.query(
+            "SELECT id,username FROM users WHERE id=$1 LIMIT 1",
+            [legacyId],
+          );
+          if (idCollision.rows.length && String(idCollision.rows[0].username).trim().toLowerCase() !== username) {
+            return res.status(409).json({ message: "A conta antiga não pôde ser vinculada por conflito de identificação." });
+          }
+
+          if (!idCollision.rows.length) {
+            await neonPool.query(
+              `INSERT INTO users (id,username,email,password,role,enterprise_id)
+               VALUES ($1,$2,$3,$4,$5,$6)`,
+              [
+                legacyId,
+                username,
+                legacyTarget.email || null,
+                legacyTarget.password,
+                legacyTarget.role || "barber",
+                legacyTarget.enterpriseId ?? null,
+              ],
+            );
+          }
+
+          const migratedTarget = await neonPool.query(
+            "SELECT id,username,role,enterprise_id AS \"enterpriseId\" FROM users WHERE id=$1 LIMIT 1",
+            [legacyId],
+          );
+          target = migratedTarget.rows[0];
+        }
+      }
 
       if (!target) return res.status(404).json({ message: "Conta não encontrada." });
       if (Number(target.id) === Number(actor.id)) {
