@@ -358,11 +358,14 @@ export async function registerRoutes(
   const windowsClients = new Map<number, WebSocket>();
   const labelsWsToken = String(process.env.AURA_LABELS_WS_TOKEN || "").trim();
 
-  function isValidLabelsToken(supplied: string): boolean {
-    if (!labelsWsToken || !supplied) return false;
-    const expected = Buffer.from(labelsWsToken, "utf8");
+  function isValidLabelsTokenFor(expectedToken: string, supplied: string): boolean {
+    if (!expectedToken || !supplied) return false;
+    const expected = Buffer.from(expectedToken, "utf8");
     const actual = Buffer.from(supplied, "utf8");
     return expected.length === actual.length && timingSafeEqual(expected, actual);
+  }
+  function isValidLabelsToken(supplied: string): boolean {
+    return isValidLabelsTokenFor(labelsWsToken, supplied);
   }
 
   httpServer.on("upgrade", (request, socket, head) => {
@@ -391,7 +394,7 @@ export async function registerRoutes(
     let registeredEnterpriseId: number | null = null;
     ws.send(JSON.stringify({ type: "SERVER_HELLO", message: "Conectado ao Aura System" }));
 
-    ws.on("message", (msg) => {
+    ws.on("message", async (msg) => {
       if (registeredEnterpriseId !== null) return;
       try {
         const data = JSON.parse(msg.toString());
@@ -403,6 +406,30 @@ export async function registerRoutes(
         if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
           ws.close(1008, "Estabelecimento obrigatório");
           return;
+        }
+        const tenantTokensRaw = String(process.env.AURA_LABELS_WS_TOKENS_JSON || "").trim();
+        if (tenantTokensRaw) {
+          let tenantToken = "";
+          try {
+            const tokenMap = JSON.parse(tenantTokensRaw) as Record<string, unknown>;
+            tenantToken = typeof tokenMap[String(enterpriseId)] === "string" ? String(tokenMap[String(enterpriseId)]) : "";
+          } catch {
+            ws.close(1011, "Configuração de autenticação inválida");
+            return;
+          }
+          if (!isValidLabelsTokenFor(tenantToken, suppliedToken)) {
+            ws.close(1008, "Token do estabelecimento inválido");
+            return;
+          }
+        } else {
+          const activeEnterprises = await db.select({ id: enterprises.id })
+            .from(enterprises)
+            .where(eq(enterprises.status, "active"))
+            .limit(2);
+          if (activeEnterprises.length > 1 || (activeEnterprises.length === 1 && Number(activeEnterprises[0].id) !== enterpriseId)) {
+            ws.close(1008, "Token por estabelecimento obrigatório");
+            return;
+          }
         }
         registeredEnterpriseId = enterpriseId;
         const previousClient = windowsClients.get(enterpriseId);
