@@ -835,7 +835,7 @@ export async function registerRoutes(
         FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id
         WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
-      `);
+      `, [Number((req.user as any).enterpriseId)]);
       const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit ORDER BY created_at DESC LIMIT 150");
       return res.json({ accounts: result.rows, audit: audit.rows, modules: accountModules, actions: ["view","create","edit","delete","approve","administer"] });
     } catch (error: any) {
