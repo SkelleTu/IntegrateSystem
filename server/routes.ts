@@ -381,6 +381,10 @@ export async function registerRoutes(
       try {
         const user = await storage.getUserByUsername(username) || await storage.getUserByUsername(String(username).trim().toLowerCase());
         if (!user) return done(null, false, { message: "Incorrect username." });
+        if (neonPool) {
+          const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
+          if (control.rows[0]?.status === "suspended") return done(null, false, { message: "ACCOUNT_SUSPENDED" });
+        }
 
         const isValid = await comparePassword(user.password, password);
         if (!isValid) return done(null, false, { message: "Incorrect password." });
@@ -779,6 +783,166 @@ export async function registerRoutes(
   // Public registration must never be able to create an administrator account.
   const isSystemOwner = (user: any) =>
     isMasterAccount(user) || user?.__masterAccessAuthorized === true;
+
+  // Persistent account branching, granular permissions and immutable audit trail.
+  // Production uses Neon; fail closed rather than silently storing security state in process memory.
+  if (neonPool) {
+    await neonPool.query(`
+      CREATE TABLE IF NOT EXISTS aura_account_controls (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','suspended')),
+        permissions JSONB NOT NULL DEFAULT '{}'::jsonb,
+        updated_by INTEGER,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS aura_account_audit (
+        id BIGSERIAL PRIMARY KEY,
+        actor_user_id INTEGER,
+        target_user_id INTEGER,
+        action TEXT NOT NULL,
+        details JSONB NOT NULL DEFAULT '{}'::jsonb,
+        ip_address TEXT,
+        user_agent TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS aura_account_audit_created_idx ON aura_account_audit(created_at DESC);
+      CREATE INDEX IF NOT EXISTS aura_account_audit_target_idx ON aura_account_audit(target_user_id, created_at DESC);
+    `);
+  }
+
+  const accountModules = ["dashboard","cashier","finance","reports","inventory","fiscal","labels","monitoring","timeclock","master","account_branches","settings"];
+  const defaultAccountPermissions = Object.fromEntries(accountModules.map((module) => [module, {
+    view: false, create: false, edit: false, delete: false, approve: false, administer: false,
+  }]));
+  const auditAccountAction = async (req: any, targetUserId: number | null, action: string, details: any = {}) => {
+    if (!neonPool) return;
+    await neonPool.query(
+      "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$2,$3,$4::jsonb,$5,$6)",
+      [Number(req.user?.id) || null, targetUserId, action, JSON.stringify(details), String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0,200), String(req.headers["user-agent"] || "").slice(0,500)],
+    );
+  };
+
+  app.get("/api/admin/account-branches", isAuthenticated, async (req, res) => {
+    if (!isSystemOwner(req.user)) return res.status(403).json({ message: "Acesso restrito à conta master." });
+    if (!neonPool) return res.status(503).json({ message: "O gerenciamento seguro de contas requer o banco PostgreSQL de produção." });
+    try {
+      const result = await neonPool.query(`
+        SELECT u.id,u.username,u.email,u.role,u.enterprise_id AS "enterpriseId",
+          COALESCE(c.status,'active') AS status,
+          COALESCE(c.permissions,'{}'::jsonb) AS permissions,
+          c.updated_at AS "updatedAt",
+          (SELECT MAX(s.created_at) FROM user_sessions s WHERE s.user_id=u.id AND s.type='login') AS "lastLogin"
+        FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id
+        ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
+      `);
+      const audit = await neonPool.query("SELECT id,actor_user_id AS \"actorUserId\",target_user_id AS \"targetUserId\",action,details,ip_address AS \"ipAddress\",created_at AS \"createdAt\" FROM aura_account_audit ORDER BY created_at DESC LIMIT 150");
+      return res.json({ accounts: result.rows, audit: audit.rows, modules: accountModules, actions: ["view","create","edit","delete","approve","administer"] });
+    } catch (error: any) {
+      console.error("[ACCOUNT-BRANCHES] list failed:", error?.message || error);
+      return res.status(500).json({ message: "Falha ao consultar ramificação de contas." });
+    }
+  });
+
+  app.post("/api/admin/account-branches", isAuthenticated, async (req, res) => {
+    const actor = req.user as any;
+    if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
+    if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível para gerenciamento seguro." });
+    const parsed = z.object({
+      username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
+      password: z.string().min(12).max(128),
+      accountType: z.enum(["staff","master"]),
+      email: z.string().email().optional().or(z.literal("")),
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos. Usuário deve ter 3–32 caracteres e senha, no mínimo, 12." });
+    try {
+      const username = parsed.data.username.toLowerCase();
+      if (await storage.getUserByUsername(username)) return res.status(409).json({ message: "Nome de usuário já utilizado." });
+      const enterpriseId = Number(actor.enterpriseId);
+      if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ message: "A conta master precisa estar vinculada a um estabelecimento." });
+      const enterprise = await storage.getEnterprise(enterpriseId);
+      if (!enterprise || enterprise.status !== "active") return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
+      const permissions = parsed.data.accountType === "master"
+        ? Object.fromEntries(accountModules.map((module) => [module, { view:true,create:true,edit:true,delete:true,approve:true,administer:true }]))
+        : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:false,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
+      const created = await storage.createUser({
+        username, password: await hashPassword(parsed.data.password),
+        role: parsed.data.accountType === "master" ? "owner" : "barber",
+        enterpriseId,
+        email: parsed.data.email || null,
+      } as any);
+      await neonPool.query(
+        "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3)",
+        [created.id, JSON.stringify(permissions), Number(actor.id)],
+      );
+      await auditAccountAction(req, Number(created.id), "account.created", { username, accountType: parsed.data.accountType, enterpriseId });
+      return res.status(201).json({ account: toPublicUser(created), status:"active", permissions });
+    } catch (error: any) {
+      console.error("[ACCOUNT-BRANCHES] create failed:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível criar a conta. Verifique o cadastro e tente novamente." });
+    }
+  });
+
+  app.patch("/api/admin/account-branches/:id", isAuthenticated, async (req, res) => {
+    const actor = req.user as any;
+    if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
+    if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId) || targetId <= 0) return res.status(400).json({ message: "ID inválido." });
+    if (targetId === Number(actor.id)) return res.status(400).json({ message: "A conta master autenticada não pode alterar a própria proteção por este painel." });
+    const parsed = z.object({
+      status: z.enum(["active","suspended"]).optional(),
+      permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
+      role: z.enum(["barber","admin","owner"]).optional(),
+      password: z.string().min(12).max(128).optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Alteração inválida." });
+    try {
+      const target = await storage.getUser(targetId);
+      if (!target) return res.status(404).json({ message: "Conta não encontrada." });
+      if (Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(403).json({ message: "A conta pertence a outro estabelecimento." });
+      if (parsed.data.role === "owner" && !isSystemOwner(actor)) return res.status(403).json({ message: "Somente master pode conceder privilégio master." });
+      if (parsed.data.role) await storage.updateUser(targetId, { role: parsed.data.role } as any);
+      if (parsed.data.password) await storage.updateUser(targetId, { password: await hashPassword(parsed.data.password) } as any);
+      const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
+      const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
+      const currentPermissions = parsed.data.permissions || prior.rows[0]?.permissions || defaultAccountPermissions;
+      for (const [module, actions] of Object.entries(currentPermissions)) {
+        if (!accountModules.includes(module) || !actions || Object.keys(actions).some((action) => !["view","create","edit","delete","approve","administer"].includes(action))) {
+          return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
+        }
+      }
+      await neonPool.query(`
+        INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
+        VALUES ($1,$2,$3::jsonb,$4,NOW())
+        ON CONFLICT (user_id) DO UPDATE SET status=EXCLUDED.status,permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()
+      `,[targetId,currentStatus,JSON.stringify(currentPermissions),Number(actor.id)]);
+      if (currentStatus === "suspended") {
+        await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
+      }
+      await auditAccountAction(req,targetId,"account.updated",{ status:currentStatus,role:parsed.data.role,permissionsChanged:!!parsed.data.permissions,passwordChanged:!!parsed.data.password });
+      return res.json({ ok:true,status:currentStatus,permissions:currentPermissions });
+    } catch (error: any) {
+      console.error("[ACCOUNT-BRANCHES] update failed:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível atualizar a conta." });
+    }
+  });
+
+  app.delete("/api/admin/account-branches/:id", isAuthenticated, async (req, res) => {
+    const actor = req.user as any;
+    if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
+    const targetId = Number(req.params.id);
+    if (!Number.isSafeInteger(targetId) || targetId <= 0 || targetId === Number(actor.id)) return res.status(400).json({ message: "Não é permitido remover esta conta." });
+    try {
+      const target = await storage.getUser(targetId);
+      if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
+      await auditAccountAction(req,targetId,"account.deleted",{ username:target.username,role:target.role });
+      await storage.deleteUser(targetId);
+      return res.status(204).send();
+    } catch (error: any) {
+      console.error("[ACCOUNT-BRANCHES] delete failed:", error?.message || error);
+      return res.status(500).json({ message: "Não foi possível remover a conta." });
+    }
+  });
 
   app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
