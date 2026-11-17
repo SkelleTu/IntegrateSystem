@@ -997,7 +997,7 @@ export async function registerRoutes(
           return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
         }
       }
-      if (parsed.data.role && parsed.data.role !== "owner" && (currentPermissions.master?.view || currentPermissions.master?.administer || currentPermissions.account_branches?.view || currentPermissions.account_branches?.administer)) {
+      if (parsed.data.role && parsed.data.role !== "owner" && ([...Object.values(currentPermissions.master || {}), ...Object.values(currentPermissions.account_branches || {})].some(Boolean))) {
         return res.status(400).json({ message: "Módulos master e ramificação de contas são exclusivos de contas master." });
       }
       const userChanges: any = {};
