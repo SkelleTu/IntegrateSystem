@@ -102,11 +102,18 @@ function normalizeRole(user: any): string {
 
 function hasAdminRole(user: any): boolean {
   const role = normalizeRole(user);
-  return role === "admin" || role === "owner";
+  return role === "admin" || role === "owner" || user?.__masterAccessAuthorized === true;
 }
 
 function hasOwnerRole(user: any): boolean {
-  return normalizeRole(user) === "owner";
+  return normalizeRole(user) === "owner" || user?.__masterAccessAuthorized === true;
+}
+
+function isMasterAccount(user: any): boolean {
+  return (
+    normalizeRole(user) === "owner" ||
+    String(user?.username || "").trim().toLowerCase() === "skelletu"
+  );
 }
 
 function toPublicUser(user: any) {
@@ -350,6 +357,25 @@ export async function registerRoutes(
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // A successful master-password authorization grants temporary privileged access
+  // without changing the user's real account role in the database.
+  app.use((req: any, _res, next) => {
+    const expiresAt = Number(req.session?.masterAccessUntil || 0);
+    if (
+      req.isAuthenticated?.() &&
+      Number.isFinite(expiresAt) &&
+      expiresAt > Date.now() &&
+      req.user
+    ) {
+      Object.defineProperty(req.user, "__masterAccessAuthorized", {
+        value: true,
+        enumerable: false,
+        configurable: true,
+      });
+    }
+    next();
+  });
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
@@ -512,6 +538,60 @@ export async function registerRoutes(
         res.json(toPublicUser(user));
       });
     })(req, res, next);
+  });
+
+  app.post("/api/auth/authorize-master", isAuthenticated, async (req: any, res: any) => {
+    const ip = String(req.ip || req.socket?.remoteAddress || "unknown");
+    const username = String(req.user?.username || "").trim().toLowerCase();
+
+    if (!allowPublicAction("master-authorize-ip:" + ip, 10, 15 * 60 * 1000)
+      || (username && !allowPublicAction("master-authorize-user:" + username, 5, 15 * 60 * 1000))) {
+      return res.status(429).json({ message: "Muitas tentativas. Aguarde antes de tentar novamente." });
+    }
+
+    const masterPassword =
+      typeof req.body?.masterPassword === "string" ? req.body.masterPassword : "";
+
+    if (!masterPassword) {
+      return res.status(400).json({ message: "Senha master obrigatória." });
+    }
+
+    try {
+      // Prefer the dedicated system master account, then fall back to any owner account.
+      const masterUser =
+        await storage.getUserByUsername("SkelleTu") ||
+        (await storage.getUserByUsername("skelletu")) ||
+        undefined;
+
+      const ownerUser = masterUser && hasOwnerRole(masterUser)
+        ? masterUser
+        : await storage.getUsers?.().then((users: any[]) =>
+            users?.find((candidate) => hasOwnerRole(candidate))
+          ).catch(() => undefined);
+
+      if (!ownerUser || !hasOwnerRole(ownerUser)) {
+        return res.status(503).json({ message: "Conta master não configurada." });
+      }
+
+      const valid = await comparePassword(ownerUser.password, masterPassword);
+      if (!valid) {
+        return res.status(403).json({ message: "Senha da conta master inválida." });
+      }
+
+      req.session.masterAccessUntil = Date.now() + 15 * 60 * 1000;
+
+      await new Promise<void>((resolve, reject) => {
+        req.session.save((err: any) => (err ? reject(err) : resolve()));
+      });
+
+      return res.json({
+        authorized: true,
+        expiresAt: req.session.masterAccessUntil,
+      });
+    } catch (error) {
+      console.error("[AUTH] Master authorization failed:", error);
+      return res.status(500).json({ message: "Não foi possível validar o acesso master." });
+    }
   });
 
   app.post(api.auth.logout.path, async (req, res) => {
@@ -678,8 +758,7 @@ export async function registerRoutes(
   // Enterprise administration is restricted to an authenticated system owner.
   // Public registration must never be able to create an administrator account.
   const isSystemOwner = (user: any) =>
-    String(user?.role || "").trim().toLowerCase() === "owner" ||
-    String(user?.username || "").trim().toLowerCase() === "skelletu";
+    isMasterAccount(user) || user?.__masterAccessAuthorized === true;
 
   app.get("/api/admin/enterprises", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) {
