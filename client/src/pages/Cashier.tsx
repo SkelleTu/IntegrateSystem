@@ -838,11 +838,11 @@ function CashierContent({
   };
 
   return (
-    <div className="fixed inset-0 bg-black flex flex-col overflow-hidden">
+    <div className="cashier-shell fixed inset-0 bg-black flex flex-col overflow-hidden">
       <BackgroundIcons />
-      <div className="flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
+      <div className="cashier-layout flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
         {/* Area Principal de Produtos */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-4">
+        <div className="cashier-products flex-1 flex flex-col min-h-0 overflow-hidden p-4">
           <div className="w-full flex items-center justify-between mb-4 shrink-0 gap-3">
             <Button 
               variant="outline" 
@@ -983,7 +983,7 @@ function CashierContent({
         </div>
 
         {/* Sidebar Direita / Carrinho */}
-        <div className="w-full lg:w-[400px] shrink-0 border-l border-white/10 bg-zinc-950/30 backdrop-blur-xl flex flex-col h-full min-h-0 relative z-40">
+        <div className="cashier-sidebar w-full lg:w-[400px] shrink-0 border-l border-white/10 bg-zinc-950/30 backdrop-blur-xl flex flex-col h-full min-h-0 relative z-40">
           <div className="flex-1 flex flex-col min-h-0">
             <div className="p-4 border-b border-white/5 space-y-3 bg-white/5">
               <div className="flex flex-col gap-3">
