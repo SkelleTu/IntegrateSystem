@@ -1090,7 +1090,10 @@ export async function registerRoutes(
   });
 
   app.get("/api/settings", isAuthenticated, async (req, res) => {
-    const enterpriseId = req.query.enterpriseId ? Number(req.query.enterpriseId) : undefined;
+    const user = req.user as any;
+    const requestedId = req.query.enterpriseId ? Number(req.query.enterpriseId) : Number(user.enterpriseId);
+    const enterpriseId = isSystemOwner(user) ? requestedId : Number(user.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ message: "Conta sem estabelecimento vinculado." });
     const s = await storage.getSettings(enterpriseId);
     res.json(s);
   });
