@@ -373,9 +373,12 @@ export async function initApp() {
       progress: 55,
     });
 
-    app.get("/api/google-drive/status", (_req: Request, res: Response) => {
+    app.get("/api/google-drive/status", (req: Request, res: Response) => {
+      if (!(req as any).isAuthenticated?.()) {
+        return res.status(401).json({ code: "UNAUTHORIZED", message: "Autenticação obrigatória." });
+      }
       const status = getGoogleDriveBackupStatus();
-      res.json(status);
+      return res.json(status);
     });
 
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
@@ -424,6 +427,9 @@ export async function initApp() {
 
     const universalServerUrl = (process.env.UNIVERSAL_SERVER_URL || "https://universal-server1.onrender.com").replace(/\/$/, "");
     app.get("/api/universal/status", async (req: Request, res: Response) => {
+      if (!(req as any).isAuthenticated?.()) {
+        return res.status(401).json({ code: "UNAUTHORIZED", message: "Autenticação obrigatória." });
+      }
       const startedAt = Date.now();
       try {
         const response = await fetch(universalServerUrl + "/api/healthz", {
