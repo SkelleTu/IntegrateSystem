@@ -47,8 +47,18 @@ export default function AccountBranches() {
           <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-mail (opcional)" className="rounded-lg bg-black border border-white/15 p-3"/>
           <select value={accountType} onChange={e=>setAccountType(e.target.value as any)} className="rounded-lg bg-black border border-white/15 p-3"><option value="staff">Conta subordinada</option><option value="master">Outra conta master</option></select>
         </div>
-        <button disabled={create.isPending||username.length<3||password.length<12} onClick={()=>create.mutate()} className="rounded-lg bg-cyan-500 px-5 py-3 font-bold text-black disabled:opacity-40">{create.isPending?"Criando…":"Criar conta vinculada"}</button>
-        <p className="text-xs text-zinc-500">A empresa é herdada no servidor da conta master autenticada. Nenhuma conta subordinada precisa cadastrar outro estabelecimento.</p>
+        <button
+          type="button"
+          disabled={create.isPending || username.trim().length < 3 || password.length < 12}
+          onClick={() => create.mutate()}
+          className="rounded-lg bg-cyan-500 px-5 py-3 font-bold text-black disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {create.isPending ? "Criando…" : "Criar conta vinculada"}
+        </button>
+        <p className="text-xs text-zinc-500">
+          Usuário: mínimo 3 caracteres · Senha: mínimo 12 caracteres · E-mail: opcional.
+          A empresa é herdada no servidor da conta master autenticada. Nenhuma conta subordinada precisa cadastrar outro estabelecimento.
+        </p>
       </section>
       <section className="rounded-2xl border border-amber-500/20 bg-amber-500/[.03] p-5 space-y-3">
         <div>
