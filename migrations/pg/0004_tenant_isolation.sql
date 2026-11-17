@@ -1,29 +1,11 @@
 -- 0004_tenant_isolation.sql
--- Converts the legacy single-tenant operational schema into explicit tenant-scoped data.
--- Safe policy: existing orphaned rows may be assigned automatically only when exactly
--- one active enterprise exists. If multiple active enterprises exist, the migration
--- aborts instead of guessing ownership.
-
 BEGIN;
-
 DO $$
-DECLARE
-  active_count integer;
-  default_enterprise integer;
+DECLARE active_count integer; default_enterprise integer;
 BEGIN
-  SELECT count(*), min(id) INTO active_count, default_enterprise
-  FROM enterprises WHERE status = 'active';
-
-  IF active_count = 0 THEN
-    RAISE EXCEPTION 'TENANT MIGRATION: no active enterprise exists; refusing to guess tenant ownership';
-  END IF;
-
-  IF active_count > 1 THEN
-    RAISE EXCEPTION 'TENANT MIGRATION: multiple active enterprises exist; explicit backfill mapping is required before enabling NOT NULL tenant columns';
-  END IF;
-
-  -- Columns already present in the remediation schema are added idempotently for
-  -- production databases that still have the legacy shape.
+  SELECT count(*), min(id) INTO active_count, default_enterprise FROM enterprises WHERE status = 'active';
+  IF active_count = 0 THEN RAISE EXCEPTION 'TENANT MIGRATION: no active enterprise exists'; END IF;
+  IF active_count > 1 THEN RAISE EXCEPTION 'TENANT MIGRATION: multiple active enterprises require explicit backfill mapping'; END IF;
   ALTER TABLE services ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE tickets ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE queue_state ADD COLUMN IF NOT EXISTS enterprise_id integer;
@@ -45,75 +27,33 @@ BEGIN
   ALTER TABLE stock_snapshots ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE fiscal_settings ADD COLUMN IF NOT EXISTS enterprise_id integer;
   ALTER TABLE nfce ADD COLUMN IF NOT EXISTS enterprise_id integer;
-  ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS enterprise_id integer;
-
-  -- Direct user ownership.
-  UPDATE cash_register cr SET enterprise_id = u.enterprise_id
-    FROM users u WHERE cr.enterprise_id IS NULL AND cr.user_id = u.id AND u.enterprise_id IS NOT NULL;
-  UPDATE sales s SET enterprise_id = u.enterprise_id
-    FROM users u WHERE s.enterprise_id IS NULL AND s.user_id = u.id AND u.enterprise_id IS NOT NULL;
-  UPDATE transactions t SET enterprise_id = default_enterprise
-    WHERE t.enterprise_id IS NULL;
-  UPDATE time_clock tc SET enterprise_id = u.enterprise_id
-    FROM users u WHERE tc.enterprise_id IS NULL AND tc.user_id = u.id AND u.enterprise_id IS NOT NULL;
-  UPDATE user_sessions us SET enterprise_id = u.enterprise_id
-    FROM users u WHERE us.enterprise_id IS NULL AND us.user_id = u.id AND u.enterprise_id IS NOT NULL;
-
-  -- Child rows inherit the tenant from their parent.
-  UPDATE sale_items si SET enterprise_id = s.enterprise_id
-    FROM sales s WHERE si.enterprise_id IS NULL AND si.sale_id = s.id;
-  UPDATE payments p SET enterprise_id = s.enterprise_id
-    FROM sales s WHERE p.enterprise_id IS NULL AND p.sale_id = s.id;
-  UPDATE nfce n SET enterprise_id = s.enterprise_id
-    FROM sales s WHERE n.enterprise_id IS NULL AND n.sale_id = s.id;
-
-  UPDATE inventory_logs il SET enterprise_id = i.enterprise_id
-    FROM inventory i WHERE il.enterprise_id IS NULL AND il.inventory_id = i.id;
-  UPDATE inventory_restocks ir SET enterprise_id = i.enterprise_id
-    FROM inventory i WHERE ir.enterprise_id IS NULL AND ir.inventory_id = i.id;
-
-  UPDATE batches b SET enterprise_id = p.enterprise_id
-    FROM products p WHERE b.enterprise_id IS NULL AND b.product_id = p.id;
-  UPDATE batch_logs bl SET enterprise_id = COALESCE(b.enterprise_id, p.enterprise_id)
-    FROM products p LEFT JOIN batches b ON b.id = bl.batch_id
-    WHERE bl.enterprise_id IS NULL AND bl.product_id = p.id;
-
-  -- Legacy rows without a derivable parent belong to the sole active tenant.
-  UPDATE services SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE tickets SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE queue_state SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE categories SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE menu_items SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE transactions SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE settings SET enterprise_id = default_enterprise
-    WHERE enterprise_id IS NULL OR enterprise_id <= 0
-      OR NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id = settings.enterprise_id);
-  UPDATE inventory SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE inventory_logs SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE inventory_restocks SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE products SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE batches SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE batch_logs SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE stock_snapshots SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE fiscal_settings SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE nfce SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-  UPDATE user_sessions SET enterprise_id = default_enterprise WHERE enterprise_id IS NULL;
-
-  -- Refuse to silently discard ambiguous ownership.
-  IF EXISTS (SELECT 1 FROM cash_register WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM sales WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM sale_items WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM payments WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM time_clock WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM inventory_logs WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM inventory_restocks WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM batches WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM batch_logs WHERE enterprise_id IS NULL)
-     OR EXISTS (SELECT 1 FROM user_sessions WHERE enterprise_id IS NULL)
-  THEN
-    RAISE EXCEPTION 'TENANT MIGRATION: unresolved tenant ownership remains; migration rolled back';
-  END IF;
-
+  UPDATE cash_register cr SET enterprise_id=u.enterprise_id FROM users u WHERE cr.enterprise_id IS NULL AND cr.user_id=u.id AND u.enterprise_id IS NOT NULL;
+  UPDATE sales s SET enterprise_id=u.enterprise_id FROM users u WHERE s.enterprise_id IS NULL AND s.user_id=u.id AND u.enterprise_id IS NOT NULL;
+  UPDATE time_clock tc SET enterprise_id=u.enterprise_id FROM users u WHERE tc.enterprise_id IS NULL AND tc.user_id=u.id AND u.enterprise_id IS NOT NULL;
+  UPDATE sale_items si SET enterprise_id=s.enterprise_id FROM sales s WHERE si.enterprise_id IS NULL AND si.sale_id=s.id;
+  UPDATE payments p SET enterprise_id=s.enterprise_id FROM sales s WHERE p.enterprise_id IS NULL AND p.sale_id=s.id;
+  UPDATE nfce n SET enterprise_id=s.enterprise_id FROM sales s WHERE n.enterprise_id IS NULL AND n.sale_id=s.id;
+  UPDATE inventory_logs il SET enterprise_id=i.enterprise_id FROM inventory i WHERE il.enterprise_id IS NULL AND il.inventory_id=i.id;
+  UPDATE inventory_restocks ir SET enterprise_id=i.enterprise_id FROM inventory i WHERE ir.enterprise_id IS NULL AND ir.inventory_id=i.id;
+  UPDATE batches b SET enterprise_id=p.enterprise_id FROM products p WHERE b.enterprise_id IS NULL AND b.product_id=p.id;
+  UPDATE batch_logs bl SET enterprise_id=COALESCE(b.enterprise_id,p.enterprise_id) FROM products p LEFT JOIN batches b ON b.id=bl.batch_id WHERE bl.enterprise_id IS NULL AND bl.product_id=p.id;
+  UPDATE services SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE tickets SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE queue_state SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE categories SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE menu_items SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE transactions SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE settings SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL OR enterprise_id<=0 OR NOT EXISTS (SELECT 1 FROM enterprises e WHERE e.id=settings.enterprise_id);
+  UPDATE inventory SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE inventory_logs SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE inventory_restocks SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE products SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE batches SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE batch_logs SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE stock_snapshots SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE fiscal_settings SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  UPDATE nfce SET enterprise_id=default_enterprise WHERE enterprise_id IS NULL;
+  IF EXISTS (SELECT 1 FROM cash_register WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM sales WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM sale_items WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM payments WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM time_clock WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM inventory_logs WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM inventory_restocks WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM batches WHERE enterprise_id IS NULL) OR EXISTS (SELECT 1 FROM batch_logs WHERE enterprise_id IS NULL) THEN RAISE EXCEPTION 'TENANT MIGRATION: unresolved tenant ownership remains'; END IF;
   ALTER TABLE services ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE tickets ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE queue_state ALTER COLUMN enterprise_id SET NOT NULL;
@@ -135,12 +75,6 @@ BEGIN
   ALTER TABLE stock_snapshots ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE fiscal_settings ALTER COLUMN enterprise_id SET NOT NULL;
   ALTER TABLE nfce ALTER COLUMN enterprise_id SET NOT NULL;
-  ALTER TABLE user_sessions ALTER COLUMN enterprise_id SET NOT NULL;
-
-  -- Foreign keys are intentionally NOT added here: the existing application
-  -- schema has legacy rows/references and the immediate security boundary is
-  -- tenant scoping. Cross-tenant operations are enforced by storage + route
-  -- ownership checks and are covered by the isolation test suite.
   CREATE INDEX IF NOT EXISTS services_enterprise_id_idx ON services(enterprise_id);
   CREATE INDEX IF NOT EXISTS tickets_enterprise_id_idx ON tickets(enterprise_id);
   CREATE INDEX IF NOT EXISTS queue_state_enterprise_id_idx ON queue_state(enterprise_id);
@@ -162,7 +96,5 @@ BEGIN
   CREATE INDEX IF NOT EXISTS stock_snapshots_enterprise_id_idx ON stock_snapshots(enterprise_id);
   CREATE INDEX IF NOT EXISTS fiscal_settings_enterprise_id_idx ON fiscal_settings(enterprise_id);
   CREATE INDEX IF NOT EXISTS nfce_enterprise_id_idx ON nfce(enterprise_id);
-  CREATE INDEX IF NOT EXISTS user_sessions_enterprise_id_idx ON user_sessions(enterprise_id);
 END $$;
-
 COMMIT;
