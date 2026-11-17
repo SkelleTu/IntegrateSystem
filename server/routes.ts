@@ -202,7 +202,7 @@ async function comparePassword(stored: string, supplied: string) {
   }
 }
 
-import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
+import { eq, desc, asc, and, isNull, gte, lte, or, inArray } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
 import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
@@ -279,8 +279,9 @@ export async function registerRoutes(
 
     const requestedEnterpriseId = Number(req.query?.enterpriseId);
     const requestedSlug = typeof req.query?.enterpriseSlug === "string" ? req.query.enterpriseSlug.trim() : "";
+    const publicStatuses = process.env.AURA_ENABLE_E2E_WRITES === "true" ? ["active", "pending"] : ["active"];
     if ((Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) || requestedSlug) {
-      const filters = [eq(enterprises.status, "active")];
+      const filters = [inArray(enterprises.status, publicStatuses)];
       if (Number.isSafeInteger(requestedEnterpriseId) && requestedEnterpriseId > 0) {
         filters.push(eq(enterprises.id, requestedEnterpriseId));
       } else {
