@@ -3262,8 +3262,13 @@ export async function registerRoutes(
     const suppliedTicketToken = String(req.get("x-ticket-token") || req.query?.ticketToken || "").trim();
     const ticket = await storage.getTicketByNumber(ticketNumber, !authenticatedStaff);
     if (!ticket) return res.status(404).json({ message: "Comanda não encontrada" });
-    if (!authenticatedStaff && suppliedTicketToken && String((ticket as any).publicAccessToken || "") !== suppliedTicketToken) {
-      return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+    if (!authenticatedStaff) {
+      if (!suppliedTicketToken || suppliedTicketToken.length < 32 || suppliedTicketToken.length > 128) {
+        return res.status(401).json({ code: "TICKET_POSSESSION_REQUIRED", message: "Token de posse da comanda obrigatório." });
+      }
+      if (String((ticket as any).publicAccessToken || "") !== suppliedTicketToken) {
+        return res.status(403).json({ code: "TICKET_POSSESSION_INVALID", message: "Token de posse da comanda inválido." });
+      }
     }
     delete (ticket as any).publicAccessToken;
     res.json(ticket);
