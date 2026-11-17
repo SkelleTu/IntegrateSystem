@@ -2999,7 +2999,7 @@ export async function registerRoutes(
       const id = Number(req.params.id);
       if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: "ID de transação inválido" });
       await storage.deleteTransaction(id);
-      res.status(204).send();
+      res.status(200).json({ ok: true });
     } catch (err: any) {
       const message = String(err?.message || "");
       if (/Transação .* não encontrada/.test(message)) return res.status(404).json({ message: "Transação não encontrada." });
