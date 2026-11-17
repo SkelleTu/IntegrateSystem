@@ -55,6 +55,8 @@ export default function SetupEnterprise() {
     },
   });
 
+  const isMaster = String(user?.role || "").toLowerCase() === "owner" || String(user?.username || "").trim().toLowerCase() === "skelletu";
+
   // Criar estabelecimento
   const createMutation = useMutation({
     mutationFn: async (data: typeof form) => {
@@ -113,7 +115,6 @@ export default function SetupEnterprise() {
     createMutation.mutate(form);
   };
 
-  const isMaster = String(user?.role || "").toLowerCase() === "owner" || String(user?.username || "").trim().toLowerCase() === "skelletu";
   const canCreate = isMaster && enterprises.length < 5;
 
   if (isLoading) {
