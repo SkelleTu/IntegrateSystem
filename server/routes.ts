@@ -546,12 +546,16 @@ export async function registerRoutes(
         if (loginErr) {
           return res.status(500).json({ message: "Login failed." });
         }
-        storage.logUserSession({
+        await storage.logUserSession({
           userId: user.id,
           type: "login",
           ipAddress: req.ip,
           userAgent: req.get("user-agent")
         });
+        if (neonPool) await neonPool.query(
+          "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.login',$2::jsonb,$3,$4)",
+          [Number(user.id), JSON.stringify({ username:user.username }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
+        );
         res.json(toPublicUser(user));
       });
     })(req, res, next);
@@ -596,6 +600,10 @@ export async function registerRoutes(
       }
 
       req.session.masterAccessUntil = Date.now() + 15 * 60 * 1000;
+      if (neonPool) await neonPool.query(
+        "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.master_authorized',$2::jsonb,$3,$4)",
+        [Number(req.user.id), JSON.stringify({ expiresAt:req.session.masterAccessUntil }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
+      );
 
       await new Promise<void>((resolve, reject) => {
         req.session.save((err: any) => (err ? reject(err) : resolve()));
@@ -620,6 +628,10 @@ export async function registerRoutes(
         ipAddress: req.ip,
         userAgent: req.get("user-agent")
       });
+      if (neonPool) await neonPool.query(
+        "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.logout','{}'::jsonb,$2,$3)",
+        [Number(user.id), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
+      );
     }
     req.logout((err) => {
       if (err) return res.status(500).json({ message: "Logout failed" });
