@@ -376,6 +376,19 @@ export async function registerRoutes(
     next();
   });
 
+  // Suspensions revoke access immediately, including endpoints that also serve public workflows.
+  app.use(async (req: any, res: any, next: any) => {
+    if (!req.isAuthenticated?.() || !req.user || !neonPool) return next();
+    try {
+      const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(req.user.id)]);
+      if (control.rows[0]?.status === "suspended") return res.status(403).json({ message: "Conta suspensa. Procure a conta master." });
+      return next();
+    } catch (error: any) {
+      console.error("[ACCOUNT-CONTROL] status validation failed:", error?.message || error);
+      return res.status(503).json({ message: "Não foi possível validar o status da conta." });
+    }
+  });
+
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
