@@ -91,13 +91,30 @@ export default function SetupEnterprise() {
     },
   });
 
+  if (user && !user.enterpriseId && !isMaster) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative overflow-hidden">
+        <div className="relative z-10 w-full max-w-lg rounded-2xl border border-amber-500/20 bg-white/[0.03] p-8 text-center">
+          <Building2 className="w-12 h-12 text-amber-400 mx-auto mb-5" />
+          <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-3">Conta subordinada sem vínculo</h1>
+          <p className="text-white/50 text-sm leading-6 mb-6">
+            Esta conta foi criada como conta subordinada, mas ainda não está vinculada ao estabelecimento da conta master.
+            Contas subordinadas não criam estabelecimentos próprios.
+          </p>
+          <p className="text-white/30 text-xs">Entre na conta master responsável e use Ramificação de contas para vincular esta conta ao estabelecimento correto.</p>
+        </div>
+      </div>
+    );
+  }
+
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     createMutation.mutate(form);
   };
 
-  const canCreate = enterprises.length < 5;
+  const isMaster = String(user?.role || "").toLowerCase() === "owner" || String(user?.username || "").trim().toLowerCase() === "skelletu";
+  const canCreate = isMaster && enterprises.length < 5;
 
   if (isLoading) {
     return (
@@ -191,7 +208,7 @@ export default function SetupEnterprise() {
               {/* Botão criar novo */}
               {canCreate ? (
                 <button
-                  onClick={() => setMode("create")}
+                  onClick={() => isMaster && setMode("create")}
                   className="w-full flex items-center justify-center gap-3 p-5 rounded-2xl border border-dashed border-white/20 hover:border-primary/40 hover:bg-primary/5 transition-all text-white/50 hover:text-primary group"
                 >
                   <div className="w-10 h-10 rounded-xl border border-white/10 group-hover:border-primary/30 flex items-center justify-center transition-colors">
