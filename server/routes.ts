@@ -873,7 +873,7 @@ export async function registerRoutes(
     if (!neonPool) return res.status(503).json({ message: "O gerenciamento seguro de contas requer o banco PostgreSQL de produção." });
     try {
       const result = await neonPool.query(`
-        SELECT u.id,u.username,u.email,u.role,u.enterprise_id AS "enterpriseId",
+        SELECT u.id,u.username,u.email,u.role,u.enterprise_id AS "enterpriseId", e.name AS "enterpriseName",
           COALESCE(c.status,'active') AS status,
           COALESCE(c.permissions,'{}'::jsonb) AS permissions,
           c.user_id AS "controlId",
@@ -883,7 +883,7 @@ export async function registerRoutes(
           (SELECT COUNT(*) FROM aura_sessions s WHERE (s.sess::jsonb #>> '{passport,user}')=u.id::text AND s.expire > (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint) AS "activeSessions",
           (SELECT s.ip_address FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastIp",
           (SELECT s.user_agent FROM user_sessions s WHERE s.user_id=u.id AND s.type='login' ORDER BY s.created_at DESC LIMIT 1) AS "lastDevice"
-        FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id
+        FROM users u LEFT JOIN aura_account_controls c ON c.user_id=u.id LEFT JOIN enterprises e ON e.id=u.enterprise_id
         WHERE u.enterprise_id = $1
         ORDER BY CASE WHEN LOWER(u.role)='owner' THEN 0 ELSE 1 END,u.id
       `, [Number((req.user as any).enterpriseId)]);
