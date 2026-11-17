@@ -563,13 +563,13 @@ export async function registerRoutes(
         (await storage.getUserByUsername("skelletu")) ||
         undefined;
 
-      const ownerUser = masterUser && hasOwnerRole(masterUser)
+      const ownerUser = masterUser && isMasterAccount(masterUser)
         ? masterUser
-        : await storage.getUsers?.().then((users: any[]) =>
-            users?.find((candidate) => hasOwnerRole(candidate))
+        : await storage.getUsers().then((users: any[]) =>
+            users?.find((candidate) => isMasterAccount(candidate))
           ).catch(() => undefined);
 
-      if (!ownerUser || !hasOwnerRole(ownerUser)) {
+      if (!ownerUser || !isMasterAccount(ownerUser)) {
         return res.status(503).json({ message: "Conta master não configurada." });
       }
 
