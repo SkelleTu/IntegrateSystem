@@ -29,31 +29,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { MasterPasswordGuard } from "@/components/MasterPasswordGuard";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
   const { data: user } = useUser();
   const logout = useLogout();
-  const [guardOpen, setGuardOpen] = useState(false);
-  const [pendingUrl, setPendingUrl] = useState<string | null>(null);
 
   if (!user) return null;
 
   const handleNavigation = (url: string) => {
-    const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
     const isMasterAccount =
       String(user.role || "").trim().toLowerCase() === "owner" ||
       String(user.username || "").trim().toLowerCase() === "skelletu";
-
-    if (isMasterAccount || freeRoutes.includes(url)) {
-      setPendingUrl(null);
-      setGuardOpen(false);
-      setLocation(url);
-    } else {
-      setPendingUrl(url);
-      setGuardOpen(true);
-    }
+    const moduleByUrl: Record<string,string> = {
+      "/app":"dashboard", "/caixa":"cashier", "/financeiro":"finance",
+      "/relatorios":"reports", "/inventory":"inventory", "/fiscal":"fiscal",
+      "/admin/labels":"labels", "/admin/monitoring":"monitoring",
+      "/ponto":"timeclock", "/admin/master":"master",
+      "/admin/account-branches":"account_branches",
+    };
+    const grant = user.permissions?.[moduleByUrl[url]] || {};
+    const allowed = isMasterAccount || url === "/cart" || grant.view === true || grant.administer === true;
+    if (allowed) setLocation(url);
+    else window.alert("Sua conta não possui permissão para acessar este módulo. Solicite a liberação à conta master.");
   };
 
   const navItems = [
@@ -418,11 +416,6 @@ export function Navbar() {
         </DropdownMenu>
       </div>
 
-      <MasterPasswordGuard
-        open={guardOpen}
-        onOpenChange={setGuardOpen}
-        onSuccess={() => pendingUrl && setLocation(pendingUrl)}
-      />
       </nav>
     </div>
   );
