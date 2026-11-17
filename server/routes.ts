@@ -983,10 +983,14 @@ export async function registerRoutes(
         VALUES ($1,$2,$3::jsonb,$4,NOW())
         ON CONFLICT (user_id) DO UPDATE SET status=EXCLUDED.status,permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()
       `,[targetId,currentStatus,JSON.stringify(currentPermissions),Number(actor.id)]);
-      if (currentStatus === "suspended") {
+      if (currentStatus === "suspended" || parsed.data.password) {
         await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
       }
-      await auditAccountAction(req,targetId,"account.updated",{ status:currentStatus,role:parsed.data.role,permissionsChanged:!!parsed.data.permissions,passwordChanged:!!parsed.data.password });
+      const auditAction = currentStatus === "suspended" ? "account.suspended"
+        : parsed.data.status === "active" ? "account.reactivated"
+        : parsed.data.permissions ? "account.permissions_updated"
+        : "account.updated";
+      await auditAccountAction(req,targetId,auditAction,{ status:currentStatus,role:parsed.data.role,usernameChanged:!!parsed.data.username,emailChanged:parsed.data.email!==undefined,permissionsChanged:!!parsed.data.permissions,passwordChanged:!!parsed.data.password });
       return res.json({ ok:true,status:currentStatus,permissions:currentPermissions });
     } catch (error: any) {
       console.error("[ACCOUNT-BRANCHES] update failed:", error?.message || error);
