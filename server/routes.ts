@@ -2975,6 +2975,7 @@ export async function registerRoutes(
       }
       const input = insertTransactionSchema.parse({
         ...req.body,
+        enterpriseId: activeEnterpriseId,
         businessType: activeEnterprise.businessType,
       });
       const transaction = await storage.createTransaction(input);
