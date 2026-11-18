@@ -1119,7 +1119,7 @@ export async function registerRoutes(
       const inserted = await neonPool.query(
         `INSERT INTO users (id,username,email,password,role,enterprise_id)
          VALUES ($1,$2,$3,$4,$5,$6)
-         RETURNING id,username,email,role,enterprise_id AS "enterpriseId"`,
+         RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"`,
         [newId, username, parsed.data.email || null, hashedPassword, role, enterpriseId],
       );
       const created = inserted.rows[0];
