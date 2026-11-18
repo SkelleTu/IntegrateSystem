@@ -956,7 +956,21 @@ export async function registerRoutes(
       // pelo storage e faz a migração mínima para o PostgreSQL autoritativo antes
       // de aplicar o vínculo. Isso evita o falso 404 para contas já existentes.
       if (!target) {
-        const legacyTarget: any = await storage.getUserByUsername(username);
+        let legacyTarget: any = await storage.getUserByUsername(username);
+        // Quando o sistema foi migrado do Turso para Neon, contas antigas podem
+        // continuar somente no legado. Consulte o Turso diretamente se ele estiver
+        // configurado no runtime, antes de concluir que a conta nao existe.
+        if (!legacyTarget && tursoClient) {
+          try {
+            const legacyResult = await tursoClient.execute({
+              sql: "SELECT * FROM users WHERE LOWER(username)=LOWER(?) LIMIT 1",
+              args: [username],
+            });
+            legacyTarget = legacyResult.rows[0] || null;
+          } catch (legacyLookupError: any) {
+            console.warn("[ACCOUNT-BRANCHES] legacy lookup failed:", legacyLookupError?.message || legacyLookupError);
+          }
+        }
         if (legacyTarget) {
           const legacyId = Number(legacyTarget.id);
           if (!Number.isSafeInteger(legacyId) || legacyId <= 0) {
