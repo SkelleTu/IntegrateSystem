@@ -438,7 +438,38 @@ export async function registerRoutes(
           if (control.rows[0]?.status === "suspended") return done(null, false, { message: "ACCOUNT_SUSPENDED" });
         }
 
-        const isValid = await comparePassword(user.password, password);
+        let isValid = await comparePassword(user.password, password);
+
+        // Migration-safe recovery for accounts created before Neon became authoritative:
+        // if the Neon credential is stale but the legacy credential is valid, promote
+        // that verified credential into Neon instead of forcing the user to recreate
+        // the account. The legacy password is never trusted without a successful match.
+        if (!isValid && neonPool) {
+          const legacyUser = await storage.getUserByUsername(normalizedUsername).catch(() => undefined);
+          if (legacyUser && await comparePassword(String(legacyUser.password || ""), password)) {
+            const legacyEnterpriseId = Number(legacyUser.enterpriseId);
+            const persisted = await neonPool.query(
+              `UPDATE users
+               SET password=$1,
+                   enterprise_id=CASE
+                     WHEN $2::integer > 0 THEN $2::integer
+                     ELSE enterprise_id
+                   END
+               WHERE id=$3
+               RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"`,
+              [legacyUser.password, Number.isSafeInteger(legacyEnterpriseId) ? legacyEnterpriseId : 0, Number(user.id)],
+            );
+            if (persisted.rows[0]) {
+              user = persisted.rows[0];
+              isValid = await comparePassword(String(user.password || ""), password);
+              console.log("[AUTH] legacy credential promoted to Neon", {
+                userId: Number(user.id),
+                enterpriseId: user.enterpriseId ?? null,
+              });
+            }
+          }
+        }
+
         console.log("[AUTH] subordinate/master credential check", {
           userId: Number(user.id),
           username: String(user.username),
