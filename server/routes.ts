@@ -150,6 +150,43 @@ async function comparePassword(stored: string, supplied: string) {
   }
 }
 
+async function getAuthoritativeUserById(id: number): Promise<any | undefined> {
+  const numericId = Number(id);
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) return undefined;
+  if (neonPool) {
+    const result = await neonPool.query(
+      'SELECT id,username,email,password,role,enterprise_id AS "enterpriseId" FROM users WHERE id=$1 LIMIT 1',
+      [numericId],
+    );
+    if (result.rows[0]) return result.rows[0];
+  }
+  return storage.getUser(numericId);
+}
+
+async function getAuthoritativeUserByUsername(username: string): Promise<any | undefined> {
+  const normalized = String(username ?? "").trim();
+  if (!normalized) return undefined;
+  if (neonPool) {
+    const result = await neonPool.query(
+      'SELECT id,username,email,password,role,enterprise_id AS "enterpriseId" FROM users WHERE LOWER(TRIM(username))=LOWER(TRIM($1)) LIMIT 1',
+      [normalized],
+    );
+    if (result.rows[0]) return result.rows[0];
+  }
+  return (await storage.getUserByUsername(normalized))
+    || (normalized.toLowerCase() !== normalized ? await storage.getUserByUsername(normalized.toLowerCase()) : undefined);
+}
+
+async function getAuthoritativeEnterprise(id: number): Promise<any | undefined> {
+  const numericId = Number(id);
+  if (!Number.isSafeInteger(numericId) || numericId <= 0) return undefined;
+  if (neonPool) {
+    const result = await neonPool.query('SELECT id,name,status FROM enterprises WHERE id=$1 LIMIT 1',[numericId]);
+    if (result.rows[0]) return result.rows[0];
+  }
+  return storage.getEnterprise(numericId);
+}
+
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
 import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
 import { insertFiscalSettingsSchema } from "../shared/schema";
@@ -394,18 +431,7 @@ export async function registerRoutes(
     new LocalStrategy(async (username, password, done) => {
       try {
         const normalizedUsername = String(username ?? "").trim();
-        const normalizedUsernameLower = normalizedUsername.toLowerCase();
-        // Neon é a fonte autoritativa das contas master/subordinadas. Consultar
-        // o storage legado primeiro pode devolver uma cópia antiga da credencial
-        // e fazer uma conta criada no painel falhar no login.
-        const user = (neonPool
-          ? ((await neonPool.query(
-              "SELECT * FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1)) LIMIT 1",
-              [normalizedUsername],
-            )).rows[0] as any || undefined)
-          : undefined)
-          || await storage.getUserByUsername(normalizedUsername)
-          || await storage.getUserByUsername(normalizedUsernameLower);
+        const user = await getAuthoritativeUserByUsername(normalizedUsername);
         if (!user) return done(null, false, { message: "Incorrect username." });
         if (neonPool) {
           const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
@@ -426,7 +452,7 @@ export async function registerRoutes(
 
         // Newly registered institutions remain blocked until an owner approves them.
         if (user.enterpriseId && !hasOwnerRole(user) && !isIsolatedQaRuntime) {
-          const enterprise = await storage.getEnterprise(user.enterpriseId);
+          const enterprise = await getAuthoritativeEnterprise(Number(user.enterpriseId));
           if (!enterprise || enterprise.status !== "active") {
             return done(null, false, { message: "ACCOUNT_PENDING_APPROVAL" });
           }
@@ -442,7 +468,8 @@ export async function registerRoutes(
   passport.serializeUser((user: any, done) => done(null, user.id));
   passport.deserializeUser(async (id: number, done) => {
     try {
-      const user = await storage.getUser(id);
+      const user = await getAuthoritativeUserById(Number(id));
+      if (!user) return done(null, false);
       done(null, user);
     } catch (err) {
       done(err);
@@ -560,7 +587,7 @@ export async function registerRoutes(
       if (err) return res.status(500).json({ message: "Login failed." });
       if (!user) {
         if (neonPool) {
-          const failedAccount = attemptedUsername ? await storage.getUserByUsername(attemptedUsername).catch(() => undefined) : undefined;
+          const failedAccount = attemptedUsername ? await getAuthoritativeUserByUsername(attemptedUsername).catch(() => undefined) : undefined;
           await neonPool.query(
             "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES (NULL,$1,'account.login_failed',$2::jsonb,$3,$4)",
             [failedAccount?.id || null, JSON.stringify({ username:attemptedUsername, reason:info?.message === "ACCOUNT_SUSPENDED" ? "suspended" : "invalid_credentials" }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
@@ -692,12 +719,25 @@ export async function registerRoutes(
     }
 
     try {
-      const dbUser = await storage.getUser(Number(user.id));
+      const dbUser = await getAuthoritativeUserById(Number(user.id));
       if (!dbUser || !(await comparePassword(dbUser.password, currentPassword))) {
         return res.status(403).json({ message: "A senha atual está incorreta." });
       }
 
-      const updatedUser = await storage.updateUser(dbUser.id, { password: await hashPassword(newPassword) });
+      const newHash = await hashPassword(newPassword);
+      let updatedUser: any;
+      if (neonPool) {
+        const updated = await neonPool.query(
+          'UPDATE users SET password=$1 WHERE id=$2 RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"',
+          [newHash, Number(dbUser.id)],
+        );
+        updatedUser = updated.rows[0];
+        if (!updatedUser || !(await comparePassword(String(updatedUser.password || ""), newPassword))) {
+          throw new Error("A nova credencial não foi confirmada no PostgreSQL.");
+        }
+      } else {
+        updatedUser = await storage.updateUser(dbUser.id, { password: newHash });
+      }
       if (!updatedUser) return res.status(500).json({ message: "Não foi possível salvar a nova senha." });
 
       // Revoke every other persisted session for this account; preserve the current session.
@@ -769,8 +809,8 @@ export async function registerRoutes(
       if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
         return res.status(409).json({ message: "Sua conta ainda não está vinculada a um estabelecimento. Solicite ao proprietário que conclua o vínculo antes de criar funcionários." });
       }
-      const enterprise = await storage.getEnterprise(enterpriseId);
-      if (!enterprise || enterprise.status !== "active") {
+      const enterprise = await getAuthoritativeEnterprise(enterpriseId);
+      if (!enterprise || String(enterprise.status).toLowerCase() !== "active") {
         return res.status(403).json({ message: "O estabelecimento vinculado não está ativo. Não é possível criar contas subordinadas." });
       }
 
@@ -1112,8 +1152,8 @@ export async function registerRoutes(
       if (duplicateUsername.rows.length) return res.status(409).json({ message: "Nome de usuário já utilizado." });
       const enterpriseId = Number(actor.enterpriseId);
       if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) return res.status(409).json({ message: "A conta master precisa estar vinculada a um estabelecimento." });
-      const enterprise = await storage.getEnterprise(enterpriseId);
-      if (!enterprise || enterprise.status !== "active") return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
+      const enterprise = await getAuthoritativeEnterprise(enterpriseId);
+      if (!enterprise || String(enterprise.status).toLowerCase() !== "active") return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
       const permissions = parsed.data.accountType === "master"
         ? Object.fromEntries(accountModules.map((module) => [module, { view:true,create:true,edit:true,delete:true,approve:true,administer:true }]))
         : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
@@ -1153,8 +1193,12 @@ export async function registerRoutes(
       return res.status(201).json({ account: toPublicUser(created), status:"active", permissions });
     } catch (error: any) {
       if (createdAccountId) {
-        try { await storage.deleteUser(createdAccountId); }
-        catch (cleanupError: any) { console.error("[ACCOUNT-BRANCHES] create rollback failed:", cleanupError?.message || cleanupError); }
+        try {
+          if (neonPool) await neonPool.query("DELETE FROM users WHERE id=$1", [createdAccountId]);
+          else await storage.deleteUser(createdAccountId);
+        } catch (cleanupError: any) {
+          console.error("[ACCOUNT-BRANCHES] create rollback failed:", cleanupError?.message || cleanupError);
+        }
       }
       console.error("[ACCOUNT-BRANCHES] create failed:", error?.message || error);
       return res.status(500).json({ message: "Não foi possível criar a conta. Verifique o cadastro e tente novamente." });
