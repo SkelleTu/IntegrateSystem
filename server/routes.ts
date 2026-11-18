@@ -737,10 +737,10 @@ export async function registerRoutes(
     try {
       const schema = z.object({
         username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
-        password: z.string().min(12).max(128),
+        password: z.string().regex(/^\d{4}$/, "A senha deve conter exatamente 4 dígitos."),
       });
       const parsed = schema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ message: "Informe usuário válido e senha com pelo menos 12 caracteres." });
+      if (!parsed.success) return res.status(400).json({ message: "Informe usuário válido e senha de exatamente 4 dígitos." });
 
       // A conta subordinada sempre herda o estabelecimento da sessão autenticada.
       // Nunca aceite enterpriseId/role enviados pelo navegador.
@@ -1079,11 +1079,11 @@ export async function registerRoutes(
     if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível para gerenciamento seguro." });
     const parsed = z.object({
       username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
-      password: z.string().min(12).max(128),
+      password: z.string().regex(/^\d{4}$/, "A senha deve conter exatamente 4 dígitos."),
       accountType: z.enum(["staff","master"]),
       email: z.string().email().optional().or(z.literal("")),
     }).safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos. Usuário deve ter 3–32 caracteres e senha, no mínimo, 12." });
+    if (!parsed.success) return res.status(400).json({ message: "Dados inválidos. Usuário deve ter 3–32 caracteres e senha de exatamente 4 dígitos." });
     let createdAccountId: number | null = null;
     try {
       const username = parsed.data.username.toLowerCase();
@@ -1145,7 +1145,7 @@ export async function registerRoutes(
       role: z.enum(["barber","admin","owner"]).optional(),
       username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/).optional(),
       email: z.string().email().optional().or(z.literal("")),
-      password: z.string().min(12).max(128).optional(),
+      password: z.string().regex(/^\d{4}$/, "A senha deve conter exatamente 4 dígitos.").optional(),
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Alteração inválida." });
     try {
