@@ -431,7 +431,7 @@ export async function registerRoutes(
     new LocalStrategy(async (username, password, done) => {
       try {
         const normalizedUsername = String(username ?? "").trim();
-        const user = await getAuthoritativeUserByUsername(normalizedUsername);
+        let user = await getAuthoritativeUserByUsername(normalizedUsername);
         if (!user) return done(null, false, { message: "Incorrect username." });
         if (neonPool) {
           const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
