@@ -99,11 +99,28 @@ export default function SetupEnterprise() {
         <div className="relative z-10 w-full max-w-lg rounded-2xl border border-amber-500/20 bg-white/[0.03] p-8 text-center">
           <Building2 className="w-12 h-12 text-amber-400 mx-auto mb-5" />
           <h1 className="text-2xl font-black text-white uppercase tracking-tight mb-3">Conta subordinada sem vínculo</h1>
-          <p className="text-white/50 text-sm leading-6 mb-6">
+          <p className="text-white/50 text-sm leading-6 mb-5">
             Esta conta foi criada como conta subordinada, mas ainda não está vinculada ao estabelecimento da conta master.
-            Contas subordinadas não criam estabelecimentos próprios.
+            <span className="text-white/70"> Contas subordinadas não criam estabelecimentos próprios.</span>
           </p>
-          <p className="text-white/30 text-xs mb-6">Entre na conta master responsável e use Ramificação de contas para vincular esta conta ao estabelecimento correto.</p>
+
+          <div className="mb-6 rounded-xl border border-white/10 bg-white/[0.02] p-4 text-left">
+            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-3">
+              Como corrigir
+            </p>
+            <ol className="space-y-2 text-xs leading-5 text-white/50">
+              <li><span className="text-white/80 font-bold">1.</span> Saia desta conta e entre com a conta <span className="text-white font-bold">master</span> responsável pela empresa.</li>
+              <li><span className="text-white/80 font-bold">2.</span> No painel da conta master, abra <span className="text-white font-bold">Ramificação de contas</span>.</li>
+              <li><span className="text-white/80 font-bold">3.</span> Use <span className="text-white font-bold">Vincular conta subordinada existente</span>.</li>
+              <li><span className="text-white/80 font-bold">4.</span> Informe o usuário desta conta e confirme o vínculo com o estabelecimento correto.</li>
+              <li><span className="text-white/80 font-bold">5.</span> Depois que o vínculo for concluído, volte ao login e entre novamente com esta conta subordinada.</li>
+            </ol>
+          </div>
+
+          <p className="text-white/30 text-xs leading-5 mb-6">
+            Não crie um novo estabelecimento para esta conta. O vínculo deve ser realizado pela conta master.
+          </p>
+
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button
               type="button"
