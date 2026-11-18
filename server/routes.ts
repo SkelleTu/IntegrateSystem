@@ -413,6 +413,15 @@ export async function registerRoutes(
         }
 
         const isValid = await comparePassword(user.password, password);
+        console.log("[AUTH] subordinate/master credential check", {
+          userId: Number(user.id),
+          username: String(user.username),
+          role: String(user.role),
+          enterpriseId: user.enterpriseId ?? null,
+          passwordHashPresent: Boolean(String(user.password || "").trim()),
+          passwordHashFormat: String(user.password || "").includes("."),
+          passwordMatched: isValid,
+        });
         if (!isValid) return done(null, false, { message: "Incorrect password." });
 
         // Newly registered institutions remain blocked until an owner approves them.
