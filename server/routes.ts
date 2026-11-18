@@ -1082,12 +1082,25 @@ export async function registerRoutes(
       const permissions = parsed.data.accountType === "master"
         ? Object.fromEntries(accountModules.map((module) => [module, { view:true,create:true,edit:true,delete:true,approve:true,administer:true }]))
         : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
-      const created = await storage.createUser({
-        username, password: await hashPassword(parsed.data.password),
-        role: parsed.data.accountType === "master" ? "owner" : "barber",
-        enterpriseId,
-        email: parsed.data.email || null,
-      } as any);
+      // Criacao de conta subordinada: gravar diretamente no PostgreSQL autoritativo.
+      // Nao use o writer legado aqui; o painel de ramificacao e uma operacao Neon-only.
+      const nextIdResult = await neonPool.query(
+        "SELECT nextval(pg_get_serial_sequence('public.users','id')) AS id",
+      );
+      const newId = Number(nextIdResult.rows[0]?.id);
+      if (!Number.isSafeInteger(newId) || newId <= 0) {
+        throw new Error("Nao foi possivel reservar um ID para a nova conta.");
+      }
+      const hashedPassword = await hashPassword(parsed.data.password);
+      const role = parsed.data.accountType === "master" ? "owner" : "barber";
+      const inserted = await neonPool.query(
+        `INSERT INTO users (id,username,email,password,role,enterprise_id)
+         VALUES ($1,$2,$3,$4,$5,$6)
+         RETURNING id,username,email,role,enterprise_id AS "enterpriseId"`,
+        [newId, username, parsed.data.email || null, hashedPassword, role, enterpriseId],
+      );
+      const created = inserted.rows[0];
+      if (!created) throw new Error("A conta nao foi retornada pelo PostgreSQL apos a criacao.");
       createdAccountId = Number(created.id);
       await neonPool.query(
         "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3)",
