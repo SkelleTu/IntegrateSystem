@@ -632,6 +632,10 @@ export async function registerRoutes(
       return res.status(429).json({ message: "Muitas tentativas. Aguarde antes de tentar novamente." });
     }
 
+    if (!isMasterAccount(req.user)) {
+      return res.status(403).json({ message: "Somente a conta master pode realizar esta autorização." });
+    }
+
     const masterPassword =
       typeof req.body?.masterPassword === "string" ? req.body.masterPassword : "";
 
@@ -815,16 +819,32 @@ export async function registerRoutes(
       }
 
       const username = parsed.data.username.toLowerCase();
-      const existing = await storage.getUserByUsername(username);
+      const existing = await getAuthoritativeUserByUsername(username);
       if (existing) return res.status(409).json({ message: "Este nome de usuário já está em uso." });
 
       const hashed = await hashPassword(parsed.data.password);
-      const newUser = await storage.createUser({
-        username,
-        password: hashed,
-        role: "barber",
-        enterpriseId,
-      } as any);
+      const nextIdResult = await neonPool.query("SELECT nextval(pg_get_serial_sequence('public.users','id')) AS id");
+      const newId = Number(nextIdResult.rows[0]?.id);
+      if (!Number.isSafeInteger(newId) || newId <= 0) throw new Error("Não foi possível reservar um ID para a nova conta.");
+      const inserted = await neonPool.query(
+        `INSERT INTO users (id,username,email,password,role,enterprise_id)
+         VALUES ($1,$2,$3,$4,'barber',$5)
+         RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"`,
+        [newId, username, null, hashed, enterpriseId],
+      );
+      const newUser = inserted.rows[0];
+      if (!newUser || !(await comparePassword(String(newUser.password || ""), parsed.data.password))) {
+        throw new Error("A credencial da conta subordinada não foi confirmada no PostgreSQL.");
+      }
+      const permissions = {
+        dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false },
+        cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false },
+        timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false },
+      };
+      await neonPool.query(
+        "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3) ON CONFLICT (user_id) DO UPDATE SET status='active',permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()",
+        [newUser.id, JSON.stringify(permissions), Number(user.id)],
+      );
       return res.status(201).json(toPublicUser(newUser));
     } catch (err: any) {
       console.error("[ACCOUNT-BRANCHES] Employee creation failed:", err?.message || err);
@@ -1222,10 +1242,10 @@ export async function registerRoutes(
     }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Alteração inválida." });
     try {
-      const target = await storage.getUser(targetId);
+      const target = await getAuthoritativeUserById(targetId);
       if (!target) return res.status(404).json({ message: "Conta não encontrada." });
       if (Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(403).json({ message: "A conta pertence a outro estabelecimento." });
-      if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
+      if (String(target.username).trim().toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema possui proteção adicional." });
       if (parsed.data.role === "owner" && !isSystemOwner(actor)) return res.status(403).json({ message: "Somente master pode conceder privilégio master." });
       if (parsed.data.username) {
         const duplicate = await neonPool.query("SELECT id FROM users WHERE LOWER(username)=LOWER($1) AND id<>$2 LIMIT 1",[parsed.data.username.toLowerCase(),targetId]);
@@ -1247,7 +1267,26 @@ export async function registerRoutes(
       if (parsed.data.username) userChanges.username = parsed.data.username.toLowerCase();
       if (parsed.data.email !== undefined) userChanges.email = parsed.data.email || null;
       if (parsed.data.password) userChanges.password = await hashPassword(parsed.data.password);
-      if (Object.keys(userChanges).length) await storage.updateUser(targetId, userChanges);
+      if (Object.keys(userChanges).length) {
+        const assignments: string[] = [];
+        const values: any[] = [];
+        for (const [key, value] of Object.entries(userChanges)) {
+          if (!["role","username","email","password"].includes(key)) continue;
+          assignments.push(`${key}=${values.length + 1}`);
+          values.push(value);
+        }
+        values.push(targetId);
+        const updated = await neonPool.query(
+          `UPDATE users SET ${assignments.join(", ")} WHERE id=${values.length}
+           RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"`,
+          values,
+        );
+        const persisted = updated.rows[0];
+        if (!persisted) throw new Error("Conta não encontrada no PostgreSQL ao salvar alterações.");
+        if (parsed.data.password && !(await comparePassword(String(persisted.password || ""), parsed.data.password))) {
+          throw new Error("A nova senha da conta não foi confirmada no PostgreSQL.");
+        }
+      }
       await neonPool.query(`
         INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
         VALUES ($1,$2,$3::jsonb,$4,NOW())
@@ -1274,12 +1313,12 @@ export async function registerRoutes(
     const targetId = Number(req.params.id);
     if (!Number.isSafeInteger(targetId) || targetId <= 0 || targetId === Number(actor.id)) return res.status(400).json({ message: "Não é permitido remover esta conta." });
     try {
-      const target = await storage.getUser(targetId);
+      const target = await getAuthoritativeUserById(targetId);
       if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
-      if (target.username.toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema não pode ser removida." });
+      if (String(target.username).trim().toLowerCase() === "skelletu") return res.status(403).json({ message: "A conta raiz do sistema não pode ser removida." });
       await auditAccountAction(req,targetId,"account.deleted",{ username:target.username,role:target.role });
-      if (neonPool) await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
-      await storage.deleteUser(targetId);
+      await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
+      await neonPool.query("DELETE FROM users WHERE id=$1",[targetId]);
       return res.status(204).send();
     } catch (error: any) {
       console.error("[ACCOUNT-BRANCHES] delete failed:", error?.message || error);
