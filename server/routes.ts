@@ -395,14 +395,17 @@ export async function registerRoutes(
       try {
         const normalizedUsername = String(username ?? "").trim();
         const normalizedUsernameLower = normalizedUsername.toLowerCase();
-        const user = await storage.getUserByUsername(normalizedUsername)
-          || await storage.getUserByUsername(normalizedUsernameLower)
-          || (neonPool
-            ? ((await neonPool.query(
-                "SELECT * FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1)) LIMIT 1",
-                [normalizedUsername],
-              )).rows[0] as any || undefined)
-            : undefined);
+        // Neon é a fonte autoritativa das contas master/subordinadas. Consultar
+        // o storage legado primeiro pode devolver uma cópia antiga da credencial
+        // e fazer uma conta criada no painel falhar no login.
+        const user = (neonPool
+          ? ((await neonPool.query(
+              "SELECT * FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1)) LIMIT 1",
+              [normalizedUsername],
+            )).rows[0] as any || undefined)
+          : undefined)
+          || await storage.getUserByUsername(normalizedUsername)
+          || await storage.getUserByUsername(normalizedUsernameLower);
         if (!user) return done(null, false, { message: "Incorrect username." });
         if (neonPool) {
           const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
