@@ -103,7 +103,24 @@ export default function SetupEnterprise() {
             Esta conta foi criada como conta subordinada, mas ainda não está vinculada ao estabelecimento da conta master.
             Contas subordinadas não criam estabelecimentos próprios.
           </p>
-          <p className="text-white/30 text-xs">Entre na conta master responsável e use Ramificação de contas para vincular esta conta ao estabelecimento correto.</p>
+          <p className="text-white/30 text-xs mb-6">Entre na conta master responsável e use Ramificação de contas para vincular esta conta ao estabelecimento correto.</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button
+              type="button"
+              onClick={() => setLocation("/login")}
+              className="h-11 px-6 rounded-xl bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs"
+            >
+              Voltar ao login
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setLocation("/")}
+              className="h-11 px-6 rounded-xl border-white/10 text-white/60 hover:text-white hover:bg-white/5 font-bold uppercase tracking-widest text-xs"
+            >
+              Início
+            </Button>
+          </div>
         </div>
       </div>
     );
