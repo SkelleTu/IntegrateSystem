@@ -393,7 +393,16 @@ export async function registerRoutes(
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
-        const user = await storage.getUserByUsername(username) || await storage.getUserByUsername(String(username).trim().toLowerCase());
+        const normalizedUsername = String(username ?? "").trim();
+        const normalizedUsernameLower = normalizedUsername.toLowerCase();
+        const user = await storage.getUserByUsername(normalizedUsername)
+          || await storage.getUserByUsername(normalizedUsernameLower)
+          || (neonPool
+            ? ((await neonPool.query(
+                "SELECT * FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1)) LIMIT 1",
+                [normalizedUsername],
+              )).rows[0] as any || undefined)
+            : undefined);
         if (!user) return done(null, false, { message: "Incorrect username." });
         if (neonPool) {
           const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
@@ -1115,6 +1124,14 @@ export async function registerRoutes(
       );
       const created = inserted.rows[0];
       if (!created) throw new Error("A conta nao foi retornada pelo PostgreSQL apos a criacao.");
+
+      // Verificação imediata: garante que a senha recém-gravada no PostgreSQL
+      // é realmente compatível com a senha fornecida no cadastro.
+      const persistedPassword = String(created.password ?? "");
+      if (!(await comparePassword(persistedPassword, parsed.data.password))) {
+        throw new Error("Falha na verificação da credencial recém-criada.");
+      }
+
       createdAccountId = Number(created.id);
       await neonPool.query(
         "INSERT INTO aura_account_controls (user_id,status,permissions,updated_by) VALUES ($1,'active',$2::jsonb,$3)",
