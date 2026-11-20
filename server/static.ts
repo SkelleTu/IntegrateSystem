@@ -4,21 +4,34 @@ import path from "path";
 
 export function serveStatic(app: Express) {
   const distPath = path.resolve(process.cwd(), "dist", "public");
-  
-  // No Vercel, o roteamento deve ser tratado com cuidado para não conflitar com as Serverless Functions
+
+  // O frontend é uma SPA: rotas navegáveis sem arquivo físico precisam
+  // receber o index.html para o router do cliente resolver a URL.
   if (fs.existsSync(distPath)) {
+    const indexPath = path.join(distPath, "index.html");
+
     app.use(express.static(distPath));
 
-    app.get("*", (req, res, next) => {
-      // Se não for API e o arquivo não existir fisicamente, serve o index.html (SPA routing)
-      if (!req.path.startsWith("/api")) {
-        res.sendFile(path.join(distPath, "index.html"));
-      } else {
-        next();
+    app.use((req, res, next) => {
+      if (
+        req.method === "GET" &&
+        !req.path.startsWith("/api") &&
+        !path.extname(req.path)
+      ) {
+        return res.sendFile(indexPath);
       }
+      next();
+    });
+
+    // Fallback final para compatibilidade com navegadores/proxies que
+    // encaminhem uma rota SPA de forma diferente.
+    app.get("*", (req, res, next) => {
+      if (!req.path.startsWith("/api")) {
+        return res.sendFile(indexPath);
+      }
+      next();
     });
   } else {
-    // Fallback para desenvolvimento ou ambientes sem build
     const publicPath = path.resolve(process.cwd(), "public");
     app.use(express.static(publicPath));
   }
