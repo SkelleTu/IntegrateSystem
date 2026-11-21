@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -31,7 +31,7 @@ export function MasterAccessPrompt() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const originalFetch = window.fetch.bind(window);
     const onRequest = (event: Event) => {
       const detail = (event as CustomEvent<MasterAccessRequest>).detail;
