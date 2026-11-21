@@ -89,7 +89,6 @@ import { Loader2, Plus, Minus, ShoppingCart, Banknote, CreditCard, QrCode, Arrow
 import { motion, AnimatePresence } from "framer-motion";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-import { BackgroundIcons } from "@/components/BackgroundIcons";
 import auraLogo from "@assets/AURA_1768346008566.png";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
@@ -839,7 +838,6 @@ function CashierContent({
 
   return (
     <div className="cashier-shell fixed inset-0 bg-black flex flex-col overflow-hidden">
-      <BackgroundIcons />
       <div className="cashier-layout flex flex-col lg:flex-row flex-1 min-h-0 overflow-hidden relative" style={{ paddingTop: "64px" }}>
         {/* Area Principal de Produtos */}
         <div className="cashier-products flex-1 flex flex-col min-h-0 overflow-hidden p-4">
