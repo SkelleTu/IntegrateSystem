@@ -53,7 +53,7 @@ export function Navbar() {
       "/admin/account-branches":"account_branches",
     };
     const grant = user.permissions?.[moduleByUrl[url]] || {};
-    const allowed = isMasterAccount || url === "/cart" || grant.view === true || grant.administer === true;
+    const allowed = isMasterAccount || user.masterAccessAuthorized === true || url === "/cart" || grant.view === true || grant.administer === true;
     if (allowed) {
       setLocation(url);
       return;
