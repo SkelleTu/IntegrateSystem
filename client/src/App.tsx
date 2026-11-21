@@ -77,9 +77,6 @@ function RouteLoading() {
 
 
 import { Navbar } from "@/components/layout/Navbar";
-import { installMasterAccessInterceptor } from "@/lib/masterAccess";
-
-installMasterAccessInterceptor();
 import { StatusBar } from "@/components/layout/StatusBar";
 import { Button } from "@/components/ui/button";
 import {
