@@ -512,15 +512,21 @@ function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts 
 
       {/* ── Nome ────────────────────────────────────────────────────────────── */}
       <div className="col-span-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome do Grupo *</Label>
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Produto *</Label>
         <Input className={`mt-1 ${T.dialogInput}`} value={form.name} onChange={e => setForm((f: any) => ({ ...f, name: e.target.value }))} placeholder={isKg ? "Ex: Carne Bovina, Frango, Queijo Minas" : "Ex: Amaciantes, Detergente, Papel Higiênico"} />
-        <p className="text-[9px] mt-1 text-white/30 font-bold">Nome genérico do tipo de produto — os detalhes (marca, tamanho, sabor) vão nas variantes</p>
+        <p className="text-[9px] mt-1 text-white/30 font-bold">Nome principal exibido no estoque e no caixa. Marca, tamanho e sabor ficam na variante.</p>
       </div>
 
       {/* ── Categoria ─────────────────────────────────────────────────────── */}
       <div className="col-span-2">
         <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
-        <Input className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Limpeza, Higiene, Bebidas" />
+        <Input list="aura-product-categories" className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Padaria, Bebidas, Limpeza" />
+      <datalist id="aura-product-categories">
+        {Array.from(new Set(allProducts.map((p: any) => String(p.category || "").trim()).filter(Boolean))).sort().map((category: string) => (
+          <option key={category} value={category} />
+        ))}
+      </datalist>
+      <p className="text-[9px] mt-1 text-white/30 font-bold">Escolha uma categoria já usada ou digite uma nova. Mantenha a mesma grafia para organizar o estoque.</p>
       </div>
 
       {/* ── NCM (auto-detectado) ───────────────────────────────────────────── */}
@@ -615,14 +621,14 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
       />
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Variante</Label>
+      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Nome da Variante</Label>
       <Input
         className={`mt-1 ${T.dialogInput}`}
         value={form.variantName ?? ""}
         onChange={e => setForm((f: any) => ({ ...f, variantName: e.target.value }))}
         placeholder={isKg ? "Ex: Carne Bovina Traseira, Frango Inteiro..." : "Ex: Louê Essências Vanilla 500ml, Triex Fresh 500ml..."}
       />
-      <p className="text-[9px] mt-1 text-white/30 font-bold">Escreva aqui a marca, tamanho, sabor — tudo que diferencia este item do grupo</p>
+      <p className="text-[9px] mt-1 text-white/30 font-bold">Use marca, tamanho, sabor ou outra característica que diferencie esta variante.</p>
     </div>
     <div className="col-span-2">
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Código de Barras (EAN/GTIN)</Label>
@@ -2010,7 +2016,7 @@ export default function InventoryPage() {
             </div>
 
             <div className={`border-t pt-4 ${isLight ? "border-slate-200" : "border-white/10"}`}>
-              <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${T.muted}`}>Primeiro Lote</p>
+              <p className={`text-[10px] font-black uppercase tracking-widest mb-3 ${T.muted}`}>Estoque inicial</p>
               <BatchFields form={firstBatchForm} setForm={setFirstBatchForm} T={T} productUnit={productForm.unit} />
             </div>
 
