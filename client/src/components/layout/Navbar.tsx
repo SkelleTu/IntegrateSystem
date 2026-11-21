@@ -201,7 +201,7 @@ export function Navbar() {
                     <item.icon
                       className="w-3 h-3 transition-all duration-200"
                       style={{
-                        color: active ? "#00e5ff" : "rgba(160,160,180,1)",
+                        color: active ? "#00e5ff" : "#ffffff",
                         filter: active ? "drop-shadow(0 0 4px rgba(0,229,255,0.7))" : "none",
                       }}
                     />
@@ -310,7 +310,7 @@ export function Navbar() {
                         onClick={() => handleNavigation(item.url)}
                       >
                         <item.icon className="w-3.5 h-3.5 shrink-0" style={{ color: active ? "#00e5ff" : "rgba(160,160,180,1)", filter: active ? "drop-shadow(0 0 4px rgba(0,229,255,0.6))" : "none" }} />
-                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: active ? "#00e5ff" : "rgba(200,200,220,1)", textShadow: active ? "0 0 8px rgba(0,229,255,0.5)" : "none", letterSpacing: "0.12em" }}>
+                        <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: active ? "#00e5ff" : "#ffffff", textShadow: active ? "0 0 8px rgba(0,229,255,0.5)" : "none", letterSpacing: "0.12em" }}>
                           {item.title}
                         </span>
                       </DropdownMenuItem>
