@@ -495,7 +495,7 @@ const TABLE_DEFINITIONS = [
     cost_price INTEGER NOT NULL DEFAULT 0,
     sale_price INTEGER,
     sale_price_unit TEXT NOT NULL DEFAULT 'unit',
-    package_quantity INTEGER DEFAULT 1,
+    package_quantity REAL DEFAULT 1,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS batch_logs (
