@@ -355,20 +355,33 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
   if (!user) return null;
 
   const handleNav = (url: string, adminOnly?: boolean, ownerOnly?: boolean) => {
-    // Rotas liberadas para todos sem senha master
-    const freeRoutes = ["/app", "/caixa", "/ponto", "/cart"];
-    
-    const isMasterAccount =
-      user?.role === "owner" ||
+    if (!user) return;
+    const isMasterAccount = user?.role === "owner" ||
       String(user?.username || "").trim().toLowerCase() === "skelletu";
+    const routeModules: Record<string, string> = {
+      "/app": "dashboard", "/ponto": "timeclock", "/caixa": "cashier",
+      "/financeiro": "finance", "/fiscal": "fiscal", "/aura-windows": "settings",
+      "/relatorios": "reports", "/inventory": "inventory", "/admin/labels": "labels",
+    };
+    const module = routeModules[url];
+    const grants = user?.permissions as Record<string, Record<string, boolean>> | undefined;
+    const hasConfiguredScopes = Boolean(grants && Object.keys(grants).length);
+    const grant = module ? grants?.[module] || {} : {};
+    const hasView = grant.view === true || grant.create === true || grant.edit === true ||
+      grant.delete === true || grant.approve === true || grant.administer === true;
+    const legacyAllowed = ownerOnly ? isMasterAccount
+      : adminOnly ? ["admin", "owner"].includes(String(user?.role || "").toLowerCase())
+      : ["admin", "owner", "barber"].includes(String(user?.role || "").toLowerCase());
+    const allowed = isMasterAccount || (hasConfiguredScopes ? (module ? hasView : url === "/cart") : legacyAllowed);
 
-    if (isMasterAccount || freeRoutes.includes(url)) {
+    if (allowed) {
       setLocation(url);
       setOpen(false);
-    } else {
-      setPendingUrl(url);
-      setGuardOpen(true);
+      return;
     }
+    // Preserve the existing temporary master-elevation flow for denied operations.
+    setPendingUrl(url);
+    setGuardOpen(true);
   };
 
   const handleAuthorizedNav = () => {
@@ -402,8 +415,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const isLocked = false; // We use the guard now instead of total locking
-                
+
                 return (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton 
