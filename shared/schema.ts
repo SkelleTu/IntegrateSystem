@@ -1,4 +1,4 @@
-import { sqliteTable as pgTable, text, integer, numeric } from "drizzle-orm/sqlite-core";
+import { sqliteTable as pgTable, text, integer, numeric, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
