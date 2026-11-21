@@ -62,8 +62,18 @@ export default function Home() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const categoriesQuery = useQuery<Category[]>({ queryKey: ["/api/categories"] });
 
-  const isFinanceLocked  = user?.role !== "admin" && user?.role !== "owner";
-  const isInventoryLocked = user?.role !== "admin" && user?.role !== "owner";
+  const permissions = (user?.permissions || {}) as Record<string, Record<string, boolean>>;
+  const hasConfiguredScopes = Object.keys(permissions).length > 0;
+  const canViewModule = (module: string, legacyAllowed: boolean) => {
+    if (user?.role === "owner" || String(user?.username || "").trim().toLowerCase() === "skelletu") return true;
+    if (!hasConfiguredScopes) return legacyAllowed;
+    const grant = permissions[module] || {};
+    return grant.view === true || grant.create === true || grant.edit === true ||
+      grant.delete === true || grant.approve === true || grant.administer === true;
+  };
+  const isCashierLocked = !canViewModule("cashier", ["admin", "owner", "barber"].includes(String(user?.role || "").toLowerCase()));
+  const isFinanceLocked = !canViewModule("finance", ["admin", "owner"].includes(String(user?.role || "").toLowerCase()));
+  const isInventoryLocked = !canViewModule("inventory", ["admin", "owner"].includes(String(user?.role || "").toLowerCase()));
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-20 md:pt-28">
@@ -109,7 +119,7 @@ export default function Home() {
       {/* ── Module cards ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 w-full max-w-[1400px] z-10 mb-12 md:mb-20 px-2 auto-rows-fr justify-center mx-auto">
         {[
-          { id: "caixa",      title: "Caixa",      icon: ClipboardList, path: "/caixa",     desc: "Gestão & Vendas",       locked: false,             admin: false, tourId: "card-caixa" },
+          { id: "caixa",      title: "Caixa",      icon: ClipboardList, path: "/caixa",     desc: "Gestão & Vendas",       locked: isCashierLocked,    admin: false, tourId: "card-caixa" },
           { id: "financeiro", title: "Financeiro",  icon: Landmark,      path: "/financeiro", desc: "Controle de Gastos",   locked: isFinanceLocked,   admin: true,  tourId: "card-financeiro" },
           { id: "estoque",    title: "Estoque",     icon: Search,        path: "/inventory",  desc: "Gestão de Mercadorias",locked: isInventoryLocked, admin: true,  tourId: "card-estoque" },
         ].map((item) => (
