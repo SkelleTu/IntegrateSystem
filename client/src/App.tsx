@@ -77,6 +77,7 @@ function RouteLoading() {
 
 
 import { Navbar } from "@/components/layout/Navbar";
+import { MasterAccessPrompt } from "@/components/MasterAccessPrompt";
 import { StatusBar } from "@/components/layout/StatusBar";
 import { Button } from "@/components/ui/button";
 import {
@@ -262,6 +263,7 @@ function AppContent() {
         </main>
       </div>
       <Toaster />
+      <MasterAccessPrompt />
       {user && <StatusBar />}
       <div className="fixed bottom-6 right-6 z-[9999] pointer-events-none opacity-20 hover:opacity-40 transition-opacity duration-500 hidden sm:block">
         <img src={auraLogo} alt="Aura Logo Overlay" className="w-12 h-auto grayscale brightness-200" />
