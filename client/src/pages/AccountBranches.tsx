@@ -77,19 +77,113 @@ export default function AccountBranches() {
         <div className="overflow-x-auto"><table className="w-full text-sm min-w-[720px]"><thead className="text-left text-zinc-500 border-b border-white/10"><tr><th className="p-3">Conta</th><th className="p-3">Perfil</th><th className="p-3">Estabelecimento</th><th className="p-3">Status</th><th className="p-3">Sessões</th><th className="p-3">Último acesso / atividade</th><th className="p-3">Ações</th></tr></thead><tbody>{accounts.map(a=><tr key={a.id} className="border-b border-white/5"><td className="p-3 font-semibold">{a.username}<div className="text-xs text-zinc-500">{a.email||"—"} · #{a.id}</div></td><td className="p-3">{a.role}</td><td className="p-3">{a.enterpriseName||"Sem vínculo"}<div className="text-xs text-zinc-500">ID {a.enterpriseId??"—"}</div></td><td className="p-3"><span className={a.status==="active"?"text-emerald-400":"text-red-400"}>{a.status==="active"?"Ativa":"Suspensa"}</span></td><td className="p-3">{a.activeSessions??0} ativa(s)</td><td className="p-3">{a.lastLogin?new Date(a.lastLogin).toLocaleString():"Nunca"}<div className="text-xs text-zinc-500">{a.lastIp||"IP indisponível"}</div><div className="text-xs text-zinc-500 max-w-[180px] truncate">{a.lastDevice||"Dispositivo indisponível"}</div><div className="text-xs text-cyan-500/80">Atividade: {a.lastActivity?new Date(a.lastActivity).toLocaleString():"Sem registro"}</div></td><td className="p-3"><div className="flex gap-2"><button onClick={()=>openEditor(a)} className="rounded-lg border border-white/15 px-3 py-2">Gerir</button>{a.id!==accounts.find(x=>x.role==="owner"&&x.username.toLowerCase()==="skelletu")?.id&&<button title="Remover conta" onClick={()=>{if(confirm("Remover permanentemente esta conta?"))remove.mutate(a.id)}} className="rounded-lg border border-red-500/30 p-2 text-red-300"><Trash2 size={15}/></button>}</div></td></tr>)}</tbody></table></div>
       </section>
       {activeAccount&&<section className="rounded-2xl border border-cyan-500/30 bg-white/[.03] p-5 space-y-5">
-        <div className="flex flex-wrap justify-between gap-3"><div><h2 className="font-bold text-xl">Permissões: {activeAccount.username}</h2><p className="text-xs text-zinc-500">Defina o escopo de cada setor: sem acesso, somente visualização ou acesso completo. Em acesso completo, escolha se a conta pode alterar/cadastrar.</p></div><button onClick={()=>setSelected(null)} className="text-zinc-400">Fechar</button></div>
-        <div className="grid gap-3 md:grid-cols-3"><label className="text-xs text-zinc-400">Usuário<input value={editUsername} onChange={e=>setEditUsername(e.target.value)} className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label><label className="text-xs text-zinc-400">E-mail<input value={editEmail} onChange={e=>setEditEmail(e.target.value)} className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label><label className="text-xs text-zinc-400">Nova senha (opcional)<input value={editPassword} onChange={e=>setEditPassword(e.target.value)} type="password" placeholder="Exatamente 4 dígitos" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label></div><div className="flex flex-wrap gap-3"><label className="text-sm">Status <select id="account-status" defaultValue={activeAccount.status} className="ml-2 rounded-lg bg-black border border-white/20 p-2"><option value="active">Ativa</option><option value="suspended">Suspensa</option></select></label><label className="text-sm">Perfil <select id="account-role" defaultValue={activeAccount.role} className="ml-2 rounded-lg bg-black border border-white/20 p-2"><option value="barber">Subordinada</option><option value="admin">Administradora</option><option value="owner">Master</option></select></label></div>
-        <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead><tr className="text-left text-zinc-400 border-b border-white/10"><th className="p-2">Módulo / escopo</th><th className="p-2">Acesso</th><th className="p-2">Alteração</th></tr></thead><tbody>{modules.map(module=>{
-          const grant:any = draft[module] || activeAccount.permissions?.[module] || {};
-          const access:AccessMode = grant.access === "full" || grant.access === "view" ? grant.access : (grant.view ? "view" : "none");
-          const canEdit = access === "full" && Boolean(grant.edit || grant.create || grant.delete || grant.approve || grant.administer);
-          return <tr key={module} className="border-b border-white/5">
-            <td className="p-2 font-semibold">{moduleLabels[module]||module}</td>
-            <td className="p-2"><select value={access} onChange={e=>{const next=e.target.value as AccessMode; setDraft(old=>({...old,[module]:{...(old[module]||grant),access:next,view:next!=="none",edit:next==="full" ? Boolean(grant.edit) : false,create:next==="full" ? Boolean(grant.create) : false,delete:next==="full" ? Boolean(grant.delete) : false,approve:next==="full" ? Boolean(grant.approve) : false,administer:next==="full" ? Boolean(grant.administer) : false}}));}} className="rounded-lg bg-black border border-white/15 p-2"><option value="none">{accessLabels.none}</option><option value="view">{accessLabels.view}</option><option value="full">{accessLabels.full}</option></select></td>
-            <td className="p-2"><label className="inline-flex items-center gap-2 text-xs text-zinc-300"><input type="checkbox" checked={canEdit} disabled={access!=="full"} onChange={e=>{const enabled=e.target.checked; setDraft(old=>({...old,[module]:{...(old[module]||grant),access:"full",view:true,edit:enabled,create:enabled,delete:enabled,approve:enabled,administer:enabled}}));}} />Pode alterar/cadastrar</label></td>
-          </tr>;
-        })}</tbody></table></div>
-        <div className="flex flex-wrap gap-3"><button onClick={()=>update.mutate({status:(document.getElementById("account-status") as HTMLSelectElement).value,role:(document.getElementById("account-role") as HTMLSelectElement).value,username:editUsername,email:editEmail,password:editPassword||undefined,permissions:{...activeAccount.permissions,...draft}})} disabled={update.isPending} className="rounded-lg bg-cyan-500 px-5 py-3 font-bold text-black">Salvar alterações</button><button onClick={()=>update.mutate({status:activeAccount.status==="active"?"suspended":"active"})} className="rounded-lg border border-white/20 px-4 py-3 flex items-center gap-2">{activeAccount.status==="active"?<LockKeyhole size={16}/>:<UnlockKeyhole size={16}/>} {activeAccount.status==="active"?"Suspender":"Reativar"}</button></div>
+        <div className="flex flex-wrap justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-xl">Permissões: {activeAccount.username}</h2>
+            <p className="text-xs text-zinc-500 mt-1">Cada setor é independente. Marque o setor e, dentro dele, selecione exatamente os escopos que esta conta poderá executar.</p>
+          </div>
+          <button onClick={()=>setSelected(null)} className="text-zinc-400">Fechar</button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="text-xs text-zinc-400">Usuário<input value={editUsername} onChange={e=>setEditUsername(e.target.value)} className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label>
+          <label className="text-xs text-zinc-400">E-mail<input value={editEmail} onChange={e=>setEditEmail(e.target.value)} className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label>
+          <label className="text-xs text-zinc-400">Nova senha (opcional)<input value={editPassword} onChange={e=>setEditPassword(e.target.value)} type="password" placeholder="Exatamente 4 dígitos" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" className="mt-1 block w-full rounded-lg bg-black border border-white/20 p-2 text-white"/></label>
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <label className="text-sm">Status <select id="account-status" defaultValue={activeAccount.status} className="ml-2 rounded-lg bg-black border border-white/20 p-2"><option value="active">Ativa</option><option value="suspended">Suspensa</option></select></label>
+          <label className="text-sm">Perfil <select id="account-role" defaultValue={activeAccount.role} className="ml-2 rounded-lg bg-black border border-white/20 p-2"><option value="barber">Subordinada</option><option value="admin">Administradora</option><option value="owner">Master</option></select></label>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/10 bg-black/20 px-4 py-3">
+            <div>
+              <p className="text-sm font-bold">Setores e escopos</p>
+              <p className="text-xs text-zinc-500">As permissões abaixo pertencem exclusivamente ao setor selecionado.</p>
+            </div>
+            <button
+              type="button"
+              onClick={()=>{
+                const allEnabled=modules.every(module=>{
+                  const g:any=draft[module]||activeAccount.permissions?.[module]||{};
+                  return Boolean(g.view||g.create||g.edit||g.delete||g.approve||g.administer);
+                });
+                setDraft(old=>Object.fromEntries(modules.map(module=>[module, allEnabled
+                  ? {access:"none",view:false,create:false,edit:false,delete:false,approve:false,administer:false}
+                  : {access:"full",view:true,create:true,edit:true,delete:true,approve:true,administer:true}
+                ])));
+              }}
+              className="rounded-lg border border-cyan-500/30 px-3 py-2 text-xs font-bold text-cyan-300"
+            >
+              {modules.every(module=>{
+                const g:any=draft[module]||activeAccount.permissions?.[module]||{};
+                return Boolean(g.view||g.create||g.edit||g.delete||g.approve||g.administer);
+              }) ? "Desmarcar todos" : "Marcar todos"}
+            </button>
+          </div>
+
+          {modules.map(module=>{
+            const grant:any = draft[module] || activeAccount.permissions?.[module] || {};
+            const enabled = Boolean(grant.view||grant.create||grant.edit||grant.delete||grant.approve||grant.administer);
+            const checkedCount = allActions.filter(action=>Boolean(grant[action])).length;
+            const fullAccess = checkedCount === allActions.length;
+            const setSectorEnabled=(value:boolean)=>{
+              if(!value){
+                setDraft(old=>({...old,[module]:{access:"none",view:false,create:false,edit:false,delete:false,approve:false,administer:false}}));
+                return;
+              }
+              setDraft(old=>({...old,[module]:{...(old[module]||grant),access:fullAccess?"full":"view",view:true}}));
+            };
+            const setAction=(action:Action,value:boolean)=>{
+              setDraft(old=>{
+                const current:any={...(old[module]||grant)};
+                current[action]=value;
+                if(action!=="view" && value) current.view=true;
+                const count=allActions.filter(a=>Boolean(current[a])).length;
+                current.access=count===0?"none":count===allActions.length?"full":"view";
+                return {...old,[module]:current};
+              });
+            };
+            return <div key={module} className={`rounded-2xl border ${enabled?"border-cyan-500/30 bg-cyan-500/[.035]":"border-white/10 bg-black/20"} overflow-hidden`}>
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={enabled}
+                    onChange={e=>setSectorEnabled(e.target.checked)}
+                    className="h-5 w-5 accent-cyan-500"
+                  />
+                  <span>
+                    <span className="block font-bold">{moduleLabels[module]||module}</span>
+                    <span className="block text-[11px] text-zinc-500">{enabled ? `${checkedCount}/${allActions.length} escopos ativos` : "Sem acesso"}</span>
+                  </span>
+                </label>
+                <span className="text-[11px] uppercase tracking-wider text-zinc-500">{fullAccess ? "Acesso completo" : enabled ? "Acesso personalizado" : "Bloqueado"}</span>
+              </div>
+
+              <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 p-3 ${enabled?"":"opacity-45"}`}>
+                {allActions.map(action=><label key={action} className={`flex items-center gap-3 rounded-lg border border-white/10 px-3 py-2.5 ${enabled?"cursor-pointer hover:bg-white/[.04]":"cursor-not-allowed"}`}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(grant[action])}
+                    disabled={!enabled}
+                    onChange={e=>setAction(action,e.target.checked)}
+                    className="h-4 w-4 accent-cyan-500"
+                  />
+                  <span className="text-sm">{actionLabels[action]}</span>
+                </label>)}
+              </div>
+
+              {enabled && <div className="px-4 pb-3 text-[11px] text-zinc-500">Visualizar é a base de acesso. Ao marcar qualquer ação operacional, a visualização permanece habilitada.</div>}
+            </div>;
+          })}
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <button onClick={()=>update.mutate({status:(document.getElementById("account-status") as HTMLSelectElement).value,role:(document.getElementById("account-role") as HTMLSelectElement).value,username:editUsername,email:editEmail,password:editPassword||undefined,permissions:{...activeAccount.permissions,...draft}})} disabled={update.isPending} className="rounded-lg bg-cyan-500 px-5 py-3 font-bold text-black">Salvar alterações</button>
+          <button onClick={()=>update.mutate({status:activeAccount.status==="active"?"suspended":"active"})} className="rounded-lg border border-white/20 px-4 py-3 flex items-center gap-2">{activeAccount.status==="active"?<LockKeyhole size={16}/>:<UnlockKeyhole size={16}/>} {activeAccount.status==="active"?"Suspender":"Reativar"}</button>
+        </div>
       </section>}
       <section className="rounded-2xl border border-white/10 bg-white/[.03] p-5"><h2 className="font-bold flex items-center gap-2 mb-4"><ShieldCheck size={18}/> Auditoria administrativa recente</h2><div className="space-y-2 max-h-[420px] overflow-y-auto">{(data?.audit||[]).map((item:any)=><div key={item.id} className="border-b border-white/5 py-2 text-xs flex flex-wrap justify-between gap-2"><span className="text-cyan-300">{item.action}</span><span className="text-zinc-400">Responsável #{item.actorUserId} · Conta #{item.targetUserId}</span><span className="text-zinc-500">{new Date(item.createdAt).toLocaleString()}</span></div>)}{!data?.audit?.length&&<p className="text-sm text-zinc-500">Nenhuma ação registrada ainda.</p>}</div></section>
     </div>
