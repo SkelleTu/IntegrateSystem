@@ -1487,7 +1487,7 @@ export default function InventoryPage() {
   // ─── Access guard ──────────────────────────────────────────────────────────
 
   const normalizedRole = String(user?.role ?? "").trim().toLowerCase();
-  if (normalizedRole !== "admin" && normalizedRole !== "owner") {
+  if (normalizedRole !== "admin" && normalizedRole !== "owner" && user?.masterAccessAuthorized !== true) {
     return (
       <div className="flex items-center justify-center min-h-[80vh] p-4">
         <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
