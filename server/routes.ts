@@ -1289,12 +1289,32 @@ export async function registerRoutes(
       }
       const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
       const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
-      const currentPermissions = parsed.data.permissions || (parsed.data.role && parsed.data.role !== target.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
+      let currentPermissions: any = parsed.data.permissions || (parsed.data.role && parsed.data.role !== target.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
+      // A master may edit any subordinate module scope. The UI sends the role
+      // together with the permission payload, so never reject the whole save
+      // merely because an exclusive module arrived with a stale/default scope.
+      // Instead, enforce the invariant server-side: subordinate accounts always
+      // receive no access to master administration and account branching.
+      const effectiveRole = String(parsed.data.role || target.role || "").toLowerCase();
+      if (effectiveRole !== "owner") {
+        currentPermissions = { ...currentPermissions };
+        for (const module of ["master", "account_branches"]) {
+          currentPermissions[module] = {
+            access: "none",
+            view: false,
+            create: false,
+            edit: false,
+            delete: false,
+            approve: false,
+            administer: false,
+          };
+        }
+      }
       // Persist only boolean action flags. The access scope is a derived UI value;
       // keeping it out of the canonical JSON avoids incompatibilities with legacy
       // account-control records while RBAC remains fully enforced by the flags.
       const persistPermissions = Object.fromEntries(
-        Object.entries(currentPermissions).map(([module, actions]) => [
+        Object.entries(currentPermissions).map(([module, actions]: [string, any]) => [
           module,
           Object.fromEntries(Object.entries(actions || {}).filter(([key]) => key !== "access")),
         ]),
@@ -1307,17 +1327,8 @@ export async function registerRoutes(
         if (actions.access !== undefined && !["none","view","full"].includes(String(actions.access))) return res.status(400).json({ message: "Escopo de acesso inválido." });
         if (actions.access === "none" && Object.entries(actions).some(([key,value]) => key !== "access" && value === true)) return res.status(400).json({ message: "Um escopo sem acesso não pode possuir permissões de alteração." });
       }
-      // "access" is a scope string, not a boolean permission. In particular,
-      // access:"none" must remain valid for subordinate accounts; String("none")
-      // is truthy and the previous some(Boolean) check rejected every such account.
-      const hasRestrictedMasterAccess = ["master", "account_branches"].some((module) =>
-        Object.entries(currentPermissions[module] || {}).some(([key, value]) =>
-          key === "access" ? value !== "none" && value !== undefined : value === true
-        )
-      );
-      if (parsed.data.role && parsed.data.role !== "owner" && hasRestrictedMasterAccess) {
-        return res.status(400).json({ message: "Módulos master e ramificação de contas são exclusivos de contas master." });
-      }
+      // Exclusive modules were normalized above for every non-master target.
+      // This keeps their protection without rejecting legitimate scope edits.
       const userChanges: any = {};
       if (parsed.data.role) userChanges.role = parsed.data.role;
       if (parsed.data.username) userChanges.username = parsed.data.username.toLowerCase();
