@@ -663,10 +663,8 @@ export async function registerRoutes(
       return res.status(429).json({ message: "Muitas tentativas. Aguarde antes de tentar novamente." });
     }
 
-    if (!isMasterAccount(req.user)) {
-      return res.status(403).json({ message: "Somente a conta master pode realizar esta autorização." });
-    }
-
+    // Any authenticated subordinate may request an elevation; the master password
+    // is always verified against the authoritative master account below.
     const masterPassword =
       typeof req.body?.masterPassword === "string" ? req.body.masterPassword : "";
 
@@ -1679,6 +1677,14 @@ export async function registerRoutes(
       if (req.method !== "GET" && typeof auditAccountAction === "function") await auditAccountAction(req, Number(user.id), "module.master.mutation", { path:String(req.path || "") });
       return next();
     }
+    // A valid master password temporarily elevates only this authenticated session.
+    // Keep account suspension checks in the earlier global middleware.
+    if (user.__masterAccessAuthorized === true) {
+      if (req.method !== "GET" && typeof auditAccountAction === "function") {
+        await auditAccountAction(req, Number(user.id), "module.master_override.mutation", { path:String(req.path || "") });
+      }
+      return next();
+    }
 
     const path = String(req.path || "");
     const method = String(req.method || "GET").toUpperCase();
@@ -1715,7 +1721,12 @@ export async function registerRoutes(
         if (role === "admin") allowed = !["master","account_branches"].includes(module);
         else if (role === "barber") allowed = (module === "dashboard" && action === "view") || (module === "cashier" && ["view","create"].includes(action)) || (module === "timeclock" && ["view","create"].includes(action));
       }
-      if (!allowed) return res.status(403).json({ message: "Ação não autorizada para esta conta. Solicite a liberação à conta master.", module, action });
+      if (!allowed) return res.status(403).json({
+        code: "MASTER_PASSWORD_REQUIRED",
+        message: "Esta ação não está liberada para esta conta. Informe a senha da conta master para autorizar temporariamente.",
+        module,
+        action,
+      });
       // Downstream handlers historically use hasAdminRole() for the same
       // administrative endpoints. Mark only this already-authorized request so
       // those guards do not accidentally block a valid scoped subordinate.
