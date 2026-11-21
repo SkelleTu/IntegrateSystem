@@ -2251,7 +2251,12 @@ export async function registerRoutes(
             _productId: prod.id,
             _batchId: batch.id,
             name,
-            price: batch.salePrice ?? prod.salePrice ?? 0,
+            price: batch.salePriceUnit === "package" && prod.unit === "kg" && Number(batch.packageQuantity) > 0
+              ? Math.round((batch.salePrice ?? prod.salePrice ?? 0) / Number(batch.packageQuantity))
+              : (batch.salePrice ?? prod.salePrice ?? 0),
+            packagePrice: batch.salePrice ?? prod.salePrice ?? 0,
+            priceUnit: batch.salePriceUnit ?? prod.salePriceUnit ?? "unit",
+            packageQuantity: batch.packageQuantity ?? prod.packageQuantity ?? 1,
             barcode: batch.barcode ?? null,
             sku: batch.sku ?? null,
             codigoProduto: (prod as any).codigoProduto ?? null,
