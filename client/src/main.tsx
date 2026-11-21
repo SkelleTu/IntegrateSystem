@@ -2,10 +2,8 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { installAuraRuntimeMonitor } from "./lib/runtimeMonitor";
 import { installAuraWebMCP } from "./lib/webmcp";
-import { installMasterAccessInterceptor } from "./lib/masterAccess";
 
 installAuraRuntimeMonitor();
-installMasterAccessInterceptor();
 
 // Expose structured Aura operations to WebMCP-capable browsers/agents.
 // The bridge uses the current browser session; credentials are never passed to WebMCP.
