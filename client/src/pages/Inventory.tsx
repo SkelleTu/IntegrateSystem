@@ -438,6 +438,7 @@ function detectNCM(name: string, category: string): { ncm: string; descricao: st
 const emptyProduct = () => ({
   name: "", brand: "", category: "", flavor: "", unit: "Unidade",
   weight: "", description: "", minStock: "5", salePrice: "",
+  salePriceUnit: "unit", packageQuantity: "1",
   ncm: "", cfop: "", codigoBalanca: "", codigoProduto: "",
 });
 
@@ -447,7 +448,7 @@ const emptyBatch = () => ({
   // Lote / rastreabilidade
   batchNumber: "", supplierCode: "", supplier: "",
   // Estoque e preços
-  quantity: "", costPrice: "", salePrice: "",
+  quantity: "", costPrice: "", costPriceUnit: "unit", salePrice: "", salePriceUnit: "unit", packageQuantity: "1",
   // Datas
   manufactureDate: "", expiryDate: "",
   entryDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()),
@@ -574,6 +575,19 @@ function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts 
   );
 }
 
+function PriceBasisToggle({ value, onChange }: { value: "unit" | "package"; onChange: (value: "unit" | "package") => void }) {
+  const next = value === "unit" ? "package" : "unit";
+  return (
+    <button type="button" onClick={() => onChange(next)}
+      title={value === "unit" ? "Alternar para preço por embalagem" : "Alternar para preço por unidade"}
+      aria-label={value === "unit" ? "Preço por unidade. Clique para usar embalagem." : "Preço por embalagem. Clique para usar unidade."}
+      className="inline-flex items-center gap-1 h-6 px-2 rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/[0.08] hover:border-primary/30 text-[9px] font-black uppercase tracking-wider text-white/55 transition-all">
+      <span>{value === "unit" ? "Unidade" : "Embalagem"}</span>
+      <ChevronDown className="h-3 w-3 text-primary/70" />
+    </button>
+  );
+}
+
 function BatchFields({ form, setForm, T, productUnit }: any) {
   const isKg = productUnit === "kg";
   return (
@@ -635,29 +649,31 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
       {isKg && <p className="text-[9px] mt-1 text-white/30 font-bold">Kg disponíveis em estoque</p>}
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-        {isKg ? "Custo de Compra (R$/kg)" : "Custo de Compra (R$)"}
-      </Label>
-      <Input
-        className={`mt-1 ${T.dialogInput}`}
-        value={form.costPrice}
-        onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))}
-        placeholder={isKg ? "Ex: 18,50 por kg" : "0,00"}
-      />
-      {isKg && <p className="text-[9px] mt-1 text-white/30 font-bold">Custo por quilograma</p>}
+      <div className="flex items-center justify-between gap-2">
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>{isKg ? "Custo de Compra (R$/kg)" : "Custo de Compra (R$)"}</Label>
+        <PriceBasisToggle value={form.costPriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, costPriceUnit: value }))} />
+      </div>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.costPrice} onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))}
+        placeholder={form.costPriceUnit === "package" ? "Ex: 60,00 por embalagem" : (isKg ? "Ex: 18,50 por kg" : "0,00 por unidade")} />
+      <p className="text-[9px] mt-1 text-white/30 font-bold">{form.costPriceUnit === "package" ? "Valor total pago pela embalagem." : (isKg ? "Custo da unidade-base de venda (kg)." : "Custo de cada unidade.")}</p>
     </div>
     <div>
-      <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>
-        {isKg ? "Preço de Venda (R$/kg)" : "Preço de Venda (R$)"}
-      </Label>
-      <Input
-        className={`mt-1 ${T.dialogInput}`}
-        value={form.salePrice ?? ""}
-        onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
-        placeholder={isKg ? "Ex: 29,90 por kg" : "0,00 (deixe em branco para usar o preço do produto)"}
-      />
-      {isKg && <p className="text-[9px] mt-1 text-primary/60 font-bold">⚖️ Caixa calcula automaticamente: peso × preço/kg</p>}
+      <div className="flex items-center justify-between gap-2">
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>{isKg ? "Preço de Venda (R$/kg)" : "Preço de Venda (R$)"}</Label>
+        <PriceBasisToggle value={form.salePriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, salePriceUnit: value }))} />
+      </div>
+      <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice ?? ""} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
+        placeholder={form.salePriceUnit === "package" ? "Ex: 29,90 por embalagem" : (isKg ? "Ex: 29,90 por kg" : "0,00 por unidade")} />
+      <p className="text-[9px] mt-1 text-primary/60 font-bold">{form.salePriceUnit === "package" ? "Preço aplicado à embalagem no caixa." : (isKg ? "Preço aplicado por kg no caixa." : "Preço aplicado por unidade no caixa.")}</p>
     </div>
+    {(form.costPriceUnit === "package" || form.salePriceUnit === "package") && (
+      <div className="col-span-2">
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Conteúdo da Embalagem {isKg ? "(kg)" : "(unidades)"}</Label>
+        <Input type="number" min="0.001" step={isKg ? "0.001" : "1"} className={`mt-1 ${T.dialogInput}`} value={form.packageQuantity ?? "1"}
+          onChange={e => setForm((f: any) => ({ ...f, packageQuantity: e.target.value }))} placeholder={isKg ? "Ex: 5 (kg por embalagem)" : "Ex: 12 (unidades por embalagem)"} />
+        <p className="text-[9px] mt-1 text-white/30 font-bold">Usado para converter preço de embalagem para a unidade-base quando necessário.</p>
+      </div>
+    )}
     {/* ── Datas ─────────────────────────────────────────────────────────── */}
     <div>
       <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Validade</Label>
