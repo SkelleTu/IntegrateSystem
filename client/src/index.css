@@ -198,6 +198,27 @@
     box-shadow: 0 0 20px rgba(0, 229, 255, 0.6);
     transform: translateY(-1px);
   }
+
+  /* Global button contrast standard: interactive button labels/icons remain white
+     across all sectors and navigation, including custom buttons outside the shared Button component. */
+  button,
+  button *,
+  [role="button"],
+  [role="button"] * {
+    color: #ffffff !important;
+  }
+
+  /* Preserve icon standard while guaranteeing text contrast. */
+  button svg,
+  [role="button"] svg {
+    color: #00e5ff !important;
+  }
+
+  /* Native links styled as controls must follow the same high-contrast rule. */
+  a[class*="btn"],
+  a[class*="button"] {
+    color: #ffffff !important;
+  }
 }
 
 @layer utilities {
