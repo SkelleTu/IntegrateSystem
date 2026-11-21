@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
+import { useUser } from "@/hooks/use-auth";
 
 type AuthorizationRequest = {
   resolve: (authorized: boolean) => void;
@@ -19,6 +20,24 @@ type AuthorizationRequest = {
 
 export function MasterAuthorizationDialog() {
   const queryClient = useQueryClient();
+  const { data: user } = useUser();
+
+  // Keep the UI in sync with the server-side five-minute elevation window.
+  // Without this timer, a page opened during elevation could keep rendering
+  // privileged data from stale React Query state after the server revoked access.
+  useEffect(() => {
+    if (user?.masterAccessAuthorized !== true || !user.masterAccessExpiresAt) return;
+
+    const delay = Math.max(0, Number(user.masterAccessExpiresAt) - Date.now() + 50);
+    const timer = window.setTimeout(() => {
+      queryClient.setQueryData(["/api/user"], (current: any) =>
+        current ? { ...current, masterAccessAuthorized: false, masterAccessExpiresAt: null } : current
+      );
+      void queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [user?.masterAccessAuthorized, user?.masterAccessExpiresAt, queryClient]);
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
