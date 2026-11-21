@@ -105,7 +105,7 @@ export default function Home() {
             />
           </div>
           <div className="relative z-10">
-            <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-3 md:mb-5">
+            <div className="inline-block px-4 py-1.5 rounded-full border border-white bg-white/5 backdrop-blur-md mb-3 md:mb-5">
               <p className="text-white text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
                 Plataforma Multi-Serviços
               </p>
