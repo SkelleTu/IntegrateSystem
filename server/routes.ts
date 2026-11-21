@@ -1318,18 +1318,17 @@ export async function registerRoutes(
       if (parsed.data.email !== undefined) userChanges.email = parsed.data.email || null;
       if (parsed.data.password) userChanges.password = await hashPassword(parsed.data.password);
       if (Object.keys(userChanges).length) {
-        const assignments: string[] = [];
-        const values: any[] = [];
-        for (const [key, value] of Object.entries(userChanges)) {
-          if (!["role","username","email","password"].includes(key)) continue;
-          assignments.push(`${key}=${values.length + 1}`);
-          values.push(value);
-        }
-        values.push(targetId);
+        // Neon production path: build this small trusted column set as literal SQL.
+        // This avoids the parameter-binding incompatibility observed in account updates.
+        const sqlValue = (value: unknown) => value === null || value === undefined
+          ? "NULL"
+          : `'${String(value).replace(/'/g, "''")}'`;
+        const assignments = Object.entries(userChanges)
+          .filter(([key]) => ["role","username","email","password"].includes(key))
+          .map(([key,value]) => `${key}=${sqlValue(value)}`);
         const updated = await neonPool.query(
-          `UPDATE users SET ${assignments.join(", ")} WHERE id=${values.length}
+          `UPDATE users SET ${assignments.join(", ")} WHERE id=${targetId}
            RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"`,
-          values,
         );
         const persisted = updated.rows[0];
         if (!persisted) throw new Error("Conta não encontrada no PostgreSQL ao salvar alterações.");
