@@ -974,9 +974,16 @@ export async function registerRoutes(
   }]));
   const auditAccountAction = async (req: any, targetUserId: number | null, action: string, details: any = {}) => {
     if (!neonPool) return;
+    const actorId = Number(req.user?.id) || null;
+    const detailsJson = JSON.stringify(details).replace(/'/g, "''");
+    const ipAddress = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0,200).replace(/'/g, "''");
+    const userAgent = String(req.headers["user-agent"] || "").slice(0,500).replace(/'/g, "''");
+    const actionSql = String(action).replace(/'/g, "''");
+    const actorSql = actorId === null ? "NULL" : String(actorId);
+    const targetSql = targetUserId === null ? "NULL" : String(Number(targetUserId));
     await neonPool.query(
-      "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$2,$3,$4::jsonb,$5,$6)",
-      [Number(req.user?.id) || null, targetUserId, action, JSON.stringify(details), String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0,200), String(req.headers["user-agent"] || "").slice(0,500)],
+      `INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent)
+       VALUES (${actorSql},${targetSql},'${actionSql}','${detailsJson}'::jsonb,'${ipAddress}','${userAgent}')`,
     );
   };
 
