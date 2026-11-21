@@ -1,5 +1,4 @@
 import { useLocation } from "wouter";
-import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 const auraLogo = "/aura-system-logo.svg";
 import {
   ClipboardList, Landmark, Search, Lock,
@@ -82,12 +81,9 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-20 md:pt-28">
 
-      {/* ── Backgrounds ─────────────────────────────────────────────────── */}
-      <div
-        className="absolute inset-0 z-[-2] opacity-40 blur-[2px] bg-fixed bg-center bg-cover"
-        style={{ backgroundImage: `url(${luxuryBg})`, backgroundPosition: "center 20%" }}
-      />
-      <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/40 via-transparent to-black/60" />
+      {/* ── Background ──────────────────────────────────────────────────── */}
+      <div className="absolute inset-0 z-[-2] bg-black/35" />
+      <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/25 via-transparent to-black/60" />
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <motion.div
