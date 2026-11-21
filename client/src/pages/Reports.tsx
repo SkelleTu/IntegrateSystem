@@ -33,7 +33,7 @@ export default function Reports() {
   });
 
   const [saleToCancel, setSaleToCancel] = useState<number | null>(null);
-  const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin";
+  const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin" || user?.masterAccessAuthorized === true;
   const [expandedRegister, setExpandedRegister] = useState<number | null>(null);
 
   const { data: sales, isLoading: isLoadingSales } = useQuery<Sale[]>({
