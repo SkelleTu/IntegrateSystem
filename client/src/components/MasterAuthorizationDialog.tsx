@@ -66,8 +66,8 @@ export function MasterAuthorizationDialog() {
         return;
       }
 
-      queryClient.setQueryData(["/api/auth/me"], (current: any) => current ? { ...current, masterAccessAuthorized: true, masterAccessExpiresAt: Number(data.expiresAt || Date.now() + 5 * 60 * 1000) } : current);
-      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.setQueryData(["/api/user"], (current: any) => current ? { ...current, masterAccessAuthorized: true, masterAccessExpiresAt: Number(data.expiresAt || Date.now() + 5 * 60 * 1000) } : current);
+      await queryClient.invalidateQueries({ queryKey: ["/api/user"] });
       setOpen(false);
       setPassword("");
       const resolve = resolveRequest;
