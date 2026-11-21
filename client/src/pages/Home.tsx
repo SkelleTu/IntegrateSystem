@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useTour } from "@/components/tour/TourContext";
+import { BackgroundIcons } from "@/components/BackgroundIcons";
 
 function getTutorialKey(userId: number | string) {
   return `aura_tutorial_done_${userId}`;
@@ -80,10 +81,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-transparent flex flex-col items-center p-4 md:p-8 lg:p-12 relative overflow-x-hidden font-body max-w-[2560px] mx-auto pt-20 md:pt-28">
-
-      {/* ── Background ──────────────────────────────────────────────────── */}
-      <div className="absolute inset-0 z-[-2] bg-black/35" />
-      <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/25 via-transparent to-black/60" />
+      <BackgroundIcons />
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <motion.div
