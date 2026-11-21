@@ -652,12 +652,12 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
         onChange={e => setForm((f: any) => ({ ...f, quantity: e.target.value }))}
         placeholder={isKg ? "Ex: 5.500 (kg)" : "0"}
       />
-      {isKg && <p className="text-[9px] mt-1 text-white/30 font-bold">Kg disponíveis em estoque</p>}
+
     </div>
     <div>
       <div className="flex items-center justify-between gap-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>{isKg ? "Custo de Compra (R$/kg)" : "Custo de Compra (R$)"}</Label>
-        <PriceBasisToggle value={form.costPriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, costPriceUnit: value }))} />
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Custo de Compra</Label>
+        <PriceBasisToggle value={form.costPriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, costPriceUnit: value, ...(value === "package" && (!f.packageQuantity || String(f.packageQuantity) === "1") ? { packageQuantity: "" } : {}) }))} />
       </div>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.costPrice} onChange={e => setForm((f: any) => ({ ...f, costPrice: e.target.value }))}
         placeholder={form.costPriceUnit === "package" ? "Ex: 60,00 por embalagem" : (isKg ? "Ex: 18,50 por kg" : "0,00 por unidade")} />
@@ -665,8 +665,8 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
     </div>
     <div>
       <div className="flex items-center justify-between gap-2">
-        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>{isKg ? "Preço de Venda (R$/kg)" : "Preço de Venda (R$)"}</Label>
-        <PriceBasisToggle value={form.salePriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, salePriceUnit: value }))} />
+        <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Preço de Venda</Label>
+        <PriceBasisToggle value={form.salePriceUnit === "package" ? "package" : "unit"} onChange={value => setForm((f: any) => ({ ...f, salePriceUnit: value, ...(value === "package" && (!f.packageQuantity || String(f.packageQuantity) === "1") ? { packageQuantity: "" } : {}) }))} />
       </div>
       <Input className={`mt-1 ${T.dialogInput}`} value={form.salePrice ?? ""} onChange={e => setForm((f: any) => ({ ...f, salePrice: e.target.value }))}
         placeholder={form.salePriceUnit === "package" ? "Ex: 29,90 por embalagem" : (isKg ? "Ex: 29,90 por kg" : "0,00 por unidade")} />
@@ -675,9 +675,9 @@ function BatchFields({ form, setForm, T, productUnit }: any) {
     {(form.costPriceUnit === "package" || form.salePriceUnit === "package") && (
       <div className="col-span-2">
         <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Conteúdo da Embalagem {isKg ? "(kg)" : "(unidades)"}</Label>
-        <Input type="number" min="0.001" step={isKg ? "0.001" : "1"} className={`mt-1 ${T.dialogInput}`} value={form.packageQuantity ?? "1"}
+        <Input type="number" min="0.001" step={isKg ? "0.001" : "1"} className={`mt-1 ${T.dialogInput}`} value={form.packageQuantity ?? ""}
           onChange={e => setForm((f: any) => ({ ...f, packageQuantity: e.target.value }))} placeholder={isKg ? "Ex: 5 (kg por embalagem)" : "Ex: 12 (unidades por embalagem)"} />
-        <p className="text-[9px] mt-1 text-white/30 font-bold">Usado para converter preço de embalagem para a unidade-base quando necessário.</p>
+        <p className="text-[9px] mt-1 text-white/30 font-bold">Necessário para calcular o valor por kg quando o preço de venda for por embalagem.</p>
       </div>
     )}
     {/* ── Datas ─────────────────────────────────────────────────────────── */}
