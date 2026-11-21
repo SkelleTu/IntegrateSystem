@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
+import { requestMasterAuthorization } from "@/lib/masterAccess";
 import { useToast } from "@/hooks/use-toast";
 import { differenceInDays, format } from "date-fns";
 import Fuse from "fuse.js";
@@ -9,7 +10,7 @@ import {
   Package, Search, Plus, Loader2, ChevronDown, ChevronUp,
   Sun, Moon, AlertTriangle, Trash2, Edit2, X, Tag,
   Calendar, Layers, TrendingDown, ShoppingCart, Clock, BarChart3,
-  ScanBarcode, CheckCircle2, XCircle, GripVertical, Flame
+  ScanBarcode, CheckCircle2, XCircle, GripVertical, Flame, LockKeyhole, ShieldCheck
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1489,13 +1490,42 @@ export default function InventoryPage() {
   const normalizedRole = String(user?.role ?? "").trim().toLowerCase();
   if (normalizedRole !== "admin" && normalizedRole !== "owner" && user?.masterAccessAuthorized !== true) {
     return (
-      <div className="flex items-center justify-center min-h-[80vh] p-4">
-        <Card className="w-full max-w-md bg-black/40 backdrop-blur-xl border-white/10">
-          <CardHeader>
-            <CardTitle className="text-destructive font-black italic uppercase tracking-tighter text-xl">Acesso Restrito</CardTitle>
+      <div className="relative flex min-h-[calc(100vh-5rem)] items-center justify-center overflow-hidden px-4 pb-10 pt-24">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(0,229,255,0.08),transparent_58%)]" />
+        <Card className="relative w-full max-w-xl overflow-hidden rounded-3xl border border-cyan-400/20 bg-zinc-950/90 text-white shadow-[0_24px_80px_rgba(0,0,0,0.55),0_0_45px_rgba(0,229,255,0.08)] backdrop-blur-xl">
+          <div className="h-1 w-full bg-gradient-to-r from-transparent via-cyan-400 to-transparent" />
+          <CardHeader className="items-center px-6 pb-3 pt-8 text-center sm:px-10">
+            <div className="mb-3 flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-400/25 bg-amber-400/10 shadow-[0_0_28px_rgba(251,191,36,0.10)]">
+              <LockKeyhole className="h-8 w-8 text-amber-300" />
+            </div>
+            <Badge variant="outline" className="mb-2 border-amber-400/30 bg-amber-400/5 px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+              Permissão necessária
+            </Badge>
+            <CardTitle className="text-center text-2xl font-black uppercase tracking-tight text-white sm:text-3xl">
+              Acesso ao estoque bloqueado
+            </CardTitle>
           </CardHeader>
-          <CardContent className="text-white/60 font-medium">
-            Somente o proprietário tem acesso ao controle de estoque.
+          <CardContent className="flex flex-col items-center px-6 pb-8 text-center sm:px-10">
+            <p className="max-w-md text-sm leading-relaxed text-zinc-300">
+              Sua conta não possui permissão permanente para visualizar este setor. Os dados e as operações de estoque continuam protegidos.
+            </p>
+            <div className="mt-5 flex w-full max-w-md items-start gap-3 rounded-xl border border-cyan-400/15 bg-cyan-400/5 p-4 text-left">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-300" />
+              <p className="text-xs leading-relaxed text-zinc-300">
+                Você pode solicitar uma autorização temporária à conta master. Quando aprovada, ela libera o acesso por até 5 minutos e é revogada automaticamente.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => void requestMasterAuthorization()}
+              className="mt-6 h-12 w-full max-w-md rounded-xl bg-cyan-400 font-black uppercase tracking-wider text-zinc-950 shadow-[0_0_24px_rgba(0,229,255,0.16)] hover:bg-cyan-300"
+            >
+              <LockKeyhole className="mr-2 h-4 w-4" />
+              Solicitar autorização temporária
+            </Button>
+            <p className="mt-4 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+              Nenhum dado será alterado ao solicitar acesso
+            </p>
           </CardContent>
         </Card>
       </div>
