@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,7 @@ type AuthorizationRequest = {
 };
 
 export function MasterAuthorizationDialog() {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -64,6 +66,8 @@ export function MasterAuthorizationDialog() {
         return;
       }
 
+      queryClient.setQueryData(["/api/auth/me"], (current: any) => current ? { ...current, masterAccessAuthorized: true, masterAccessExpiresAt: Number(data.expiresAt || Date.now() + 5 * 60 * 1000) } : current);
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       setOpen(false);
       setPassword("");
       const resolve = resolveRequest;
