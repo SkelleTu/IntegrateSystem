@@ -38,10 +38,13 @@ export default function Home() {
     }
   }, [user]);          // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleNavigation = (url: string, adminOnly?: boolean) => {
+  const handleNavigation = (url: string, module: string) => {
     if (!user) { setLocation("/login"); return; }
-    if (adminOnly && user?.role !== "admin" && user?.role !== "owner") {
-      toast({ title: "Acesso Negado", description: "Restrito ao proprietário.", variant: "destructive" });
+    const legacyAllowed = module === "cashier"
+      ? ["admin", "owner", "barber"].includes(String(user?.role || "").toLowerCase())
+      : ["admin", "owner"].includes(String(user?.role || "").toLowerCase());
+    if (!canViewModule(module, legacyAllowed)) {
+      toast({ title: "Acesso Negado", description: "Este setor não está liberado para sua conta.", variant: "destructive" });
       return;
     }
     setLocation(url);
@@ -128,7 +131,7 @@ export default function Home() {
             data-tour={item.tourId}
             whileHover={item.locked ? {} : { y: -5, scale: 1.02 }}
             whileTap={item.locked ? {} : { scale: 0.98 }}
-            onClick={() => handleNavigation(item.path, item.admin)}
+            onClick={() => handleNavigation(item.path, item.id === "caixa" ? "cashier" : item.id === "financeiro" ? "finance" : "inventory")}
             className={`group relative h-full flex ${item.locked ? "opacity-50 grayscale cursor-not-allowed" : ""}`}
           >
             <div className="absolute -inset-1 bg-gradient-to-b from-primary/10 to-transparent rounded-[1.5rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />
