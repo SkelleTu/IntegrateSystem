@@ -469,6 +469,8 @@ const TABLE_DEFINITIONS = [
     image_url TEXT,
     min_stock INTEGER NOT NULL DEFAULT 5,
     sale_price INTEGER,
+    sale_price_unit TEXT NOT NULL DEFAULT 'unit',
+    package_quantity INTEGER DEFAULT 1,
     em_liquidacao INTEGER NOT NULL DEFAULT 0,
     ncm TEXT,
     cfop TEXT,
@@ -492,6 +494,8 @@ const TABLE_DEFINITIONS = [
     quantity INTEGER NOT NULL DEFAULT 0,
     cost_price INTEGER NOT NULL DEFAULT 0,
     sale_price INTEGER,
+    sale_price_unit TEXT NOT NULL DEFAULT 'unit',
+    package_quantity INTEGER DEFAULT 1,
     created_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS batch_logs (
@@ -549,6 +553,11 @@ export async function setupDatabase() {
     "ALTER TABLE batches ADD COLUMN sku TEXT",
     "ALTER TABLE batches ADD COLUMN variant_name TEXT",
     "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
+    "ALTER TABLE batches ADD COLUMN cost_price_unit TEXT NOT NULL DEFAULT 'unit'",
+    "ALTER TABLE batches ADD COLUMN sale_price_unit TEXT NOT NULL DEFAULT 'unit'",
+    "ALTER TABLE batches ADD COLUMN package_quantity INTEGER DEFAULT 1",
+    "ALTER TABLE products ADD COLUMN sale_price_unit TEXT NOT NULL DEFAULT 'unit'",
+    "ALTER TABLE products ADD COLUMN package_quantity INTEGER DEFAULT 1",
     // Legacy Turso databases may have a users table created before auth columns existed.
     "ALTER TABLE users ADD COLUMN username TEXT",
     "ALTER TABLE users ADD COLUMN password TEXT",
