@@ -1330,11 +1330,14 @@ export async function registerRoutes(
           throw new Error("A nova senha da conta não foi confirmada no PostgreSQL.");
         }
       }
-      await neonPool.query(`
-        INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
-        VALUES ($1,$2,$3::jsonb,$4,NOW())
-        ON CONFLICT (user_id) DO UPDATE SET status=EXCLUDED.status,permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()
-      `,[targetId,currentStatus,JSON.stringify(persistPermissions),Number(actor.id)]);
+      await neonPool.query({
+        text: `
+          INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
+          VALUES ($1,$2,$3::jsonb,$4,NOW())
+          ON CONFLICT (user_id) DO UPDATE SET status=EXCLUDED.status,permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()
+        `,
+        values: [targetId,currentStatus,JSON.stringify(persistPermissions),Number(actor.id)],
+      });
       if (currentStatus === "suspended" || parsed.data.password) {
         await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
       }
