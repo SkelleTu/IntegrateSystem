@@ -1285,6 +1285,15 @@ export async function registerRoutes(
       const prior = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[targetId]);
       const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
       const currentPermissions = parsed.data.permissions || (parsed.data.role && parsed.data.role !== target.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
+      // Persist only boolean action flags. The access scope is a derived UI value;
+      // keeping it out of the canonical JSON avoids incompatibilities with legacy
+      // account-control records while RBAC remains fully enforced by the flags.
+      const persistPermissions = Object.fromEntries(
+        Object.entries(currentPermissions).map(([module, actions]) => [
+          module,
+          Object.fromEntries(Object.entries(actions || {}).filter(([key]) => key !== "access")),
+        ]),
+      );
       for (const [module, actions] of Object.entries(currentPermissions)) {
         if (!accountModules.includes(module) || !actions) return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
         const keys = Object.keys(actions);
@@ -1325,7 +1334,7 @@ export async function registerRoutes(
         INSERT INTO aura_account_controls (user_id,status,permissions,updated_by,updated_at)
         VALUES ($1,$2,$3::jsonb,$4,NOW())
         ON CONFLICT (user_id) DO UPDATE SET status=EXCLUDED.status,permissions=EXCLUDED.permissions,updated_by=EXCLUDED.updated_by,updated_at=NOW()
-      `,[targetId,currentStatus,JSON.stringify(currentPermissions),Number(actor.id)]);
+      `,[targetId,currentStatus,JSON.stringify(persistPermissions),Number(actor.id)]);
       if (currentStatus === "suspended" || parsed.data.password) {
         await neonPool.query("DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}')=$1",[String(targetId)]);
       }
