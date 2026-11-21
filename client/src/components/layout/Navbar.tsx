@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { useRef } from "react";
+import { requestMasterAuthorization } from "@/lib/masterAccess";
 
 export function Navbar() {
   const [location, setLocation] = useLocation();
@@ -57,13 +58,9 @@ export function Navbar() {
       setLocation(url);
       return;
     }
-    window.dispatchEvent(new CustomEvent("aura:master-access-required", {
-      detail: {
-        title: "Acesso ao módulo restrito",
-        onSuccess: () => setLocation(url),
-        onCancel: () => undefined,
-      },
-    }));
+    void requestMasterAuthorization().then((authorized) => {
+      if (authorized) setLocation(url);
+    });
   };
 
   const navItems = [
