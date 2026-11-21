@@ -245,6 +245,8 @@ export const products = pgTable("products", {
   imageUrl: text("image_url"),
   minStock: integer("min_stock").notNull().default(5),
   salePrice: integer("sale_price"), // in cents
+  salePriceUnit: text("sale_price_unit").notNull().default("unit"), // "unit" or "package"
+  packageQuantity: integer("package_quantity").default(1), // quantity contained in one package when applicable
   emLiquidacao: integer("em_liquidacao", { mode: "boolean" }).default(false),
   ncm: text("ncm"),
   cfop: text("cfop"),
@@ -272,7 +274,10 @@ export const batches = pgTable("batches", {
   // ── Estoque e preços ─────────────────────────────────────────────────────────
   quantity: integer("quantity").notNull().default(0),
   costPrice: integer("cost_price").notNull().default(0), // in cents
+  costPriceUnit: text("cost_price_unit").notNull().default("unit"), // "unit" or "package"
   salePrice: integer("sale_price"),                      // Preço de venda em centavos por variante (sobrepõe produto)
+  salePriceUnit: text("sale_price_unit").notNull().default("unit"), // "unit" or "package"
+  packageQuantity: integer("package_quantity").default(1), // quantity contained in one package when applicable
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
