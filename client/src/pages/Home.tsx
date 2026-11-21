@@ -68,6 +68,7 @@ export default function Home() {
   const permissions = (user?.permissions || {}) as Record<string, Record<string, boolean>>;
   const hasConfiguredScopes = Object.keys(permissions).length > 0;
   const canViewModule = (module: string, legacyAllowed: boolean) => {
+    if (user?.masterAccessAuthorized === true) return true;
     if (user?.role === "owner" || String(user?.username || "").trim().toLowerCase() === "skelletu") return true;
     if (!hasConfiguredScopes) return legacyAllowed;
     const grant = permissions[module] || {};
