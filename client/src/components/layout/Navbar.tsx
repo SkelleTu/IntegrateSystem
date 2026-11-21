@@ -79,6 +79,16 @@ export function Navbar() {
   const startNavDrag = (event: React.PointerEvent<HTMLDivElement>) => {
     const el = navScrollRef.current;
     if (!el) return;
+
+    // Interactive controls must receive an ordinary pointer sequence.
+    // Capturing their pointer on the scroll container can turn a simple click
+    // into a drag and suppress the button's click event.
+    const target = event.target as HTMLElement;
+    if (target.closest("button, a, [role='button'], [role='menuitem'], input")) {
+      dragState.current = { active: false, startX: 0, startScrollLeft: 0, moved: false };
+      return;
+    }
+
     dragState.current = {
       active: true,
       startX: event.clientX,
