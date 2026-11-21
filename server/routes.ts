@@ -694,7 +694,7 @@ export async function registerRoutes(
         return res.status(403).json({ message: "Senha da conta master inválida." });
       }
 
-      req.session.masterAccessUntil = Date.now() + 15 * 60 * 1000;
+      req.session.masterAccessUntil = Date.now() + 5 * 60 * 1000;
       if (neonPool) await neonPool.query(
         "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.master_authorized',$2::jsonb,$3,$4)",
         [Number(req.user.id), JSON.stringify({ expiresAt:req.session.masterAccessUntil }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
@@ -802,6 +802,8 @@ export async function registerRoutes(
   app.get(api.auth.me.path, isAuthenticated, async (req, res) => {
     const user: any = req.user;
     const publicUser: any = toPublicUser(user);
+    publicUser.masterAccessAuthorized = user.__masterAccessAuthorized === true;
+    publicUser.masterAccessExpiresAt = user.__masterAccessAuthorized === true ? Number(req.session?.masterAccessUntil || 0) : null;
     if (neonPool && !isMasterAccount(user)) {
       const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
       publicUser.accountStatus = control.rows[0]?.status || "active";
