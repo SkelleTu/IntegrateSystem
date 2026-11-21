@@ -104,6 +104,16 @@ export function Navbar() {
     }
   };
 
+  const handleNavItemClick = (event: React.MouseEvent, url: string) => {
+    if (dragState.current.moved) {
+      event.preventDefault();
+      event.stopPropagation();
+      dragState.current.moved = false;
+      return;
+    }
+    handleNavigation(url);
+  };
+
   const handleNavWheel = (event: React.WheelEvent<HTMLDivElement>) => {
     const el = navScrollRef.current;
     if (!el || el.scrollWidth <= el.clientWidth) return;
@@ -146,7 +156,7 @@ export function Navbar() {
                 return (
                   <button
                     key={item.url}
-                    onClick={() => handleNavigation(item.url)}
+                    onClick={(event) => handleNavItemClick(event, item.url)}
                     className="relative group flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all duration-200 shrink-0 whitespace-nowrap"
                     style={{
                       background: active
