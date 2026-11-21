@@ -1307,7 +1307,15 @@ export async function registerRoutes(
         if (actions.access !== undefined && !["none","view","full"].includes(String(actions.access))) return res.status(400).json({ message: "Escopo de acesso inválido." });
         if (actions.access === "none" && Object.entries(actions).some(([key,value]) => key !== "access" && value === true)) return res.status(400).json({ message: "Um escopo sem acesso não pode possuir permissões de alteração." });
       }
-      if (parsed.data.role && parsed.data.role !== "owner" && ([...Object.values(currentPermissions.master || {}), ...Object.values(currentPermissions.account_branches || {})].some(Boolean))) {
+      // "access" is a scope string, not a boolean permission. In particular,
+      // access:"none" must remain valid for subordinate accounts; String("none")
+      // is truthy and the previous some(Boolean) check rejected every such account.
+      const hasRestrictedMasterAccess = ["master", "account_branches"].some((module) =>
+        Object.entries(currentPermissions[module] || {}).some(([key, value]) =>
+          key === "access" ? value !== "none" && value !== undefined : value === true
+        )
+      );
+      if (parsed.data.role && parsed.data.role !== "owner" && hasRestrictedMasterAccess) {
         return res.status(400).json({ message: "Módulos master e ramificação de contas são exclusivos de contas master." });
       }
       const userChanges: any = {};
