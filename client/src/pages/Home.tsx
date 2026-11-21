@@ -106,7 +106,7 @@ export default function Home() {
           </div>
           <div className="relative z-10">
             <div className="inline-block px-4 py-1.5 rounded-full border border-primary/20 bg-primary/5 backdrop-blur-md mb-3 md:mb-5">
-              <p className="text-primary text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
+              <p className="text-white text-[10px] md:text-xs tracking-[0.4em] font-bold uppercase">
                 Plataforma Multi-Serviços
               </p>
             </div>
@@ -138,8 +138,8 @@ export default function Home() {
             <div className="absolute -inset-1 bg-gradient-to-b from-primary/10 to-transparent rounded-[1.5rem] blur-xl opacity-0 group-hover:opacity-100 transition duration-500" />
             <div className={`relative bg-white/10 backdrop-blur-xl rounded-[1.5rem] p-6 md:p-8 flex flex-col items-center text-center border border-white/10 transition-all duration-500 w-full h-full justify-center shadow-none ${item.locked ? "" : "cursor-pointer hover:border-primary/40"}`}>
               {item.locked && <Lock className="absolute top-4 right-4 w-4 h-4 text-white/40" />}
-              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center mb-4 group-hover:bg-primary/10 group-hover:border-primary/40 transition-all duration-500">
-                <item.icon className="w-8 h-8 md:w-10 md:h-10 text-white" strokeWidth={1.5} />
+              <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-white border border-white flex items-center justify-center mb-4 group-hover:bg-white group-hover:border-white transition-all duration-500 shadow-[0_0_18px_rgba(255,255,255,0.16)]">
+                <item.icon className="w-8 h-8 md:w-10 md:h-10 text-[#05070a]" strokeWidth={1.5} />
               </div>
               <h2 className="text-xl md:text-2xl font-black text-white mb-2 uppercase tracking-tighter italic">{item.title}</h2>
               <div className="h-1 w-10 bg-primary/30 rounded-full mb-3 group-hover:w-16 group-hover:bg-primary transition-all duration-500" />
@@ -160,7 +160,7 @@ export default function Home() {
           { icon: Shield, title: "Tradição",          desc: "O ambiente clássico com tecnologia moderna." },
         ].map((b, i) => (
           <div key={i} className="text-center">
-            <b.icon className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4" strokeWidth={1.5} />
+            <b.icon className="w-10 h-10 md:w-12 md:h-12 text-white mx-auto mb-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.35)]" strokeWidth={1.5} />
             <h3 className="text-lg md:text-xl font-black text-white uppercase mb-2 italic">{b.title}</h3>
             <p className="text-white/60 text-xs md:text-sm font-medium">{b.desc}</p>
           </div>
