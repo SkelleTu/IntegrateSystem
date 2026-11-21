@@ -813,10 +813,20 @@ export async function setupDatabase() {
     }
   }
 
-  // Neon is authoritative when DATABASE_URL is configured. Validate its real
-  // PostgreSQL schema before allowing authentication/routes to start.
+  // Neon is authoritative when DATABASE_URL is configured. Apply additive price-basis
+  // migrations before schema parity validation so existing production data is preserved.
   if (neonPool) {
     await verifyNeonConnection();
+    await neonPool.query(`
+      ALTER TABLE products
+        ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
+        ADD COLUMN IF NOT EXISTS package_quantity INTEGER DEFAULT 1;
+      ALTER TABLE batches
+        ADD COLUMN IF NOT EXISTS cost_price_unit TEXT NOT NULL DEFAULT 'unit',
+        ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
+        ADD COLUMN IF NOT EXISTS package_quantity INTEGER DEFAULT 1;
+    `);
+
     const report = await auditDatabaseParity();
     if (!report.ok) {
       throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
