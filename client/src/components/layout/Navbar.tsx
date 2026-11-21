@@ -53,8 +53,17 @@ export function Navbar() {
     };
     const grant = user.permissions?.[moduleByUrl[url]] || {};
     const allowed = isMasterAccount || url === "/cart" || grant.view === true || grant.administer === true;
-    if (allowed) setLocation(url);
-    else window.alert("Sua conta não possui permissão para acessar este módulo. Solicite a liberação à conta master.");
+    if (allowed) {
+      setLocation(url);
+      return;
+    }
+    window.dispatchEvent(new CustomEvent("aura:master-access-required", {
+      detail: {
+        title: "Acesso ao módulo restrito",
+        onSuccess: () => setLocation(url),
+        onCancel: () => undefined,
+      },
+    }));
   };
 
   const navItems = [
