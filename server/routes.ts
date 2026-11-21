@@ -102,7 +102,7 @@ function normalizeRole(user: any): string {
 
 function hasAdminRole(user: any): boolean {
   const role = normalizeRole(user);
-  return role === "admin" || role === "owner" || user?.__masterAccessAuthorized === true;
+  return role === "admin" || role === "owner" || user?.__masterAccessAuthorized === true || user?.__scopedAdminAuthorized === true;
 }
 
 function hasOwnerRole(user: any): boolean {
@@ -1645,6 +1645,10 @@ export async function registerRoutes(
   async function isAuthenticated(req: any, res: any, next: any) {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Unauthorized" });
     const user = req.user as any;
+    // This flag is request-scoped. It allows legacy route-level admin guards to
+    // coexist with the granular Neon RBAC check below without granting global
+    // administrator privileges to subordinate accounts.
+    user.__scopedAdminAuthorized = false;
     if (isSystemOwner(user)) {
       if (req.method !== "GET" && typeof auditAccountAction === "function") await auditAccountAction(req, Number(user.id), "module.master.mutation", { path:String(req.path || "") });
       return next();
@@ -1678,7 +1682,7 @@ export async function registerRoutes(
         const grant = control.permissions[module] || {};
         if (grant.access === "none") allowed = false;
         else if (grant.access === "view") allowed = action === "view";
-        else if (grant.access === "full") allowed = action === "view" || grant.edit === true || grant.administer === true;
+        else if (grant.access === "full") allowed = true;
         else allowed = grant.administer === true || grant[action] === true;
       } else {
         const role = String(user.role || "").toLowerCase();
@@ -1686,6 +1690,10 @@ export async function registerRoutes(
         else if (role === "barber") allowed = (module === "dashboard" && action === "view") || (module === "cashier" && ["view","create"].includes(action)) || (module === "timeclock" && ["view","create"].includes(action));
       }
       if (!allowed) return res.status(403).json({ message: "Ação não autorizada para esta conta. Solicite a liberação à conta master.", module, action });
+      // Downstream handlers historically use hasAdminRole() for the same
+      // administrative endpoints. Mark only this already-authorized request so
+      // those guards do not accidentally block a valid scoped subordinate.
+      user.__scopedAdminAuthorized = true;
       if (method !== "GET") await auditAccountAction(req, Number(user.id), `module.${module}.${action}`, { path });
       return next();
     } catch (error: any) {
