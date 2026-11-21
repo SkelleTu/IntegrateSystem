@@ -45,7 +45,7 @@ function generateIcons(count: number): FloatingIcon[] {
     x: Math.random() * 100,
     y: Math.random() * 100,
     size: 16 + Math.random() * 24,
-    opacity: 0.03 + Math.random() * 0.06,
+    opacity: 0.08 + Math.random() * 0.08,
     duration: 15 + Math.random() * 25,
     delay: Math.random() * -20,
     rotateDirection: Math.random() > 0.5 ? 1 : -1,
@@ -62,7 +62,7 @@ export function BackgroundIcons() {
     return (
     <>
       <div 
-        className="fixed inset-0 overflow-hidden pointer-events-none z-0 bg-black w-full h-full"
+        className="fixed inset-0 overflow-hidden pointer-events-none z-[5] bg-black/0 w-full h-full"
         style={{
           backgroundImage: `
             linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
@@ -73,7 +73,7 @@ export function BackgroundIcons() {
         }}
       />
       
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-[5]">
         {icons.map((icon) => {
           const IconComponent = icon.Icon;
           return (
