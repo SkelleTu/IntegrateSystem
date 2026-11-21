@@ -916,10 +916,10 @@ function CashierContent({
                         )}
                         <div className="flex items-center justify-between">
                           <span className="text-white/40 text-[8px] font-bold uppercase tracking-wider italic">
-                            {(item as any).unitType === "kg" ? "por Kg" : "Unid."}
+                            {(item as any).priceUnit === "package" ? "por embalagem" : ((item as any).unitType === "kg" ? "por Kg" : "por unidade")}
                           </span>
                           <p className="text-primary font-black text-sm md:text-base italic tracking-tighter">
-                            R$ {(item.price / 100).toFixed(2)}
+                            {((item as any).priceUnit === "package" && (item as any).packagePrice !== undefined) ? `R$ ${((item as any).packagePrice / 100).toFixed(2)}` : `R$ ${(item.price / 100).toFixed(2)}`}
                           </p>
                         </div>
                       </div>
@@ -944,7 +944,7 @@ function CashierContent({
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-white/30 text-[9px] font-bold uppercase">
-                          {(item as any).unitType === "kg" ? "por Kg" : "Unidade"}
+                          {(item as any).priceUnit === "package" ? "por embalagem" : ((item as any).unitType === "kg" ? "por Kg" : "Unidade")}
                         </span>
                         {(item as any).emLiquidacao && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase text-orange-500">
