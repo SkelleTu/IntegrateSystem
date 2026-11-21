@@ -254,7 +254,7 @@ export const products = pgTable("products", {
   minStock: integer("min_stock").notNull().default(5),
   salePrice: integer("sale_price"), // in cents
   salePriceUnit: text("sale_price_unit").notNull().default("unit"), // "unit" or "package"
-  packageQuantity: integer("package_quantity").default(1), // quantity contained in one package when applicable
+  packageQuantity: numeric("package_quantity", { precision: 12, scale: 3 }).default("1"), // quantity contained in one package when applicable
   emLiquidacao: boolean("em_liquidacao").default(false),
   ncm: text("ncm"),
   cfop: text("cfop"),
