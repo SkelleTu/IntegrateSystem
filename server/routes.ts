@@ -1206,8 +1206,8 @@ export async function registerRoutes(
       const enterprise = await getAuthoritativeEnterprise(enterpriseId);
       if (!enterprise || String(enterprise.status).toLowerCase() !== "active") return res.status(409).json({ message: "Estabelecimento master inexistente ou inativo." });
       const permissions = parsed.data.accountType === "master"
-        ? Object.fromEntries(accountModules.map((module) => [module, { view:true,create:true,edit:true,delete:true,approve:true,administer:true }]))
-        : { ...defaultAccountPermissions, dashboard: { view:true,create:false,edit:false,delete:false,approve:false,administer:false }, cashier: { view:true,create:true,edit:true,delete:false,approve:false,administer:false }, timeclock: { view:true,create:true,edit:false,delete:false,approve:false,administer:false } };
+        ? Object.fromEntries(accountModules.map((module) => [module, { access:"full", edit:true, view:true,create:true,delete:true,approve:true,administer:true }]))
+        : Object.fromEntries(accountModules.map((module) => [module, { access:"none", edit:false, view:false,create:false,delete:false,approve:false,administer:false }]));
       // Criacao de conta subordinada: gravar diretamente no PostgreSQL autoritativo.
       // Nao use o writer legado aqui; o painel de ramificacao e uma operacao Neon-only.
       const nextIdResult = await neonPool.query(
@@ -1286,9 +1286,12 @@ export async function registerRoutes(
       const currentStatus = parsed.data.status || prior.rows[0]?.status || "active";
       const currentPermissions = parsed.data.permissions || (parsed.data.role && parsed.data.role !== target.role && parsed.data.role !== "owner" ? defaultAccountPermissions : prior.rows[0]?.permissions || defaultAccountPermissions);
       for (const [module, actions] of Object.entries(currentPermissions)) {
-        if (!accountModules.includes(module) || !actions || Object.keys(actions).some((action) => !["view","create","edit","delete","approve","administer"].includes(action))) {
-          return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
-        }
+        if (!accountModules.includes(module) || !actions) return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
+        const keys = Object.keys(actions);
+        const allowedKeys = new Set(["access","edit","view","create","delete","approve","administer"]);
+        if (keys.some((key) => !allowedKeys.has(key))) return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
+        if (actions.access !== undefined && !["none","view","full"].includes(String(actions.access))) return res.status(400).json({ message: "Escopo de acesso inválido." });
+        if (actions.access === "none" && Object.entries(actions).some(([key,value]) => key !== "access" && value === true)) return res.status(400).json({ message: "Um escopo sem acesso não pode possuir permissões de alteração." });
       }
       if (parsed.data.role && parsed.data.role !== "owner" && ([...Object.values(currentPermissions.master || {}), ...Object.values(currentPermissions.account_branches || {})].some(Boolean))) {
         return res.status(400).json({ message: "Módulos master e ramificação de contas são exclusivos de contas master." });
@@ -1673,7 +1676,10 @@ export async function registerRoutes(
       let allowed = false;
       if (control?.permissions) {
         const grant = control.permissions[module] || {};
-        allowed = grant.administer === true || grant[action] === true;
+        if (grant.access === "none") allowed = false;
+        else if (grant.access === "view") allowed = action === "view";
+        else if (grant.access === "full") allowed = action === "view" || grant.edit === true || grant.administer === true;
+        else allowed = grant.administer === true || grant[action] === true;
       } else {
         const role = String(user.role || "").toLowerCase();
         if (role === "admin") allowed = !["master","account_branches"].includes(module);
