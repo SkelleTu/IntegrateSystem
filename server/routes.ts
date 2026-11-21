@@ -2337,10 +2337,11 @@ export async function registerRoutes(
 
   app.post("/api/products", isAuthenticated, async (req, res) => {
     try {
-      const { salePrice, minStock, ...rest } = req.body;
+      const { salePrice, minStock, packageQuantity, ...rest } = req.body;
       const data = insertProductSchema.parse({
         ...rest,
         salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
+        packageQuantity: packageQuantity !== undefined && packageQuantity !== "" ? Number(packageQuantity) : 1,
         minStock: minStock !== undefined && minStock !== "" ? Number(minStock) : 5,
       });
       const p = await storage.createProduct(data);
@@ -2353,10 +2354,11 @@ export async function registerRoutes(
 
   app.put("/api/products/:id", isAuthenticated, async (req, res) => {
     try {
-      const { salePrice, minStock, emLiquidacao, ...rest } = req.body;
+      const { salePrice, minStock, emLiquidacao, packageQuantity, ...rest } = req.body;
       const data = {
         ...rest,
         salePrice: salePrice !== undefined ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : undefined,
+        packageQuantity: packageQuantity !== undefined && packageQuantity !== "" ? Number(packageQuantity) : undefined,
         minStock: minStock !== undefined ? Number(minStock) : undefined,
         ...(emLiquidacao !== undefined && { emLiquidacao: Boolean(emLiquidacao) }),
       };
@@ -2453,10 +2455,11 @@ export async function registerRoutes(
       const user = req.user as any;
       const productId = Number(req.params.id);
       if (!Number.isInteger(productId) || productId <= 0) return res.status(400).json({ message: "Produto inválido" });
-      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const { quantity, costPrice, salePrice, packageQuantity, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const payload = insertBatchSchema.parse({
         productId,
         ...rest,
+        packageQuantity: packageQuantity !== undefined && packageQuantity !== "" ? Number(packageQuantity) : 1,
         quantity: Number(quantity),
         costPrice: costPrice ? Math.round(Number(String(costPrice).replace(",", ".")) * 100) : 0,
         salePrice: salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null,
@@ -2474,8 +2477,9 @@ export async function registerRoutes(
 
   app.put("/api/batches/:id", isAuthenticated, async (req, res) => {
     try {
-      const { quantity, costPrice, salePrice, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
+      const { quantity, costPrice, salePrice, packageQuantity, expiryDate, manufactureDate, entryDate, ...rest } = req.body;
       const data: any = { ...rest };
+      if (packageQuantity !== undefined && packageQuantity !== "") data.packageQuantity = Number(packageQuantity);
       if (quantity !== undefined) data.quantity = Number(quantity);
       if (costPrice !== undefined) data.costPrice = Math.round(Number(String(costPrice).replace(",", ".")) * 100);
       if (salePrice !== undefined) data.salePrice = salePrice ? Math.round(Number(String(salePrice).replace(",", ".")) * 100) : null;
