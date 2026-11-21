@@ -1265,7 +1265,7 @@ export async function registerRoutes(
     if (targetId === Number(actor.id)) return res.status(400).json({ message: "A conta master autenticada não pode alterar a própria proteção por este painel." });
     const parsed = z.object({
       status: z.enum(["active","suspended"]).optional(),
-      permissions: z.record(z.string(), z.record(z.string(), z.boolean())).optional(),
+      permissions: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.enum(["none","view","full"])]))).optional(),
       role: z.enum(["barber","admin","owner"]).optional(),
       username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/).optional(),
       email: z.string().email().optional().or(z.literal("")),
