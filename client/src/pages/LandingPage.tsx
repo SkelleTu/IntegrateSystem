@@ -161,7 +161,7 @@ export default function LandingPage() {
                 alt="Aura System Logo" 
                 className="w-48 md:w-64 h-auto max-h-[280px] object-contain relative z-10 mx-auto"
               />
-              <h1 className="mt-1 text-5xl md:text-7xl font-black tracking-[-0.06em] text-white drop-shadow-[0_0_28px_rgba(0,229,255,0.28)] text-center">Aura System</h1>
+              <h1 className="mt-1 mb-10 text-5xl md:text-7xl font-black tracking-[-0.06em] text-white drop-shadow-[0_0_28px_rgba(0,229,255,0.28)] text-center">Aura System</h1>
             </div>
           </div>
           <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
