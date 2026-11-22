@@ -183,6 +183,8 @@ export function generateNFCeXML(
               ? "03"
               : p.method === "pix"
               ? "17"
+              : p.method === "credit_internal"
+              ? "99"
               : "99",
           vPag: (p.amount / 100).toFixed(2),
         })),
