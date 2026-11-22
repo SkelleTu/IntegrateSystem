@@ -635,6 +635,26 @@ export async function ensureAuditTriggers() {
     SELECT 'legacy_create','fiscal','nfce',n.id::TEXT,COALESCE(NULLIF(n.status,''),'active'),n.data_emissao,to_jsonb(n)::TEXT,'{"source":"historical_backfill","table":"nfce"}'
     FROM nfce n WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='nfce' AND a.entity_id=n.id::TEXT AND a.action='legacy_create');
   `);
+  await neonPool.query(`
+    UPDATE sale_items si
+    SET cost_total = CASE
+      WHEN lower(COALESCE(b.cost_price_unit,'unit'))='package'
+        THEN ROUND(si.quantity * b.cost_price / GREATEST(COALESCE(b.package_quantity,1),0.000001))
+      ELSE ROUND(CASE WHEN lower(COALESCE(si.unit_type,'unit'))='kg'
+        THEN si.quantity * b.cost_price / 1000.0
+        ELSE si.quantity * b.cost_price END)
+    END
+    FROM batches b
+    WHERE si.cost_total IS NULL AND si.item_type='product' AND si.item_id >= 500000
+      AND b.id = si.item_id - 500000;
+
+    UPDATE sale_items si
+    SET cost_total = ROUND(si.quantity * i.cost_price)
+    FROM inventory i
+    WHERE si.cost_total IS NULL
+      AND i.id = CASE WHEN si.item_id >= 10000 AND si.item_id < 500000 THEN si.item_id - 10000 ELSE si.item_id END;
+  `);
+
 }
 
 export async function setupDatabase() {
