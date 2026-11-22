@@ -202,7 +202,7 @@ const TABLE_DEFINITIONS = [
     enterprise_id INTEGER, actor_user_id INTEGER, action TEXT NOT NULL, module TEXT NOT NULL,
     entity_type TEXT NOT NULL, entity_id TEXT, status TEXT NOT NULL DEFAULT 'active',
     occurred_at INTEGER NOT NULL, details TEXT, old_data TEXT, new_data TEXT, ip_address TEXT, user_agent TEXT
-  ` ,
+  )`,
   `CREATE TABLE IF NOT EXISTS runtime_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sequence INTEGER NOT NULL,
