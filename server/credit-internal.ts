@@ -75,6 +75,7 @@ async function evaluate(req: Request, c: any) {
       await audit(req,c.id,"credit.limit_reduced",{reductionCents:reduction,newLimitCents:newLimit,reason:"delay_32_plus_days"});
       c.credit_limit_cents=newLimit;
       c.risk_reduction_cents=Number(c.risk_reduction_cents||0)+reduction;
+      c.observation_started_at=c.observation_started_at || new Date().toISOString();
       c.last_risk_event_at=new Date().toISOString();
     }
   }
