@@ -1,5 +1,5 @@
 import { useLocation } from "wouter";
-const auraLogo = "/aura-system-logo.svg";
+const auraLogo = "/aura-system-logo.webp?v=1";
 import {
   ClipboardList, Landmark, Search, Lock,
   Clock, Star, Shield, Download, BookOpen, Power,
