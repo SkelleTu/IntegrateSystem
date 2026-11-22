@@ -292,6 +292,16 @@ export const batchLogs = pgTable("batch_logs", {
   createdAt: integer("created_at", { mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
 });
 
+export const auditEvents = pgTable("audit_events", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  enterpriseId: integer("enterprise_id"), actorUserId: integer("actor_user_id"),
+  action: text("action").notNull(), module: text("module").notNull(), entityType: text("entity_type").notNull(),
+  entityId: text("entity_id"), status: text("status").notNull().default("active"),
+  occurredAt: integer("occurred_at", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+  details: text("details"), oldData: text("old_data"), newData: text("new_data"), ipAddress: text("ip_address"), userAgent: text("user_agent"),
+});
+export type AuditEvent = typeof auditEvents.$inferSelect;
+
 export const insertProductSchema = createInsertSchema(products, {
   name: z.string().trim().min(1, "Nome do produto é obrigatório"),
   unit: z.string().trim().min(1, "Unidade é obrigatória"),
