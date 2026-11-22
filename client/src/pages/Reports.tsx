@@ -23,6 +23,24 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/hooks/use-auth";
 
+
+function AuditTimeline({ dateRange }: { dateRange: { start: string; end: string } }) {
+  const [module,setModule]=useState(""); const [status,setStatus]=useState(""); const [action,setAction]=useState(""); const [q,setQ]=useState(""); const [hourStart,setHourStart]=useState(""); const [hourEnd,setHourEnd]=useState("");
+  const p=new URLSearchParams({start:dateRange.start,end:dateRange.end,limit:"500"}); if(module)p.set("module",module); if(status)p.set("status",status); if(action)p.set("action",action); if(q)p.set("q",q); if(hourStart)p.set("hourStart",hourStart); if(hourEnd)p.set("hourEnd",hourEnd);
+  const {data=[],isLoading}=useQuery<any[]>({queryKey:["/api/audit/events",p.toString()],queryFn:async()=>{const r=await fetch("/api/audit/events?"+p.toString());if(!r.ok)throw new Error("Falha");return r.json();},refetchInterval:15000});
+  return <div className="space-y-5">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+      <select value={module} onChange={e=>setModule(e.target.value)} className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white"><option value="">Todos os setores</option><option value="caixa">Caixa</option><option value="estoque">Estoque</option><option value="financeiro">Financeiro</option><option value="fiscal">Fiscal</option><option value="administracao">Administração</option></select>
+      <select value={action} onChange={e=>setAction(e.target.value)} className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white"><option value="">Todas ações</option><option value="insert">Criação</option><option value="update">Alteração</option><option value="delete">Exclusão</option></select>
+      <select value={status} onChange={e=>setStatus(e.target.value)} className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white"><option value="">Todos status</option><option value="active">Ativo</option><option value="deleted">Deletado</option></select>
+      <input type="time" value={hourStart} onChange={e=>setHourStart(e.target.value)} className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white [color-scheme:dark]"/>
+      <input type="time" value={hourEnd} onChange={e=>setHourEnd(e.target.value)} className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white [color-scheme:dark]"/>
+      <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Produto, protocolo, ID..." className="bg-black border border-white/10 rounded-lg h-10 px-3 text-xs font-bold text-white"/>
+    </div>
+    {isLoading?<div className="py-10 text-center text-primary font-black uppercase text-xs">Carregando auditoria...</div>:data.length===0?<div className="py-10 text-center text-zinc-600 font-black uppercase text-xs">Nenhum evento encontrado</div>:<div className="space-y-2 max-h-[650px] overflow-y-auto pr-2">{data.map((e:any)=><div key={e.id} className="rounded-xl border border-white/5 bg-black/30 p-4"><div className="flex gap-4"><div className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center shrink-0"><History className="w-4 h-4 text-primary"/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="text-white font-black text-xs">{new Date(e.occurredAt).toLocaleDateString("pt-BR")}</span><span className="text-primary font-black text-xs">{new Date(e.occurredAt).toLocaleTimeString("pt-BR",{hour12:false})}</span><Badge className="bg-white/10 text-white border-white/10 text-[8px] uppercase">{e.module}</Badge><Badge className={e.status==="deleted"?"bg-red-500/15 text-red-300":"bg-emerald-500/10 text-emerald-300"}>{e.status==="deleted"?"DELETADO":e.action==="insert"?"CRIADO":e.action==="update"?"ALTERADO":"REGISTRADO"}</Badge></div><p className="text-zinc-300 font-bold text-xs mt-2">{e.entityType} #{e.entityId||"—"}</p><p className="text-zinc-500 text-[10px] mt-1">{e.actorUserId?"Usuário #"+e.actorUserId:"Registro automático do sistema"}{e.details?" · "+String(e.details).slice(0,220):""}</p></div></div></div>)}</div>}
+  </div>
+}
+
 export default function Reports() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
