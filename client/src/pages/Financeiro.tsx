@@ -23,10 +23,8 @@ export default function Financeiro() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [businessType, setBusinessType] = useState<string>("outro");
-  const [dateRange, setDateRange] = useState({
-    start: format(new Date(), "yyyy-MM-dd"),
-    end: format(new Date(), "yyyy-MM-dd"),
-  });
+  const businessToday = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [dateRange, setDateRange] = useState({ start: businessToday, end: businessToday });
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const dateRangeValid = dateRange.start <= dateRange.end;
 
@@ -45,8 +43,8 @@ export default function Financeiro() {
   const { data: sales, isLoading: isLoadingSales } = useQuery<any[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const start = new Date(dateRange.start + 'T00:00:00');
-      const end = new Date(dateRange.end + 'T23:59:59');
+      const start = new Date(dateRange.start + 'T00:00:00-03:00');
+      const end = new Date(dateRange.end + 'T23:59:59.999-03:00');
       const res = await fetch(`/api/sales?start=${start.toISOString()}&end=${end.toISOString()}`);
       return res.json();
     },
@@ -57,8 +55,8 @@ export default function Financeiro() {
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
     queryKey: ["/api/transactions", dateRange.start, dateRange.end, businessType],
     queryFn: async () => {
-      const start = new Date(dateRange.start + 'T00:00:00');
-      const end = new Date(dateRange.end + 'T23:59:59');
+      const start = new Date(dateRange.start + 'T00:00:00-03:00');
+      const end = new Date(dateRange.end + 'T23:59:59.999-03:00');
       const url = `/api/transactions?start=${start.toISOString()}&end=${end.toISOString()}&businessType=${businessType}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Erro ao buscar transações");
