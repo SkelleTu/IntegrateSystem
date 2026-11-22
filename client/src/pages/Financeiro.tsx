@@ -174,14 +174,15 @@ export default function Financeiro() {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0, finalNetBalance: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
     
-    const extraIncome = (transactions || []).filter(t => t.type === "income" && t.category !== "vendas" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    
-    const inventoryValue = inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
-    
-    const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
-    
-    const grossProfit = Number(cogsData?.grossProfit ?? 0);
+    const toFiniteNumber = (value: unknown) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const extraIncome = (transactions || []).filter(t => t.type === "income" && t.category !== "vendas" && t.businessType === businessType).reduce((sum, t) => sum + toFiniteNumber(t.amount), 0);
+    const expenses = (transactions || []).filter(t => t.type === "expense" && t.businessType === businessType).reduce((sum, t) => sum + toFiniteNumber(t.amount), 0);
+    const inventoryValue = inventory.reduce((sum, item) => sum + (toFiniteNumber(item.costPrice) * toFiniteNumber(item.quantity)), 0);
+    const salesGross = completedSales.reduce((sum, s) => sum + toFiniteNumber(s.totalAmount), 0);
+    const grossProfit = toFiniteNumber(cogsData?.grossProfit);
     const totalNet = grossProfit + extraIncome - expenses;
     const finalNetBalance = totalNet;
     return { gross: salesGross + extraIncome, net: totalNet, grossProfit, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
