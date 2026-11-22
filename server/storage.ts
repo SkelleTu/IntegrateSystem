@@ -657,7 +657,11 @@ export class DatabaseStorage implements IStorage {
         if (!register || register.status !== "open" || register.closedAt) throw new Error("A venda exige um caixa aberto.");
       }
       for (const item of items) {
-        const batchId = item.itemType === "product" && item.itemId >= 500000 ? item.itemId - 500000 : null;
+        const numericItemId = Number(item.itemId);
+        const normalizedItemType = String(item.itemType || "").trim().toLowerCase();
+        const batchId = normalizedItemType === "product" && Number.isSafeInteger(numericItemId) && numericItemId >= 500000
+          ? numericItemId - 500000
+          : null;
         if (batchId !== null) {
           const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
           if (!batch) throw new Error(`Lote ${batchId} não encontrado para a venda.`);
@@ -708,9 +712,14 @@ export class DatabaseStorage implements IStorage {
             );
           }
 
-          await database.update(batches)
-            .set({ quantity: batch.quantity - item.quantity })
-            .where(eq(batches.id, batchId));
+          const updatedBatchRows = await database.update(batches)
+            .set({ quantity: Number(batch.quantity) - Number(item.quantity) })
+            .where(eq(batches.id, batchId))
+            .returning({ id: batches.id, quantity: batches.quantity });
+          if (updatedBatchRows.length !== 1) {
+            throw new Error("Falha ao baixar o lote " + batchId + " na venda #" + insertedSale.id + ": nenhuma linha foi atualizada.");
+          }
+          console.log("[SALE_STOCK] Venda #" + insertedSale.id + ": lote " + batchId + " baixado de " + batch.quantity + " para " + updatedBatchRows[0].quantity + ".");
 
           runtimeEvent("sale-batch-deduction", `Baixa do lote ${batch.id} na venda #${insertedSale.id}`, {
             phase: "inventory", saleId: insertedSale.id, batchId: batch.id,
