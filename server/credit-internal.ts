@@ -139,7 +139,8 @@ export function registerCreditInternalRoutes(app: Express) {
     if(q){ params.push("%"+q+"%"); where+=" AND (full_name ILIKE $2 OR cpf ILIKE $2 OR COALESCE(phone,'') ILIKE $2)"; }
     const r=await neonPool!.query("SELECT id,full_name,cpf,phone,email,credit_limit_cents,payment_cycle_days,status,risk_reduction_cents FROM credit_internal_customers "+where+" ORDER BY full_name LIMIT 25",params);
     const out=[];
-    for(const c of r.rows){
+    for(const raw of r.rows){
+      const c = await evaluate(req, raw);
       const openQ=await neonPool!.query("SELECT COALESCE(SUM(amount_cents-paid_cents),0) open FROM credit_internal_purchases WHERE enterprise_id=$1 AND customer_id=$2 AND status<>'paid'",[eid(req),c.id]);
       const authQ=await neonPool!.query("SELECT COALESCE(SUM(extra_limit_cents),0) extra FROM credit_internal_authorizations WHERE enterprise_id=$1 AND customer_id=$2 AND valid_until>=NOW()",[eid(req),c.id]);
       const open=Number(openQ.rows[0]?.open||0), extra=Number(authQ.rows[0]?.extra||0), limit=Number(c.credit_limit_cents||0), available=Math.max(0,limit+extra-open);
