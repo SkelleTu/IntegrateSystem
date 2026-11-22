@@ -645,7 +645,7 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
-  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], creditContext?: { customerId: number }): Promise<Sale> {
+  async createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], creditContext?: { customerId: number; enterpriseId: number }): Promise<Sale> {
     this.logAction(`Nova venda registrada. Total: R$ ${sale.totalAmount / 100}`);
     const sharedSaleId = await nextSharedId(sales);
     return await dualWriteTransaction(async (database) => {
@@ -663,11 +663,11 @@ export class DatabaseStorage implements IStorage {
         if (!creditContext?.customerId) throw new Error("Crédito Interno exige cliente vinculado.");
         if (creditPayments.length !== 1) throw new Error("A venda pode ter somente um lançamento de Crédito Interno.");
         const creditAmount = Number(creditPayments[0].amount || 0);
-        const customerResult: any = await database.execute(sql`SELECT * FROM credit_internal_customers WHERE id = ${creditContext.customerId} AND enterprise_id = ${(sale as any).enterpriseId || 0} FOR UPDATE`);
+        const customerResult: any = await database.execute(sql`SELECT * FROM credit_internal_customers WHERE id = ${creditContext.customerId} AND enterprise_id = ${creditContext?.enterpriseId || 0} FOR UPDATE`);
         creditCustomer = customerResult.rows?.[0];
         if (!creditCustomer) throw new Error("Cliente de Crédito Interno não encontrado para este estabelecimento.");
-        const openResult: any = await database.execute(sql`SELECT COALESCE(SUM(amount_cents-paid_cents),0) AS open FROM credit_internal_purchases WHERE enterprise_id = ${(sale as any).enterpriseId || 0} AND customer_id = ${creditContext.customerId} AND status <> 'paid'`);
-        const authResult: any = await database.execute(sql`SELECT COALESCE(SUM(extra_limit_cents),0) AS extra FROM credit_internal_authorizations WHERE enterprise_id = ${(sale as any).enterpriseId || 0} AND customer_id = ${creditContext.customerId} AND valid_until >= NOW()`);
+        const openResult: any = await database.execute(sql`SELECT COALESCE(SUM(amount_cents-paid_cents),0) AS open FROM credit_internal_purchases WHERE enterprise_id = ${creditContext?.enterpriseId || 0} AND customer_id = ${creditContext.customerId} AND status <> 'paid'`);
+        const authResult: any = await database.execute(sql`SELECT COALESCE(SUM(extra_limit_cents),0) AS extra FROM credit_internal_authorizations WHERE enterprise_id = ${creditContext?.enterpriseId || 0} AND customer_id = ${creditContext.customerId} AND valid_until >= NOW()`);
         const openDebt = Number(openResult.rows?.[0]?.open || 0);
         const extraLimit = Number(authResult.rows?.[0]?.extra || 0);
         const available = Math.max(0, Number(creditCustomer.credit_limit_cents || 0) + extraLimit - openDebt);
@@ -692,11 +692,11 @@ export class DatabaseStorage implements IStorage {
       if (!insertedSale) throw new Error("Não foi possível obter a venda recém-criada.");
       if (creditCustomer && creditDueAt) {
         const creditAmount = Number(creditPayments[0].amount);
-        const creditResult: any = await database.execute(sql`INSERT INTO credit_internal_purchases (enterprise_id,customer_id,sale_id,description,amount_cents,due_at,status,notes) VALUES (${(sale as any).enterpriseId || 0},${creditContext!.customerId},${insertedSale.id},${"Venda PDV #" + insertedSale.id},${creditAmount},${creditDueAt},'open',${"Forma de pagamento: Crédito Interno"}) RETURNING id`);
+        const creditResult: any = await database.execute(sql`INSERT INTO credit_internal_purchases (enterprise_id,customer_id,sale_id,description,amount_cents,due_at,status,notes) VALUES (${creditContext?.enterpriseId || 0},${creditContext!.customerId},${insertedSale.id},${"Venda PDV #" + insertedSale.id},${creditAmount},${creditDueAt},'open',${"Forma de pagamento: Crédito Interno"}) RETURNING id`);
         const creditPurchaseId = Number(creditResult.rows?.[0]?.id);
         if (!creditPurchaseId) throw new Error("Não foi possível criar a obrigação de Crédito Interno.");
         await database.execute(sql`UPDATE sales SET credit_customer_id = ${creditContext!.customerId}, credit_purchase_id = ${creditPurchaseId} WHERE id = ${insertedSale.id}`);
-        await database.execute(sql`INSERT INTO credit_internal_audit(enterprise_id,customer_id,actor_user_id,action,details) VALUES (${(sale as any).enterpriseId || 0},${creditContext!.customerId},${sale.userId || null},'credit.purchase_created',${JSON.stringify({purchaseId:creditPurchaseId,saleId:insertedSale.id,amountCents:creditAmount,dueAt:creditDueAt.toISOString()})}::jsonb)`);
+        await database.execute(sql`INSERT INTO credit_internal_audit(enterprise_id,customer_id,actor_user_id,action,details) VALUES (${creditContext?.enterpriseId || 0},${creditContext!.customerId},${sale.userId || null},'credit.purchase_created',${JSON.stringify({purchaseId:creditPurchaseId,saleId:insertedSale.id,amountCents:creditAmount,dueAt:creditDueAt.toISOString()})}::jsonb)`);
       }
       runtimeEvent("sale-created", `Venda #${insertedSale.id} criada`, {
         phase: "sale", saleId: insertedSale.id, cashRegisterId: sale.cashRegisterId ?? null,
