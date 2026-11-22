@@ -540,6 +540,17 @@ export async function registerRoutes(
   });
 
 
+
+  app.get("/api/financial/cogs", isAuthenticated, async (req: any, res: any) => {
+    const user=req.user as any; if(!hasAdminRole(user)) return res.status(403).json({message:"Acesso restrito à gestão."});
+    if(!neonPool) return res.json({revenue:0,cogs:0,grossProfit:0,trackedItems:0});
+    const start=String(req.query.start||""); const end=String(req.query.end||"");
+    const params:any[]=[]; const where:string[]=["s.status='completed'"];
+    if(start){params.push(start+"T00:00:00-03:00");where.push("s.created_at >= $"+params.length+"::timestamptz");}
+    if(end){params.push(end+"T23:59:59.999-03:00");where.push("s.created_at <= $"+params.length+"::timestamptz");}
+    const q="SELECT COALESCE(SUM(s.total_amount),0)::bigint revenue,COALESCE(SUM(si.cost_total),0)::bigint cogs,COUNT(si.id)::bigint tracked_items FROM sales s JOIN sale_items si ON si.sale_id=s.id WHERE "+where.join(" AND ");
+    try{const row=(await neonPool.query(q,params)).rows[0]||{};return res.json({revenue:Number(row.revenue||0),cogs:Number(row.cogs||0),grossProfit:Number(row.revenue||0)-Number(row.cogs||0),trackedItems:Number(row.tracked_items||0)});}catch(e:any){return res.status(500).json({message:"Falha ao calcular lucro bruto."});}
+  });
   app.get("/api/audit/events", isAuthenticated, async (req: any, res: any) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito à gestão." });
