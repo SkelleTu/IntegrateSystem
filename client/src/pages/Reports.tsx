@@ -333,7 +333,7 @@ export default function Reports() {
         <CardContent className="p-6"><AuditTimeline dateRange={dateRange} /></CardContent>
       </Card>
 
-      <AlertDialog open={saleToCancel !== null onOpenChange={(open) => !open && setSaleToCancel(null)}>
+      <AlertDialog open={saleToCancel !== null} onOpenChange={(open) => !open && setSaleToCancel(null)}>
         <AlertDialogContent className="bg-zinc-950 border-white/10 text-white rounded-2xl p-8 shadow-2xl">
           <AlertDialogHeader>
             <div className="flex items-center gap-3 mb-4">
