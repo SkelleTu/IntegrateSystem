@@ -3067,7 +3067,7 @@ export async function registerRoutes(
     if (!Number.isSafeInteger(itemsTotal) || itemsTotal !== totalAmount) {
       return res.status(400).json({ message: "A soma dos itens deve corresponder ao total da venda." });
     }
-    const validPaymentMethods = new Set(["cash", "card", "pix"]);
+    const validPaymentMethods = new Set(["cash", "card", "pix", "credit_internal"]);
     for (const [index, payment] of payments.entries()) {
       const amount = Number(payment?.amount);
       if (!validPaymentMethods.has(String(payment?.method)) || !Number.isSafeInteger(amount) || amount <= 0) {
@@ -3079,6 +3079,14 @@ export async function registerRoutes(
       return res.status(400).json({ message: "A soma dos pagamentos deve corresponder exatamente ao total da venda." });
     }
 
+    const creditPayment = payments.find((p: any) => String(p?.method) === "credit_internal");
+    const creditCustomerId = creditPayment ? Number(sale?.creditCustomerId) : null;
+    if (creditPayment && (!Number.isSafeInteger(creditCustomerId) || creditCustomerId <= 0)) {
+      return res.status(400).json({ message: "Selecione um cliente válido para o Crédito Interno." });
+    }
+    if (creditPayment && payments.filter((p:any)=>String(p?.method)==="credit_internal").length > 1) {
+      return res.status(400).json({ message: "A venda pode ter somente um pagamento em Crédito Interno." });
+    }
     const parsedSale = insertSaleSchema.parse({ 
       ...sale, 
       cashRegisterId: register.id, 
@@ -3092,7 +3100,8 @@ export async function registerRoutes(
     const newSale = await storage.createSale(
       parsedSale,
       parsedItems,
-      parsedPayments
+      parsedPayments,
+      creditPayment ? { customerId: creditCustomerId!, enterpriseId: Number(user.enterpriseId || 0) } : undefined
     );
 
     if (ticketId) {
