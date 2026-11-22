@@ -540,6 +540,23 @@ export async function registerRoutes(
   });
 
 
+  app.get("/api/audit/events", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user as any;
+    if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito à gestão." });
+    if (!neonPool) return res.json([]);
+    const params: any[] = []; const where: string[] = [];
+    const add = (part: string, value: any) => { params.push(value); where.push(part.replace("$N", "$" + params.length)); };
+    const q = String(req.query.q || "").trim();
+    if (req.query.start) add("occurred_at >= $N::timestamptz", String(req.query.start)+"T00:00:00-03:00");
+    if (req.query.end) add("occurred_at <= $N::timestamptz", String(req.query.end)+"T23:59:59.999-03:00");
+    if (req.query.hourStart) add("occurred_at::time >= $N::time", String(req.query.hourStart)+":00");
+    if (req.query.hourEnd) add("occurred_at::time <= $N::time", String(req.query.hourEnd)+":00");
+    for (const key of ["module","action","entityType","status","entityId"]) { const v=String(req.query[key]||"").trim(); if(v) add((key==="entityType"?"entity_type":key==="entityId"?"entity_id":key)+" = $N",v); }
+    if(q) add("(COALESCE(details,'') || COALESCE(old_data,'') || COALESCE(new_data,'') || COALESCE(entity_id,'')) ILIKE '%' || $N || '%'",q);
+    const limit=Math.min(Math.max(Number(req.query.limit||500),1),2000);
+    const sqlText="SELECT id,enterprise_id AS \"enterpriseId\",actor_user_id AS \"actorUserId\",action,module,entity_type AS \"entityType\",entity_id AS \"entityId\",status,occurred_at AS \"occurredAt\",details,old_data AS \"oldData\",new_data AS \"newData\",ip_address AS \"ipAddress\",user_agent AS \"userAgent\" FROM audit_events "+(where.length?"WHERE "+where.join(" AND "):"")+" ORDER BY occurred_at DESC,id DESC LIMIT "+limit;
+    try { return res.json((await neonPool.query(sqlText,params)).rows); } catch(error:any) { console.error("[AUDIT]",error?.message||error); return res.status(500).json({message:"Não foi possível consultar a auditoria."}); }
+  });
   app.get("/api/audit/db-parity", async (req, res) => {
     if (!(req as any).auroraOperator || !(req as any).mcpClaims) {
       return res.status(403).json({ ok: false, message: "Authenticated Aura MCP execution required" });
