@@ -957,6 +957,7 @@ export async function setupDatabase() {
   // migrations before schema parity validation so existing production data is preserved.
   if (neonPool) {
     await verifyNeonConnection();
+    await ensureAuditTriggers();
     await neonPool.query(`
       CREATE TABLE IF NOT EXISTS audit_events (
         id SERIAL PRIMARY KEY, enterprise_id INTEGER, actor_user_id INTEGER, action TEXT NOT NULL,
