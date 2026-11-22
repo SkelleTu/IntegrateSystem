@@ -170,6 +170,30 @@ export function registerCreditInternalRoutes(app: Express) {
     const r=await neonPool!.query("INSERT INTO credit_internal_authorizations(enterprise_id,customer_id,authorized_by,extra_limit_cents,valid_until,payment_due_at,reason) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",[eid(req),id,Number((req.user as any).id),extra,until,req.body?.paymentDueAt?new Date(req.body.paymentDueAt):null,req.body?.reason||null]);
     await audit(req,id,"credit.exception_authorization",{authorizationId:r.rows[0].id,extraLimitCents:extra,validUntil:until.toISOString()}); res.status(201).json(r.rows[0]);
   });
+  app.get("/api/credit-internal/customers/:id/term", async(req,res)=>{
+    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
+    await ensureCreditInternalSchema(); const id=Number(req.params.id);
+    const q=await neonPool!.query("SELECT * FROM credit_internal_customers WHERE id=$1 AND enterprise_id=$2",[id,eid(req)]);
+    if(!q.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
+    const c=q.rows[0];
+    res.json({
+      title:"Termo de Crédito Interno",
+      version:c.contract_version,
+      customer:{name:c.full_name,cpf:c.cpf,rg:c.rg,address:c.address,addressNumber:c.address_number,phone:c.phone,email:c.email},
+      credit:{limit:money(c.credit_limit_cents),paymentCycleDays:c.payment_cycle_days},
+      rules:{toleranceDays:31,blockAfterDays:32,reductionPct:10,recoveryDays:90,penaltyPct:PENALTY_PCT,interestReference:"Taxa Legal do art. 406 do Código Civil, vigente no período quando aplicável."},
+      signature:{type:c.signature_type,signedAt:c.contract_signed_at}
+    });
+  });
+  app.post("/api/credit-internal/customers/:id/signature", async(req,res)=>{
+    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
+    await ensureCreditInternalSchema(); const id=Number(req.params.id); const type=String(req.body?.type||"").toLowerCase();
+    if(type!=="manual" && type!=="electronic") return res.status(400).json({message:"Tipo de assinatura inválido."});
+    const r=await neonPool!.query("UPDATE credit_internal_customers SET signature_type=$1,contract_signed_at=NOW(),updated_at=NOW() WHERE id=$2 AND enterprise_id=$3 RETURNING signature_type,contract_signed_at,contract_version",[type,id,eid(req)]);
+    if(!r.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
+    await audit(req,id,"credit.contract_signed",{signatureType:type,contractVersion:r.rows[0].contract_version});
+    res.json(r.rows[0]);
+  });
   app.get("/api/credit-internal/legal-rate", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     res.json({monthlyPct:LEGAL_MONTHLY_PCT,dailyApproxPct:LEGAL_MONTHLY_PCT/30,penaltyPct:PENALTY_PCT,reference:"BCB Comunicado 46.215 — novembro/2026"});
