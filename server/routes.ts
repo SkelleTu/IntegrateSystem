@@ -3019,11 +3019,18 @@ export async function registerRoutes(
       const quantity = Number(item?.quantity);
       const unitPrice = Number(item?.unitPrice);
       const totalPrice = Number(item?.totalPrice);
+      const unitType = String(item?.unitType || "unit").toLowerCase();
+      // Produtos vendidos por peso chegam ao backend com quantidade em gramas,
+      // enquanto unitPrice permanece em centavos por kg. O subtotal, portanto,
+      // precisa ser convertido de gramas para kg antes da validação.
+      const expectedTotalPrice = unitType === "kg"
+        ? Math.round((quantity * unitPrice) / 1000)
+        : quantity * unitPrice;
       if (!Number.isSafeInteger(quantity) || quantity <= 0 ||
           !Number.isSafeInteger(unitPrice) || unitPrice < 0 ||
           !Number.isSafeInteger(totalPrice) || totalPrice < 0 ||
-          totalPrice !== quantity * unitPrice) {
-        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal precisam ser inteiros em centavos e consistentes.` });
+          !Number.isSafeInteger(expectedTotalPrice) || totalPrice !== expectedTotalPrice) {
+        return res.status(400).json({ message: `Item ${index + 1} inválido: quantidade, preço unitário e subtotal não correspondem ao tipo de unidade informado.` });
       }
     }
     const itemsTotal = items.reduce((sum: number, item: any) => sum + Number(item.totalPrice), 0);
