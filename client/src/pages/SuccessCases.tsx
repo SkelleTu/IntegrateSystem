@@ -1,5 +1,5 @@
 import { Star, TrendingUp, Shield, Zap, BarChart3, Users } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+import auraLogo from "/aura-system-logo.webp?v=1";
 import metricsBg from "@assets/generated_images/digital_dashboard_with_floating_data_analytics_and_cyan_glowing_metrics..png";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
