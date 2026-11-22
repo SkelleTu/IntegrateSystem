@@ -222,7 +222,90 @@
 }
 
 @layer utilities {
+  /* Aura module visual standard: all authenticated modules use the same
+     dark graphite/cyan visual language established by the Financial module. */
+  .aura-module-theme {
+    color: #f4f4f5;
+  }
+
+  .aura-module-theme > *:first-child {
+    background-color: #0a0a0a !important;
+    color: #f4f4f5 !important;
+  }
+
+  .aura-module-theme h1,
+  .aura-module-theme h2,
+  .aura-module-theme h3 {
+    color: #ffffff;
+    letter-spacing: -0.025em;
+  }
+
+  .aura-module-theme h1,
+  .aura-module-theme h2 {
+    font-weight: 900;
+  }
+
+  /* Shared Financeiro-style panels/cards. */
+  .aura-module-theme [class*="bg-white/5"],
+  .aura-module-theme [class*="bg-white/[.03]"],
+  .aura-module-theme [class*="bg-white/[.04]"],
+  .aura-module-theme [class*="bg-zinc-900/50"],
+  .aura-module-theme [class*="bg-black/40"],
+  .aura-module-theme [class*="bg-black/60"] {
+    background-color: rgba(24, 24, 27, 0.52) !important;
+    border-color: rgba(255, 255, 255, 0.07) !important;
+    color: #f4f4f5;
+  }
+
+  .aura-module-theme [class*="rounded-2xl"],
+  .aura-module-theme [class*="rounded-[2rem]"] {
+    border-radius: 1rem;
+  }
+
+  .aura-module-theme [class*="text-zinc-500"] {
+    color: #a1a1aa !important;
+  }
+
+  .aura-module-theme [class*="text-zinc-400"] {
+    color: #d4d4d8 !important;
+  }
+
+  .aura-module-theme [class*="text-white/60"],
+  .aura-module-theme [class*="text-white/50"] {
+    color: rgba(255, 255, 255, 0.68) !important;
+  }
+
+  .aura-module-theme input,
+  .aura-module-theme textarea,
+  .aura-module-theme select {
+    background-color: rgba(10, 10, 10, 0.72);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .aura-module-theme table thead {
+    background: rgba(24, 24, 27, 0.65);
+    color: #d4d4d8;
+  }
+
+  .aura-module-theme table tbody tr {
+    border-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .aura-module-theme table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.025);
+  }
+
+  .aura-module-theme button {
+    font-weight: 800;
+  }
+
+  .aura-module-theme [class*="border-white/5"],
+  .aura-module-theme [class*="border-white/10"] {
+    border-color: rgba(255, 255, 255, 0.07) !important;
+  }
 }
+
 
 .light-stock [class*="text-[8px]"]  { font-size: 11px !important; }
 .light-stock [class*="text-[9px]"]  { font-size: 12px !important; }
