@@ -733,6 +733,10 @@ export default function Cashier() {
       setWeightInputValue={setWeightInputValue}
       activeItemForWeight={activeItemForWeight}
       handleWeightSubmit={handleWeightSubmit}
+      creditCustomerSearch={creditCustomerSearch}
+      setCreditCustomerSearch={setCreditCustomerSearch}
+      selectedCreditCustomer={selectedCreditCustomer}
+      setSelectedCreditCustomer={setSelectedCreditCustomer}
     />
   );
 }
@@ -747,7 +751,8 @@ function CashierContent({
   setSelectedProductForAdjust, setAdjustProductModalOpen,
   updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen,
   weightModalOpen, setWeightModalOpen, weightInputValue, setWeightInputValue,
-  activeItemForWeight, handleWeightSubmit
+  activeItemForWeight, handleWeightSubmit,
+  creditCustomerSearch, setCreditCustomerSearch, selectedCreditCustomer, setSelectedCreditCustomer
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -800,7 +805,7 @@ function CashierContent({
       if (!res.ok) throw new Error("Não foi possível consultar os clientes de Crédito Interno.");
       return res.json();
     },
-    enabled: !!user && paymentModalOpen && currentMethod === "credit_internal",
+    enabled: paymentModalOpen && currentMethod === "credit_internal",
     staleTime: 10000,
   });
 
@@ -847,7 +852,7 @@ function CashierContent({
     setShowFiscalFields(!showFiscalFields);
   };
 
-  const handlePayment = (method: "cash" | "card" | "pix") => {
+  const handlePayment = (method: "cash" | "card" | "pix" | "credit_internal") => {
     if (cart.length === 0) {
       toast({ title: "Carrinho Vazio", variant: "destructive" });
       return;
@@ -862,6 +867,10 @@ function CashierContent({
   };
 
   const addPayment = () => {
+    if (currentMethod === "credit_internal" && !selectedCreditCustomer) {
+      toast({ title: "Cliente não selecionado", description: "Selecione o cliente do Crédito Interno antes de confirmar.", variant: "destructive" });
+      return;
+    }
     const amount = Math.round(Number(customerAmount.replace(",", ".")) * 100);
     if (isNaN(amount) || amount <= 0) {
       toast({ title: "Valor Inválido", variant: "destructive" });
