@@ -60,6 +60,7 @@ const TimeClock = lazy(() => import("@/pages/TimeClock"));
 import FiscalConfig from "@/pages/fiscal/FiscalConfig";
 const LabelSystem = lazy(() => import("@/pages/LabelSystem"));
 import MasterControl from "./pages/MasterControl";
+import CreditoInterno from "./pages/CreditoInterno";
 const AccountBranches = lazy(() => import("./pages/AccountBranches"));
 import Monitoring from "./pages/Monitoring";
 const WindowsAppRunner = lazy(() => import("./pages/admin/WindowsAppRunner"));
@@ -172,6 +173,7 @@ function Router() {
             <Route path="/admin/monitoring" component={Monitoring} />
             <Route path="/cart" component={ClientCart} />
             <Route path="/admin/master" component={MasterControl} />
+            <Route path="/admin/credito-interno" component={CreditoInterno} />
             <Route path="/admin/account-branches" component={AccountBranches} />
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
