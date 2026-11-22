@@ -135,6 +135,7 @@ export const saleItems = pgTable("sale_items", {
   quantity: integer("quantity").notNull(),
   unitPrice: integer("unit_price").notNull(), // in cents
   totalPrice: integer("total_price").notNull(), // in cents
+  costTotal: integer("cost_total"), // historical total acquisition cost for this sold item, in cents
   unitType: text("unit_type").default("unit").notNull(), 
 });
 
