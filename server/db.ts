@@ -609,6 +609,26 @@ export async function ensureAuditTriggers() {
     END;
     $do$;
   `);
+  await neonPool.query(`
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','caixa','sales',s.id::TEXT,COALESCE(NULLIF(s.status,''),'active'),s.created_at,to_jsonb(s)::TEXT,'{"source":"historical_backfill","table":"sales"}'
+    FROM sales s WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='sales' AND a.entity_id=s.id::TEXT AND a.action='legacy_create');
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','financeiro','transactions',t.id::TEXT,'active',t.created_at,to_jsonb(t)::TEXT,'{"source":"historical_backfill","table":"transactions"}'
+    FROM transactions t WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='transactions' AND a.entity_id=t.id::TEXT AND a.action='legacy_create');
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','estoque','inventory',i.id::TEXT,'active',i.updated_at,to_jsonb(i)::TEXT,'{"source":"historical_backfill","table":"inventory"}'
+    FROM inventory i WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='inventory' AND a.entity_id=i.id::TEXT AND a.action='legacy_create');
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','estoque','products',p.id::TEXT,'active',p.created_at,to_jsonb(p)::TEXT,'{"source":"historical_backfill","table":"products"}'
+    FROM products p WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='products' AND a.entity_id=p.id::TEXT AND a.action='legacy_create');
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','estoque','batches',b.id::TEXT,'active',b.created_at,to_jsonb(b)::TEXT,'{"source":"historical_backfill","table":"batches"}'
+    FROM batches b WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='batches' AND a.entity_id=b.id::TEXT AND a.action='legacy_create');
+    INSERT INTO audit_events (action,module,entity_type,entity_id,status,occurred_at,new_data,details)
+    SELECT 'legacy_create','fiscal','nfce',n.id::TEXT,COALESCE(NULLIF(n.status,''),'active'),n.data_emissao,to_jsonb(n)::TEXT,'{"source":"historical_backfill","table":"nfce"}'
+    FROM nfce n WHERE NOT EXISTS (SELECT 1 FROM audit_events a WHERE a.entity_type='nfce' AND a.entity_id=n.id::TEXT AND a.action='legacy_create');
+  `);
 }
 
 export async function setupDatabase() {
