@@ -132,6 +132,13 @@ export default function Financeiro() {
     fieldOnChange(cents);
   };
 
+
+  const { data: cogsData } = useQuery<any>({
+    queryKey: ["/api/financial/cogs", dateRange.start, dateRange.end],
+    queryFn: async () => { const res=await fetch(`/api/financial/cogs?start=${dateRange.start}&end=${dateRange.end}`); if(!res.ok) throw new Error("Erro ao calcular lucro bruto"); return res.json(); },
+    enabled: dateRangeValid,
+    refetchInterval: 30000,
+  });
   const { data: inventory = [] } = useQuery<any[]>({
     queryKey: ["/api/inventory"],
   });
@@ -176,9 +183,9 @@ export default function Financeiro() {
     
     const totalNet = salesGross + extraIncome - expenses;
     const finalNetBalance = salesGross + extraIncome - expenses - inventoryValue;
-    const grossProfit = salesGross - inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    const grossProfit = Number(cogsData?.grossProfit ?? 0);
     return { gross: salesGross + extraIncome, net: totalNet, grossProfit, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
-  }, [sales, transactions, inventory, businessType]);
+  }, [sales, transactions, inventory, businessType, cogsData]);
 
   const onSubmit = (data: any) => {
     transactionMutation.mutate(data);
