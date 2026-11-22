@@ -395,7 +395,29 @@ export default function Cashier() {
       }
       return { sale };
     },
+    onError: (error: any) => {
+      const message = error instanceof Error ? error.message : "Não foi possível concluir a venda.";
+      console.error("[POS] Falha ao finalizar venda:", error);
+      toast({
+        title: "Venda não concluída",
+        description: message.replace(/^\d+:\s*/, "").slice(0, 240),
+        variant: "destructive",
+      });
+    },
     onSuccess: async (data) => {
+      // A venda é persistida de forma transacional no backend. Atualizar as
+      // consultas dos módulos após a confirmação mantém Caixa, Estoque,
+      // Financeiro e Relatórios sincronizados com a mesma venda.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/products/cashier-items"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/products"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/sales"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] }),
+      ]);
+
       setCart([]);
       setPaymentModalOpen(false);
       setConfirmModalOpen(false);
