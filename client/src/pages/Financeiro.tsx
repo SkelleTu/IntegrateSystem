@@ -181,9 +181,9 @@ export default function Financeiro() {
     
     const salesGross = completedSales.reduce((sum, s) => sum + (Number(s.totalAmount) || 0), 0);
     
-    const totalNet = salesGross + extraIncome - expenses;
-    const finalNetBalance = salesGross + extraIncome - expenses - inventoryValue;
     const grossProfit = Number(cogsData?.grossProfit ?? 0);
+    const totalNet = grossProfit + extraIncome - expenses;
+    const finalNetBalance = totalNet;
     return { gross: salesGross + extraIncome, net: totalNet, grossProfit, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
   }, [sales, transactions, inventory, businessType, cogsData]);
 
@@ -217,22 +217,22 @@ export default function Financeiro() {
           <div className="p-6 rounded-2xl bg-zinc-800/30 border border-white/5 space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Lucro Bruto</span>
-              <DollarSign className={`w-4 h-4 ${financialData.net >= 0 ? 'text-primary' : 'text-red-500'}`} />
+              <DollarSign className={`w-4 h-4 ${financialData.grossProfit >= 0 ? 'text-primary' : 'text-red-500'}`} />
             </div>
-            <div className={`text-4xl font-black italic tracking-tighter ${financialData.net >= 0 ? 'text-white' : 'text-red-500'}`}>
+            <div className={`text-4xl font-black italic tracking-tighter ${financialData.grossProfit >= 0 ? 'text-white' : 'text-red-500'}`}>
               R$ {(financialData.grossProfit / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
 
           <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-primary/80 tracking-widest">Lucro Líquido Final</span>
+              <span className="text-[10px] uppercase font-bold text-primary/80 tracking-widest">Lucro Líquido</span>
               <Wallet className="w-4 h-4 text-primary" />
             </div>
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.finalNetBalance >= 0 ? 'text-primary' : 'text-red-500'}`}>
               R$ {(financialData.finalNetBalance / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-[9px] text-zinc-500 font-medium">Capital de giro real (vendas + entradas - despesas - estoque)</p>
+            <p className="text-[9px] text-zinc-500 font-medium">Resultado líquido do período (lucro bruto + outras entradas - despesas)</p>
           </div>
 
           <div className="p-4 rounded-xl bg-zinc-800/20 border border-white/5 flex items-center gap-4">
