@@ -122,7 +122,7 @@ export interface IStorage {
   getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
   openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
   closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
-  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[]): Promise<Sale>;
+  createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], creditContext?: { customerId: number; enterpriseId: number }): Promise<Sale>;
   getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
   cancelSale(id: number): Promise<Sale>;
 
