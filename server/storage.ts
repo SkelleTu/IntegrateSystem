@@ -978,15 +978,38 @@ export class DatabaseStorage implements IStorage {
           }
         }
 
+        const creditPurchaseResult: any = await transaction.execute(sql`SELECT id,paid_cents,status FROM credit_internal_purchases WHERE sale_id = ${id} LIMIT 1 FOR UPDATE`);
+        const creditPurchase = creditPurchaseResult.rows?.[0];
+        if (creditPurchase && Number(creditPurchase.paid_cents || 0) > 0) {
+          throw new Error("A venda possui Crédito Interno já pago; faça o estorno financeiro do recebimento antes de cancelar esta venda.");
+        }
+        if (creditPurchase) {
+          await transaction.execute(sql`UPDATE credit_internal_purchases SET status = 'cancelled' WHERE id = ${Number(creditPurchase.id)}`);
+        }
+        const salePayments = await transaction.select().from(payments).where(eq(payments.saleId, id));
+        const immediateAmount = salePayments.filter((p: any) => String(p.method) !== "credit_internal").reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+        const creditAmount = salePayments.filter((p: any) => String(p.method) === "credit_internal").reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
         const businessType = await getBusinessTypeForUser(transaction, sale.userId);
-        await transaction.insert(transactions).values({
-          businessType,
-          type: "expense",
-          category: "vendas",
-          description: `ESTORNO: Venda PDV #${id} CANCELADA`,
-          amount: sale.totalAmount,
-          createdAt: new Date()
-        });
+        if (immediateAmount > 0) {
+          await transaction.insert(transactions).values({
+            businessType,
+            type: "expense",
+            category: "vendas",
+            description: `ESTORNO: Venda PDV #${id} CANCELADA`,
+            amount: immediateAmount,
+            createdAt: new Date()
+          });
+        }
+        if (creditAmount > 0) {
+          await transaction.insert(transactions).values({
+            businessType,
+            type: "expense",
+            category: "contas_a_receber",
+            description: `ESTORNO: Venda PDV #${id} — Crédito Interno`,
+            amount: creditAmount,
+            createdAt: new Date()
+          });
+        }
         runtimeEvent("sale-cancelled", `Venda #${id} cancelada e estorno financeiro gravado`, {
           phase: "sale", saleId: id, amount: sale.totalAmount,
         });
