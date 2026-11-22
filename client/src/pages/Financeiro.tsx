@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { Badge } from "@/components/ui/badge";
+import { LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function Financeiro() {
@@ -135,6 +136,33 @@ export default function Financeiro() {
     queryKey: ["/api/inventory"],
   });
 
+  const chartData = useMemo(() => {
+    const byDay = new Map<string, { day: string; sales: number; income: number; expenses: number }>();
+    (sales || []).filter(s => s.status === "completed").forEach(s => {
+      const d = format(new Date(s.createdAt), "dd/MM");
+      const row = byDay.get(d) || { day: d, sales: 0, income: 0, expenses: 0 };
+      row.sales += Number(s.totalAmount || 0) / 100;
+      byDay.set(d, row);
+    });
+    (transactions || []).forEach(t => {
+      const d = format(new Date(t.createdAt), "dd/MM");
+      const row = byDay.get(d) || { day: d, sales: 0, income: 0, expenses: 0 };
+      if (t.type === "income" && t.category !== "vendas") row.income += Number(t.amount || 0) / 100;
+      if (t.type === "expense") row.expenses += Number(t.amount || 0) / 100;
+      byDay.set(d, row);
+    });
+    return Array.from(byDay.values()).sort((a, b) => a.day.localeCompare(b.day));
+  }, [sales, transactions]);
+
+  const expenseComposition = useMemo(() => {
+    const map = new Map<string, number>();
+    (transactions || []).filter(t => t.type === "expense").forEach(t => {
+      const label = String(t.category || "outros").replace(/^./, x => x.toUpperCase());
+      map.set(label, (map.get(label) || 0) + Number(t.amount || 0) / 100);
+    });
+    return Array.from(map, ([name, value]) => ({ name, value }));
+  }, [transactions]);
+
   const financialData = useMemo(() => {
     if (!sales || !transactions) return { gross: 0, net: 0, expenses: 0, extraIncome: 0, count: 0, inventoryValue: 0, finalNetBalance: 0 };
     const completedSales = (sales || []).filter(s => s.status === "completed");
@@ -180,7 +208,7 @@ export default function Financeiro() {
         <div className="grid grid-cols-1 gap-4">
           <div className="p-6 rounded-2xl bg-zinc-800/30 border border-white/5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Saldo Líquido</span>
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Lucro Líquido</span>
               <DollarSign className={`w-4 h-4 ${financialData.net >= 0 ? 'text-primary' : 'text-red-500'}`} />
             </div>
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.net >= 0 ? 'text-white' : 'text-red-500'}`}>
@@ -190,7 +218,7 @@ export default function Financeiro() {
 
           <div className="p-6 rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-primary/80 tracking-widest">Saldo Líquido Final</span>
+              <span className="text-[10px] uppercase font-bold text-primary/80 tracking-widest">Lucro Líquido Final</span>
               <Wallet className="w-4 h-4 text-primary" />
             </div>
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.finalNetBalance >= 0 ? 'text-primary' : 'text-red-500'}`}>
@@ -233,7 +261,7 @@ export default function Financeiro() {
         <div className="mt-auto pt-6 border-t border-white/5">
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full bg-white text-black hover:bg-primary hover:text-white font-black uppercase italic h-14 rounded-xl transition-all shadow-xl">
+              <Button className="w-full bg-zinc-800/70 text-white border border-white/10 hover:bg-primary hover:text-black hover:border-primary/40 font-black uppercase italic h-14 rounded-xl transition-all shadow-[0_10px_35px_rgba(0,0,0,0.25)]">
                 <PlusCircle className="w-5 h-5 mr-2" /> Novo Lançamento
               </Button>
             </DialogTrigger>
@@ -446,22 +474,60 @@ export default function Financeiro() {
               </div>
             </TabsContent>
 
-            <TabsContent value="analysis" className="flex-1 bg-zinc-900/20 border border-white/5 rounded-2xl p-8 mt-0">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-4">
-                    <h3 className="text-zinc-500 uppercase font-black italic text-[10px] tracking-widest">Resumo Operacional</h3>
-                    <div className="p-6 rounded-2xl bg-black/40 border border-white/5 space-y-6">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold text-zinc-400">Tickets Gerados</span>
-                        <span className="text-xl font-black italic">{financialData.count}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold text-zinc-400">Ticket Médio</span>
-                        <span className="text-xl font-black italic">R$ {financialData.count > 0 ? (financialData.gross / 100 / financialData.count).toFixed(2) : "0,00"}</span>
-                      </div>
+            <TabsContent value="analysis" className="flex-1 bg-zinc-900/20 border border-white/5 rounded-2xl overflow-y-auto p-6 mt-0 custom-scrollbar">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+                  <div className="xl:col-span-2 rounded-2xl border border-white/10 bg-black/35 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+                    <div className="flex items-start justify-between gap-4 mb-4">
+                      <div><p className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Performance financeira</p><h3 className="mt-1 text-xl font-black italic uppercase tracking-tight text-white">Fluxo de resultado</h3></div>
+                      <Badge variant="outline" className="border-primary/20 text-primary bg-primary/5 font-black text-[9px] uppercase">Tempo real</Badge>
+                    </div>
+                    <div className="h-[280px] w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                          <CartesianGrid stroke="rgba(255,255,255,0.07)" vertical={false} />
+                          <XAxis dataKey="day" stroke="#71717a" tick={{ fontSize: 10, fontWeight: 700 }} />
+                          <YAxis stroke="#71717a" tick={{ fontSize: 10 }} tickFormatter={(v) => "R$ " + v} />
+                          <Tooltip formatter={(value: number) => ["R$ " + Number(value).toFixed(2), ""]} contentStyle={{ background: "#09090b", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12 }} />
+                          <Legend wrapperStyle={{ fontSize: 10, fontWeight: 800 }} />
+                          <Line type="monotone" dataKey="sales" name="Vendas" stroke="#22d3ee" strokeWidth={3} dot={{ r: 3 }} />
+                          <Line type="monotone" dataKey="income" name="Entradas" stroke="#a78bfa" strokeWidth={2.5} dot={{ r: 3 }} />
+                          <Line type="monotone" dataKey="expenses" name="Despesas" stroke="#f87171" strokeWidth={2.5} dot={{ r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
                     </div>
                   </div>
-               </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+                    <p className="text-[10px] uppercase tracking-[0.25em] font-black text-zinc-500">Composição</p><h3 className="mt-1 text-xl font-black italic uppercase tracking-tight text-white">Despesas por categoria</h3>
+                    <div className="h-[280px] w-full mt-2">
+                      {expenseComposition.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie data={expenseComposition} dataKey="value" nameKey="name" cx="50%" cy="48%" outerRadius={92} innerRadius={52} paddingAngle={3}>
+                              {expenseComposition.map((_, index) => <Cell key={index} fill={["#22d3ee", "#a78bfa", "#f87171", "#fbbf24", "#34d399", "#60a5fa"][index % 6]} />)}
+                            </Pie>
+                            <Tooltip formatter={(value: number) => ["R$ " + Number(value).toFixed(2), ""]} contentStyle={{ background: "#09090b", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12 }} />
+                            <Legend wrapperStyle={{ fontSize: 9, fontWeight: 800 }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : <div className="h-full flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-zinc-600">Sem despesas no período</div>}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5"><p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Lucro líquido</p><p className={financialData.net >= 0 ? "mt-2 text-2xl font-black italic text-primary" : "mt-2 text-2xl font-black italic text-red-400"}>R$ {(financialData.net / 100).toFixed(2)}</p></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5"><p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Entradas extras</p><p className="mt-2 text-2xl font-black italic text-violet-300">R$ {(financialData.extraIncome / 100).toFixed(2)}</p></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5"><p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Despesas</p><p className="mt-2 text-2xl font-black italic text-red-400">R$ {(financialData.expenses / 100).toFixed(2)}</p></div>
+                  <div className="rounded-2xl border border-white/10 bg-black/35 p-5"><p className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Ticket médio</p><p className="mt-2 text-2xl font-black italic text-white">R$ {financialData.count > 0 ? (financialData.gross / 100 / financialData.count).toFixed(2) : "0,00"}</p></div>
+                </div>
+                <div className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-black/30 to-violet-500/5 p-6">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div><p className="text-[9px] uppercase tracking-[0.25em] font-black text-primary/70">Indicador principal</p><h3 className="text-2xl font-black italic uppercase tracking-tight">Lucro líquido do período</h3></div>
+                    <div className={financialData.net >= 0 ? "text-4xl font-black italic tracking-tighter text-primary" : "text-4xl font-black italic tracking-tighter text-red-400"}>R$ {(financialData.net / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500">Resultado após todas as entradas e despesas registradas no intervalo selecionado.</p>
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
