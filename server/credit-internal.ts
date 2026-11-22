@@ -206,15 +206,6 @@ export function registerCreditInternalRoutes(app: Express) {
   });
   app.post("/api/credit-internal/customers/:id/signature", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
-    await ensureCreditInternalSchema(); const id=Number(req.params.id); const type=String(req.body?.type||"").toLowerCase();
-    if(type!=="manual" && type!=="electronic") return res.status(400).json({message:"Tipo de assinatura inválido."});
-    const r=await neonPool!.query("UPDATE credit_internal_customers SET signature_type=$1,contract_signed_at=NOW(),updated_at=NOW() WHERE id=$2 AND enterprise_id=$3 RETURNING signature_type,contract_signed_at,contract_version",[type,id,eid(req)]);
-    if(!r.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
-    await audit(req,id,"credit.contract_signed",{signatureType:type,contractVersion:r.rows[0].contract_version});
-    res.json(r.rows[0]);
-  });
-  app.post("/api/credit-internal/customers/:id/signature", async(req,res)=>{
-    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     await ensureCreditInternalSchema();
     const id=Number(req.params.id);
     const type=String(req.body?.signatureType||"").toLowerCase();
