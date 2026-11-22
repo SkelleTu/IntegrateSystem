@@ -195,6 +195,15 @@ export function registerCreditInternalRoutes(app: Express) {
       signature:{type:c.signature_type,signedAt:c.contract_signed_at}
     });
   });
+  app.delete("/api/credit-internal/customers/:id", async(req,res)=>{
+    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
+    await ensureCreditInternalSchema();
+    const id=Number(req.params.id);
+    const q=await neonPool!.query("DELETE FROM credit_internal_customers WHERE id=$1 AND enterprise_id=$2 RETURNING id",[id,eid(req)]);
+    if(!q.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
+    await audit(req,id,"credit.customer_deleted",{});
+    res.json({ok:true,id});
+  });
   app.post("/api/credit-internal/customers/:id/signature", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     await ensureCreditInternalSchema(); const id=Number(req.params.id); const type=String(req.body?.type||"").toLowerCase();
