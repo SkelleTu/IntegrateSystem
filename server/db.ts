@@ -524,6 +524,93 @@ const TABLE_DEFINITIONS = [
   )`,
 ];
 
+export async function ensureAuditTriggers() {
+  if (!neonPool) return;
+  await neonPool.query(`
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id SERIAL PRIMARY KEY,
+      enterprise_id INTEGER,
+      actor_user_id INTEGER,
+      action TEXT NOT NULL,
+      module TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id TEXT,
+      status TEXT NOT NULL DEFAULT 'active',
+      occurred_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      details TEXT,
+      old_data TEXT,
+      new_data TEXT,
+      ip_address TEXT,
+      user_agent TEXT
+    );
+    CREATE OR REPLACE FUNCTION aura_audit_row_change() RETURNS trigger AS $func$
+    DECLARE
+      row_data JSONB;
+      inferred_actor INTEGER;
+      inferred_enterprise INTEGER;
+    BEGIN
+      row_data := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+      inferred_actor := NULLIF(COALESCE(row_data->>'user_id', row_data->>'owner_id', row_data->>'actor_user_id'), '')::INTEGER;
+      inferred_enterprise := NULLIF(COALESCE(row_data->>'enterprise_id', current_setting('aura.enterprise_id', true)), '')::INTEGER;
+      INSERT INTO audit_events (
+        enterprise_id, actor_user_id, action, module, entity_type, entity_id, status,
+        occurred_at, old_data, new_data, details
+      ) VALUES (
+        inferred_enterprise,
+        COALESCE(inferred_actor, NULLIF(current_setting('aura.actor_user_id', true), '')::INTEGER),
+        CASE
+          WHEN TG_OP='INSERT' THEN 'create'
+          WHEN TG_OP='UPDATE' THEN
+            CASE
+              WHEN (to_jsonb(OLD)->>'status') IS DISTINCT FROM (to_jsonb(NEW)->>'status')
+                   AND lower(COALESCE(to_jsonb(NEW)->>'status','')) IN ('cancelled','canceled','estornado','reversed','deleted')
+                THEN lower(to_jsonb(NEW)->>'status')
+              ELSE 'update'
+            END
+          ELSE 'delete'
+        END,
+        CASE
+          WHEN TG_TABLE_NAME IN ('sales','sale_items','payments','cash_register') THEN 'caixa'
+          WHEN TG_TABLE_NAME IN ('products','batches','batch_logs','inventory','inventory_logs','inventory_restocks','stock_snapshots') THEN 'estoque'
+          WHEN TG_TABLE_NAME IN ('transactions') THEN 'financeiro'
+          WHEN TG_TABLE_NAME IN ('nfce','fiscal_settings') THEN 'fiscal'
+          WHEN TG_TABLE_NAME IN ('users','user_sessions','enterprises','settings') THEN 'administracao'
+          WHEN TG_TABLE_NAME IN ('time_clock') THEN 'administracao'
+          ELSE TG_TABLE_NAME
+        END,
+        TG_TABLE_NAME,
+        CASE WHEN TG_OP='DELETE' THEN OLD.id::TEXT ELSE NEW.id::TEXT END,
+        CASE WHEN TG_OP='DELETE' THEN 'deleted' ELSE COALESCE(NULLIF(lower(to_jsonb(NEW)->>'status'),''),'active') END,
+        NOW(),
+        CASE WHEN TG_OP IN ('UPDATE','DELETE') THEN to_jsonb(OLD)::TEXT END,
+        CASE WHEN TG_OP IN ('INSERT','UPDATE') THEN to_jsonb(NEW)::TEXT END,
+        json_build_object('operation', TG_OP, 'table', TG_TABLE_NAME)::TEXT
+      );
+      RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+    END;
+    $func$ LANGUAGE plpgsql;
+
+    DO $do$
+    DECLARE t TEXT;
+    BEGIN
+      FOREACH t IN ARRAY ARRAY[
+        'users','enterprises','cash_register','sales','sale_items','payments','transactions',
+        'inventory','inventory_logs','inventory_restocks','products','batches','batch_logs',
+        'stock_snapshots','fiscal_settings','nfce','time_clock','tickets','menu_items','categories','services'
+      ] LOOP
+        IF to_regclass(t) IS NOT NULL THEN
+          EXECUTE format('DROP TRIGGER IF EXISTS aura_audit_%I ON %I', t, t);
+          EXECUTE format(
+            'CREATE TRIGGER aura_audit_%I AFTER INSERT OR UPDATE OR DELETE ON %I FOR EACH ROW EXECUTE FUNCTION aura_audit_row_change()',
+            t, t
+          );
+        END IF;
+      END LOOP;
+    END;
+    $do$;
+  `);
+}
+
 export async function setupDatabase() {
   // ── SQLite local: cria tabelas via SQL direto ──────────────────────────────
   for (const stmt of TABLE_DEFINITIONS) {
