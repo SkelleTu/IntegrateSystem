@@ -44,8 +44,8 @@ function generateIcons(count: number): FloatingIcon[] {
     Icon: cyberIcons[Math.floor(Math.random() * cyberIcons.length)],
     x: Math.random() * 100,
     y: Math.random() * 100,
-    size: 16 + Math.random() * 24,
-    opacity: 0.08 + Math.random() * 0.08,
+    size: 20 + Math.random() * 24,
+    opacity: 0.13 + Math.random() * 0.09,
     duration: 15 + Math.random() * 25,
     delay: Math.random() * -20,
     rotateDirection: Math.random() > 0.5 ? 1 : -1,
@@ -65,7 +65,7 @@ export function BackgroundIcons() {
         className="fixed inset-0 overflow-hidden pointer-events-none z-[5] bg-black/0 w-full h-full"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(rgba(0, 229, 255, 0.025) 1px, transparent 1px),
             linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px)
           `,
           backgroundSize: '40px 40px, 40px 40px',
@@ -79,22 +79,26 @@ export function BackgroundIcons() {
           return (
             <div
               key={icon.id}
-              className="absolute text-primary"
+              className="absolute"
               style={{
                 left: `${icon.x}%`,
                 top: `${icon.y}%`,
                 opacity: icon.opacity,
+                color: icon.id % 5 === 0 ? "rgba(167, 139, 250, 0.95)" : "rgba(0, 229, 255, 0.95)",
+                filter: "drop-shadow(0 0 10px rgba(0, 229, 255, 0.22))",
                 animation: `floatCyber ${icon.duration}s ease-in-out infinite`,
                 animationDelay: `${icon.delay}s`,
               }}
             >
               <IconComponent 
                 size={icon.size} 
-                strokeWidth={1}
+                strokeWidth={1.25}
                 style={{
                   animation: `rotateCyber ${icon.duration * 2}s linear infinite`,
                   animationDirection: icon.rotateDirection > 0 ? 'normal' : 'reverse',
-                  filter: 'drop-shadow(0 0 8px rgba(0, 229, 255, 0.4))',
+                  filter: icon.id % 5 === 0
+                    ? 'drop-shadow(0 0 10px rgba(167, 139, 250, 0.32))'
+                    : 'drop-shadow(0 0 10px rgba(0, 229, 255, 0.42))',
                 }}
               />
             </div>
@@ -112,7 +116,7 @@ export function BackgroundIcons() {
           }}
         />
         
-        <svg className="absolute inset-0 w-full h-full opacity-[0.02]">
+        <svg className="absolute inset-0 w-full h-full opacity-[0.018]">
           <defs>
             <pattern id="circuit-pattern" x="0" y="0" width="100" height="100" patternUnits="userSpaceOnUse">
               <path 
@@ -134,7 +138,7 @@ export function BackgroundIcons() {
         </svg>
 
         <div 
-          className="absolute inset-0 opacity-[0.015]"
+          className="absolute inset-0 opacity-[0.012]"
           style={{
             backgroundImage: `
               repeating-linear-gradient(
