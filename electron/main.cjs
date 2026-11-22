@@ -187,6 +187,8 @@ function createWindow() {
   });
 }
 
+if (process.platform === 'win32') app.setAppUserModelId('com.aurasystem.app');
+
 app.whenReady().then(() => {
   sendRuntimeEvent('electron-ready', 'Electron ficou pronto', {
     phase: 'electron',

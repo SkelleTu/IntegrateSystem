@@ -1,7 +1,7 @@
 {
   "appId": "com.aurasystem.app",
   "productName": "Aura System",
-  "icon": "client/public/aura-system-logo.svg",
+  "icon": "ico.ico",
   "directories": {
     "output": "dist"
   },
@@ -12,7 +12,9 @@
     "dist/**/*",
     "node_modules/electron/dist/**/*",
     "node_modules/electron/path.txt",
-    "node_modules/electron/index.js"
+    "node_modules/electron/index.js",
+    "ico.ico",
+    "electron/icon.png"
   ],
   "extraMetadata": {
     "main": "electron/main.cjs"
@@ -20,6 +22,7 @@
   "npmRebuild": false,
   "asar": false,
   "win": {
-    "target": "portable"
+    "target": "portable",
+    "icon": "ico.ico"
   }
 }

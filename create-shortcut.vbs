@@ -1,8 +1,10 @@
 Set oWS = WScript.CreateObject("WScript.Shell")
-sLinkFile = oWS.CurrentDirectory & "\Aura.lnk"
-Set oLink = oWS.CreateShortcut(sLinkFile)
-oLink.TargetPath = oWS.CurrentDirectory & "\Aura.bat"
-oLink.Arguments = ""
+Set fso = CreateObject("Scripting.FileSystemObject")
+sDir = fso.GetParentFolderName(WScript.ScriptFullName)
+sDesktop = oWS.SpecialFolders("Desktop")
+Set oLink = oWS.CreateShortcut(sDesktop & "\Aura System.lnk")
+oLink.TargetPath = sDir & "\Aura System.bat"
+oLink.WorkingDirectory = sDir
 oLink.Description = "Aura System"
-oLink.IconLocation = oWS.CurrentDirectory & "\ico.ico"
+oLink.IconLocation = sDir & "\ico.ico,0"
 oLink.Save
