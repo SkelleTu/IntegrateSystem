@@ -866,6 +866,7 @@ export async function setupDatabase() {
       ALTER TABLE products
         ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
         ADD COLUMN IF NOT EXISTS package_quantity NUMERIC(12,3) DEFAULT 1;
+      ALTER TABLE sale_items ADD COLUMN IF NOT EXISTS cost_total INTEGER;
       ALTER TABLE batches
         ADD COLUMN IF NOT EXISTS cost_price_unit TEXT NOT NULL DEFAULT 'unit',
         ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
