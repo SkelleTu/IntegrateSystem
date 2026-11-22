@@ -23,7 +23,7 @@ import { registerMcpOAuth, verifyMcpAccessToken } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 import { getRuntimeObservability } from "./runtime-observability";
-import { registerCreditInternalRoutes } from "./credit-internal";
+import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -316,6 +316,7 @@ export async function initApp() {
       progress: 30,
     });
 
+    await ensureCreditInternalSchema();
     await registerRoutes(httpServer, app);
     registerCreditInternalRoutes(app);
 
