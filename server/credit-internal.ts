@@ -20,8 +20,9 @@ export async function ensureCreditInternalSchema() {
     "address TEXT NOT NULL, address_number TEXT, complement TEXT, neighborhood TEXT, city TEXT, state TEXT, zip_code TEXT, phone TEXT, email TEXT, " +
     "credit_limit_cents BIGINT NOT NULL DEFAULT 0, original_limit_cents BIGINT NOT NULL DEFAULT 0, payment_cycle_days INTEGER NOT NULL DEFAULT 30, " +
     "status TEXT NOT NULL DEFAULT 'good', risk_reduction_cents BIGINT NOT NULL DEFAULT 0, observation_started_at TIMESTAMPTZ, contract_version INTEGER NOT NULL DEFAULT 1, " +
-    "signature_type TEXT, contract_signed_at TIMESTAMPTZ, contract_file_url TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())"
+    "signature_type TEXT, contract_signed_at TIMESTAMPTZ, contract_file_url TEXT, notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_risk_event_at TIMESTAMPTZ)"
   );
+  await neonPool.query("ALTER TABLE credit_internal_customers ADD COLUMN IF NOT EXISTS last_risk_event_at TIMESTAMPTZ");
   await neonPool.query(
     "CREATE TABLE IF NOT EXISTS credit_internal_purchases (" +
     "id SERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, customer_id INTEGER NOT NULL REFERENCES credit_internal_customers(id) ON DELETE CASCADE, " +
@@ -62,6 +63,20 @@ async function evaluate(req: Request, c: any) {
     if (remaining <= 0) continue;
     const days = Math.max(0, Math.floor((Date.now() - new Date(p.due_at).getTime()) / 86400000));
     if (days > 0) { overdue += remaining; maxDays = Math.max(maxDays, days); }
+  }
+  if (maxDays >= 32 && Number(c.credit_limit_cents) > 0) {
+    const last = c.last_risk_event_at ? new Date(c.last_risk_event_at).getTime() : 0;
+    const elapsed = last ? Math.floor((Date.now() - last) / 86400000) : 99999;
+    const cycles = Math.max(1, Math.floor(elapsed / 30));
+    if (!last || cycles >= 1) {
+      const reduction = Math.max(1, Math.floor(Number(c.credit_limit_cents) * 0.10));
+      const newLimit = Math.max(0, Number(c.credit_limit_cents) - reduction);
+      await neonPool.query("UPDATE credit_internal_customers SET credit_limit_cents=$1,risk_reduction_cents=risk_reduction_cents+$2,observation_started_at=COALESCE(observation_started_at,NOW()),last_risk_event_at=NOW(),updated_at=NOW(),status=$3 WHERE id=$4 AND enterprise_id=$5", [newLimit,reduction,newLimit<=0?"blocked":"attention",c.id,eid(req)]);
+      await audit(req,c.id,"credit.limit_reduced",{reductionCents:reduction,newLimitCents:newLimit,reason:"delay_32_plus_days"});
+      c.credit_limit_cents=newLimit;
+      c.risk_reduction_cents=Number(c.risk_reduction_cents||0)+reduction;
+      c.last_risk_event_at=new Date().toISOString();
+    }
   }
   let status = maxDays >= 32 ? "blocked" : maxDays > 0 ? "attention" : "good";
   if (status === "good" && Number(c.risk_reduction_cents) > 0 && c.observation_started_at) {
