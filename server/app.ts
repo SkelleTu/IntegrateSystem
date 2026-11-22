@@ -23,6 +23,7 @@ import { registerMcpOAuth, verifyMcpAccessToken } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 import { getRuntimeObservability } from "./runtime-observability";
+import { registerCreditInternalRoutes } from "./credit-internal";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -316,6 +317,7 @@ export async function initApp() {
     });
 
     await registerRoutes(httpServer, app);
+    registerCreditInternalRoutes(app);
 
     // OAuth do MCP é registrado depois das sessões/Passport para que uma sessão
     // mestre já autenticada possa autorizar o ChatGPT sem pedir usuário e senha novamente.
