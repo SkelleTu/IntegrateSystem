@@ -51,7 +51,7 @@ export function Navbar() {
       "/relatorios":"reports", "/inventory":"inventory", "/fiscal":"fiscal",
       "/admin/labels":"labels", "/admin/monitoring":"monitoring",
       "/ponto":"timeclock", "/admin/master":"master",
-      "/admin/account-branches":"account_branches",
+      "/admin/account-branches":"account_branches", "/admin/credito-interno":"credit_internal",
     };
     const grant = user.permissions?.[moduleByUrl[url]] || {};
     const allowed = isMasterAccount || user.masterAccessAuthorized === true || url === "/cart" || grant.view === true || grant.administer === true;
