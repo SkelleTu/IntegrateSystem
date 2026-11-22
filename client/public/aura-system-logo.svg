@@ -1,1 +1,26 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc"><title>Aura System</title><desc>Logo Aura System com símbolo A, órbita ciano e violeta e identificação Integrated PDV System.</desc><defs><linearGradient id="orb" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00e5ff"/><stop offset=".58" stop-color="#38bdf8"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient><linearGradient id="aura" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00d9ff"/><stop offset=".52" stop-color="#0ea5e9"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient><filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g transform="translate(512 420)"><circle cx="0" cy="0" r="286" fill="none" stroke="url(#orb)" stroke-width="12" opacity=".92"/><circle cx="270" cy="-92" r="13" fill="#00e5ff" filter="url(#glow)"/><circle cx="300" cy="-22" r="12" fill="#6366f1" filter="url(#glow)"/><circle cx="300" cy="48" r="11" fill="#8b5cf6" filter="url(#glow)"/><path d="M-220 170 L0 -205 L220 170 L112 170 L0 -18 L-112 170 Z" fill="url(#aura)" filter="url(#glow)"/><path d="M-112 170 L0 -18 L112 170 L-4 170 L-58 80 L-112 170Z" fill="#f5f7fb"/></g><g text-anchor="middle" font-family="Arial, Helvetica, sans-serif"><text x="512" y="735" font-size="82" font-weight="900" letter-spacing="8" fill="#00bff3">AURA</text><text x="512" y="735" dx="260" font-size="82" font-weight="900" letter-spacing="8" fill="#8b5cf6"> SYSTEM</text><text x="512" y="800" font-size="22" font-weight="700" letter-spacing="7" fill="#334155">INTEGRATED PDV SYSTEM</text></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<title>Aura System — símbolo</title>
+<desc>Emblema abstrato AURA com geometria angular, núcleo grafite e órbitas neon ciano, azul, violeta e magenta.</desc>
+<defs>
+ <linearGradient id="edge" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00e5ff"/><stop offset=".42" stop-color="#22d3ee"/><stop offset=".72" stop-color="#7c3aed"/><stop offset="1" stop-color="#f0abfc"/></linearGradient>
+ <linearGradient id="face" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#07151d"/><stop offset=".5" stop-color="#111827"/><stop offset="1" stop-color="#21153a"/></linearGradient>
+ <linearGradient id="core" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00d9ff"/><stop offset=".5" stop-color="#38bdf8"/><stop offset="1" stop-color="#a855f7"/></linearGradient>
+ <filter id="neon" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+ <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+ <linearGradient id="sheen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".34"/><stop offset=".45" stop-color="#fff" stop-opacity=".05"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+</defs>
+<g transform="translate(512 512)">
+ <ellipse rx="345" ry="150" transform="rotate(-31)" fill="none" stroke="#00e5ff" stroke-width="16" opacity=".12" filter="url(#soft)"/>
+ <ellipse rx="345" ry="150" transform="rotate(-31)" fill="none" stroke="url(#edge)" stroke-width="10" opacity=".92"/>
+ <ellipse rx="322" ry="132" transform="rotate(31)" fill="none" stroke="url(#edge)" stroke-width="7" opacity=".66"/>
+ <path d="M-302 104C-205 262 73 291 303 83" fill="none" stroke="#c026d3" stroke-width="7" opacity=".48" filter="url(#neon)"/>
+ <circle cx="276" cy="-103" r="13" fill="#00e5ff" filter="url(#neon)"/>
+ <circle cx="-278" cy="102" r="10" fill="#a855f7" filter="url(#neon)"/>
+ <path d="M-238 210L0-218L238 210L126 210L0-22L-126 210Z" fill="url(#face)" stroke="url(#edge)" stroke-width="10" filter="url(#neon)"/>
+ <path d="M-126 210L0-22L126 210L-7 210L-63 112L-126 210Z" fill="#081016" stroke="url(#core)" stroke-width="5"/>
+ <path d="M-238 210L0-218L238 210" fill="none" stroke="url(#sheen)" stroke-width="4"/>
+ <path d="M-80 116L0-22L80 116" fill="none" stroke="#00e5ff" stroke-width="6" opacity=".88" filter="url(#neon)"/>
+ <path d="M-48 163L0 79L48 163" fill="none" stroke="#a855f7" stroke-width="5" opacity=".86" filter="url(#neon)"/>
+ <circle cx="0" cy="-218" r="7" fill="#f5d0fe" filter="url(#neon)"/>
+</g>
+</svg>
