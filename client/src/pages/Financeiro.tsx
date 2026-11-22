@@ -176,7 +176,8 @@ export default function Financeiro() {
     
     const totalNet = salesGross + extraIncome - expenses;
     const finalNetBalance = salesGross + extraIncome - expenses - inventoryValue;
-    return { gross: salesGross + extraIncome, net: totalNet, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
+    const grossProfit = salesGross - inventory.reduce((sum, item) => sum + (Number(item.costPrice) * Number(item.quantity)), 0);
+    return { gross: salesGross + extraIncome, net: totalNet, grossProfit, expenses, extraIncome, count: completedSales.length, inventoryValue, finalNetBalance };
   }, [sales, transactions, inventory, businessType]);
 
   const onSubmit = (data: any) => {
@@ -208,11 +209,11 @@ export default function Financeiro() {
         <div className="grid grid-cols-1 gap-4">
           <div className="p-6 rounded-2xl bg-zinc-800/30 border border-white/5 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Lucro Líquido</span>
+              <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-widest">Lucro Bruto</span>
               <DollarSign className={`w-4 h-4 ${financialData.net >= 0 ? 'text-primary' : 'text-red-500'}`} />
             </div>
             <div className={`text-4xl font-black italic tracking-tighter ${financialData.net >= 0 ? 'text-white' : 'text-red-500'}`}>
-              R$ {(financialData.net / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              R$ {(financialData.grossProfit / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </div>
           </div>
 
