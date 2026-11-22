@@ -675,8 +675,31 @@ export class DatabaseStorage implements IStorage {
         userId: sale.userId ?? null, totalAmount: insertedSale.totalAmount,
       });
       
-      const itemsWithSaleId = items.map(item => ({ ...item, saleId: insertedSale.id }));
-      await database.insert(saleItems).values(itemsWithSaleId);
+      const itemsWithSaleId = [];
+      for (const item of items) {
+        let costTotal: number | null = null;
+        const numericItemId = Number(item.itemId);
+        const batchId = String(item.itemType || "").toLowerCase() === "product" && numericItemId >= 500000 ? numericItemId - 500000 : null;
+        if (batchId !== null) {
+          const [batch] = await database.select().from(batches).where(eq(batches.id, batchId)).limit(1);
+          if (batch) {
+            const qty = Number(item.quantity || 0);
+            const packageQty = Math.max(Number(batch.packageQuantity || 1), 0.000001);
+            const unitCost = String(batch.costPriceUnit || "unit") === "package" ? Number(batch.costPrice || 0) / packageQty : Number(batch.costPrice || 0);
+            costTotal = String(batch.unit || "").toLowerCase() === "kg" || String(item.unitType || "").toLowerCase() === "kg"
+              ? Math.round(qty * unitCost / 1000)
+              : Math.round(qty * unitCost);
+          }
+        } else {
+          const legacyId = numericItemId >= 10000 && numericItemId < 500000 ? numericItemId - 10000 : null;
+          const [legacy] = await database.select().from(inventory).where(
+            legacyId !== null ? eq(inventory.id, legacyId) : and(eq(inventory.itemId, numericItemId), eq(inventory.itemType, item.itemType))
+          ).limit(1);
+          if (legacy) costTotal = Math.round(Number(item.quantity || 0) * Number(legacy.costPrice || 0));
+        }
+        itemsWithSaleId.push({ ...item, saleId: insertedSale.id, costTotal });
+      }
+      await database.insert(saleItems).values(itemsWithSaleId as any);
       runtimeEvent("sale-items-created", `Itens da venda #${insertedSale.id} gravados`, {
         phase: "sale", saleId: insertedSale.id, itemCount: itemsWithSaleId.length,
       });
