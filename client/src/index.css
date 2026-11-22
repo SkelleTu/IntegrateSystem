@@ -29,8 +29,8 @@
   
   --radius: 0.75rem;
   
-  --font-display: "Segoe UI", Arial, sans-serif;
-  --font-body: "Segoe UI", Inter, Arial, sans-serif;
+  --font-display: Calibri, "Segoe UI", Arial, sans-serif;
+  --font-body: Calibri, "Segoe UI", Arial, sans-serif;
   --font-mono: "Cascadia Mono", Consolas, "Courier New", monospace;
 }
 
@@ -94,7 +94,7 @@
 
   body {
     @apply text-foreground antialiased selection:bg-primary/30 selection:text-primary relative;
-    font-family: var(--font-body);
+    font-family: Calibri, "Segoe UI", Arial, sans-serif;
     background: transparent !important;
   }
 
