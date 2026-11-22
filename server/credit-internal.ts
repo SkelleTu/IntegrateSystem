@@ -25,10 +25,13 @@ export async function ensureCreditInternalSchema() {
   await neonPool.query("ALTER TABLE credit_internal_customers ADD COLUMN IF NOT EXISTS last_risk_event_at TIMESTAMPTZ");
   await neonPool.query(
     "CREATE TABLE IF NOT EXISTS credit_internal_purchases (" +
-    "id SERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, customer_id INTEGER NOT NULL REFERENCES credit_internal_customers(id) ON DELETE CASCADE, " +
+    "id SERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, customer_id INTEGER NOT NULL REFERENCES credit_internal_customers(id) ON DELETE CASCADE, sale_id INTEGER UNIQUE, " +
     "description TEXT NOT NULL, amount_cents BIGINT NOT NULL, paid_cents BIGINT NOT NULL DEFAULT 0, purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), " +
     "due_at TIMESTAMPTZ NOT NULL, status TEXT NOT NULL DEFAULT 'open', notes TEXT)"
   );
+  await neonPool.query("ALTER TABLE credit_internal_purchases ADD COLUMN IF NOT EXISTS sale_id INTEGER UNIQUE");
+  await neonPool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS credit_customer_id INTEGER");
+  await neonPool.query("ALTER TABLE sales ADD COLUMN IF NOT EXISTS credit_purchase_id INTEGER");
   await neonPool.query(
     "CREATE TABLE IF NOT EXISTS credit_internal_payments (" +
     "id SERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, customer_id INTEGER NOT NULL REFERENCES credit_internal_customers(id) ON DELETE CASCADE, " +
@@ -127,6 +130,23 @@ export function registerCreditInternalRoutes(app: Express) {
     await ensureCreditInternalSchema();
     res.json({ok:true,toleranceDays:31,blockAfterDays:32,recoveryDays:90,penaltyPct:PENALTY_PCT,legalMonthlyPct:LEGAL_MONTHLY_PCT,legalReference:"Taxa Legal — art. 406 do Código Civil — BCB, novembro/2026"});
   });
+  app.get("/api/credit-internal/cashier/customers", async (req,res)=>{
+    if(!req.isAuthenticated?.()) return res.sendStatus(401);
+    await ensureCreditInternalSchema();
+    const q=String(req.query.q||"").trim();
+    const params:any[]=[eid(req)];
+    let where="WHERE enterprise_id=$1";
+    if(q){ params.push("%"+q+"%"); where+=" AND (full_name ILIKE $2 OR cpf ILIKE $2 OR COALESCE(phone,'') ILIKE $2)"; }
+    const r=await neonPool!.query("SELECT id,full_name,cpf,phone,email,credit_limit_cents,payment_cycle_days,status,risk_reduction_cents FROM credit_internal_customers "+where+" ORDER BY full_name LIMIT 25",params);
+    const out=[];
+    for(const c of r.rows){
+      const openQ=await neonPool!.query("SELECT COALESCE(SUM(amount_cents-paid_cents),0) open FROM credit_internal_purchases WHERE enterprise_id=$1 AND customer_id=$2 AND status<>'paid'",[eid(req),c.id]);
+      const authQ=await neonPool!.query("SELECT COALESCE(SUM(extra_limit_cents),0) extra FROM credit_internal_authorizations WHERE enterprise_id=$1 AND customer_id=$2 AND valid_until>=NOW()",[eid(req),c.id]);
+      const open=Number(openQ.rows[0]?.open||0), extra=Number(authQ.rows[0]?.extra||0), limit=Number(c.credit_limit_cents||0), available=Math.max(0,limit+extra-open);
+      out.push({...c,creditLimit:money(limit),openDebt:money(open),authorizedExtra:money(extra),available:money(available),riskReduction:money(c.risk_reduction_cents)});
+    }
+    res.json(out);
+  });
   app.get("/api/credit-internal/customers", async (req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     await ensureCreditInternalSchema(); res.json(await list(req));
@@ -172,7 +192,8 @@ export function registerCreditInternalRoutes(app: Express) {
     const days=Math.max(0,Math.floor((Date.now()-new Date(p.due_at).getTime())/86400000)); const penalty=days>0?Math.round(remaining*PENALTY_PCT/100):0; const interest=Math.round(remaining*(LEGAL_MONTHLY_PCT/100)*(days/30)); const total=principal+penalty+interest;
     await neonPool!.query("INSERT INTO credit_internal_payments(enterprise_id,customer_id,purchase_id,principal_cents,penalty_cents,interest_cents,total_cents,days_late,interest_monthly_pct) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",[eid(req),id,pid,principal,penalty,interest,total,days,LEGAL_MONTHLY_PCT]);
     const newPaid=Number(p.paid_cents)+principal; await neonPool!.query("UPDATE credit_internal_purchases SET paid_cents=$1,status=$2 WHERE id=$3",[newPaid,newPaid>=Number(p.amount_cents)?"paid":"open",pid]);
-    await audit(req,id,"credit.payment_recorded",{purchaseId:pid,principalCents:principal,penaltyCents:penalty,interestCents:interest,daysLate:days,totalCents:total});
+    await neonPool!.query("INSERT INTO transactions(business_type,type,category,description,amount,created_at) SELECT e.business_type,'income','credito_interno',$1,$2,NOW() FROM enterprises e WHERE e.id=$3",["Recebimento Crédito Interno #"+pid+" — "+String(p.description||""),total,eid(req)]);
+    await audit(req,id,"credit.payment_recorded",{purchaseId:pid,principalCents:principal,penaltyCents:penalty,interestCents:interest,daysLate:days,totalCents:total,financialTransactionCreated:true});
     res.status(201).json({principal:money(principal),penalty:money(penalty),interest:money(interest),daysLate:days,total:money(total)});
   });
   app.post("/api/credit-internal/customers/:id/authorization", async(req,res)=>{
