@@ -551,7 +551,13 @@ export async function ensureAuditTriggers() {
     BEGIN
       row_data := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
       inferred_actor := NULLIF(COALESCE(row_data->>'user_id', row_data->>'owner_id', row_data->>'actor_user_id'), '')::INTEGER;
+      IF inferred_actor IS NULL AND TG_TABLE_NAME IN ('payments','sale_items','nfce') AND NULLIF(row_data->>'sale_id','') IS NOT NULL THEN
+        SELECT s.user_id INTO inferred_actor FROM sales s WHERE s.id = (row_data->>'sale_id')::INTEGER LIMIT 1;
+      END IF;
       inferred_enterprise := NULLIF(COALESCE(row_data->>'enterprise_id', current_setting('aura.enterprise_id', true)), '')::INTEGER;
+      IF inferred_enterprise IS NULL AND inferred_actor IS NOT NULL THEN
+        SELECT u.enterprise_id INTO inferred_enterprise FROM users u WHERE u.id = inferred_actor LIMIT 1;
+      END IF;
       INSERT INTO audit_events (
         enterprise_id, actor_user_id, action, module, entity_type, entity_id, status,
         occurred_at, old_data, new_data, details
