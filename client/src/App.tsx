@@ -205,6 +205,7 @@ function LandingNavigation() {
     <nav className="fixed top-0 left-0 w-full z-[100] px-4 md:px-6 py-3 flex items-center justify-between border-b border-white/5 bg-black/50 backdrop-blur-md">
       <div className="flex items-center gap-2 shrink-0">
         <img src={auraLogo} alt="Aura Logo" className="h-10 md:h-14 w-auto" />
+        <span className="text-white font-black text-base md:text-xl tracking-[-0.03em] drop-shadow-[0_0_14px_rgba(0,229,255,0.28)]">Aura System</span>
       </div>
       <div className="hidden lg:flex items-center gap-6 xl:gap-8">
         {navLinks.map((link) => (
