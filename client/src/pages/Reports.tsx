@@ -27,10 +27,8 @@ export default function Reports() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
-    start: format(new Date(), "yyyy-MM-dd"),
-    end: format(new Date(), "yyyy-MM-dd"),
-  });
+  const businessToday = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: businessToday, end: businessToday });
 
   const [saleToCancel, setSaleToCancel] = useState<number | null>(null);
   const isAuthorizedToCancel = user?.role === "owner" || user?.role === "admin" || user?.masterAccessAuthorized === true;
@@ -39,8 +37,8 @@ export default function Reports() {
   const { data: sales, isLoading: isLoadingSales } = useQuery<Sale[]>({
     queryKey: ["/api/sales", dateRange.start, dateRange.end],
     queryFn: async () => {
-      const start = dateRange.start ? `${dateRange.start}T00:00:00.000Z` : "";
-      const end = dateRange.end ? `${dateRange.end}T23:59:59.999Z` : "";
+      const start = dateRange.start ? `${dateRange.start}T00:00:00.000-03:00` : "";
+      const end = dateRange.end ? `${dateRange.end}T23:59:59.999-03:00` : "";
       const res = await fetch(`/api/sales?start=${start}&end=${end}`);
       if (!res.ok) return [];
       return res.json();
