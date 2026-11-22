@@ -36,7 +36,7 @@ import { BackgroundIcons } from "@/components/BackgroundIcons";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { Menu } from "lucide-react";
-const auraLogo = "/aura-system-logo.svg";
+const auraLogo = "/aura-system-logo.svg?v=7";
 
 const AboutUs = lazy(() => import("@/pages/AboutUs"));
 const Solutions = lazy(() => import("@/pages/Solutions"));
