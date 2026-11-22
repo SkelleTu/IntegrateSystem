@@ -145,7 +145,7 @@ function Router() {
   return (
     <div className={`flex h-screen w-full ${isCashierPage ? "overflow-hidden" : ""}`}>
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        <main className={`flex-1 relative ${isCashierPage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"} ${["/financeiro", "/inventory", "/admin/monitoring"].includes(location) ? "pt-20" : ""}`}>
+        <main className={`aura-module-theme flex-1 relative ${isCashierPage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"} ${["/financeiro", "/inventory", "/admin/monitoring"].includes(location) ? "pt-20" : ""}`}>
           <Suspense fallback={<RouteLoading />}>
           <Switch>
             <Route path="/" component={LandingPage} />
