@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/use-auth";
 import { requestMasterAuthorization } from "@/lib/masterAccess";
 import { useToast } from "@/hooks/use-toast";
-import { differenceInDays, format } from "date-fns";
+import { differenceInCalendarDays, format } from "date-fns";
 import Fuse from "fuse.js";
 import {
   Package, Search, Plus, Loader2, ChevronDown, ChevronUp,
@@ -79,9 +79,16 @@ function utcDateOnly(d: string | Date): Date {
   return new Date(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate());
 }
 
+function daysUntilExpiry(date: string | Date | null | undefined): number | null {
+  if (!date) return null;
+  // Validade é uma data de calendário, não um instante de 24h.
+  // Ex.: 23/11 continua válido durante todo o dia 22/11 no fuso do usuário.
+  return differenceInCalendarDays(utcDateOnly(date), utcDateOnly(new Date()));
+}
+
 function getExpiryUrgency(date: string | Date | null | undefined): "safe" | "blue" | "yellow" | "red" {
   if (!date) return "safe";
-  const days = differenceInDays(utcDateOnly(date), new Date());
+  const days = daysUntilExpiry(date)!;
   if (days <= 0) return "red";
   if (days <= 3) return "red";
   if (days <= 7) return "yellow";
@@ -92,6 +99,11 @@ function getExpiryUrgency(date: string | Date | null | undefined): "safe" | "blu
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return "—";
   try { return format(utcDateOnly(d), "dd/MM/yyyy"); } catch { return "—"; }
+}
+
+function dateInputValue(d: string | Date | null | undefined) {
+  if (!d) return "";
+  try { return format(utcDateOnly(d), "yyyy-MM-dd"); } catch { return ""; }
 }
 
 function fmtCurrency(cents: number | null | undefined) {
@@ -1019,8 +1031,8 @@ export default function InventoryPage() {
       items = items.filter(p => {
         if (filterStatus === "baixo")     return p.totalQuantity < p.minStock;
         if (filterStatus === "sem_lotes") return p.totalQuantity <= 0;
-        if (filterStatus === "vencidos")  return p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0;
-        if (filterStatus === "vencendo")  return p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7;
+        if (filterStatus === "vencidos")  return p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) <= 0;
+        if (filterStatus === "vencendo")  return p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) > 0 && daysUntilExpiry(p.nearestExpiry) <= 7;
         return true;
       });
     }
@@ -1046,7 +1058,7 @@ export default function InventoryPage() {
   function ExpiryBadge({ date }: { date: string | Date | null | undefined }) {
     if (!date) return null;
     const u = getExpiryUrgency(date);
-    const days = differenceInDays(utcDateOnly(date), new Date());
+    const days = daysUntilExpiry(date);
     const cfg = {
       red:    { cls: "bg-red-500/15 border-red-500/30 text-red-400", label: days <= 0 ? "VENCIDO" : `VENCE EM ${days}d` },
       yellow: { cls: "bg-yellow-500/15 border-yellow-500/30 text-yellow-400", label: `VENCE EM ${days}d` },
@@ -1145,9 +1157,9 @@ export default function InventoryPage() {
       quantity: String(b.quantity),
       costPrice: b.costPrice ? String((b.costPrice / 100).toFixed(2)) : "",
       salePrice: b.salePrice ? String((b.salePrice / 100).toFixed(2)) : "",
-      manufactureDate: b.manufactureDate ? new Date(b.manufactureDate).toISOString().slice(0, 10) : "",
-      expiryDate: b.expiryDate ? new Date(b.expiryDate).toISOString().slice(0, 10) : "",
-      entryDate: new Date(b.entryDate).toISOString().slice(0, 10),
+      manufactureDate: b.manufactureDate ? dateInputValue(b.manufactureDate) : "",
+      expiryDate: b.expiryDate ? dateInputValue(b.expiryDate) : "",
+      entryDate: dateInputValue(b.entryDate),
     });
     setEditingBatch(b);
   }
@@ -1558,8 +1570,8 @@ export default function InventoryPage() {
 
   const totalProducts = products.length;
   const lowStockCount = products.filter(p => p.totalQuantity < p.minStock).length;
-  const expiringCount = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) > 0 && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 7).length;
-  const expiredCount  = products.filter(p => p.nearestExpiry && differenceInDays(utcDateOnly(p.nearestExpiry), new Date()) <= 0).length;
+  const expiringCount = products.filter(p => p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) > 0 && daysUntilExpiry(p.nearestExpiry) <= 7).length;
+  const expiredCount  = products.filter(p => p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) <= 0).length;
   const saleCount     = products.filter(p => p.emLiquidacao).length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
