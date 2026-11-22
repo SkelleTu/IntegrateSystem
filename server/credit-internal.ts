@@ -181,25 +181,6 @@ export function registerCreditInternalRoutes(app: Express) {
     const r=await neonPool!.query("INSERT INTO credit_internal_authorizations(enterprise_id,customer_id,authorized_by,extra_limit_cents,valid_until,payment_due_at,reason) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *",[eid(req),id,Number((req.user as any).id),extra,until,req.body?.paymentDueAt?new Date(req.body.paymentDueAt):null,req.body?.reason||null]);
     await audit(req,id,"credit.exception_authorization",{authorizationId:r.rows[0].id,extraLimitCents:extra,validUntil:until.toISOString()}); res.status(201).json(r.rows[0]);
   });
-  app.post("/api/credit-internal/qa/force-due-date", async(req,res)=>{
-    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
-    await ensureCreditInternalSchema();
-    const purchaseId=Number(req.body?.purchaseId); const dueAt=new Date(String(req.body?.dueAt));
-    if(!purchaseId || Number.isNaN(dueAt.getTime())) return res.status(400).json({message:"purchaseId e dueAt válidos são obrigatórios."});
-    const q=await neonPool!.query("UPDATE credit_internal_purchases SET due_at=$1 WHERE id=$2 AND enterprise_id=$3 AND notes='TESTE QA' RETURNING id,due_at",[dueAt,purchaseId,eid(req)]);
-    if(!q.rows[0]) return res.status(404).json({message:"Compra QA não encontrada."});
-    await audit(req,null,"credit.qa_due_date_forced",{purchaseId,dueAt:dueAt.toISOString()});
-    res.json({ok:true,purchaseId,dueAt:q.rows[0].due_at});
-  });
-  app.post("/api/credit-internal/qa/force-observation-start", async(req,res)=>{
-    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
-    await ensureCreditInternalSchema();
-    const customerId=Number(req.body?.customerId); const startedAt=new Date(String(req.body?.startedAt));
-    if(!customerId || Number.isNaN(startedAt.getTime())) return res.status(400).json({message:"customerId e startedAt válidos são obrigatórios."});
-    const q=await neonPool!.query("UPDATE credit_internal_customers SET observation_started_at=$1 WHERE id=$2 AND enterprise_id=$3 AND notes LIKE 'TESTE QA%' RETURNING id,observation_started_at",[startedAt,customerId,eid(req)]);
-    if(!q.rows[0]) return res.status(404).json({message:"Cliente QA não encontrado."});
-    res.json({ok:true,customerId,observationStartedAt:q.rows[0].observation_started_at});
-  });
   app.get("/api/credit-internal/customers/:id/term", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     await ensureCreditInternalSchema(); const id=Number(req.params.id);
