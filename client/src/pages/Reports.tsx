@@ -323,7 +323,17 @@ export default function Reports() {
         </Card>
       </div>
 
-      <AlertDialog open={saleToCancel !== null} onOpenChange={(open) => !open && setSaleToCancel(null)}>
+      <Card className="bg-zinc-900 border-white/10 shadow-2xl rounded-2xl overflow-hidden">
+        <CardHeader className="border-b border-white/5 bg-white/5 p-6">
+          <CardTitle className="text-white uppercase italic tracking-tighter text-xl font-black flex items-center gap-3">
+            <History className="w-6 h-6 text-primary" /> Linha do Tempo Operacional
+          </CardTitle>
+          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">Auditoria permanente de caixa, vendas, estoque, financeiro, fiscal e administração</p>
+        </CardHeader>
+        <CardContent className="p-6"><AuditTimeline dateRange={dateRange} /></CardContent>
+      </Card>
+
+      <AlertDialog open={saleToCancel !== null onOpenChange={(open) => !open && setSaleToCancel(null)}>
         <AlertDialogContent className="bg-zinc-950 border-white/10 text-white rounded-2xl p-8 shadow-2xl">
           <AlertDialogHeader>
             <div className="flex items-center gap-3 mb-4">
