@@ -99,8 +99,10 @@ export default function Cashier() {
   const [cart, setCart] = useState<{ item: MenuItem; quantity: number }[]>([]);
   const [openingAmount, setOpeningAmount] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const [payments, setPayments] = useState<{ method: "cash" | "card" | "pix"; amount: number }[]>([]);
-  const [currentMethod, setCurrentMethod] = useState<"cash" | "card" | "pix" | null>(null);
+  const [payments, setPayments] = useState<{ method: "cash" | "card" | "pix" | "credit_internal"; amount: number }[]>([]);
+  const [currentMethod, setCurrentMethod] = useState<"cash" | "card" | "pix" | "credit_internal" | null>(null);
+  const [creditCustomerSearch, setCreditCustomerSearch] = useState("");
+  const [selectedCreditCustomer, setSelectedCreditCustomer] = useState<any>(null);
   const [customerAmount, setCustomerAmount] = useState("");
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [searchTicket, setSearchTicket] = useState("");
@@ -416,6 +418,7 @@ export default function Cashier() {
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/cash-register/open"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/cash-registers/history"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/credit-internal/cashier/customers"] }),
       ]);
 
       setCart([]);
@@ -425,6 +428,8 @@ export default function Cashier() {
       setPayments([]);
       setCurrentMethod(null);
       setCustomerInfo({ name: "", taxId: "", email: "" });
+      setSelectedCreditCustomer(null);
+      setCreditCustomerSearch("");
       setShowFiscalFields(false);
       
       toast({ 
@@ -547,7 +552,7 @@ export default function Cashier() {
     setShowFiscalFields(!showFiscalFields);
   };
 
-  const handlePayment = (method: "cash" | "card" | "pix") => {
+  const handlePayment = (method: "cash" | "card" | "pix" | "credit_internal") => {
     if (cart.length === 0) {
       toast({ title: "Carrinho Vazio", variant: "destructive" });
       return;
@@ -562,6 +567,10 @@ export default function Cashier() {
   };
 
   const addPayment = () => {
+    if (currentMethod === "credit_internal" && !selectedCreditCustomer) {
+      toast({ title: "Cliente não selecionado", description: "Selecione o cliente do Crédito Interno antes de confirmar.", variant: "destructive" });
+      return;
+    }
     const amount = Math.round(Number(customerAmount.replace(",", ".")) * 100);
     if (isNaN(amount) || amount <= 0) {
       toast({ title: "Valor Inválido", variant: "destructive" });
@@ -611,7 +620,8 @@ export default function Cashier() {
           totalPrice: Math.round(i.item.price * i.quantity) 
         };
       }),
-      payments: isSimulation ? [{ method: "cash", amount: total }] : payments
+      payments: isSimulation ? [{ method: "cash", amount: total }] : payments,
+      creditCustomerId: (!isSimulation && payments.some((p: any) => p.method === "credit_internal")) ? selectedCreditCustomer?.id : null
     });
   };
 
@@ -782,6 +792,17 @@ function CashierContent({
   const removePayment = (index: number) => {
     setPayments((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
   };
+
+  const { data: creditCustomers = [], isLoading: isLoadingCreditCustomers } = useQuery<any[]>({
+    queryKey: ["/api/credit-internal/cashier/customers", creditCustomerSearch],
+    queryFn: async () => {
+      const res = await fetch("/api/credit-internal/cashier/customers?q=" + encodeURIComponent(creditCustomerSearch));
+      if (!res.ok) throw new Error("Não foi possível consultar os clientes de Crédito Interno.");
+      return res.json();
+    },
+    enabled: !!user && paymentModalOpen && currentMethod === "credit_internal",
+    staleTime: 10000,
+  });
 
   const { data: fiscalSettingsData, isLoading: isLoadingFiscal } = useQuery<FiscalSettings>({
     queryKey: ["/api/fiscal/settings"],
@@ -1178,7 +1199,7 @@ function CashierContent({
                 </span>
               </div>
 
-              <div className="grid grid-cols-4 gap-1.5 pt-1">
+              <div className="grid grid-cols-5 gap-1.5 pt-1">
                 <Button 
                   variant="outline" 
                   className={`flex flex-col items-center justify-center h-14 border-white/10 transition-all gap-1 group relative overflow-hidden ${showFiscalFields ? 'bg-primary/20 text-primary border-primary/50' : 'bg-zinc-900/50 text-white hover:border-primary/50 hover:bg-primary/5'}`} 
@@ -1213,6 +1234,15 @@ function CashierContent({
                 >
                   <QrCode className="w-4 h-4 text-primary/60 group-hover:text-primary transition-transform group-hover:scale-110" />
                   <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">PIX</span>
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="flex flex-col items-center justify-center h-14 border-white/10 bg-zinc-900/50 text-white hover:border-purple-500/50 hover:bg-purple-500/5 transition-all gap-1 group" 
+                  disabled={remainingTotal <= 0} 
+                  onClick={() => handlePayment('credit_internal')}
+                >
+                  <CreditCard className="w-4 h-4 text-purple-400/70 group-hover:text-purple-400 transition-transform group-hover:scale-110" />
+                  <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">CRÉDITO</span>
                 </Button>
               </div>
 
@@ -1284,9 +1314,46 @@ function CashierContent({
         <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-3xl shadow-2xl z-[999]">
           <DialogHeader>
             <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
-              PAGAMENTO: <span className="text-primary">{currentMethod?.toUpperCase()}</span>
+              PAGAMENTO: <span className="text-primary">{currentMethod === "credit_internal" ? "CRÉDITO INTERNO" : currentMethod?.toUpperCase()}</span>
             </DialogTitle>
           </DialogHeader>
+          {currentMethod === "credit_internal" && (
+            <div className="space-y-3">
+              <Input
+                placeholder="BUSCAR CLIENTE POR NOME, CPF OU TELEFONE..."
+                value={creditCustomerSearch}
+                onChange={e => setCreditCustomerSearch(e.target.value)}
+                className="bg-black border-white/10 text-white h-11 text-xs font-black rounded-xl"
+                autoFocus
+              />
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {isLoadingCreditCustomers ? (
+                  <div className="text-center text-white/30 text-xs font-black py-5">CONSULTANDO CLIENTES...</div>
+                ) : creditCustomers.length === 0 ? (
+                  <div className="text-center text-white/30 text-xs font-black py-5">NENHUM CLIENTE ENCONTRADO</div>
+                ) : creditCustomers.map((customer: any) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => setSelectedCreditCustomer(customer)}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${selectedCreditCustomer?.id === customer.id ? "border-purple-400 bg-purple-500/10" : "border-white/10 bg-white/5 hover:border-purple-400/40"}`}
+                  >
+                    <div className="flex justify-between gap-3">
+                      <span className="text-white font-black uppercase text-xs">{customer.full_name}</span>
+                      <span className={`text-[9px] font-black uppercase ${customer.status === "blocked" ? "text-red-500" : customer.status === "attention" ? "text-yellow-400" : "text-green-400"}`}>{customer.status}</span>
+                    </div>
+                    <div className="text-white/40 text-[9px] mt-1">CPF {customer.cpf} • Disponível R$ {Number(customer.available || 0).toFixed(2)}</div>
+                  </button>
+                ))}
+              </div>
+              {selectedCreditCustomer && (
+                <div className="rounded-xl border border-purple-400/30 bg-purple-500/10 p-3 text-xs">
+                  <div className="flex justify-between"><span className="text-white/40 uppercase font-black">Cliente</span><span className="text-white font-black">{selectedCreditCustomer.full_name}</span></div>
+                  <div className="flex justify-between mt-1"><span className="text-white/40 uppercase font-black">Limite disponível</span><span className="text-purple-300 font-black">R$ {Number(selectedCreditCustomer.available || 0).toFixed(2)}</span></div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="space-y-8 pt-6">
             <div className="flex justify-between items-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">
               <span className="text-zinc-500 uppercase font-black text-xs tracking-widest">Total Restante</span>
@@ -1305,6 +1372,11 @@ function CashierContent({
                 autoFocus 
               />
             </div>
+            {currentMethod === "credit_internal" && selectedCreditCustomer && (
+              <div className="rounded-xl border border-purple-400/20 bg-purple-500/5 px-4 py-3 text-[10px] font-black uppercase text-purple-300">
+                Compra vinculada a {selectedCreditCustomer.full_name}
+              </div>
+            )}
             {currentMethod === "cash" && (() => {
               const received = Math.round(Number(customerAmount.replace(",", ".")) * 100);
               const diff = received - remainingTotal;
