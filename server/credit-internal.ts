@@ -79,6 +79,16 @@ async function evaluate(req: Request, c: any) {
     }
   }
   let status = maxDays >= 32 ? "blocked" : maxDays > 0 ? "attention" : "good";
+  if (status === "blocked" && Number(c.risk_reduction_cents || 0) === 0) {
+    const reduction = Math.min(Math.max(0, Number(c.credit_limit_cents)), Math.round(Number(c.original_limit_cents || c.credit_limit_cents) * 0.10));
+    if (reduction > 0) {
+      await neonPool.query("UPDATE credit_internal_customers SET credit_limit_cents=GREATEST(0,credit_limit_cents-$1),risk_reduction_cents=risk_reduction_cents+$1,observation_started_at=NOW(),updated_at=NOW() WHERE id=$2 AND enterprise_id=$3", [reduction,c.id,eid(req)]);
+      await audit(req,c.id,"credit.limit_reduced",{reductionCents:reduction,reason:"qualifying_overdue"});
+      c.credit_limit_cents=Number(c.credit_limit_cents)-reduction;
+      c.risk_reduction_cents=Number(c.risk_reduction_cents)+reduction;
+      c.observation_started_at=new Date().toISOString();
+    }
+  }
   if (status === "good" && Number(c.risk_reduction_cents) > 0 && c.observation_started_at) {
     const observed = Math.floor((Date.now() - new Date(c.observation_started_at).getTime()) / 86400000);
     if (observed >= 90) {
@@ -193,6 +203,18 @@ export function registerCreditInternalRoutes(app: Express) {
     if(!r.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
     await audit(req,id,"credit.contract_signed",{signatureType:type,contractVersion:r.rows[0].contract_version});
     res.json(r.rows[0]);
+  });
+  app.post("/api/credit-internal/customers/:id/signature", async(req,res)=>{
+    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
+    await ensureCreditInternalSchema();
+    const id=Number(req.params.id);
+    const type=String(req.body?.signatureType||"").toLowerCase();
+    if(!["manual","electronic"].includes(type)) return res.status(400).json({message:"Tipo de assinatura inválido."});
+    const q=await neonPool!.query("SELECT id FROM credit_internal_customers WHERE id=$1 AND enterprise_id=$2",[id,eid(req)]);
+    if(!q.rows[0]) return res.status(404).json({message:"Cliente não encontrado."});
+    await neonPool!.query("UPDATE credit_internal_customers SET signature_type=$1,contract_signed_at=NOW(),contract_version=contract_version+1,updated_at=NOW() WHERE id=$2 AND enterprise_id=$3",[type,id,eid(req)]);
+    await audit(req,id,"credit.contract_signed",{signatureType:type});
+    res.json({ok:true,signatureType:type,signedAt:new Date().toISOString()});
   });
   app.get("/api/credit-internal/legal-rate", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
