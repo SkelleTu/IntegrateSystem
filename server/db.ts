@@ -556,6 +556,7 @@ export async function setupDatabase() {
     "ALTER TABLE inventory ADD COLUMN rotation INTEGER DEFAULT 0",
     "ALTER TABLE inventory ADD COLUMN image_scale INTEGER DEFAULT 100",
     "ALTER TABLE sale_items ADD COLUMN unit_type TEXT DEFAULT 'unit'",
+    "ALTER TABLE sale_items ADD COLUMN cost_total INTEGER",
     "ALTER TABLE batches ADD COLUMN sku TEXT",
     "ALTER TABLE batches ADD COLUMN variant_name TEXT",
     "ALTER TABLE batches ADD COLUMN sale_price INTEGER",
