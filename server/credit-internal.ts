@@ -191,6 +191,15 @@ export function registerCreditInternalRoutes(app: Express) {
     await audit(req,null,"credit.qa_due_date_forced",{purchaseId,dueAt:dueAt.toISOString()});
     res.json({ok:true,purchaseId,dueAt:q.rows[0].due_at});
   });
+  app.post("/api/credit-internal/qa/force-observation-start", async(req,res)=>{
+    if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
+    await ensureCreditInternalSchema();
+    const customerId=Number(req.body?.customerId); const startedAt=new Date(String(req.body?.startedAt));
+    if(!customerId || Number.isNaN(startedAt.getTime())) return res.status(400).json({message:"customerId e startedAt válidos são obrigatórios."});
+    const q=await neonPool!.query("UPDATE credit_internal_customers SET observation_started_at=$1 WHERE id=$2 AND enterprise_id=$3 AND notes LIKE 'TESTE QA%' RETURNING id,observation_started_at",[startedAt,customerId,eid(req)]);
+    if(!q.rows[0]) return res.status(404).json({message:"Cliente QA não encontrado."});
+    res.json({ok:true,customerId,observationStartedAt:q.rows[0].observation_started_at});
+  });
   app.get("/api/credit-internal/customers/:id/term", async(req,res)=>{
     if(!master(req)) return res.status(403).json({message:"Acesso exclusivo da Conta Mestre."});
     await ensureCreditInternalSchema(); const id=Number(req.params.id);
