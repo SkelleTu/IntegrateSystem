@@ -28,6 +28,7 @@ import path from "path";
 import fs from "fs";
 import { verifyMcpAccessToken } from "./mcp-oauth";
 import { neonPool } from "./neon-db.js";
+import { ensureAuditTriggers } from "./db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
 
 const uploadStorage = multer.diskStorage({
@@ -555,6 +556,7 @@ export async function registerRoutes(
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito à gestão." });
     if (!neonPool) return res.json([]);
+    await ensureAuditTriggers();
     const params: any[] = []; const where: string[] = [];
     const add = (part: string, value: any) => { params.push(value); where.push(part.replace("$N", "$" + params.length)); };
     const q = String(req.query.q || "").trim();
