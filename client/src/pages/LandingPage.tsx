@@ -10,7 +10,7 @@ const auraLogo = "/aura-system-logo.webp?v=1";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
-import { CyberTextureOverlay } from "@/components/CyberTextureOverlay";
+
 
 export default function LandingPage() {
   const [location, setLocation] = useLocation();
@@ -144,8 +144,7 @@ export default function LandingPage() {
       />
       <div className="absolute inset-0 z-[-1] bg-gradient-to-b from-black/40 via-transparent to-black/60" />
       
-      {/* Cybernetic Icons Texture Overlay */}
-      <CyberTextureOverlay iconCount={45} className="z-[1]" />
+
 
       {/* Decorative Neon Elements */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/10 rounded-full blur-[120px] pointer-events-none" />
@@ -162,6 +161,7 @@ export default function LandingPage() {
                 alt="Aura System Logo" 
                 className="w-48 md:w-64 h-auto relative z-10"
               />
+              <h1 className="mt-5 text-5xl md:text-7xl font-black tracking-[-0.06em] text-white drop-shadow-[0_0_28px_rgba(0,229,255,0.28)]">Aura System</h1>
             </div>
           </div>
           <p className="text-zinc-400 text-lg md:text-2xl max-w-2xl mx-auto font-medium tracking-wide">
@@ -185,7 +185,7 @@ export default function LandingPage() {
                 <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
                   <ShieldCheck className="w-12 h-12 text-primary" />
                 </div>
-                <feature.icon className="w-10 h-10 text-primary mb-6 group-hover:scale-110 transition-transform drop-shadow-[0_0_8px_rgba(0,229,255,0.4)]" />
+                <feature.icon className="w-10 h-10 text-white mb-6 group-hover:scale-110 transition-transform drop-shadow-[0_0_10px_rgba(255,255,255,0.35)]" />
                 <h3 className="text-white font-black uppercase text-lg mb-3 tracking-tighter">{feature.title}</h3>
                 <p className="text-zinc-400 text-sm leading-relaxed font-medium">{feature.desc}</p>
               </div>
