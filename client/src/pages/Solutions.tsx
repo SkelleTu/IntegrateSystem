@@ -1,5 +1,5 @@
 import { Zap, ShieldCheck, BarChart3, Users2, Clock, Smartphone } from "lucide-react";
-import auraLogo from "@assets/AURA_1768346008566.png";
+import auraLogo from "/aura-system-logo.webp?v=1";
 import luxuryBg from "@assets/stock_images/professional_busines_cc21c314.jpg";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
