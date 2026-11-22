@@ -258,7 +258,7 @@ export default function Financeiro() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="bg-zinc-900 border-white/10 text-white font-black italic">
-                            <SelectItem value="padaria">Padaria</SelectItem>
+                            <SelectItem value="outro">Padaria</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormItem>
@@ -349,7 +349,7 @@ export default function Financeiro() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-zinc-900 border-white/10 text-white font-black italic">
-              <SelectItem value="padaria">Unidade Padaria</SelectItem>
+              <SelectItem value="outro">Unidade Padaria</SelectItem>
             </SelectContent>
           </Select>
         </header>
