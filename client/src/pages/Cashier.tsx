@@ -247,7 +247,8 @@ export default function Cashier() {
     const term = searchTerm.toLowerCase().trim();
 
     // 1. Exact code match (barcode, SKU, ID, codigoProduto, codigoBalanca)
-    //    If any item matches exactly by code, return ONLY those — never mix with name results.    const exactCodeMatches = normalizedItems.filter(item =>
+    //    If any item matches exactly by code, return ONLY those — never mix with name results.
+    const exactCodeMatches = normalizedItems.filter(item =>
       (item.id && item.id.toString() === term) ||
       (item.barcode && item.barcode.toLowerCase() === term) ||
       ((item as any).sku && (item as any).sku.toLowerCase() === term) ||
