@@ -497,7 +497,8 @@ export default function Cashier() {
   const loadTicketMutation = useMutation({
     mutationFn: async (number: string) => {
       const res = await fetch(`/api/tickets/${number}`);
-      if (!res.ok) throw new Error("Comanda não encontrada");      return res.json();
+      if (!res.ok) throw new Error("Comanda não encontrada");
+      return res.json();
     },
     onSuccess: (data) => {
       if (data.items) {
@@ -748,7 +749,8 @@ function CashierContent({
   loadTicketMutation, payments, setPayments, currentMethod, setCurrentMethod, 
   customerAmount, setCustomerAmount, paymentModalOpen, setPaymentModalOpen, 
   customerInfo, setCustomerInfo, showFiscalFields, setShowFiscalFields, 
-  finalizeSale, saleMutation, remainingTotal,  setSelectedProductForAdjust, setAdjustProductModalOpen,
+  finalizeSale, saleMutation, remainingTotal,
+  setSelectedProductForAdjust, setAdjustProductModalOpen,
   updateProductAdjustmentMutation, selectedProductForAdjust, adjustProductModalOpen,
   weightModalOpen, setWeightModalOpen, weightInputValue, setWeightInputValue,
   activeItemForWeight, handleWeightSubmit,
@@ -997,7 +999,8 @@ function CashierContent({
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-white/30 text-[9px] font-bold uppercase">
                           {(item as any).priceUnit === "package" ? "por embalagem" : ((item as any).unitType === "kg" ? "por Kg" : "Unidade")}
-                        </span>                        {(item as any).emLiquidacao && (
+                        </span>
+                        {(item as any).emLiquidacao && (
                           <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase text-orange-500">
                             <Flame className="h-2.5 w-2.5" />Liquidação
                           </span>
@@ -1247,3 +1250,269 @@ function CashierContent({
                   variant="outline" 
                   className="flex flex-col items-center justify-center h-14 border-white/10 bg-zinc-900/50 text-white hover:border-purple-500/50 hover:bg-purple-500/5 transition-all gap-1 group" 
                   disabled={remainingTotal <= 0} 
+                  onClick={() => handlePayment('credit_internal')}
+                >
+                  <CreditCard className="w-4 h-4 text-purple-400/70 group-hover:text-purple-400 transition-transform group-hover:scale-110" />
+                  <span className="text-[8px] font-black uppercase tracking-wider text-white/60 group-hover:text-white">CRÉDITO</span>
+                </Button>
+              </div>
+
+              <Button 
+                className="w-full h-12 bg-primary text-black font-black uppercase italic text-sm rounded-lg shadow-[0_0_20px_rgba(0,229,255,0.2)] hover:scale-[1.01] active:scale-95 transition-all" 
+                onClick={() => finalizeSale(false)} 
+                disabled={saleMutation.isPending || cart.length === 0}
+              >
+                {saleMutation.isPending ? <Loader2 className="animate-spin w-5 h-5" /> : "FINALIZAR VENDA"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weight Input Modal */}
+      <Dialog open={weightModalOpen} onOpenChange={setWeightModalOpen}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black italic uppercase tracking-tighter text-primary flex items-center gap-2">
+              ⚖️ {activeItemForWeight?.name}
+            </DialogTitle>
+            <p className="text-white/30 text-[10px] font-black uppercase tracking-widest">
+              R$ {activeItemForWeight ? (activeItemForWeight.price / 100).toFixed(2).replace(".", ",") : "0,00"} / kg
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase tracking-widest text-white/40">Peso em kg</Label>
+              <Input
+                autoFocus
+                value={weightInputValue}
+                onChange={(e) => setWeightInputValue(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleWeightSubmit()}
+                className="bg-black border-white/10 h-16 text-4xl font-black text-center text-primary tracking-widest rounded-xl"
+                placeholder="0.000"
+              />
+            </div>
+
+            {/* Preview do total em tempo real */}
+            {(() => {
+              const w = parseFloat(weightInputValue.replace(",", "."));
+              const pricePerKg = activeItemForWeight?.price || 0;
+              const total = !isNaN(w) && w > 0 ? w * pricePerKg : 0;
+              return (
+                <div className={`rounded-xl border px-4 py-3 flex items-center justify-between transition-all ${total > 0 ? "bg-primary/10 border-primary/30" : "bg-white/5 border-white/10"}`}>
+                  <div className="text-[10px] font-black uppercase tracking-widest text-white/40">
+                    {!isNaN(w) && w > 0 ? `${w.toFixed(3)} kg × R$ ${(pricePerKg / 100).toFixed(2).replace(".", ",")} =` : "Total"}
+                  </div>
+                  <div className={`text-2xl font-black italic ${total > 0 ? "text-primary" : "text-white/20"}`}>
+                    R$ {(total / 100).toFixed(2).replace(".", ",")}
+                  </div>
+                </div>
+              );
+            })()}
+
+            <Button 
+              className="w-full h-14 bg-primary text-black font-black uppercase italic text-lg rounded-xl shadow-[0_0_20px_rgba(0,229,255,0.3)] disabled:opacity-40"
+              onClick={handleWeightSubmit}
+              disabled={(() => { const w = parseFloat(weightInputValue.replace(",", ".")); return isNaN(w) || w <= 0; })()}
+            >
+              Confirmar Peso
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
+        <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-10 rounded-3xl shadow-2xl z-[999]">
+          <DialogHeader>
+            <DialogTitle className="text-white uppercase italic tracking-tighter text-3xl font-black">
+              PAGAMENTO: <span className="text-primary">{currentMethod === "credit_internal" ? "CRÉDITO INTERNO" : currentMethod?.toUpperCase()}</span>
+            </DialogTitle>
+          </DialogHeader>
+          {currentMethod === "credit_internal" && (
+            <div className="space-y-3">
+              <Input
+                placeholder="BUSCAR CLIENTE POR NOME, CPF OU TELEFONE..."
+                value={creditCustomerSearch}
+                onChange={e => setCreditCustomerSearch(e.target.value)}
+                className="bg-black border-white/10 text-white h-11 text-xs font-black rounded-xl"
+                autoFocus
+              />
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {isLoadingCreditCustomers ? (
+                  <div className="text-center text-white/30 text-xs font-black py-5">CONSULTANDO CLIENTES...</div>
+                ) : creditCustomers.length === 0 ? (
+                  <div className="text-center text-white/30 text-xs font-black py-5">NENHUM CLIENTE ENCONTRADO</div>
+                ) : creditCustomers.map((customer: any) => (
+                  <button
+                    key={customer.id}
+                    type="button"
+                    onClick={() => setSelectedCreditCustomer(customer)}
+                    className={`w-full text-left p-3 rounded-xl border transition-all ${selectedCreditCustomer?.id === customer.id ? "border-purple-400 bg-purple-500/10" : "border-white/10 bg-white/5 hover:border-purple-400/40"}`}
+                  >
+                    <div className="flex justify-between gap-3">
+                      <span className="text-white font-black uppercase text-xs">{customer.full_name}</span>
+                      <span className={`text-[9px] font-black uppercase ${customer.status === "blocked" ? "text-red-500" : customer.status === "attention" ? "text-yellow-400" : "text-green-400"}`}>{customer.status}</span>
+                    </div>
+                    <div className="text-white/40 text-[9px] mt-1">CPF {customer.cpf} • Disponível R$ {Number(customer.available || 0).toFixed(2)}</div>
+                  </button>
+                ))}
+              </div>
+              {selectedCreditCustomer && (
+                <div className="rounded-xl border border-purple-400/30 bg-purple-500/10 p-3 text-xs">
+                  <div className="flex justify-between"><span className="text-white/40 uppercase font-black">Cliente</span><span className="text-white font-black">{selectedCreditCustomer.full_name}</span></div>
+                  <div className="flex justify-between mt-1"><span className="text-white/40 uppercase font-black">Limite disponível</span><span className="text-purple-300 font-black">R$ {Number(selectedCreditCustomer.available || 0).toFixed(2)}</span></div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="space-y-8 pt-6">
+            <div className="flex justify-between items-center bg-red-500/10 p-4 rounded-2xl border border-red-500/20">
+              <span className="text-zinc-500 uppercase font-black text-xs tracking-widest">Total Restante</span>
+              <span className="text-4xl font-black italic text-red-500">R$ {(remainingTotal / 100).toFixed(2)}</span>
+            </div>
+            <div className="space-y-4">
+              <label className="text-zinc-500 text-[10px] uppercase font-black tracking-widest pl-2">
+                {currentMethod === "cash" ? "Valor Recebido em Dinheiro" : "Valor a Pagar"}
+              </label>
+              <Input 
+                type="text" 
+                value={customerAmount} 
+                onChange={(e) => setCustomerAmount(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') addPayment(); }}
+                className="bg-black border-white/10 text-white text-5xl h-24 font-black italic rounded-3xl text-center focus:border-primary/50 shadow-inner" 
+                autoFocus 
+              />
+            </div>
+            {currentMethod === "credit_internal" && selectedCreditCustomer && (
+              <div className="rounded-xl border border-purple-400/20 bg-purple-500/5 px-4 py-3 text-[10px] font-black uppercase text-purple-300">
+                Compra vinculada a {selectedCreditCustomer.full_name}
+              </div>
+            )}
+            {currentMethod === "cash" && (() => {
+              const received = Math.round(Number(customerAmount.replace(",", ".")) * 100);
+              const diff = received - remainingTotal;
+              if (isNaN(received) || received <= 0) return null;
+              if (diff > 0) return (
+                <div className="flex justify-between items-center bg-green-500/10 p-4 rounded-2xl border border-green-500/30">
+                  <span className="text-green-400 uppercase font-black text-xs tracking-widest">💰 TROCO</span>
+                  <span className="text-3xl font-black italic text-green-400">R$ {(diff / 100).toFixed(2)}</span>
+                </div>
+              );
+              if (diff < 0) return (
+                <div className="flex justify-between items-center bg-yellow-500/10 p-4 rounded-2xl border border-yellow-500/30">
+                  <span className="text-yellow-400 uppercase font-black text-xs tracking-widest">⚠️ FALTA</span>
+                  <span className="text-3xl font-black italic text-yellow-400">R$ {(Math.abs(diff) / 100).toFixed(2)}</span>
+                </div>
+              );
+              return (
+                <div className="flex justify-between items-center bg-green-500/10 p-4 rounded-2xl border border-green-500/30">
+                  <span className="text-green-400 uppercase font-black text-xs tracking-widest">✅ VALOR EXATO</span>
+                  <span className="text-3xl font-black italic text-green-400">Sem troco</span>
+                </div>
+              );
+            })()}
+            <Button 
+              className="w-full h-20 bg-primary text-black font-black uppercase italic text-2xl rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-lg" 
+              onClick={addPayment}
+            >
+              CONFIRMAR VALOR
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ProductAdjustModal 
+        isOpen={adjustProductModalOpen} 
+        onClose={() => setAdjustProductModalOpen(false)} 
+        product={selectedProductForAdjust}
+        onSave={(data: any) => updateProductAdjustmentMutation.mutate({ id: selectedProductForAdjust.id, ...data })}
+        isPending={updateProductAdjustmentMutation.isPending}
+      />
+    </div>
+  );
+}
+
+function ProductAdjustModal({ isOpen, onClose, product, onSave, isPending }: any) {
+  const [rotation, setRotation] = useState(product?.rotation || 0);
+  const [scale, setScale] = useState(product?.imageScale || 100);
+
+  useEffect(() => {
+    if (product) {
+      setRotation(product.rotation || 0);
+      setScale(product.imageScale || 100);
+    }
+  }, [product, isOpen]);
+
+  if (!product) return null;
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-md p-6 rounded-3xl shadow-2xl z-[1000] max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="text-white uppercase italic tracking-tighter text-2xl font-black">
+            AJUSTAR: <span className="text-primary">{product.name}</span>
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6 pt-2">
+          <div className="aspect-square w-full max-w-[280px] mx-auto bg-white/5 rounded-2xl flex items-center justify-center overflow-hidden border border-white/5">
+            {product.imageUrl ? (
+              <img 
+                src={product.imageUrl} 
+                alt={product.name} 
+                style={{ transform: `rotate(${rotation}deg) scale(${scale / 100})` }}
+                className="w-40 h-40 object-contain transition-transform duration-200"
+              />
+            ) : (
+              <Package className="h-12 w-12 text-white/10" />
+            )}
+          </div>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                  <RotateCw className="w-3 h-3" /> Rotação: {rotation}°
+                </Label>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary hover:bg-white/5" onClick={() => setRotation(0)}>RESET</Button>
+              </div>
+              <Slider 
+                value={[rotation]} 
+                min={0} 
+                max={360} 
+                step={1} 
+                onValueChange={([val]) => setRotation(val)}
+                className="py-2"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label className="text-white/40 text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                  <Maximize className="w-3 h-3" /> Escala: {scale}%
+                </Label>
+                <Button variant="ghost" size="sm" className="h-6 text-[8px] font-black uppercase text-primary hover:bg-white/5" onClick={() => setScale(100)}>RESET</Button>
+              </div>
+              <Slider 
+                value={[scale]} 
+                min={50} 
+                max={200} 
+                step={1} 
+                onValueChange={([val]) => setScale(val)}
+                className="py-2"
+              />
+            </div>
+          </div>
+
+          <Button 
+            className="w-full h-12 bg-primary text-black font-black uppercase italic text-base rounded-xl hover:scale-[1.01] active:scale-95 transition-all shadow-lg mt-2" 
+            onClick={() => onSave({ rotation, imageScale: scale })}
+            disabled={isPending}
+          >
+            {isPending ? <Loader2 className="animate-spin w-5 h-5" /> : "SALVAR ALTERAÇÕES"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
