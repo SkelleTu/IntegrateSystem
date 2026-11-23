@@ -1160,7 +1160,9 @@ function CashierContent({
                   <p className="text-[8px] font-black uppercase text-zinc-500 tracking-widest leading-none">Pagamentos</p>
                   {payments.map((p: any, idx: number) => (
                     <div key={idx} className="flex justify-between items-center bg-white/5 px-2 py-0.5 rounded text-[8px] border border-white/5">
-                      <span className="text-white/60 uppercase font-black italic">{p.method}</span>
+                      <span className="text-white/60 uppercase font-black italic">
+                        {p.method === "cash" ? "DINHEIRO" : p.method === "card" ? "CARTÃO" : p.method === "pix" ? "PIX" : p.method === "credit_internal" ? "CRÉDITO INTERNO" : p.method}
+                      </span>
                       <div className="flex items-center gap-2">
                         <span className="text-primary font-black">R$ {(p.amount / 100).toFixed(2)}</span>
                         <Button variant="ghost" size="icon" className="h-3.5 w-3.5 text-red-500 hover:bg-red-500/10 p-0" onClick={() => removePayment(idx)}>
@@ -1169,10 +1171,20 @@ function CashierContent({
                       </div>
                     </div>
                   ))}
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-white/40 uppercase font-black text-[8px] italic">Total distribuído</span>
+                    <span className="text-white font-black text-[10px]">R$ {(totalPaid / 100).toFixed(2)}</span>
+                  </div>
                   {remainingTotal > 0 && (
                     <div className="flex justify-between items-center px-1">
                       <span className="text-red-500/60 uppercase font-black text-[8px] italic">Falta pagar</span>
                       <span className="text-red-500 font-black text-[10px]">R$ {(remainingTotal / 100).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {remainingTotal === 0 && payments.length > 1 && (
+                    <div className="flex justify-between items-center px-1">
+                      <span className="text-green-400/70 uppercase font-black text-[8px] italic">Pagamento misto</span>
+                      <span className="text-green-400 font-black text-[10px]">CONFIRMADO</span>
                     </div>
                   )}
                 </div>
