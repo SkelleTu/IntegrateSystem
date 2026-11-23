@@ -832,24 +832,26 @@ export class DatabaseStorage implements IStorage {
       }
 
       const businessType = await getBusinessTypeForUser(database, sale.userId);
-      const immediatePaymentsTotal = paymentsData.filter((payment: any) => String(payment.method) !== "credit_internal").reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
-      if (immediatePaymentsTotal > 0) {
+      // Cada forma de pagamento gera seu próprio lançamento financeiro.
+      // A venda continua sendo única (saleId), mas o Financeiro preserva a
+      // composição exata do recebimento para conciliação e relatórios.
+      const paymentLabels: Record<string, string> = {
+        cash: "Dinheiro",
+        card: "Cartão",
+        pix: "PIX",
+        credit_internal: "Crédito Interno",
+      };
+      for (const payment of paymentsData) {
+        const method = String(payment.method);
+        const amount = Number(payment.amount || 0);
+        if (amount <= 0) continue;
+        const label = paymentLabels[method] || method;
         await database.insert(transactions).values({
           businessType,
           type: "income",
-          category: "vendas",
-          description: `Venda PDV #${insertedSale.id}`,
-          amount: immediatePaymentsTotal,
-          createdAt: new Date()
-        });
-      }
-      if (creditPayments.length > 0) {
-        await database.insert(transactions).values({
-          businessType,
-          type: "income",
-          category: "contas_a_receber",
-          description: `Venda PDV #${insertedSale.id} — Crédito Interno`,
-          amount: Number(creditPayments[0].amount),
+          category: method === "credit_internal" ? "contas_a_receber" : "vendas",
+          description: `Venda PDV #${insertedSale.id} — ${label}`,
+          amount,
           createdAt: new Date()
         });
       }
@@ -996,26 +998,26 @@ export class DatabaseStorage implements IStorage {
           await transaction.execute(sql`UPDATE credit_internal_purchases SET status = 'cancelled' WHERE id = ${Number(creditPurchase.id)}`);
         }
         const salePayments = await transaction.select().from(payments).where(eq(payments.saleId, id));
-        const immediateAmount = salePayments.filter((p: any) => String(p.method) !== "credit_internal").reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
-        const creditAmount = salePayments.filter((p: any) => String(p.method) === "credit_internal").reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
         const businessType = await getBusinessTypeForUser(transaction, sale.userId);
-        if (immediateAmount > 0) {
+        const paymentLabels: Record<string, string> = {
+          cash: "Dinheiro",
+          card: "Cartão",
+          pix: "PIX",
+          credit_internal: "Crédito Interno",
+        };
+        // O cancelamento estorna cada componente separadamente, preservando
+        // a composição original da venda no Financeiro.
+        for (const payment of salePayments) {
+          const method = String(payment.method);
+          const amount = Number(payment.amount || 0);
+          if (amount <= 0) continue;
+          const label = paymentLabels[method] || method;
           await transaction.insert(transactions).values({
             businessType,
             type: "expense",
-            category: "vendas",
-            description: `ESTORNO: Venda PDV #${id} CANCELADA`,
-            amount: immediateAmount,
-            createdAt: new Date()
-          });
-        }
-        if (creditAmount > 0) {
-          await transaction.insert(transactions).values({
-            businessType,
-            type: "expense",
-            category: "contas_a_receber",
-            description: `ESTORNO: Venda PDV #${id} — Crédito Interno`,
-            amount: creditAmount,
+            category: method === "credit_internal" ? "contas_a_receber" : "vendas",
+            description: `ESTORNO: Venda PDV #${id} — ${label}`,
+            amount,
             createdAt: new Date()
           });
         }
