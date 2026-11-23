@@ -759,6 +759,10 @@ function CashierContent({
 }: any) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  // Derivado localmente para que o resumo de pagamentos seja independente
+  // do escopo do componente pai. Isso evita ReferenceError ao adicionar o
+  // primeiro pagamento e mantém a composição exibida no próprio Caixa.
+  const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + Number(p?.amount || 0), 0);
 
   // Scanner detection: scanners type characters very fast (< 50ms between each char)
   const lastKeystrokeTimeRef = useRef<number>(0);
