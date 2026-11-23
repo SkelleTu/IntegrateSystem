@@ -941,7 +941,16 @@ export class DatabaseStorage implements IStorage {
         await transaction.update(sales)
           .set({ status: "cancelled" })
           .where(eq(sales.id, id));
+        await transaction.update(sales)
+          .set({ status: "cancelled", fiscalStatus: "cancelled" })
+          .where(eq(sales.id, id));
         const [updatedSale] = await transaction.select().from(sales).where(eq(sales.id, id)).limit(1);
+
+        // A venda cancelada não deve permanecer como documento fiscal ativo no módulo Fiscal.
+        // O XML/chave são preservados para auditoria, enquanto o estado do documento passa a cancelled.
+        await transaction.update(nfce)
+          .set({ status: "cancelled", motivo: `Venda PDV #${id} cancelada` })
+          .where(eq(nfce.saleId, id));
 
         for (const reversal of stockReversals) {
           const { item, stock } = reversal;
