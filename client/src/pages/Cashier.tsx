@@ -407,10 +407,10 @@ export default function Cashier() {
       });
     },
     onSuccess: async (data) => {
-      // A venda é persistida de forma transacional no backend. Atualizar as
-      // consultas dos módulos após a confirmação mantém Caixa, Estoque,
-      // Financeiro e Relatórios sincronizados com a mesma venda.
-      await Promise.all([
+      // A venda já foi persistida de forma transacional no backend.
+      // Falhas secundárias de refetch não podem transformar uma venda concluída
+      // em erro de renderização no PDV.
+      await Promise.allSettled([
         queryClient.invalidateQueries({ queryKey: ["/api/products/cashier-items"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/products"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/inventory"] }),
@@ -612,15 +612,16 @@ export default function Cashier() {
           : null
       },
       items: cart.map(i => {
-        const isKg = (i.item as any).unitType === "kg";
+        const isKg = String((i.item as any).unitType || (i.item as any).unit || "").toLowerCase() === "kg";
         return { 
           itemType: 'product', 
           itemId: i.item.id, 
-          // Para produtos por quilo, a quantidade é enviada em gramas (inteiro)
-          // Para unidade, permanece como inteiro
+          // Produtos por quilo seguem em gramas no payload; produtos por unidade seguem inteiros.
+          // O unitType explícito impede o backend de interpretar peso como unidade.
           quantity: isKg ? Math.round(i.quantity * 1000) : Math.round(i.quantity), 
           unitPrice: i.item.price, 
-          totalPrice: Math.round(i.item.price * i.quantity) 
+          totalPrice: Math.round(i.item.price * i.quantity),
+          unitType: isKg ? "kg" : "unit",
         };
       }),
       payments: isSimulation ? [{ method: "cash", amount: total }] : payments,
