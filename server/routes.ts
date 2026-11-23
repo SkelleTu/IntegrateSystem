@@ -3225,6 +3225,7 @@ export async function registerRoutes(
       // Simulação de emissão (Estrutura completa NF-e / NFC-e)
       const isNFCe = sale.fiscalType === "NFCe";
       const mod = isNFCe ? "65" : "55";
+      const salePayments = await storage.getPayments(sale.id);
       const simulatedKey = `35240100000000000191${mod}001${String(sale.id).padStart(9, '0')}123456789`;
       
       const simulatedXml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -3277,7 +3278,19 @@ export async function registerRoutes(
       </total>
       <transp><modFrete>9</modFrete></transp>
       <pag>
-        <detPag><tPag>01</tPag><vPag>${(sale.totalAmount/100).toFixed(2)}</vPag></detPag>
+        ${(await storage.getPayments(sale.id)).map((p: any) => {
+          const tPag = p.method === "cash" ? "01"
+            : p.method === "card" ? "03"
+            : p.method === "pix" ? "17"
+            : p.method === "credit_internal" ? "05"
+            : "99";
+          return `<detPag><indPag>0</indPag><tPag>${tPag}</tPag><vPag>${(Number(p.amount)/100).toFixed(2)}</vPag></detPag>`;
+        }).join("")}
+        ${(() => {
+          const paid = (salePayments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+          const change = paid - Number(sale.totalAmount || 0);
+          return change > 0 ? `<vTroco>${(change/100).toFixed(2)}</vTroco>` : "";
+        })()}
       </pag>
     </infNFe>
     <Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo>...</Signature>
