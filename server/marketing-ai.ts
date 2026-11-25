@@ -146,7 +146,7 @@ export function registerMarketingAIRoutes(
     const agent = String(req.body?.agent || "Market Research").slice(0, 80);
     const requested = String(req.body?.provider || "auto");
     const configs = providerConfigs();
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && item.configured);
+    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || item.id === "kilo"));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível. Configure um provedor no Render ou use o Kilo gratuito." });
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-12).filter((item: any) => ["user", "assistant"].includes(item?.role) && typeof item?.content === "string").map((item: any) => ({ role: item.role, content: item.content.slice(0, 12000) })) : [];
     const messages = [
