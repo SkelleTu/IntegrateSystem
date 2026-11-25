@@ -74,7 +74,7 @@ async function complete(provider: ProviderConfig, messages: any[], model?: strin
   if (!selectedModel) throw new Error(`Modelo não definido para ${provider.name}.`);
   if (!provider.apiKey && !(provider.id === "kilo" && provider.free)) throw new Error(`Credencial não configurada para ${provider.name}.`);
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
-  if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+  if (provider.apiKey) headers[provider.authHeader || "Authorization"] = provider.authHeader ? provider.apiKey : `Bearer ${provider.apiKey}`;
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
     headers,
