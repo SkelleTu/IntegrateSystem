@@ -833,7 +833,7 @@ export async function registerRoutes(
     const user: any = req.user;
     const publicUser: any = toPublicUser(user);
     publicUser.masterAccessAuthorized = user.__masterAccessAuthorized === true;
-    publicUser.masterAccessExpiresAt = user.__masterAccessAuthorized === true ? Number(req.session?.masterAccessUntil || 0) : null;
+    publicUser.masterAccessExpiresAt = user.__masterAccessAuthorized === true ? Number((req.session as any)?.masterAccessUntil || 0) : null;
     if (neonPool && !isMasterAccount(user)) {
       const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
       publicUser.accountStatus = control.rows[0]?.status || "active";
