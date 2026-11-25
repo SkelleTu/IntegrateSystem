@@ -1,6 +1,6 @@
 import type { Express } from "express";
 
-type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "compatible";
+type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "invista-hf" | "invista-groq" | "compatible";
 type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string; configured: boolean; free: boolean; authHeader?: string };
 
 const DEFAULTS = {
@@ -16,6 +16,9 @@ function providerConfigs(): ProviderConfig[] {
   const geminiKey = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
   const openrouterKey = String(process.env.OPENROUTER_API_KEY || "").trim();
   const groqKey = String(process.env.GROQ_API_KEY || "").trim();
+  const invistaBridgeToken = String(process.env.INVISTA_AI_BRIDGE_TOKEN || "").trim();
+  const invistaHfBase = String(process.env.INVISTA_AI_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-ai").trim().replace(/\\/$/, "");
+  const invistaGroqBase = String(process.env.INVISTA_GROQ_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-groq").trim().replace(/\\/$/, "");
   const compatibleUrl = String(process.env.AURA_AI_COMPAT_BASE_URL || "").trim().replace(/\/$/, "");
   const compatibleKey = String(process.env.AURA_AI_COMPAT_API_KEY || "").trim();
   return [
@@ -25,6 +28,8 @@ function providerConfigs(): ProviderConfig[] {
     { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", apiKey: geminiKey, model: String(process.env.GEMINI_MODEL || "gemini-2.5-flash"), configured: Boolean(geminiKey), free: false, authHeader: "x-goog-api-key" },
     { id: "openrouter", name: "OpenRouter", baseUrl: String(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, ""), apiKey: openrouterKey, model: String(process.env.OPENROUTER_MODEL || "openai/gpt-4.1-mini"), configured: Boolean(openrouterKey), free: false },
     { id: "groq", name: "Groq", baseUrl: String(process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), apiKey: groqKey, model: String(process.env.GROQ_MODEL || "llama-3.3-70b-versatile"), configured: Boolean(groqKey), free: false },
+    { id: "invista-hf", name: "Hugging Face · InvistaPro", baseUrl: invistaHfBase, apiKey: invistaBridgeToken, model: String(process.env.INVISTA_HF_MODEL || "openai/gpt-oss-120b:fastest"), configured: Boolean(invistaBridgeToken), free: false },
+    { id: "invista-groq", name: "Groq · InvistaPro", baseUrl: invistaGroqBase, apiKey: invistaBridgeToken, model: String(process.env.INVISTA_GROQ_MODEL || "openai/gpt-oss-120b"), configured: Boolean(invistaBridgeToken) && process.env.INVISTA_GROQ_ENABLED === "true", free: false },
     { id: "compatible", name: String(process.env.AURA_AI_COMPAT_NAME || "OpenAI-compatible API"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: String(process.env.AURA_AI_COMPAT_MODEL || ""), configured: Boolean(compatibleUrl), free: false },
   ];
 }
@@ -91,7 +96,7 @@ async function complete(provider: ProviderConfig, messages: any[], model?: strin
 }
 
 function providerOrder(configs: ProviderConfig[]): ProviderConfig[] {
-  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "kilo,huggingface,openai,gemini,openrouter,groq,compatible").split(",").map((item) => item.trim().toLowerCase());
+  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "invista-hf,invista-groq,kilo,huggingface,openai,gemini,openrouter,groq,compatible").split(",").map((item) => item.trim().toLowerCase());
   return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && provider.configured));
 }
 
