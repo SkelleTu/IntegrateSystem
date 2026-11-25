@@ -52,6 +52,7 @@ export function Navbar() {
       "/admin/labels":"labels", "/admin/monitoring":"monitoring",
       "/ponto":"timeclock", "/admin/master":"master",
       "/admin/account-branches":"account_branches", "/admin/credito-interno":"credit_internal",
+      "/renda-variavel":"variable_income",
     };
     const grant = user.permissions?.[moduleByUrl[url]] || {};
     const allowed = isMasterAccount || user.masterAccessAuthorized === true || url === "/cart" || grant.view === true || grant.administer === true;
@@ -66,6 +67,7 @@ export function Navbar() {
 
   const navItems = [
     { title: "Dashboard", url: "/app",               icon: LayoutDashboard },
+    { title: "Renda Variável", url: "/renda-variavel", icon: TrendingUp },
     { title: "Caixa",     url: "/caixa",             icon: ClipboardList },
     { title: "Financeiro",url: "/financeiro",        icon: Landmark },
     { title: "Relatórios",url: "/relatorios",        icon: BarChart3 },
