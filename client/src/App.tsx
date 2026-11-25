@@ -127,6 +127,24 @@ function Router() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-transparent flex items-center justify-center px-6">
+        <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/70 p-6 text-center text-white backdrop-blur-xl">
+          <h1 className="text-lg font-black">Não foi possível validar a sessão</h1>
+          <p className="mt-2 text-sm text-zinc-400">{error instanceof Error ? error.message : "O servidor não respondeu corretamente."}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="mt-5 rounded-xl bg-primary px-5 py-3 text-sm font-black text-white transition hover:opacity-90"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Routes that should be full screen without the main layout
   const isAuthPage = ["/login", "/register", "/setup"].includes(location);
 
