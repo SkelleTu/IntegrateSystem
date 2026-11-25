@@ -1,41 +1,46 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 
-type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "invista-hf" | "invista-groq" | "compatible";
-type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string; configured: boolean; free: boolean; authHeader?: string };
-
+type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "cerebras" | "deepseek" | "mistral" | "nvidia" | "compatible";
+type ProviderConfig = {
+  id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string;
+  configured: boolean; free: boolean; anonymousFree?: boolean; authHeader?: string; privacyWarning?: string;
+};
 const DEFAULTS = {
   huggingface: { baseUrl: "https://router.huggingface.co/v1", model: "openai/gpt-oss-120b:fastest" },
   kilo: { baseUrl: "https://ai-gateway.kilo.ai/api/v1", model: "kilo-auto/free" },
   openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
 };
-
+function env(name: string, fallback = ""): string { return String(process.env[name] || fallback).trim(); }
 function providerConfigs(): ProviderConfig[] {
-  const hfKey = String(process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || "").trim();
-  const kiloKey = String(process.env.KILO_API_KEY || "").trim();
-  const openaiKey = String(process.env.OPENAI_API_KEY || "").trim();
-  const geminiKey = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
-  const openrouterKey = String(process.env.OPENROUTER_API_KEY || "").trim();
-  const groqKey = String(process.env.GROQ_API_KEY || "").trim();
-  const invistaBridgeToken = String(process.env.INVISTA_AI_BRIDGE_TOKEN || "").trim();
-  const invistaHfBase = String(process.env.INVISTA_AI_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-ai").trim().replace(/\/$/, "");
-  const invistaGroqBase = String(process.env.INVISTA_GROQ_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-groq").trim().replace(/\/$/, "");
-  const compatibleUrl = String(process.env.AURA_AI_COMPAT_BASE_URL || "").trim().replace(/\/$/, "");
-  const compatibleKey = String(process.env.AURA_AI_COMPAT_API_KEY || "").trim();
+  const hfKey = env("HF_TOKEN") || env("HUGGINGFACE_API_KEY");
+  const kiloKey = env("KILO_API_KEY");
+  const openaiKey = env("OPENAI_API_KEY");
+  const geminiKey = env("GEMINI_API_KEY") || env("GOOGLE_API_KEY");
+  const openrouterKey = env("OPENROUTER_API_KEY");
+  const groqKey = env("GROQ_API_KEY");
+  const cerebrasKey = env("CEREBRAS_API_KEY");
+  const deepseekKey = env("DEEPSEEK_API_KEY");
+  const mistralKey = env("MISTRAL_API_KEY");
+  const nvidiaKey = env("NVIDIA_API_KEY");
+  const compatibleUrl = env("AURA_AI_COMPAT_BASE_URL").replace(/\/$/, "");
+  const compatibleKey = env("AURA_AI_COMPAT_API_KEY");
+  const kiloAnonymous = !kiloKey;
   return [
-    { id: "huggingface", name: "Hugging Face", baseUrl: String(process.env.HF_BASE_URL || DEFAULTS.huggingface.baseUrl).replace(/\/$/, ""), apiKey: hfKey, model: String(process.env.HF_MODEL || DEFAULTS.huggingface.model), configured: Boolean(hfKey), free: false },
-    { id: "kilo", name: "Kilo AI Gateway", baseUrl: String(process.env.KILO_BASE_URL || DEFAULTS.kilo.baseUrl).replace(/\/$/, ""), apiKey: kiloKey, model: String(process.env.KILO_MODEL || DEFAULTS.kilo.model), configured: Boolean(kiloKey), free: !kiloKey },
-    { id: "openai", name: "OpenAI", baseUrl: String(process.env.OPENAI_BASE_URL || DEFAULTS.openai.baseUrl).replace(/\/$/, ""), apiKey: openaiKey, model: String(process.env.OPENAI_MODEL || DEFAULTS.openai.model), configured: Boolean(openaiKey), free: false },
-    { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", apiKey: geminiKey, model: String(process.env.GEMINI_MODEL || "gemini-2.5-flash"), configured: Boolean(geminiKey), free: false, authHeader: "x-goog-api-key" },
-    { id: "openrouter", name: "OpenRouter", baseUrl: String(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, ""), apiKey: openrouterKey, model: String(process.env.OPENROUTER_MODEL || "openai/gpt-4.1-mini"), configured: Boolean(openrouterKey), free: false },
-    { id: "groq", name: "Groq", baseUrl: String(process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), apiKey: groqKey, model: String(process.env.GROQ_MODEL || "llama-3.3-70b-versatile"), configured: Boolean(groqKey), free: false },
-    { id: "invista-hf", name: "Hugging Face · InvistaPro", baseUrl: invistaHfBase, apiKey: invistaBridgeToken, model: String(process.env.INVISTA_HF_MODEL || "openai/gpt-oss-120b:fastest"), configured: Boolean(invistaBridgeToken) && process.env.INVISTA_HF_ENABLED === "true", free: false },
-    { id: "invista-groq", name: "Groq · InvistaPro", baseUrl: invistaGroqBase, apiKey: invistaBridgeToken, model: String(process.env.INVISTA_GROQ_MODEL || "openai/gpt-oss-120b"), configured: Boolean(invistaBridgeToken) && process.env.INVISTA_GROQ_ENABLED === "true", free: false },
-    { id: "compatible", name: String(process.env.AURA_AI_COMPAT_NAME || "OpenAI-compatible API"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: String(process.env.AURA_AI_COMPAT_MODEL || ""), configured: Boolean(compatibleUrl), free: false },
+    { id: "kilo", name: "Kilo AI Gateway", baseUrl: env("KILO_BASE_URL", DEFAULTS.kilo.baseUrl).replace(/\/$/, ""), apiKey: kiloKey, model: env("KILO_MODEL", DEFAULTS.kilo.model), configured: Boolean(kiloKey), free: kiloAnonymous, anonymousFree: kiloAnonymous, privacyWarning: kiloAnonymous ? "O Kilo Auto Free não exige chave nem créditos, mas o provedor informa que prompts podem ser registrados e usados para melhoria. Não envie dados pessoais, dados de clientes ou informações comerciais confidenciais." : undefined },
+    { id: "huggingface", name: "Hugging Face Inference Providers", baseUrl: env("HF_BASE_URL", DEFAULTS.huggingface.baseUrl).replace(/\/$/, ""), apiKey: hfKey, model: env("HF_MODEL", DEFAULTS.huggingface.model), configured: Boolean(hfKey), free: false },
+    { id: "openrouter", name: "OpenRouter", baseUrl: env("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").replace(/\/$/, ""), apiKey: openrouterKey, model: env("OPENROUTER_MODEL", "openrouter/free"), configured: Boolean(openrouterKey), free: false },
+    { id: "groq", name: "Groq", baseUrl: env("GROQ_BASE_URL", "https://api.groq.com/openai/v1").replace(/\/$/, ""), apiKey: groqKey, model: env("GROQ_MODEL", "openai/gpt-oss-120b"), configured: Boolean(groqKey), free: false },
+    { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", apiKey: geminiKey, model: env("GEMINI_MODEL", "gemini-2.5-flash"), configured: Boolean(geminiKey), free: false, authHeader: "x-goog-api-key" },
+    { id: "openai", name: "OpenAI", baseUrl: env("OPENAI_BASE_URL", DEFAULTS.openai.baseUrl).replace(/\/$/, ""), apiKey: openaiKey, model: env("OPENAI_MODEL", DEFAULTS.openai.model), configured: Boolean(openaiKey), free: false },
+    { id: "cerebras", name: "Cerebras Inference", baseUrl: env("CEREBRAS_BASE_URL", "https://api.cerebras.ai/v1").replace(/\/$/, ""), apiKey: cerebrasKey, model: env("CEREBRAS_MODEL", "gpt-oss-120b"), configured: Boolean(cerebrasKey), free: false },
+    { id: "deepseek", name: "DeepSeek", baseUrl: env("DEEPSEEK_BASE_URL", "https://api.deepseek.com").replace(/\/$/, ""), apiKey: deepseekKey, model: env("DEEPSEEK_MODEL", "deepseek-flash"), configured: Boolean(deepseekKey), free: false },
+    { id: "mistral", name: "Mistral AI", baseUrl: env("MISTRAL_BASE_URL", "https://api.mistral.ai/v1").replace(/\/$/, ""), apiKey: mistralKey, model: env("MISTRAL_MODEL", "mistral-small-latest"), configured: Boolean(mistralKey), free: false },
+    { id: "nvidia", name: "NVIDIA NIM", baseUrl: env("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1").replace(/\/$/, ""), apiKey: nvidiaKey, model: env("NVIDIA_MODEL", "meta/llama-3.3-70b-instruct"), configured: Boolean(nvidiaKey), free: false, privacyWarning: "Endpoints NVIDIA gratuitos de avaliação podem ter retenção de prompts conforme os termos do serviço. Não envie dados confidenciais." },
+    { id: "compatible", name: env("AURA_AI_COMPAT_NAME", "API OpenAI-compatible personalizada"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: env("AURA_AI_COMPAT_MODEL"), configured: Boolean(compatibleUrl && compatibleKey), free: false },
   ];
 }
-
 function safeProvider(provider: ProviderConfig) {
-  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, anonymousFree: provider.id === "kilo" && provider.free, baseUrl: provider.baseUrl, defaultModel: provider.model };
+  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, anonymousFree: Boolean(provider.anonymousFree), baseUrl: provider.baseUrl, defaultModel: provider.model, privacyWarning: provider.privacyWarning || null };
 }
 
 function agentInstructions(agent: string): string {
@@ -77,7 +82,7 @@ async function listModels(provider: ProviderConfig): Promise<any[]> {
 async function complete(provider: ProviderConfig, messages: any[], model?: string): Promise<{ text: string; model: string; usage: any }> {
   const selectedModel = String(model || provider.model || "").trim();
   if (!selectedModel) throw new Error(`Modelo não definido para ${provider.name}.`);
-  if (!provider.apiKey && !(provider.id === "kilo" && provider.free)) throw new Error(`Credencial não configurada para ${provider.name}.`);
+  if (!provider.apiKey && !(provider.id === "kilo" && (selectedModel === "kilo-auto/free" || selectedModel === "openrouter/free" || selectedModel.endsWith(":free")))) throw new Error("Acesso sem chave permitido somente a modelos gratuitos do Kilo. Configure uma credencial para usar modelos pagos.");
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
   if (provider.apiKey) headers[provider.authHeader || "Authorization"] = provider.authHeader ? provider.apiKey : `Bearer ${provider.apiKey}`;
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -95,9 +100,18 @@ async function complete(provider: ProviderConfig, messages: any[], model?: strin
   return { text, model: String(payload?.model || selectedModel), usage: payload?.usage || null };
 }
 
-function providerOrder(configs: ProviderConfig[]): ProviderConfig[] {
-  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "invista-hf,invista-groq,kilo,huggingface,openai,gemini,openrouter,groq,compatible").split(",").map((item) => item.trim().toLowerCase());
-  return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && provider.configured));
+function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] {
+  const research = ["gemini", "openrouter", "groq", "cerebras", "huggingface", "deepseek", "mistral", "openai", "nvidia", "compatible", "kilo"];
+  const analysis = ["openai", "gemini", "deepseek", "groq", "cerebras", "openrouter", "huggingface", "mistral", "nvidia", "compatible", "kilo"];
+  const creative = ["gemini", "openai", "mistral", "openrouter", "groq", "cerebras", "huggingface", "deepseek", "nvidia", "compatible", "kilo"];
+  const group = ["Profit Analyst", "Financial Analyst", "Opportunity Scorer", "Conversion Analyst"].includes(agent)
+    ? analysis
+    : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
+      ? creative
+      : research;
+  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER");
+  const requested = (configuredOrder ? configuredOrder.split(",") : group).map((item) => item.trim().toLowerCase());
+  return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
 }
 
 export function registerMarketingAIRoutes(
@@ -121,9 +135,11 @@ export function registerMarketingAIRoutes(
       const normalized = models.map((item: any) => ({
         id: String(item?.id || item?.model || ""),
         name: String(item?.name || item?.id || item?.model || ""),
-        free: String(item?.id || "").endsWith(":free") || item?.pricing?.prompt === "0" || item?.pricing?.completion === "0",
-        contextLength: item?.context_length || item?.contextLength || null,
-      })).filter((item: any) => item.id).slice(0, 200);
+        free: item?.isFree === true || String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0"),
+        contextLength: item?.context_length || item?.contextLength || item?.top_provider?.context_length || null,
+        privacyWarning: item?.mayTrainOnYourPrompts === true ? "O provedor pode registrar ou usar prompts para melhoria." : null,
+        chatCompatible: !Array.isArray(item?.architecture?.output_modalities) || item.architecture.output_modalities.includes("text"),
+      })).filter((item: any) => item.id && item.chatCompatible && (!(provider.id === "kilo" && provider.anonymousFree) || item.free)).slice(0, 200);
       res.json({ provider: provider.id, models: normalized });
     } catch (error: any) {
       res.status(502).json({ message: error?.message || "Não foi possível consultar o catálogo do provedor." });
@@ -134,7 +150,7 @@ export function registerMarketingAIRoutes(
     if (!marketingTenant(req, res)) return;
     const configs = providerConfigs();
     const requested = String(req.body?.provider || "auto");
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || item.id === "kilo"));
+    const candidates = requested === "auto" ? providerOrder(configs, String(req.body?.agent || "")) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível para teste." });
     const messages = [
       { role: "system", content: "Responda em português brasileiro. Você está verificando conectividade. Responda apenas: CONEXÃO IA OK." },
@@ -157,7 +173,7 @@ export function registerMarketingAIRoutes(
     const agent = String(req.body?.agent || "Market Research").slice(0, 80);
     const requested = String(req.body?.provider || "auto");
     const configs = providerConfigs();
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || item.id === "kilo"));
+    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível. Configure um provedor no Render ou use o Kilo gratuito." });
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-12).filter((item: any) => ["user", "assistant"].includes(item?.role) && typeof item?.content === "string").map((item: any) => ({ role: item.role, content: item.content.slice(0, 12000) })) : [];
     const messages = [
