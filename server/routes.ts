@@ -998,7 +998,7 @@ export async function registerRoutes(
     `);
   }
 
-  const accountModules = ["dashboard","cashier","finance","reports","inventory","fiscal","labels","monitoring","timeclock","master","account_branches","settings"];
+  const accountModules = ["dashboard","cashier","finance","reports","inventory","fiscal","labels","monitoring","timeclock","master","account_branches","settings","marketing"];
   const defaultAccountPermissions = Object.fromEntries(accountModules.map((module) => [module, {
     view: false, create: false, edit: false, delete: false, approve: false, administer: false,
   }]));
@@ -1746,6 +1746,7 @@ export async function registerRoutes(
       : path.startsWith("/api/inventory") || path.startsWith("/api/products") || path.startsWith("/api/batches") ? "inventory"
       : path.startsWith("/api/cash-register") || path.startsWith("/api/sales") ? "cashier"
       : path.startsWith("/api/transactions") ? "finance"
+      : path.startsWith("/api/marketing") ? "marketing"
       : path.startsWith("/api/labels") ? "labels"
       : path.startsWith("/api/my-enterprises") || path.startsWith("/api/settings") || path.startsWith("/api/backup") || path.startsWith("/api/windows") ? "settings"
       : path.startsWith("/api/services") || path.startsWith("/api/queue") ? "dashboard"
