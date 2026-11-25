@@ -1,4 +1,5 @@
 import type { Express, Response } from "express";
+import { neonPool } from "./neon-db.js";
 
 type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "cerebras" | "deepseek" | "mistral" | "nvidia" | "compatible";
 type ProviderConfig = {
@@ -123,11 +124,84 @@ function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] 
   });
 }
 
+let agentSchemaPromise: Promise<void> | null = null;
+async function ensureAgentSchema() {
+  if (!neonPool) throw new Error("MARKETING_DATABASE_UNAVAILABLE");
+  if (!agentSchemaPromise) {
+    agentSchemaPromise = (async () => {
+      await neonPool.query(`CREATE TABLE IF NOT EXISTS aura_marketing_agent_runs (
+        id BIGSERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, actor_user_id INTEGER NOT NULL,
+        agent VARCHAR(80) NOT NULL, provider VARCHAR(40) NOT NULL, model VARCHAR(180) NOT NULL,
+        prompt TEXT NOT NULL, response TEXT NOT NULL, usage JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )`);
+      await neonPool.query("CREATE INDEX IF NOT EXISTS aura_marketing_agent_runs_tenant_created_idx ON aura_marketing_agent_runs (enterprise_id, created_at DESC)");
+      await neonPool.query(`CREATE TABLE IF NOT EXISTS aura_marketing_agent_memory (
+        id BIGSERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, agent VARCHAR(80) NOT NULL,
+        memory_key VARCHAR(120) NOT NULL, memory_value TEXT NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (enterprise_id, agent, memory_key)
+      )`);
+    })().catch((error) => { agentSchemaPromise = null; throw error; });
+  }
+  await agentSchemaPromise;
+}
+
 export function registerMarketingAIRoutes(
   app: Express,
   isAuthenticated: (req: any, res: any, next: any) => any,
   marketingTenant: (req: any, res: any) => number | null,
 ) {
+  app.get("/api/marketing/ai/runs", isAuthenticated, async (req: any, res: Response) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureAgentSchema();
+      const agent = String(req.query.agent || "").trim().slice(0, 80);
+      const limit = Math.min(Math.max(Number(req.query.limit || 20), 1), 50);
+      const result = await neonPool!.query(
+        "SELECT id,agent,provider,model,prompt,response,usage,created_at AS \"createdAt\" FROM aura_marketing_agent_runs WHERE enterprise_id=$1" + (agent ? " AND agent=$2" : "") + " ORDER BY created_at DESC LIMIT " + limit,
+        agent ? [enterpriseId, agent] : [enterpriseId],
+      );
+      return res.json({ runs: result.rows });
+    } catch (error: any) {
+      console.error("[MARKETING AI] run history unavailable:", error?.message || error);
+      return res.status(503).json({ message: "Histórico dos agentes temporariamente indisponível." });
+    }
+  });
+
+  app.get("/api/marketing/ai/memory", isAuthenticated, async (req: any, res: Response) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureAgentSchema();
+      const agent = String(req.query.agent || "").trim().slice(0, 80);
+      const result = await neonPool!.query(
+        "SELECT agent,memory_key AS \"key\",memory_value AS value,updated_at AS \"updatedAt\" FROM aura_marketing_agent_memory WHERE enterprise_id=$1" + (agent ? " AND agent IN ($2,'*')" : "") + " ORDER BY updated_at DESC LIMIT 100",
+        agent ? [enterpriseId, agent] : [enterpriseId],
+      );
+      return res.json({ memory: result.rows });
+    } catch (error: any) {
+      console.error("[MARKETING AI] memory unavailable:", error?.message || error);
+      return res.status(503).json({ message: "Memória dos agentes temporariamente indisponível." });
+    }
+  });
+
+  app.post("/api/marketing/ai/memory", isAuthenticated, async (req: any, res: Response) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    const agent = String(req.body?.agent || "*").trim().slice(0, 80) || "*";
+    const key = String(req.body?.key || "").trim().slice(0, 120);
+    const value = String(req.body?.value || "").trim();
+    if (!key || !value || value.length > 4000) return res.status(400).json({ message: "Informe uma chave e um valor de até 4.000 caracteres." });
+    try {
+      await ensureAgentSchema();
+      const result = await neonPool!.query(
+        "INSERT INTO aura_marketing_agent_memory (enterprise_id,agent,memory_key,memory_value) VALUES ($1,$2,$3,$4) ON CONFLICT (enterprise_id,agent,memory_key) DO UPDATE SET memory_value=EXCLUDED.memory_value,updated_at=NOW() RETURNING agent,memory_key AS \"key\",memory_value AS value,updated_at AS \"updatedAt\"",
+        [enterpriseId, agent, key, value],
+      );
+      return res.status(200).json({ memory: result.rows[0] });
+    } catch (error: any) {
+      console.error("[MARKETING AI] memory save failed:", error?.message || error);
+      return res.status(503).json({ message: "Não foi possível salvar a memória do agente." });
+    }
+  });
+
   app.get("/api/marketing/ai/providers", isAuthenticated, (req: any, res: any) => {
     if (!marketingTenant(req, res)) return;
     const providers = providerConfigs();
@@ -185,6 +259,17 @@ export function registerMarketingAIRoutes(
     const candidates = requested === "auto" ? providerOrder(configs, agent) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível. Configure um provedor no Render ou use o Kilo gratuito." });
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-12).filter((item: any) => ["user", "assistant"].includes(item?.role) && typeof item?.content === "string").map((item: any) => ({ role: item.role, content: item.content.slice(0, 12000) })) : [];
+    let memoryContext = "";
+    try {
+      await ensureAgentSchema();
+      const memory = await neonPool!.query(
+        "SELECT memory_key,memory_value FROM aura_marketing_agent_memory WHERE enterprise_id=$1 AND agent IN ($2,'*') ORDER BY updated_at DESC LIMIT 30",
+        [enterpriseId, agent],
+      );
+      if (memory.rows.length) memoryContext = "\\n\\nMEMÓRIA OPERACIONAL DA EMPRESA:\\n" + memory.rows.map((row: any) => "- " + row.memory_key + ": " + row.memory_value).join("\\n");
+    } catch (error: any) {
+      console.error("[MARKETING AI] memory read failed:", error?.message || error);
+    }
     const messages = [
       { role: "system", content: `Você é ${agent}, agente especializado da Central de Marketing IA da Aura System. ${agentInstructions(agent)}\n\nTrabalhe com rigor factual. Não invente pesquisas, fontes, dados, preços ou ações externas. Quando não tiver acesso a dados ao vivo, declare isso e proponha como verificar. Não execute follow/unfollow, publicação, comentários ou mensagens sem integração oficial, permissão e confirmação aplicáveis. Responda em português brasileiro, com plano prático e próximos passos.` },
       ...history,
@@ -194,6 +279,15 @@ export function registerMarketingAIRoutes(
     for (const provider of candidates) {
       try {
         const result = await complete(provider, messages, req.body?.model);
+        try {
+          await ensureAgentSchema();
+          await neonPool!.query(
+            "INSERT INTO aura_marketing_agent_runs (enterprise_id,actor_user_id,agent,provider,model,prompt,response,usage) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)",
+            [enterpriseId, Number(req.user?.id), agent, provider.id, result.model, message, result.text, JSON.stringify(result.usage || {})],
+          );
+        } catch (persistError: any) {
+          console.error("[MARKETING AI] run persistence failed:", persistError?.message || persistError);
+        }
         return res.json({ ok: true, provider: provider.id, providerName: provider.name, model: result.model, message: result.text, usage: result.usage, agent, enterpriseId });
       } catch (error: any) { failures.push(`${provider.name}: ${error?.message || String(error)}`); }
     }
