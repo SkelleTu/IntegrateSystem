@@ -67,6 +67,7 @@ const WindowsAppRunner = lazy(() => import("./pages/admin/WindowsAppRunner"));
 const AuraWindows = lazy(() => import("./pages/AuraWindows"));
 const Backup = lazy(() => import("./pages/Backup"));
 const SetupEnterprise = lazy(() => import("./pages/SetupEnterprise"));
+const MarketingHub = lazy(() => import("./pages/MarketingHub"));
 
 function RouteLoading() {
   return (
