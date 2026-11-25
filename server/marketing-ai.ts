@@ -82,7 +82,7 @@ async function listModels(provider: ProviderConfig): Promise<any[]> {
 async function complete(provider: ProviderConfig, messages: any[], model?: string): Promise<{ text: string; model: string; usage: any }> {
   const selectedModel = String(model || provider.model || "").trim();
   if (!selectedModel) throw new Error(`Modelo não definido para ${provider.name}.`);
-  if (!provider.apiKey && !(provider.id === "kilo" && (selectedModel === "kilo-auto/free" || selectedModel.endsWith(":free")))) throw new Error("Acesso sem chave permitido somente a modelos gratuitos do Kilo. Configure uma credencial para usar modelos pagos.");
+  if (!provider.apiKey && !(provider.id === "kilo" && (selectedModel === "kilo-auto/free" || selectedModel === "openrouter/free" || selectedModel.endsWith(":free")))) throw new Error("Acesso sem chave permitido somente a modelos gratuitos do Kilo. Configure uma credencial para usar modelos pagos.");
   const headers: Record<string, string> = { "Content-Type": "application/json", Accept: "application/json" };
   if (provider.apiKey) headers[provider.authHeader || "Authorization"] = provider.authHeader ? provider.apiKey : `Bearer ${provider.apiKey}`;
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
