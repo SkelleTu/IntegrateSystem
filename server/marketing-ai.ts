@@ -132,7 +132,7 @@ export function registerMarketingAIRoutes(
     const failures: string[] = [];
     for (const provider of candidates) {
       try {
-        const result = await complete(provider, messages);
+        const result = await complete(provider, messages, req.body?.model);
         return res.json({ ok: true, provider: provider.id, providerName: provider.name, model: result.model, response: result.text, usage: result.usage });
       } catch (error: any) { failures.push(`${provider.name}: ${error?.message || String(error)}`); }
     }
