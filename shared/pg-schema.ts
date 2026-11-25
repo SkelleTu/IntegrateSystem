@@ -103,7 +103,10 @@ export const cashRegisters = pgTable("cash_register", {
   openingAmount: integer("opening_amount"), // in cents
   closingAmount: integer("closing_amount"), // in cents
   difference: integer("difference"), // in cents
-  status: text("status").notNull(), // "open", "closed"
+  status: text("status").notNull(), // "open", "closed", "closed_pending_review"
+  timezone: text("timezone").notNull().default("America/Sao_Paulo"),
+  reviewedAt: timestamp("reviewed_at", { mode: "date" }),
+  reviewedByUserId: integer("reviewed_by_user_id"),
 });
 
 export const sales = pgTable("sales", {
