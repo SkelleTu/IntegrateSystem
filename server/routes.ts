@@ -30,7 +30,7 @@ import { verifyMcpAccessToken } from "./mcp-oauth";
 import { neonPool } from "./neon-db.js";
 import { ensureAuditTriggers } from "./db.js";
 import { NeonSessionStore } from "./neon-session-store.js";
-import { registerMarketingAIRoutes } from "./marketing-ai";
+import { registerMarketingAIRoutes } from "./marketing-ai.js";
 
 const uploadStorage = multer.diskStorage({
   destination: (_req: any, _file: any, cb: any) => {
@@ -3948,6 +3948,8 @@ export async function registerRoutes(
       return res.sendStatus(204);
     } catch (error) { return marketingError(res, error); }
   });
+
+  registerMarketingAIRoutes(app, isAuthenticated, marketingTenant);
 
   return httpServer;
 }
