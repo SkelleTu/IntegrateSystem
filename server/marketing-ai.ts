@@ -100,8 +100,17 @@ async function complete(provider: ProviderConfig, messages: any[], model?: strin
   return { text, model: String(payload?.model || selectedModel), usage: payload?.usage || null };
 }
 
-function providerOrder(configs: ProviderConfig[]): ProviderConfig[] {
-  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "kilo,groq,gemini,openrouter,cerebras,huggingface,deepseek,mistral,openai,nvidia,compatible").split(",").map((item) => item.trim().toLowerCase());
+function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] {
+  const research = ["gemini", "openrouter", "groq", "cerebras", "huggingface", "deepseek", "mistral", "openai", "nvidia", "compatible", "kilo"];
+  const analysis = ["openai", "gemini", "deepseek", "groq", "cerebras", "openrouter", "huggingface", "mistral", "nvidia", "compatible", "kilo"];
+  const creative = ["gemini", "openai", "mistral", "openrouter", "groq", "cerebras", "huggingface", "deepseek", "nvidia", "compatible", "kilo"];
+  const group = ["Profit Analyst", "Financial Analyst", "Opportunity Scorer", "Conversion Analyst"].includes(agent)
+    ? analysis
+    : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
+      ? creative
+      : research;
+  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER");
+  const requested = (configuredOrder ? configuredOrder.split(",") : group).map((item) => item.trim().toLowerCase());
   return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
 }
 
@@ -129,7 +138,7 @@ export function registerMarketingAIRoutes(
         free: item?.isFree === true || String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0"),
         contextLength: item?.context_length || item?.contextLength || item?.top_provider?.context_length || null,
         privacyWarning: item?.mayTrainOnYourPrompts === true ? "O provedor pode registrar ou usar prompts para melhoria." : null,
-      })).filter((item: any) => item.id).slice(0, 200);
+      })).filter((item: any) => item.id && (!(provider.id === "kilo" && provider.anonymousFree) || item.free)).slice(0, 200);
       res.json({ provider: provider.id, models: normalized });
     } catch (error: any) {
       res.status(502).json({ message: error?.message || "Não foi possível consultar o catálogo do provedor." });
@@ -140,7 +149,7 @@ export function registerMarketingAIRoutes(
     if (!marketingTenant(req, res)) return;
     const configs = providerConfigs();
     const requested = String(req.body?.provider || "auto");
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
+    const candidates = requested === "auto" ? providerOrder(configs, String(req.body?.agent || "")) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível para teste." });
     const messages = [
       { role: "system", content: "Responda em português brasileiro. Você está verificando conectividade. Responda apenas: CONEXÃO IA OK." },
