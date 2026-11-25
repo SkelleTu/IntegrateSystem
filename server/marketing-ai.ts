@@ -109,8 +109,8 @@ function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] 
     : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
       ? creative
       : research;
-  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER");
-  const requested = (configuredOrder ? configuredOrder.split(",") : group).map((item) => item.trim().toLowerCase());
+  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const requested = [...configuredOrder, ...group].filter((id, index, all) => all.indexOf(id) === index);
   const ordered = requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
   return ordered.flatMap((provider) => {
     if (provider.id !== "kilo" || !provider.anonymousFree || !agent) return [provider];
