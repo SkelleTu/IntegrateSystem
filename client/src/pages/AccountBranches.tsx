@@ -8,7 +8,7 @@ type Account = { id:number; username:string; email?:string|null; role:string; en
 const actionLabels:Record<Action,string> = { view:"Visualizar",create:"Criar",edit:"Editar",delete:"Excluir",approve:"Aprovar",administer:"Administrar" };
 type AccessMode = "none" | "view" | "full";
 const accessLabels:Record<AccessMode,string> = { none:"Sem acesso", view:"Somente visualizar", full:"Acesso completo" };
-const moduleLabels:Record<string,string> = { dashboard:"Dashboard",cashier:"Caixa",finance:"Financeiro",reports:"Relatórios",inventory:"Estoque",fiscal:"Fiscal",labels:"Etiquetas",monitoring:"Monitor",timeclock:"Ponto e funcionários",master:"Controle mestre",account_branches:"Ramificação de contas",settings:"Configurações" };
+const moduleLabels:Record<string,string> = { dashboard:"Dashboard",cashier:"Caixa",finance:"Financeiro",reports:"Relatórios",inventory:"Estoque",fiscal:"Fiscal",labels:"Etiquetas",monitoring:"Monitor",timeclock:"Ponto e funcionários",master:"Controle mestre",account_branches:"Ramificação de contas",variable_income:"Renda Variável",settings:"Configurações" };
 const allActions:Action[] = ["view","create","edit","delete","approve","administer"];
 
 export default function AccountBranches() {
