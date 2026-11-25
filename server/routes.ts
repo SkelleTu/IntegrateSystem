@@ -2977,11 +2977,21 @@ export async function registerRoutes(
       const existing = await storage.getOpenCashRegister(user.id);
       if (existing) return res.status(400).json({ message: "Register already open" });
 
+      const browserTimeZone = String(req.body?.timeZone || "America/Sao_Paulo").trim();
+      let validatedTimeZone = "America/Sao_Paulo";
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: browserTimeZone }).format(new Date());
+        validatedTimeZone = browserTimeZone;
+      } catch {
+        validatedTimeZone = "America/Sao_Paulo";
+      }
+
       const data = insertCashRegisterSchema.parse({
         ...req.body,
         userId: user.id,
         status: "open",
-        openedAt: new Date()
+        openedAt: new Date(),
+        timezone: validatedTimeZone,
       });
       const register = await storage.openCashRegister(data);
       return res.json(register);
@@ -2990,6 +3000,47 @@ export async function registerRoutes(
       return res.status(500).json({
         message: "Não foi possível abrir o caixa. A operação não foi confirmada.",
         code: "CASH_REGISTER_OPEN_FAILED"
+      });
+    }
+  });
+
+  app.get("/api/cash-register/pending-review", isAuthenticated, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const user = req.user as any;
+      const reviews = await storage.getPendingCashRegisterReviews(user.id);
+      return res.json(reviews);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_PENDING_REVIEW] Falha ao consultar revisões:", err);
+      return res.status(500).json({ message: "Não foi possível consultar os fechamentos pendentes." });
+    }
+  });
+
+  app.post("/api/cash-register/review", isAuthenticated, async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    try {
+      const user = req.user as any;
+      if (!hasAdminRole(user)) {
+        return res.status(403).json({ message: "A revisão de fechamento automático é exclusiva do administrador." });
+      }
+      const id = Number(req.body?.id);
+      const rawClosingAmount = Number(req.body?.closingAmount);
+      if (!Number.isSafeInteger(id) || id <= 0 || !Number.isFinite(rawClosingAmount) || rawClosingAmount < 0) {
+        return res.status(400).json({ message: "Informe o caixa e o valor físico de fechamento." });
+      }
+
+      const pending = await storage.getPendingCashRegisterReviews(user.id);
+      if (!pending.some((register: any) => Number(register.id) === id)) {
+        return res.status(404).json({ message: "Fechamento pendente não encontrado para este estabelecimento." });
+      }
+
+      const reviewed = await storage.reviewCashRegister(id, Math.round(rawClosingAmount * 100), user.id);
+      return res.json(reviewed);
+    } catch (err: any) {
+      console.error("[CASH_REGISTER_REVIEW] Falha ao revisar fechamento:", err);
+      return res.status(500).json({
+        message: err?.message || "Não foi possível concluir a revisão do fechamento.",
+        code: "CASH_REGISTER_REVIEW_FAILED"
       });
     }
   });
