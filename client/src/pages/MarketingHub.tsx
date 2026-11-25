@@ -176,6 +176,7 @@ export default function MarketingHub() {
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [editingRecord, setEditingRecord] = useState<MarketingRecord | null>(null);
   const [aiProvider, setAiProvider] = useState("auto");
+  const [aiModel, setAiModel] = useState("");
   const [aiAgent, setAiAgent] = useState("Market Research");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiReply, setAiReply] = useState<{ providerName: string; model: string; message: string } | null>(null);
@@ -184,16 +185,21 @@ export default function MarketingHub() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const overviewQuery = useQuery<Overview>({ queryKey: ["/api/marketing/overview"], staleTime: 15000 });
-  const aiProvidersQuery = useQuery<{ providers: Array<{ id: string; name: string; configured: boolean; free: boolean; defaultModel: string }> }>({
+  const aiProvidersQuery = useQuery<{ providers: Array<{ id: string; name: string; configured: boolean; free: boolean; anonymousFree?: boolean; defaultModel: string }> }>({
     queryKey: ["/api/marketing/ai/providers"],
     queryFn: async () => { const response = await fetch("/api/marketing/ai/providers", { credentials: "include" }); if (!response.ok) throw new Error("Não foi possível consultar os provedores de IA."); return response.json(); },
     enabled: section === "agent", staleTime: 30000,
+  });
+  const aiModelsQuery = useQuery<{ models: Array<{ id: string; name: string; free: boolean }> }>({
+    queryKey: ["/api/marketing/ai/models", aiProvider],
+    queryFn: async () => { const response = await fetch("/api/marketing/ai/models?provider=" + encodeURIComponent(aiProvider), { credentials: "include" }); if (!response.ok) throw new Error("Catálogo de modelos indisponível."); return response.json(); },
+    enabled: section === "agent" && aiProvider !== "auto", staleTime: 60000,
   });
   const runAiChat = async () => {
     if (!aiPrompt.trim() || aiBusy) return;
     setAiBusy(true); setAiError(""); setAiReply(null);
     try {
-      const response = await fetch("/api/marketing/ai/chat", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider, agent: aiAgent, message: aiPrompt }) });
+      const response = await fetch("/api/marketing/ai/chat", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider, model: aiModel || undefined, agent: aiAgent, message: aiPrompt }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.message || data.failures?.join(" | ") || "A IA não conseguiu responder.");
       setAiReply({ providerName: data.providerName, model: data.model, message: data.message });
@@ -203,7 +209,7 @@ export default function MarketingHub() {
   const testAiProvider = async () => {
     setAiBusy(true); setAiError(""); setAiReply(null);
     try {
-      const response = await fetch("/api/marketing/ai/test", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider }) });
+      const response = await fetch("/api/marketing/ai/test", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider, model: aiModel || undefined }) });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.message || data.failures?.join(" | ") || "Teste de IA falhou.");
       setAiReply({ providerName: data.providerName, model: data.model, message: data.response });
@@ -424,10 +430,12 @@ export default function MarketingHub() {
               <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Sparkles className="h-5 w-5 text-cyan-300" /> Central de execução IA</CardTitle><p className="text-sm text-zinc-400">Roteamento entre provedores, teste de conectividade e execução dos agentes especializados.</p></CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2"><Label>Provedor de IA</Label><select value={aiProvider} onChange={(event) => setAiProvider(event.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white"><option value="auto">Automático · fallback entre provedores</option>{(aiProvidersQuery.data?.providers || []).map((provider) => <option key={provider.id} value={provider.id} disabled={!provider.configured}>{provider.name}{provider.free ? " · gratuito" : ""}{!provider.configured ? " · sem credencial" : ""}</option>)}</select></div>
+                  <div className="space-y-2"><Label>Provedor de IA</Label><select value={aiProvider} onChange={(event) => { setAiProvider(event.target.value); setAiModel(""); }} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white"><option value="auto">Automático · fallback entre provedores configurados</option>{(aiProvidersQuery.data?.providers || []).map((provider) => <option key={provider.id} value={provider.id} disabled={!provider.configured && !provider.anonymousFree}>{provider.name}{provider.anonymousFree ? " · gratuito público" : provider.free ? " · gratuito" : ""}{!provider.configured && !provider.anonymousFree ? " · sem credencial" : ""}</option>)}</select></div>
+                  <div className="space-y-2"><Label>Modelo</Label><select value={aiModel} onChange={(event) => setAiModel(event.target.value)} disabled={aiProvider === "auto" || aiModelsQuery.isLoading} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white"><option value="">Padrão do provedor</option>{(aiModelsQuery.data?.models || []).map((model) => <option key={model.id} value={model.id}>{model.name}{model.free ? " · grátis" : ""}</option>)}</select></div>
                   <div className="space-y-2"><Label>Agente especializado</Label><select value={aiAgent} onChange={(event) => setAiAgent(event.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white">{agentCatalog.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></div>
                 </div>
                 <div className="flex flex-wrap gap-2">{(aiProvidersQuery.data?.providers || []).map((provider) => <Badge key={provider.id} className={provider.configured ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-zinc-400"}>{provider.name}: {provider.configured ? provider.free ? "gratuito / limitado" : "configurado" : "aguardando credencial"}</Badge>)}</div>
+                {aiProvider === "kilo" && (aiProvidersQuery.data?.providers || []).find((provider) => provider.id === "kilo")?.anonymousFree && <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 p-3 text-xs text-amber-100">Kilo Auto Free funciona sem chave e sem créditos, mas o provedor informa que prompts podem ser registrados e usados para melhorar serviços. Não envie dados pessoais, dados de clientes, credenciais ou informações comerciais confidenciais nessa modalidade.</div>}
                 <div className="space-y-2"><Label>Solicitação ao agente</Label><Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={4} maxLength={12000} placeholder="Ex.: Analise oportunidades de negócio no nicho de alimentação saudável no interior de São Paulo." className="border-white/10 bg-black/30 text-white" /></div>
                 <div className="flex flex-wrap gap-2"><Button disabled={!aiPrompt.trim() || aiBusy} onClick={runAiChat} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400"><Sparkles className="mr-2 h-4 w-4" />{aiBusy ? "Executando..." : "Executar agente"}</Button><Button disabled={aiBusy} onClick={testAiProvider} variant="outline" className="border-white/15 text-white">Testar conexão</Button></div>
                 {aiError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200">{aiError}</div>}
