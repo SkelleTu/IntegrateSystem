@@ -18,7 +18,7 @@ function providerConfigs(): ProviderConfig[] {
   const groqKey = String(process.env.GROQ_API_KEY || "").trim();
   const invistaBridgeToken = String(process.env.INVISTA_AI_BRIDGE_TOKEN || "").trim();
   const invistaHfBase = String(process.env.INVISTA_AI_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-ai").trim().replace(/\/$/, "");
-  const invistaGroqBase = String(process.env.INVISTA_GROQ_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-groq").trim().replace(/\\/$/, "");
+  const invistaGroqBase = String(process.env.INVISTA_GROQ_BRIDGE_BASE_URL || "https://invista-pro-v10-kzlv.onrender.com/api/internal/marketing-groq").trim().replace(/\/$/, "");
   const compatibleUrl = String(process.env.AURA_AI_COMPAT_BASE_URL || "").trim().replace(/\/$/, "");
   const compatibleKey = String(process.env.AURA_AI_COMPAT_API_KEY || "").trim();
   return [
