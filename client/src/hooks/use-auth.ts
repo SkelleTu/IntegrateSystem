@@ -11,12 +11,24 @@ export function useUser() {
   return useQuery({
     queryKey: [api.auth.me.path],
     queryFn: async () => {
-      const res = await fetch(api.auth.me.path, { credentials: "include" });
-      if (res.status === 401) return null;
-      if (!res.ok) throw new Error("Failed to fetch user");
-      return api.auth.me.responses[200].parse(await res.json());
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 15000);
+      try {
+        const res = await fetch(api.auth.me.path, { credentials: "include", signal: controller.signal, cache: "no-store" });
+        if (res.status === 401) return null;
+        if (!res.ok) throw new Error("Falha ao validar a sessão.");
+        return api.auth.me.responses[200].parse(await res.json());
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new Error("O servidor demorou para responder à validação da sessão. Atualize a página para tentar novamente.");
+        }
+        throw error;
+      } finally {
+        window.clearTimeout(timeout);
+      }
     },
     retry: false,
+    staleTime: 30000,
   });
 }
 
