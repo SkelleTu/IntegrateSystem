@@ -111,7 +111,16 @@ function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] 
       : research;
   const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER");
   const requested = (configuredOrder ? configuredOrder.split(",") : group).map((item) => item.trim().toLowerCase());
-  return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
+  const ordered = requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
+  return ordered.flatMap((provider) => {
+    if (provider.id !== "kilo" || !provider.anonymousFree || !agent) return [provider];
+    const preferredModel = ["Profit Analyst", "Financial Analyst", "Opportunity Scorer", "Conversion Analyst"].includes(agent)
+      ? "nvidia/nemotron-3-ultra-550b-a55b:free"
+      : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
+        ? "baidu/ernie-5.5-flash-preview:free"
+        : "nvidia/nemotron-3-ultra-550b-a55b:free";
+    return [{ ...provider, model: preferredModel }, { ...provider, model: "kilo-auto/free" }];
+  });
 }
 
 export function registerMarketingAIRoutes(
