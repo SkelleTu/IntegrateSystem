@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express } from "express";
 
 type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "compatible";
 type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string; configured: boolean; free: boolean; authHeader?: string };
@@ -97,10 +97,10 @@ function providerOrder(configs: ProviderConfig[]): ProviderConfig[] {
 
 export function registerMarketingAIRoutes(
   app: Express,
-  isAuthenticated: (req: Request, res: Response, next: NextFunction) => unknown,
-  marketingTenant: (req: any, res: Response) => number | null,
+  isAuthenticated: (req: any, res: any, next: any) => any,
+  marketingTenant: (req: any, res: any) => number | null,
 ) {
-  app.get("/api/marketing/ai/providers", isAuthenticated, (req: any, res: Response) => {
+  app.get("/api/marketing/ai/providers", isAuthenticated, (req: any, res: any) => {
     if (!marketingTenant(req, res)) return;
     const providers = providerConfigs();
     res.json({ providers: providers.map(safeProvider), defaultOrder: providerOrder(providers).map((provider) => provider.id), multiProvider: true });
