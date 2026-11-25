@@ -666,6 +666,9 @@ export async function setupDatabase() {
 
   // ── SQLite local: migrações incrementais (espelho das remotas) ───────────
   const localMigrations = [
+    "ALTER TABLE cash_register ADD COLUMN timezone TEXT DEFAULT 'America/Sao_Paulo'",
+    "ALTER TABLE cash_register ADD COLUMN reviewed_at INTEGER",
+    "ALTER TABLE cash_register ADD COLUMN reviewed_by_user_id INTEGER",
     "ALTER TABLE users ADD COLUMN email TEXT",
     "ALTER TABLE enterprises ADD COLUMN owner_id INTEGER",
     "ALTER TABLE enterprises ADD COLUMN business_type TEXT DEFAULT 'barbearia'",
@@ -997,6 +1000,10 @@ export async function setupDatabase() {
       $do$;
     `);
     await neonPool.query(`
+      ALTER TABLE cash_register
+        ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+        ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
+        ADD COLUMN IF NOT EXISTS reviewed_by_user_id INTEGER;
       ALTER TABLE products
         ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
         ADD COLUMN IF NOT EXISTS package_quantity NUMERIC(12,3) DEFAULT 1;
