@@ -642,7 +642,7 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db.select({ enterpriseId: users.enterpriseId })
       .from(users).where(eq(users.id, userId)).limit(1);
     if (!user?.enterpriseId) return [];
-    return await db.select({ register: cashRegisters })
+    const rows = await db.select({ register: cashRegisters })
       .from(cashRegisters)
       .innerJoin(users, eq(users.id, cashRegisters.userId))
       .where(and(
@@ -650,6 +650,7 @@ export class DatabaseStorage implements IStorage {
         eq(users.enterpriseId, user.enterpriseId),
       ))
       .orderBy(desc(cashRegisters.closedAt));
+    return rows.map((row) => row.register);
   }
 
   async autoCloseExpiredCashRegisters(now = new Date()): Promise<CashRegister[]> {
