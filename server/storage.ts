@@ -650,7 +650,7 @@ export class DatabaseStorage implements IStorage {
         eq(users.enterpriseId, user.enterpriseId),
       ))
       .orderBy(desc(cashRegisters.closedAt));
-    return rows.map((row) => row.register);
+    return rows.map((row: { register: CashRegister }) => row.register);
   }
 
   async autoCloseExpiredCashRegisters(now = new Date()): Promise<CashRegister[]> {
