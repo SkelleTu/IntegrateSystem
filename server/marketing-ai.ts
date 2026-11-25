@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 
 type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "cerebras" | "deepseek" | "mistral" | "nvidia" | "compatible";
 type ProviderConfig = {
