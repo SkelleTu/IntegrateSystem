@@ -1004,6 +1004,81 @@ export async function setupDatabase() {
         ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
         ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP,
         ADD COLUMN IF NOT EXISTS reviewed_by_user_id INTEGER;
+
+      -- Neon mantém pg_cron no próprio PostgreSQL, portanto o fechamento não
+      -- depende do processo web do Render estar acordado.
+      CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+      CREATE OR REPLACE FUNCTION public.aura_auto_close_expired_cash_registers()
+      RETURNS void
+      LANGUAGE plpgsql
+      SECURITY DEFINER
+      SET search_path = public
+      AS $
+      DECLARE
+        r RECORD;
+        midnight_at TIMESTAMPTZ;
+      BEGIN
+        FOR r IN
+          SELECT cr.id, cr.user_id, cr.opened_at, cr.timezone, u.enterprise_id
+          FROM cash_register cr
+          LEFT JOIN users u ON u.id = cr.user_id
+          WHERE cr.status = 'open'
+            AND cr.closed_at IS NULL
+            AND cr.opened_at IS NOT NULL
+            AND (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(cr.timezone, 'America/Sao_Paulo'))::date
+                > (cr.opened_at AT TIME ZONE COALESCE(cr.timezone, 'America/Sao_Paulo'))::date
+        LOOP
+          midnight_at :=
+            (((r.opened_at AT TIME ZONE COALESCE(r.timezone, 'America/Sao_Paulo'))::date + INTERVAL '1 day')
+              AT TIME ZONE COALESCE(r.timezone, 'America/Sao_Paulo'));
+
+          UPDATE cash_register
+          SET closed_at = midnight_at,
+              status = 'closed_pending_review',
+              closing_amount = NULL,
+              difference = NULL
+          WHERE id = r.id
+            AND status = 'open'
+            AND closed_at IS NULL;
+
+          IF FOUND THEN
+            INSERT INTO audit_events (
+              enterprise_id, actor_user_id, action, module, entity_type, entity_id,
+              status, occurred_at, details, old_data, new_data
+            ) VALUES (
+              r.enterprise_id, NULL, 'cash.auto_closed_midnight', 'cash', 'cash_register',
+              r.id::text, 'active', midnight_at,
+              jsonb_build_object(
+                'reason', 'automatic_midnight_closure',
+                'timezone', COALESCE(r.timezone, 'America/Sao_Paulo'),
+                'reviewRequired', true
+              )::text,
+              jsonb_build_object('status', 'open')::text,
+              jsonb_build_object(
+                'status', 'closed_pending_review',
+                'closedAt', midnight_at,
+                'timezone', COALESCE(r.timezone, 'America/Sao_Paulo')
+              )::text
+            );
+          END IF;
+        END LOOP;
+      END;
+      $;
+
+      DO $
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM cron.job WHERE jobname = 'aura_cash_register_auto_close'
+        ) THEN
+          PERFORM cron.schedule(
+            'aura_cash_register_auto_close',
+            '* * * * *',
+            'SELECT public.aura_auto_close_expired_cash_registers();'
+          );
+        END IF;
+      END
+      $;
       ALTER TABLE products
         ADD COLUMN IF NOT EXISTS sale_price_unit TEXT NOT NULL DEFAULT 'unit',
         ADD COLUMN IF NOT EXISTS package_quantity NUMERIC(12,3) DEFAULT 1;
