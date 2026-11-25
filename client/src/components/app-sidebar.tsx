@@ -30,7 +30,8 @@ import {
   X,
   FileText,
   Monitor,
-  ShieldCheck
+  ShieldCheck,
+  BrainCircuit
 } from "lucide-react"
 import { useLocation } from "wouter"
 import { useUser } from "@/hooks/use-auth"
@@ -347,6 +348,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
     { title: "Fiscal / Impressão", url: "/fiscal", icon: FileText, adminOnly: true },
     { title: "AURA WINDOWS", url: "/aura-windows", icon: Monitor, adminOnly: true },
     { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
+    { title: "Central de Marketing IA", url: "/marketing", icon: BrainCircuit, adminOnly: true },
     { title: "Estoque", url: "/inventory", icon: Search, adminOnly: true },
     { title: "Tablet Cliente", url: "/cart", icon: ShoppingCart },
     { title: "Sistema de Etiquetas", url: "/admin/labels", icon: FileText, ownerOnly: true },
@@ -362,6 +364,7 @@ export function AppSidebar({ side = "right" }: { side?: "left" | "right" }) {
       "/app": "dashboard", "/ponto": "timeclock", "/caixa": "cashier",
       "/financeiro": "finance", "/fiscal": "fiscal", "/aura-windows": "settings",
       "/relatorios": "reports", "/inventory": "inventory", "/admin/labels": "labels",
+      "/marketing": "marketing",
     };
     const module = routeModules[url];
     const grants = user?.permissions as Record<string, Record<string, boolean>> | undefined;

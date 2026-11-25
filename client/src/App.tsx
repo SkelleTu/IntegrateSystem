@@ -178,6 +178,7 @@ function Router() {
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
             <Route path="/backup" component={Backup} />
+            <Route path="/marketing" component={MarketingHub} />
             <Route component={NotFound} />
           </Switch>
           </Suspense>

@@ -3810,5 +3810,139 @@ export async function registerRoutes(
     }
   });
 
+
+  // Aura Marketing Hub — isolated, tenant-scoped workspace.
+  let marketingSchemaPromise: Promise<void> | null = null;
+  const ensureMarketingSchema = async () => {
+    if (!neonPool) throw new Error("MARKETING_DATABASE_UNAVAILABLE");
+    if (!marketingSchemaPromise) {
+      marketingSchemaPromise = (async () => {
+        await neonPool.query(`
+          CREATE TABLE IF NOT EXISTS aura_marketing_records (
+            id BIGSERIAL PRIMARY KEY,
+            enterprise_id INTEGER NOT NULL,
+            actor_user_id INTEGER NOT NULL,
+            record_type TEXT NOT NULL CHECK (record_type IN ('opportunity','product','brand','campaign','content','audience','lead','agent','automation')),
+            title VARCHAR(180) NOT NULL,
+            status VARCHAR(24) NOT NULL DEFAULT 'planned' CHECK (status IN ('draft','planned','active','paused','completed','archived')),
+            payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+          )
+        `);
+        await neonPool.query("CREATE INDEX IF NOT EXISTS aura_marketing_records_tenant_type_idx ON aura_marketing_records (enterprise_id, record_type, created_at DESC)");
+        await neonPool.query("CREATE INDEX IF NOT EXISTS aura_marketing_records_tenant_status_idx ON aura_marketing_records (enterprise_id, status, updated_at DESC)");
+      })().catch((error) => { marketingSchemaPromise = null; throw error; });
+    }
+    await marketingSchemaPromise;
+  };
+  const marketingTenant = (req: any, res: any): number | null => {
+    const user = req.user as any;
+    if (!hasAdminRole(user)) { res.status(403).json({ message: "Acesso restrito à gestão do marketing." }); return null; }
+    const enterpriseId = Number(user?.enterpriseId);
+    if (!Number.isSafeInteger(enterpriseId) || enterpriseId <= 0) {
+      res.status(403).json({ message: "A conta precisa estar vinculada a uma empresa ativa." });
+      return null;
+    }
+    return enterpriseId;
+  };
+  const marketingError = (res: any, error: any) => {
+    if (String(error?.message || "").includes("MARKETING_DATABASE_UNAVAILABLE")) {
+      return res.status(503).json({ message: "Banco PostgreSQL do módulo de marketing indisponível. Configure a conexão de produção antes de gravar dados." });
+    }
+    console.error("[MARKETING]", error);
+    return res.status(500).json({ message: "Falha interna no módulo de marketing." });
+  };
+
+  app.get("/api/marketing/overview", isAuthenticated, async (req: any, res: any) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureMarketingSchema();
+      const counts = await neonPool!.query("SELECT record_type AS type, COUNT(*)::int AS total FROM aura_marketing_records WHERE enterprise_id=$1 GROUP BY record_type", [enterpriseId]);
+      const recent = await neonPool!.query("SELECT id,record_type AS type,title,status,payload,created_at AS \"createdAt\",updated_at AS \"updatedAt\" FROM aura_marketing_records WHERE enterprise_id=$1 ORDER BY created_at DESC LIMIT 8", [enterpriseId]);
+      const totals: Record<string, number> = {};
+      for (const row of counts.rows) totals[String(row.type)] = Number(row.total || 0);
+      return res.json({ totals, recent: recent.rows });
+    } catch (error) { return marketingError(res, error); }
+  });
+
+  app.get("/api/marketing/records", isAuthenticated, async (req: any, res: any) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureMarketingSchema();
+      const type = String(req.query.type || "").trim();
+      const allowed = new Set(["opportunity","product","brand","campaign","content","audience","lead","agent","automation"]);
+      if (type && !allowed.has(type)) return res.status(400).json({ message: "Tipo de registro inválido." });
+      const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 200);
+      const result = await neonPool!.query(
+        "SELECT id,record_type AS type,title,status,payload,created_at AS \"createdAt\",updated_at AS \"updatedAt\" FROM aura_marketing_records WHERE enterprise_id=$1" + (type ? " AND record_type=$2" : "") + " ORDER BY updated_at DESC LIMIT " + limit,
+        type ? [enterpriseId, type] : [enterpriseId],
+      );
+      return res.json(result.rows);
+    } catch (error) { return marketingError(res, error); }
+  });
+
+  app.post("/api/marketing/records", isAuthenticated, async (req: any, res: any) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureMarketingSchema();
+      const body = req.body || {};
+      const allowed = new Set(["opportunity","product","brand","campaign","content","audience","lead","agent","automation"]);
+      const statuses = new Set(["draft","planned","active","paused","completed","archived"]);
+      const type = String(body.type || "");
+      const title = String(body.title || "").trim();
+      const status = String(body.status || "planned");
+      const payload = body.payload && typeof body.payload === "object" && !Array.isArray(body.payload) ? body.payload : {};
+      if (!allowed.has(type) || !title || title.length > 180 || !statuses.has(status)) return res.status(400).json({ message: "Dados inválidos. Verifique tipo, título e status." });
+      if (Buffer.byteLength(JSON.stringify(payload), "utf8") > 32768) return res.status(413).json({ message: "O conteúdo excede o limite de 32 KB." });
+      const result = await neonPool!.query(
+        "INSERT INTO aura_marketing_records (enterprise_id,actor_user_id,record_type,title,status,payload) VALUES ($1,$2,$3,$4,$5,$6::jsonb) RETURNING id,record_type AS type,title,status,payload,created_at AS \"createdAt\",updated_at AS \"updatedAt\"",
+        [enterpriseId, Number((req.user as any).id), type, title, status, JSON.stringify(payload)],
+      );
+      return res.status(201).json(result.rows[0]);
+    } catch (error) { return marketingError(res, error); }
+  });
+
+  app.patch("/api/marketing/records/:id", isAuthenticated, async (req: any, res: any) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureMarketingSchema();
+      const id = Number(req.params.id); if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "Identificador inválido." });
+      const body = req.body || {}; const sets: string[] = []; const params: any[] = [];
+      if (Object.prototype.hasOwnProperty.call(body, "title")) {
+        const title = String(body.title || "").trim(); if (!title || title.length > 180) return res.status(400).json({ message: "Título inválido." });
+        params.push(title); sets.push("title=$" + params.length);
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "status")) {
+        const status = String(body.status || ""); if (!new Set(["draft","planned","active","paused","completed","archived"]).has(status)) return res.status(400).json({ message: "Status inválido." });
+        params.push(status); sets.push("status=$" + params.length);
+      }
+      if (Object.prototype.hasOwnProperty.call(body, "payload")) {
+        const payload = body.payload;
+        if (!payload || typeof payload !== "object" || Array.isArray(payload) || Buffer.byteLength(JSON.stringify(payload), "utf8") > 32768) return res.status(400).json({ message: "Conteúdo inválido ou acima de 32 KB." });
+        params.push(JSON.stringify(payload)); sets.push("payload=$" + params.length + "::jsonb");
+      }
+      if (!sets.length) return res.status(400).json({ message: "Nenhuma alteração informada." });
+      sets.push("updated_at=NOW()"); params.push(id); const idParam = params.length; params.push(enterpriseId); const tenantParam = params.length;
+      const result = await neonPool!.query(
+        "UPDATE aura_marketing_records SET " + sets.join(",") + " WHERE id=$" + idParam + " AND enterprise_id=$" + tenantParam + " RETURNING id,record_type AS type,title,status,payload,created_at AS \"createdAt\",updated_at AS \"updatedAt\"",
+        params,
+      );
+      if (!result.rows[0]) return res.status(404).json({ message: "Registro não encontrado." });
+      return res.json(result.rows[0]);
+    } catch (error) { return marketingError(res, error); }
+  });
+
+  app.delete("/api/marketing/records/:id", isAuthenticated, async (req: any, res: any) => {
+    const enterpriseId = marketingTenant(req, res); if (!enterpriseId) return;
+    try {
+      await ensureMarketingSchema();
+      const id = Number(req.params.id); if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: "Identificador inválido." });
+      const result = await neonPool!.query("DELETE FROM aura_marketing_records WHERE id=$1 AND enterprise_id=$2 RETURNING id", [id, enterpriseId]);
+      if (!result.rowCount) return res.status(404).json({ message: "Registro não encontrado." });
+      return res.sendStatus(204);
+    } catch (error) { return marketingError(res, error); }
+  });
+
   return httpServer;
 }
