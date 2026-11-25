@@ -190,6 +190,16 @@ export default function MarketingHub() {
     queryFn: async () => { const response = await fetch("/api/marketing/ai/providers", { credentials: "include" }); if (!response.ok) throw new Error("Não foi possível consultar os provedores de IA."); return response.json(); },
     enabled: section === "agent", staleTime: 30000,
   });
+  const aiRunsQuery = useQuery<{ runs: Array<{ id: number; agent: string; provider: string; model: string; prompt: string; response: string; createdAt: string }> }>({
+    queryKey: ["/api/marketing/ai/runs", aiAgent],
+    queryFn: async () => {
+      const response = await fetch("/api/marketing/ai/runs?agent=" + encodeURIComponent(aiAgent) + "&limit=8", { credentials: "include" });
+      if (!response.ok) throw new Error("Histórico dos agentes indisponível.");
+      return response.json();
+    },
+    enabled: section === "agent",
+    staleTime: 10000,
+  });
   const aiModelsQuery = useQuery<{ models: Array<{ id: string; name: string; free: boolean }> }>({
     queryKey: ["/api/marketing/ai/models", aiProvider],
     queryFn: async () => { const response = await fetch("/api/marketing/ai/models?provider=" + encodeURIComponent(aiProvider), { credentials: "include" }); if (!response.ok) throw new Error("Catálogo de modelos indisponível."); return response.json(); },
@@ -203,6 +213,7 @@ export default function MarketingHub() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.message || data.failures?.join(" | ") || "A IA não conseguiu responder.");
       setAiReply({ providerName: data.providerName, model: data.model, message: data.message });
+      void queryClient.invalidateQueries({ queryKey: ["/api/marketing/ai/runs", aiAgent] });
     } catch (error) { setAiError(error instanceof Error ? error.message : "Falha ao consultar a IA."); }
     finally { setAiBusy(false); }
   };
@@ -454,6 +465,15 @@ export default function MarketingHub() {
                 {aiError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200">{aiError}</div>}
                 {aiReply && <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4"><div className="mb-2 flex flex-wrap items-center gap-2"><Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-200">{aiReply.providerName}</Badge><span className="text-xs text-zinc-400">{aiReply.model}</span></div><p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-100">{aiReply.message}</p></div>}
                 {aiProvidersQuery.isError && <p className="text-sm text-amber-200">Não foi possível carregar o estado dos provedores. Verifique a conexão e atualize a página.</p>}
+              </CardContent>
+            </Card>
+            <Card className="border-white/10 bg-white/[0.035] text-white">
+              <CardHeader><CardTitle className="text-lg">Memória e histórico de execução</CardTitle><p className="text-sm text-zinc-400">As execuções ficam registradas por empresa e agente. Memórias operacionais salvas são reutilizadas no contexto das próximas execuções.</p></CardHeader>
+              <CardContent className="space-y-3">
+                {aiRunsQuery.isLoading && <p className="text-sm text-zinc-400">Carregando histórico...</p>}
+                {aiRunsQuery.isError && <p className="text-sm text-amber-200">Histórico temporariamente indisponível.</p>}
+                {!aiRunsQuery.isLoading && !aiRunsQuery.isError && (aiRunsQuery.data?.runs || []).length === 0 && <p className="text-sm text-zinc-500">Nenhuma execução registrada para este agente.</p>}
+                {(aiRunsQuery.data?.runs || []).map((run) => <div key={run.id} className="rounded-lg border border-white/10 bg-black/20 p-3"><div className="flex flex-wrap items-center gap-2"><Badge className="border-cyan-400/20 bg-cyan-400/10 text-cyan-200">{run.provider}</Badge><span className="text-xs text-zinc-500">{run.model}</span><span className="ml-auto text-xs text-zinc-500">{new Date(run.createdAt).toLocaleString("pt-BR")}</span></div><p className="mt-2 text-sm font-semibold text-zinc-200">{run.prompt}</p><p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-zinc-400">{run.response}</p></div>)}
               </CardContent>
             </Card>
             <Card className="border-white/10 bg-white/[0.035] text-white">
