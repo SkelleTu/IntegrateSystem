@@ -1000,10 +1000,31 @@ export async function registerRoutes(
     `);
   }
 
-  const accountModules = ["dashboard","cashier","finance","reports","inventory","fiscal","labels","monitoring","timeclock","master","account_branches","settings","marketing"];
+  const accountModules = ["dashboard","cashier","finance","reports","inventory","fiscal","labels","monitoring","timeclock","master","account_branches","settings","marketing","variable_income"];
   const defaultAccountPermissions = Object.fromEntries(accountModules.map((module) => [module, {
     view: false, create: false, edit: false, delete: false, approve: false, administer: false,
   }]));
+  // Add the investment module permission without changing existing grants.
+  if (neonPool) {
+    try {
+      await neonPool.query(
+        `UPDATE aura_account_controls AS controls
+         SET permissions = COALESCE(controls.permissions, '{}'::jsonb) ||
+           jsonb_build_object('variable_income',
+             CASE WHEN LOWER(COALESCE(users.role, '')) IN ('admin', 'owner')
+               THEN $1::jsonb ELSE $2::jsonb END)
+         FROM users
+         WHERE users.id = controls.user_id
+           AND NOT (COALESCE(controls.permissions, '{}'::jsonb) ? 'variable_income')`,
+        [
+          JSON.stringify({ view:true, create:true, edit:true, delete:true, approve:true, administer:false }),
+          JSON.stringify({ view:false, create:false, edit:false, delete:false, approve:false, administer:false }),
+        ],
+      );
+    } catch (permissionMigrationError: any) {
+      console.warn("[RBAC] Could not add variable_income permission defaults:", permissionMigrationError?.message || permissionMigrationError);
+    }
+  }
   const auditAccountAction = async (req: any, targetUserId: number | null, action: string, details: any = {}) => {
     if (!neonPool) return;
     const actorId = Number(req.user?.id) || null;
@@ -1743,7 +1764,8 @@ export async function registerRoutes(
 
     const path = String(req.path || "");
     const method = String(req.method || "GET").toUpperCase();
-    const module = path.startsWith("/api/admin/monitoring") ? "monitoring"
+    const module = path.startsWith("/api/renda-variavel") ? "variable_income"
+      : path.startsWith("/api/admin/monitoring") ? "monitoring"
       : path.startsWith("/api/admin/account-branches") || path.startsWith("/api/admin/register-barber") ? "account_branches"
       : path.startsWith("/api/admin/time-clock") || path.startsWith("/api/time-clock") || path.startsWith("/api/auth/register-fingerprint") ? "timeclock"
       : path.startsWith("/api/fiscal") ? "fiscal"
@@ -1794,6 +1816,33 @@ export async function registerRoutes(
       return res.status(503).json({ message: "Não foi possível validar as permissões da conta." });
     }
   }
+
+  // Readiness proxy for the embedded Invista PRO V10 module.
+  // Aura keeps its own loader visible while the Render service wakes up.
+  app.get("/api/renda-variavel/health", isAuthenticated, async (_req: any, res: any) => {
+    const upstreamBase = String(process.env.INVISTA_PRO_V10_URL || "https://invista-pro-v10-kzlv.onrender.com").trim().replace(/\/+$/, "");
+    try {
+      const upstream = await fetch(upstreamBase + "/api/observability/health", {
+        method: "GET", headers: { Accept: "application/json" }, cache: "no-store",
+        signal: AbortSignal.timeout(9000),
+      });
+      const payload: any = await upstream.json().catch(() => ({}));
+      const ready = upstream.ok && payload?.status === "healthy" &&
+        payload?.routesReady === true && payload?.persistenceReady === true;
+      return res.status(ready ? 200 : 503).json({
+        ready,
+        status: ready ? "ready" : String(payload?.status || "starting"),
+        routesReady: payload?.routesReady === true,
+        persistenceReady: payload?.persistenceReady === true,
+        retryAfterMs: 2500,
+      });
+    } catch (error: any) {
+      return res.status(503).json({
+        ready: false, status: "starting", retryAfterMs: 2500,
+        message: error?.name === "TimeoutError" ? "A plataforma ainda está inicializando." : "Aguardando a aplicação de investimentos.",
+      });
+    }
+  });
 
   // Fiscal Routes
   app.get("/api/download/app", (req, res) => {
