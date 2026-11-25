@@ -116,7 +116,12 @@ export default function MarketingHub() {
       const response = await apiRequest("PATCH", "/api/marketing/records/" + id, { status: nextStatus });
       return response.json();
     },
-    onSuccess: () => invalidateMarketingQueries(),
+    onSuccess: (updated: MarketingRecord) => {
+      queryClient.setQueryData<MarketingRecord[]>(["/api/marketing/records", section], (current = []) =>
+        current.map((record) => record.id === updated.id ? updated : record)
+      );
+      void invalidateMarketingQueries();
+    },
     onError: (error: Error) => toast({ title: "Falha ao atualizar", description: error.message, variant: "destructive" }),
   });
   const deleteMutation = useMutation({
@@ -127,7 +132,12 @@ export default function MarketingHub() {
       ]);
     },
     mutationFn: async (id: number) => apiRequest("DELETE", "/api/marketing/records/" + id),
-    onSuccess: () => invalidateMarketingQueries(),
+    onSuccess: (_result, id: number) => {
+      queryClient.setQueryData<MarketingRecord[]>(["/api/marketing/records", section], (current = []) =>
+        current.filter((record) => record.id !== id)
+      );
+      void invalidateMarketingQueries();
+    },
     onError: (error: Error) => toast({ title: "Falha ao excluir", description: error.message, variant: "destructive" }),
   });
   const createMutation = useMutation({
@@ -144,9 +154,16 @@ export default function MarketingHub() {
       });
       return response.json();
     },
-    onSuccess: async () => {
+    onSuccess: async (created: MarketingRecord) => {
       setCreateOpen(false); setTitle(""); setDescription(""); setStatus("planned");
-      await invalidateMarketingQueries();
+      queryClient.setQueryData<MarketingRecord[]>(["/api/marketing/records", section], (current = []) =>
+        [created, ...current.filter((record) => record.id !== created.id)]
+      );
+      queryClient.setQueryData<Overview>(["/api/marketing/overview"], (current) => ({
+        totals: { ...(current?.totals || {}), [created.type]: (current?.totals?.[created.type] || 0) + 1 },
+        recent: [created, ...(current?.recent || []).filter((record) => record.id !== created.id)].slice(0, 8),
+      }));
+      await queryClient.invalidateQueries({ queryKey: ["/api/marketing/overview"] });
       toast({ title: "Registro salvo", description: "O item foi salvo na central de marketing." });
     },
     onError: (error: Error) => toast({ title: "Não foi possível salvar", description: error.message, variant: "destructive" }),
