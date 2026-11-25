@@ -534,7 +534,7 @@ function ProductFields({ form, setForm, T, highlightFlavor = false, allProducts 
         <Label className={`text-[10px] font-black uppercase tracking-widest ${T.dialogLabel}`}>Categoria</Label>
         <Input list="aura-product-categories" className={`mt-1 ${T.dialogInput}`} value={form.category} onChange={e => setForm((f: any) => ({ ...f, category: e.target.value }))} placeholder="Ex: Padaria, Bebidas, Limpeza" />
       <datalist id="aura-product-categories">
-        {Array.from(new Set(allProducts.map((p: any) => String(p.category || "").trim()).filter(Boolean))).sort().map((category: string) => (
+        {Array.from(new Set<string>(allProducts.map((p: any) => String(p.category || "").trim()).filter(Boolean))).sort().map((category: string) => (
           <option key={category} value={category} />
         ))}
       </datalist>
@@ -1031,8 +1031,8 @@ export default function InventoryPage() {
       items = items.filter(p => {
         if (filterStatus === "baixo")     return p.totalQuantity < p.minStock;
         if (filterStatus === "sem_lotes") return p.totalQuantity <= 0;
-        if (filterStatus === "vencidos")  return p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) <= 0;
-        if (filterStatus === "vencendo")  return p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) > 0 && daysUntilExpiry(p.nearestExpiry) <= 7;
+        if (filterStatus === "vencidos")  return p.nearestExpiry ? (daysUntilExpiry(p.nearestExpiry) ?? 1) <= 0 : false;
+        if (filterStatus === "vencendo")  { const days = p.nearestExpiry ? daysUntilExpiry(p.nearestExpiry) : null; return days !== null && days > 0 && days <= 7; }
         return true;
       });
     }
@@ -1058,7 +1058,7 @@ export default function InventoryPage() {
   function ExpiryBadge({ date }: { date: string | Date | null | undefined }) {
     if (!date) return null;
     const u = getExpiryUrgency(date);
-    const days = daysUntilExpiry(date);
+    const days = daysUntilExpiry(date) ?? 0;
     const cfg = {
       red:    { cls: "bg-red-500/15 border-red-500/30 text-red-400", label: days <= 0 ? "VENCIDO" : `VENCE EM ${days}d` },
       yellow: { cls: "bg-yellow-500/15 border-yellow-500/30 text-yellow-400", label: `VENCE EM ${days}d` },
@@ -1140,6 +1140,7 @@ export default function InventoryPage() {
       flavor: p.flavor || "", unit: p.unit, weight: p.weight || "",
       description: p.description || "", minStock: String(p.minStock),
       salePrice: p.salePrice ? String((p.salePrice / 100).toFixed(2)) : "",
+      salePriceUnit: (p as any).salePriceUnit || "unit", packageQuantity: String((p as any).packageQuantity || 1),
       ncm: p.ncm || "", cfop: p.cfop || "", codigoBalanca: p.codigoBalanca || "",
       codigoProduto: (p as any).codigoProduto || "",
     });
@@ -1156,7 +1157,9 @@ export default function InventoryPage() {
       supplier: b.supplier || "",
       quantity: String(b.quantity),
       costPrice: b.costPrice ? String((b.costPrice / 100).toFixed(2)) : "",
+      costPriceUnit: (b as any).costPriceUnit || "unit",
       salePrice: b.salePrice ? String((b.salePrice / 100).toFixed(2)) : "",
+      salePriceUnit: (b as any).salePriceUnit || "unit", packageQuantity: String((b as any).packageQuantity || 1),
       manufactureDate: b.manufactureDate ? dateInputValue(b.manufactureDate) : "",
       expiryDate: b.expiryDate ? dateInputValue(b.expiryDate) : "",
       entryDate: dateInputValue(b.entryDate),
@@ -1407,6 +1410,7 @@ export default function InventoryPage() {
         description: addBatchFor.description || "",
         minStock: String(addBatchFor.minStock || 5),
         salePrice: addBatchFor.salePrice ? String((addBatchFor.salePrice / 100).toFixed(2)) : "",
+        salePriceUnit: (addBatchFor as any).salePriceUnit || "unit", packageQuantity: String((addBatchFor as any).packageQuantity || 1),
         ncm: addBatchFor.ncm || "",
         cfop: addBatchFor.cfop || "",
         codigoBalanca: "",
@@ -1570,8 +1574,8 @@ export default function InventoryPage() {
 
   const totalProducts = products.length;
   const lowStockCount = products.filter(p => p.totalQuantity < p.minStock).length;
-  const expiringCount = products.filter(p => p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) > 0 && daysUntilExpiry(p.nearestExpiry) <= 7).length;
-  const expiredCount  = products.filter(p => p.nearestExpiry && daysUntilExpiry(p.nearestExpiry) <= 0).length;
+  const expiringCount = products.filter(p => { const days = p.nearestExpiry ? daysUntilExpiry(p.nearestExpiry) : null; return days !== null && days > 0 && days <= 7; }).length;
+  const expiredCount  = products.filter(p => p.nearestExpiry ? (daysUntilExpiry(p.nearestExpiry) ?? 1) <= 0 : false).length;
   const saleCount     = products.filter(p => p.emLiquidacao).length;
 
   // ─── Render ────────────────────────────────────────────────────────────────
