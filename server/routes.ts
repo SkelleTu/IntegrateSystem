@@ -3949,5 +3949,7 @@ export async function registerRoutes(
     } catch (error) { return marketingError(res, error); }
   });
 
+  registerMarketingAIRoutes(app, isAuthenticated, marketingTenant);
+
   return httpServer;
 }
