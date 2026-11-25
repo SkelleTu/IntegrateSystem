@@ -68,6 +68,7 @@ const AuraWindows = lazy(() => import("./pages/AuraWindows"));
 const Backup = lazy(() => import("./pages/Backup"));
 const SetupEnterprise = lazy(() => import("./pages/SetupEnterprise"));
 const MarketingHub = lazy(() => import("./pages/MarketingHub"));
+const RendaVariavel = lazy(() => import("./pages/RendaVariavel"));
 
 function RouteLoading() {
   return (
@@ -143,11 +144,13 @@ function Router() {
   }
 
   const isCashierPage = location === "/caixa" || location === "/financeiro" || location === "/relatorios";
+  const isRendaVariavelPage = location === "/renda-variavel";
+  const isImmersivePage = isCashierPage || isRendaVariavelPage;
 
   return (
-    <div className={`flex h-screen w-full ${isCashierPage ? "overflow-hidden" : ""}`}>
+    <div className={`flex h-screen w-full ${isImmersivePage ? "overflow-hidden" : ""}`}>
       <div className="flex flex-col flex-1 overflow-hidden relative">
-        <main className={`aura-module-theme flex-1 relative ${isCashierPage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"} ${["/financeiro", "/inventory", "/admin/monitoring"].includes(location) ? "pt-20" : ""}`}>
+        <main className={`aura-module-theme flex-1 relative ${isImmersivePage ? "overflow-hidden" : "overflow-y-auto custom-scrollbar"} ${["/financeiro", "/inventory", "/admin/monitoring", "/renda-variavel"].includes(location) ? "pt-20" : ""}`}>
           <Suspense fallback={<RouteLoading />}>
           <Switch>
             <Route path="/" component={LandingPage} />
@@ -180,6 +183,7 @@ function Router() {
             <Route path="/aura-windows" component={AuraWindows} />
             <Route path="/backup" component={Backup} />
             <Route path="/marketing" component={MarketingHub} />
+            <Route path="/renda-variavel" component={RendaVariavel} />
             <Route component={NotFound} />
           </Switch>
           </Suspense>
@@ -256,12 +260,14 @@ function AppContent() {
   const [location] = useLocation();
   const isLandingPage = ["/", "/quem-somos", "/solucoes", "/casos-de-sucesso", "/blog", "/contato", "/privacy", "/terms"].includes(location);
   const isCashierPage = location === "/caixa" || location === "/financeiro" || location === "/relatorios";
+  const isRendaVariavelPage = location === "/renda-variavel";
+  const isImmersivePage = isCashierPage || isRendaVariavelPage;
 
   return (
-    <div className={`relative min-h-screen w-full bg-black pb-8 ${isCashierPage ? "overflow-hidden" : "overflow-x-hidden"}`}>
+    <div className={`relative min-h-screen w-full bg-black ${isImmersivePage ? "overflow-hidden pb-0" : "overflow-x-hidden pb-8"}`}>
       <BackgroundIcons />
       <div className="flex flex-col w-full bg-transparent relative z-10 min-h-screen">
-        <main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage && !isCashierPage ? "mb-12 sm:mb-0" : ""}`}>
+        <main className={`flex-1 relative bg-transparent flex flex-col ${!isLandingPage && !isImmersivePage ? "mb-12 sm:mb-0" : ""}`}>
           <LandingNavigation />
           {user && !isLandingPage && location !== "/setup" && <Navbar />}
           <Router />
