@@ -5,7 +5,7 @@ type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: s
 
 const DEFAULTS = {
   huggingface: { baseUrl: "https://router.huggingface.co/v1", model: "openai/gpt-oss-120b:fastest" },
-  kilo: { baseUrl: "https://ai-gateway.kilo.ai/api/v1", model: "z-ai/glm-5:free" },
+  kilo: { baseUrl: "https://ai-gateway.kilo.ai/api/v1", model: "kilo-auto/free" },
   openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4.1-mini" },
 };
 
@@ -17,14 +17,14 @@ function providerConfigs(): ProviderConfig[] {
   const compatibleKey = String(process.env.AURA_AI_COMPAT_API_KEY || "").trim();
   return [
     { id: "huggingface", name: "Hugging Face", baseUrl: String(process.env.HF_BASE_URL || DEFAULTS.huggingface.baseUrl).replace(/\/$/, ""), apiKey: hfKey, model: String(process.env.HF_MODEL || DEFAULTS.huggingface.model), configured: Boolean(hfKey), free: false },
-    { id: "kilo", name: "Kilo AI Gateway", baseUrl: String(process.env.KILO_BASE_URL || DEFAULTS.kilo.baseUrl).replace(/\/$/, ""), apiKey: kiloKey, model: String(process.env.KILO_MODEL || DEFAULTS.kilo.model), configured: Boolean(kiloKey) || process.env.KILO_ANONYMOUS_FREE_ENABLED !== "false", free: !kiloKey },
+    { id: "kilo", name: "Kilo AI Gateway", baseUrl: String(process.env.KILO_BASE_URL || DEFAULTS.kilo.baseUrl).replace(/\/$/, ""), apiKey: kiloKey, model: String(process.env.KILO_MODEL || DEFAULTS.kilo.model), configured: Boolean(kiloKey), free: !kiloKey },
     { id: "openai", name: "OpenAI", baseUrl: String(process.env.OPENAI_BASE_URL || DEFAULTS.openai.baseUrl).replace(/\/$/, ""), apiKey: openaiKey, model: String(process.env.OPENAI_MODEL || DEFAULTS.openai.model), configured: Boolean(openaiKey), free: false },
     { id: "compatible", name: String(process.env.AURA_AI_COMPAT_NAME || "OpenAI-compatible API"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: String(process.env.AURA_AI_COMPAT_MODEL || ""), configured: Boolean(compatibleUrl), free: false },
   ];
 }
 
 function safeProvider(provider: ProviderConfig) {
-  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, baseUrl: provider.baseUrl, defaultModel: provider.model };
+  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, anonymousFree: provider.id === "kilo" && provider.free, baseUrl: provider.baseUrl, defaultModel: provider.model };
 }
 
 function agentInstructions(agent: string): string {
@@ -103,7 +103,7 @@ export function registerMarketingAIRoutes(
   app.get("/api/marketing/ai/models", isAuthenticated, async (req: any, res: Response) => {
     if (!marketingTenant(req, res)) return;
     const id = String(req.query.provider || "");
-    const provider = providerConfigs().find((item) => item.id === id && item.configured);
+    const provider = providerConfigs().find((item) => item.id === id && (item.configured || item.id === "kilo"));
     if (!provider) return res.status(400).json({ message: "Provedor indisponível ou não configurado." });
     try {
       const models = await listModels(provider);
@@ -112,7 +112,7 @@ export function registerMarketingAIRoutes(
         name: String(item?.name || item?.id || item?.model || ""),
         free: String(item?.id || "").endsWith(":free") || item?.pricing?.prompt === "0" || item?.pricing?.completion === "0",
         contextLength: item?.context_length || item?.contextLength || null,
-      })).filter((item: any) => item.id);
+      })).filter((item: any) => item.id).slice(0, 200);
       res.json({ provider: provider.id, models: normalized });
     } catch (error: any) {
       res.status(502).json({ message: error?.message || "Não foi possível consultar o catálogo do provedor." });
@@ -123,7 +123,7 @@ export function registerMarketingAIRoutes(
     if (!marketingTenant(req, res)) return;
     const configs = providerConfigs();
     const requested = String(req.body?.provider || "auto");
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && item.configured);
+    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || item.id === "kilo"));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível para teste." });
     const messages = [
       { role: "system", content: "Responda em português brasileiro. Você está verificando conectividade. Responda apenas: CONEXÃO IA OK." },
