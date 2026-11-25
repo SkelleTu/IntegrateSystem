@@ -398,7 +398,7 @@ export async function registerRoutes(
   // A successful master-password authorization grants temporary privileged access
   // without changing the user's real account role in the database.
   app.use((req: any, _res, next) => {
-    const expiresAt = Number(req.session?.masterAccessUntil || 0);
+    const expiresAt = Number((req.session as any)?.masterAccessUntil || 0);
     if (
       req.isAuthenticated?.() &&
       Number.isFinite(expiresAt) &&
@@ -859,6 +859,7 @@ export async function registerRoutes(
   app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar funcionários." });
+    if (!neonPool) return res.status(503).json({ message: "Banco de dados indisponível para criar contas." });
 
     try {
       const schema = z.object({
@@ -1345,13 +1346,14 @@ export async function registerRoutes(
       // Persist only boolean action flags. The access scope is a derived UI value;
       // keeping it out of the canonical JSON avoids incompatibilities with legacy
       // account-control records while RBAC remains fully enforced by the flags.
+      const permissionEntries = Object.entries(currentPermissions) as Array<[string, Record<string, any>]>;
       const persistPermissions = Object.fromEntries(
-        Object.entries(currentPermissions).map(([module, actions]: [string, any]) => [
+        permissionEntries.map(([module, actions]) => [
           module,
           Object.fromEntries(Object.entries(actions || {}).filter(([key]) => key !== "access")),
         ]),
       );
-      for (const [module, actions] of Object.entries(currentPermissions)) {
+      for (const [module, actions] of permissionEntries) {
         if (!accountModules.includes(module) || !actions) return res.status(400).json({ message: "Permissões contêm módulo ou ação inválida." });
         const keys = Object.keys(actions);
         const allowedKeys = new Set(["access","edit","view","create","delete","approve","administer"]);
@@ -1421,6 +1423,7 @@ export async function registerRoutes(
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
     const targetId = Number(req.params.id);
     if (!Number.isSafeInteger(targetId) || targetId <= 0 || targetId === Number(actor.id)) return res.status(400).json({ message: "Não é permitido remover esta conta." });
+    if (!neonPool) return res.status(503).json({ message: "Banco de dados indisponível para remover contas." });
     try {
       const target = await getAuthoritativeUserById(targetId);
       if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
@@ -3133,7 +3136,7 @@ export async function registerRoutes(
 
     const creditPayment = payments.find((p: any) => String(p?.method) === "credit_internal");
     const creditCustomerId = creditPayment ? Number(sale?.creditCustomerId) : null;
-    if (creditPayment && (!Number.isSafeInteger(creditCustomerId) || creditCustomerId <= 0)) {
+    if (creditPayment && (creditCustomerId === null || !Number.isSafeInteger(creditCustomerId) || creditCustomerId <= 0)) {
       return res.status(400).json({ message: "Selecione um cliente válido para o Crédito Interno." });
     }
     if (creditPayment && payments.filter((p:any)=>String(p?.method)==="credit_internal").length > 1) {
