@@ -106,6 +106,12 @@ export default function MarketingHub() {
     ]);
   };
   const updateMutation = useMutation({
+    onMutate: async () => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/overview"] }),
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/records"] }),
+      ]);
+    },
     mutationFn: async ({ id, nextStatus }: { id: number; nextStatus: string }) => {
       const response = await apiRequest("PATCH", "/api/marketing/records/" + id, { status: nextStatus });
       return response.json();
@@ -114,11 +120,23 @@ export default function MarketingHub() {
     onError: (error: Error) => toast({ title: "Falha ao atualizar", description: error.message, variant: "destructive" }),
   });
   const deleteMutation = useMutation({
+    onMutate: async () => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/overview"] }),
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/records"] }),
+      ]);
+    },
     mutationFn: async (id: number) => apiRequest("DELETE", "/api/marketing/records/" + id),
     onSuccess: () => invalidateMarketingQueries(),
     onError: (error: Error) => toast({ title: "Falha ao excluir", description: error.message, variant: "destructive" }),
   });
   const createMutation = useMutation({
+    onMutate: async () => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/overview"] }),
+        queryClient.cancelQueries({ queryKey: ["/api/marketing/records"] }),
+      ]);
+    },
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/marketing/records", {
         type: section, title: title.trim(), status,
