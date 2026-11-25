@@ -3822,7 +3822,7 @@ export async function registerRoutes(
             id BIGSERIAL PRIMARY KEY,
             enterprise_id INTEGER NOT NULL,
             actor_user_id INTEGER NOT NULL,
-            record_type TEXT NOT NULL CHECK (record_type IN ('opportunity','product','brand','campaign','content','audience','lead','agent','automation')),
+            record_type TEXT NOT NULL CHECK (record_type IN ('opportunity','product','brand','campaign','social','growth','community','content','audience','lead','finance','analytics','agent','automation')),
             title VARCHAR(180) NOT NULL,
             status VARCHAR(24) NOT NULL DEFAULT 'planned' CHECK (status IN ('draft','planned','active','paused','completed','archived')),
             payload JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -3871,7 +3871,7 @@ export async function registerRoutes(
     try {
       await ensureMarketingSchema();
       const type = String(req.query.type || "").trim();
-      const allowed = new Set(["opportunity","product","brand","campaign","content","audience","lead","agent","automation"]);
+      const allowed = new Set(["opportunity","product","brand","campaign","social","growth","community","content","audience","lead","finance","analytics","agent","automation"]);
       if (type && !allowed.has(type)) return res.status(400).json({ message: "Tipo de registro inválido." });
       const limit = Math.min(Math.max(Number(req.query.limit || 100), 1), 200);
       const result = await neonPool!.query(
@@ -3887,7 +3887,7 @@ export async function registerRoutes(
     try {
       await ensureMarketingSchema();
       const body = req.body || {};
-      const allowed = new Set(["opportunity","product","brand","campaign","content","audience","lead","agent","automation"]);
+      const allowed = new Set(["opportunity","product","brand","campaign","social","growth","community","content","audience","lead","finance","analytics","agent","automation"]);
       const statuses = new Set(["draft","planned","active","paused","completed","archived"]);
       const type = String(body.type || "");
       const title = String(body.title || "").trim();

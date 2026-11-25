@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
-  BrainCircuit, Radar, Package, Palette, Megaphone, Users, Target,
+  BrainCircuit, Radar, Package, Palette, Megaphone, Users, Target, UserPlus, MessagesSquare, Activity, Trash2,
   ChartNoAxesCombined, Bot, Plug, Plus, Search, RefreshCw, ArrowUpRight,
   Clock3, CheckCircle2, AlertCircle, Sparkles, Layers3, CalendarDays,
   MessageSquareText, Handshake, Wallet, X
@@ -32,9 +32,14 @@ const sections = [
   { id: "product", label: "Produtos", icon: Package },
   { id: "brand", label: "Marcas", icon: Palette },
   { id: "campaign", label: "Campanhas", icon: Megaphone },
+  { id: "social", label: "Redes sociais", icon: Activity },
+  { id: "growth", label: "Growth / Follow", icon: UserPlus },
+  { id: "community", label: "Comunidade", icon: MessagesSquare },
   { id: "content", label: "Conteúdo", icon: MessageSquareText },
   { id: "audience", label: "Audiência", icon: Users },
   { id: "lead", label: "Leads e vendas", icon: Handshake },
+  { id: "finance", label: "Financeiro", icon: Wallet },
+  { id: "analytics", label: "Desempenho", icon: ChartNoAxesCombined },
   { id: "agent", label: "Agentes IA", icon: Bot },
   { id: "automation", label: "Automações", icon: Layers3 },
   { id: "integration", label: "Integrações", icon: Plug },
@@ -94,6 +99,19 @@ export default function MarketingHub() {
     },
     enabled: !["overview", "integration"].includes(section),
   });
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, nextStatus }: { id: number; nextStatus: string }) => {
+      const response = await apiRequest("PATCH", "/api/marketing/records/" + id, { status: nextStatus });
+      return response.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/marketing"] }),
+    onError: (error: Error) => toast({ title: "Falha ao atualizar", description: error.message, variant: "destructive" }),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => apiRequest("DELETE", "/api/marketing/records/" + id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/marketing"] }),
+    onError: (error: Error) => toast({ title: "Falha ao excluir", description: error.message, variant: "destructive" }),
+  });
   const createMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/marketing/records", {
@@ -115,7 +133,7 @@ export default function MarketingHub() {
   ), [recordsQuery.data, search]);
   const totals = overviewQuery.data?.totals || {};
   const activeSection = sections.find((item) => item.id === section);
-  const canCreate = !["overview", "integration"].includes(section);
+  const canCreate = !["overview", "integration", "agent"].includes(section);
   const openCreate = () => { setTitle(""); setDescription(""); setStatus("planned"); setCreateOpen(true); };
 
   return (
@@ -197,6 +215,11 @@ export default function MarketingHub() {
           </div>
         )}
 
+        {section === "growth" && <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-100"><AlertCircle className="mr-2 inline h-4 w-4" /> Este espaço organiza pesquisa de perfis, critérios de público e fila de follow/unfollow. A execução automática só poderá ser ativada quando existir uma API oficial ou mecanismo permitido para a plataforma; não será usado para contornar limites ou proteções de contas.</div>}
+        {section === "community" && <div className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-4 text-sm text-sky-100"><MessageSquareText className="mr-2 inline h-4 w-4" /> Comentários, respostas e mensagens ficam organizados aqui. A automação depende das permissões oficiais e da conexão da conta social.</div>}
+        {section === "social" && <div className="rounded-xl border border-sky-400/20 bg-sky-400/5 p-4 text-sm text-sky-100"><Activity className="mr-2 inline h-4 w-4" /> Cadastre os canais e perfis que serão gerenciados. Publicação e coleta de métricas serão habilitadas após autenticação dos conectores.</div>}
+        {section === "finance" && <div className="rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm text-zinc-300">Registre receitas, despesas, custos de aquisição e margens. Os indicadores consolidados serão calculados a partir dos lançamentos e integrações conectadas.</div>}
+        {section === "analytics" && <div className="rounded-xl border border-white/10 bg-white/[0.025] p-4 text-sm text-zinc-300">Registre hipóteses e análises de desempenho. Dados reais de alcance, engajamento, conversão e vendas dependem dos conectores.</div>}
         {section === "integration" && (
           <div className="space-y-4">
             <Card className="border-white/10 bg-white/[0.035] text-white">
@@ -228,7 +251,7 @@ export default function MarketingHub() {
               {recordsQuery.isLoading && <div className="py-10 text-center text-sm text-zinc-400">Carregando registros...</div>}
               {recordsQuery.isError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-200">{(recordsQuery.error as Error).message}</div>}
               {!recordsQuery.isLoading && !recordsQuery.isError && filteredRecords.length === 0 && <div className="py-12 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5"><Search className="h-5 w-5 text-zinc-400" /></div><p className="font-semibold">Nenhum registro encontrado</p><p className="mt-1 text-sm text-zinc-500">Cadastre o primeiro item desta área para iniciar o histórico.</p></div>}
-              {filteredRecords.map((record) => <div key={record.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{record.title}</p><Badge className={statusColors[record.status] || "border-white/10 bg-white/5 text-zinc-300"}>{statusLabels[record.status] || record.status}</Badge></div><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-400">{String(record.payload?.description || "")}</p><p className="mt-2 text-[11px] text-zinc-600">Criado em {new Date(record.createdAt).toLocaleString("pt-BR")}</p></div></div>)}
+              {filteredRecords.map((record) => <div key={record.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{record.title}</p><Badge className={statusColors[record.status] || "border-white/10 bg-white/5 text-zinc-300"}>{statusLabels[record.status] || record.status}</Badge></div><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-400">{String(record.payload?.description || "")}</p><p className="mt-2 text-[11px] text-zinc-600">Criado em {new Date(record.createdAt).toLocaleString("pt-BR")}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={updateMutation.isPending} className="border-white/10 text-zinc-200" onClick={() => updateMutation.mutate({ id: record.id, nextStatus: record.status === "completed" ? "planned" : "completed" })}>{record.status === "completed" ? "Reabrir" : "Concluir"}</Button><Button size="sm" variant="ghost" disabled={deleteMutation.isPending} className="text-red-300 hover:bg-red-500/10 hover:text-red-200" onClick={() => { if (window.confirm("Excluir este registro?")) deleteMutation.mutate(record.id); }}><Trash2 className="h-4 w-4" /></Button></div></div>)}
             </CardContent>
           </Card>
         )}
