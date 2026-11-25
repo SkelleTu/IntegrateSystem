@@ -101,7 +101,7 @@ import { TourProvider } from "@/components/tour/TourContext";
 import { TourEngine } from "@/components/tour/TourEngine";
 
 function Router() {
-  const { data: user, isLoading } = useUser();
+  const { data: user, isLoading, error } = useUser();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
