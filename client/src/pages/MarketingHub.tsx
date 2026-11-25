@@ -4,7 +4,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   BrainCircuit, Radar, Package, Palette, Megaphone, Users, Target, UserPlus, MessagesSquare, Activity, Trash2,
-  ChartNoAxesCombined, Bot, Plug, Plus, Search, RefreshCw, ArrowUpRight,
+  ChartNoAxesCombined, Bot, Plug, Plus, Search, RefreshCw, ArrowUpRight, Pencil,
   Clock3, CheckCircle2, AlertCircle, Sparkles, Layers3, CalendarDays,
   MessageSquareText, Handshake, Wallet, X
 } from "lucide-react";
@@ -26,6 +26,7 @@ type MarketingRecord = {
   updatedAt: string;
 };
 type Overview = { totals: Record<string, number>; recent: MarketingRecord[] };
+type MarketingField = { id: string; label: string; placeholder: string; type?: "text" | "number" | "url" | "date" };
 const sections = [
   { id: "overview", label: "Visão geral", icon: ChartNoAxesCombined },
   { id: "opportunity", label: "Oportunidades", icon: Radar },
@@ -63,6 +64,91 @@ const integrationList = [
   { name: "Metricool", detail: "Calendário, métricas e desempenho social", icon: CalendarDays },
   { name: "Postiz", detail: "Planejamento e publicação multicanal", icon: Megaphone },
 ];
+const fieldDefinitions: Record<string, MarketingField[]> = {
+  opportunity: [
+    { id: "niche", label: "Nicho / mercado", placeholder: "Ex.: alimentação saudável" },
+    { id: "audience", label: "Público-alvo", placeholder: "Perfil de cliente ideal" },
+    { id: "demandEvidence", label: "Evidências de demanda", placeholder: "Pesquisas, volume, sinais e fontes" },
+    { id: "estimatedRevenue", label: "Receita potencial (R$)", placeholder: "0,00", type: "number" },
+    { id: "priority", label: "Prioridade", placeholder: "Alta, média ou baixa" },
+  ],
+  product: [
+    { id: "category", label: "Categoria", placeholder: "Categoria do produto" },
+    { id: "supplier", label: "Fornecedor", placeholder: "Nome / contato do fornecedor" },
+    { id: "cost", label: "Custo unitário (R$)", placeholder: "0,00", type: "number" },
+    { id: "salePrice", label: "Preço de venda (R$)", placeholder: "0,00", type: "number" },
+    { id: "productUrl", label: "Link do produto", placeholder: "https://...", type: "url" },
+  ],
+  brand: [
+    { id: "segment", label: "Segmento", placeholder: "Mercado de atuação" },
+    { id: "positioning", label: "Posicionamento", placeholder: "Proposta de valor e diferenciais" },
+    { id: "website", label: "Site", placeholder: "https://...", type: "url" },
+    { id: "socialHandle", label: "Perfil social", placeholder: "@perfil" },
+  ],
+  campaign: [
+    { id: "channel", label: "Canal", placeholder: "Instagram, Google, TikTok..." },
+    { id: "objective", label: "Objetivo", placeholder: "Alcance, leads, vendas..." },
+    { id: "budget", label: "Orçamento (R$)", placeholder: "0,00", type: "number" },
+    { id: "startDate", label: "Data de início", placeholder: "", type: "date" },
+    { id: "endDate", label: "Data de término", placeholder: "", type: "date" },
+  ],
+  social: [
+    { id: "platform", label: "Plataforma", placeholder: "Instagram, Facebook, TikTok..." },
+    { id: "accountName", label: "Nome da conta", placeholder: "Nome público do perfil" },
+    { id: "profileUrl", label: "URL do perfil", placeholder: "https://...", type: "url" },
+  ],
+  growth: [
+    { id: "platform", label: "Plataforma", placeholder: "Rede social" },
+    { id: "targetAudience", label: "Público-alvo", placeholder: "Quem deseja alcançar" },
+    { id: "criteria", label: "Critérios de pesquisa", placeholder: "Local, nicho, hashtags, interesses..." },
+    { id: "queueAction", label: "Ação planejada", placeholder: "Pesquisar, revisar, seguir ou deixar de seguir" },
+  ],
+  community: [
+    { id: "platform", label: "Plataforma", placeholder: "Rede / canal" },
+    { id: "communityName", label: "Comunidade", placeholder: "Nome do grupo ou comunidade" },
+    { id: "moderationRules", label: "Regras de moderação", placeholder: "Diretrizes e critérios" },
+  ],
+  content: [
+    { id: "format", label: "Formato", placeholder: "Reel, vídeo, carrossel, artigo..." },
+    { id: "channel", label: "Canal", placeholder: "Onde será publicado" },
+    { id: "scheduledAt", label: "Data de publicação", placeholder: "", type: "date" },
+    { id: "campaign", label: "Campanha vinculada", placeholder: "Nome ou referência da campanha" },
+  ],
+  audience: [
+    { id: "segment", label: "Segmento", placeholder: "Nome do segmento" },
+    { id: "demographics", label: "Perfil demográfico", placeholder: "Faixa etária, região e características" },
+    { id: "interests", label: "Interesses", placeholder: "Interesses e comportamentos" },
+    { id: "painPoints", label: "Dores e necessidades", placeholder: "Problemas que o público deseja resolver" },
+  ],
+  lead: [
+    { id: "contact", label: "Contato", placeholder: "Nome, e-mail ou telefone" },
+    { id: "company", label: "Empresa", placeholder: "Empresa / organização" },
+    { id: "source", label: "Origem", placeholder: "Indicação, campanha, site..." },
+    { id: "stage", label: "Etapa comercial", placeholder: "Novo, qualificado, proposta, ganho..." },
+    { id: "value", label: "Valor potencial (R$)", placeholder: "0,00", type: "number" },
+  ],
+  finance: [
+    { id: "entryType", label: "Tipo de lançamento", placeholder: "Receita, despesa, investimento..." },
+    { id: "amount", label: "Valor (R$)", placeholder: "0,00", type: "number" },
+    { id: "category", label: "Categoria", placeholder: "Anúncios, ferramentas, vendas..." },
+    { id: "dueDate", label: "Data", placeholder: "", type: "date" },
+    { id: "relatedCampaign", label: "Campanha vinculada", placeholder: "Campanha / centro de custo" },
+  ],
+  analytics: [
+    { id: "metric", label: "Indicador", placeholder: "Alcance, CTR, CAC, conversão..." },
+    { id: "source", label: "Fonte dos dados", placeholder: "Canal ou integração" },
+    { id: "period", label: "Período", placeholder: "Ex.: novembro/2026" },
+    { id: "value", label: "Valor observado", placeholder: "Valor / percentual" },
+    { id: "target", label: "Meta", placeholder: "Meta para comparação" },
+  ],
+  automation: [
+    { id: "trigger", label: "Gatilho", placeholder: "Evento que inicia a rotina" },
+    { id: "action", label: "Ação", placeholder: "Tarefa a executar" },
+    { id: "schedule", label: "Agendamento", placeholder: "Ex.: diariamente às 09:00" },
+    { id: "service", label: "Serviço responsável", placeholder: "n8n, API ou serviço interno" },
+  ],
+};
+const fieldLabels = Object.fromEntries(Object.values(fieldDefinitions).flat().map((field) => [field.id, field.label]));
 const agentCatalog = [
   ["Market Research", "Pesquisa nichos, demanda e tendências."],
   ["Trend Hunter", "Monitora sinais e tendências emergentes."],
@@ -87,6 +173,8 @@ export default function MarketingHub() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("planned");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
+  const [editingRecord, setEditingRecord] = useState<MarketingRecord | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const overviewQuery = useQuery<Overview>({ queryKey: ["/api/marketing/overview"], staleTime: 15000 });
@@ -150,12 +238,12 @@ export default function MarketingHub() {
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/marketing/records", {
         type: section, title: title.trim(), status,
-        payload: { description: description.trim() },
+        payload: { description: description.trim(), ...Object.fromEntries(Object.entries(fieldValues).filter(([, value]) => value.trim() !== "")) },
       });
       return response.json();
     },
     onSuccess: async (created: MarketingRecord) => {
-      setCreateOpen(false); setTitle(""); setDescription(""); setStatus("planned");
+      setCreateOpen(false); setEditingRecord(null); setTitle(""); setDescription(""); setStatus("planned"); setFieldValues({});
       queryClient.setQueryData<MarketingRecord[]>(["/api/marketing/records", section], (current = []) =>
         [created, ...current.filter((record) => record.id !== created.id)]
       );
@@ -168,14 +256,39 @@ export default function MarketingHub() {
     },
     onError: (error: Error) => toast({ title: "Não foi possível salvar", description: error.message, variant: "destructive" }),
   });
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingRecord) throw new Error("Nenhum registro selecionado.");
+      const response = await apiRequest("PATCH", "/api/marketing/records/" + editingRecord.id, {
+        title: title.trim(), status,
+        payload: { ...editingRecord.payload, description: description.trim(), ...Object.fromEntries(Object.entries(fieldValues).filter(([, value]) => value.trim() !== "")) },
+      });
+      return response.json();
+    },
+    onSuccess: async (updated: MarketingRecord) => {
+      setCreateOpen(false); setEditingRecord(null); setTitle(""); setDescription(""); setStatus("planned"); setFieldValues({});
+      queryClient.setQueryData<MarketingRecord[]>(["/api/marketing/records", section], (current = []) =>
+        current.map((record) => record.id === updated.id ? updated : record)
+      );
+      await invalidateMarketingQueries();
+      toast({ title: "Registro atualizado", description: "As alterações foram salvas." });
+    },
+    onError: (error: Error) => toast({ title: "Falha ao editar", description: error.message, variant: "destructive" }),
+  });
   const filteredRecords = useMemo(() => (recordsQuery.data || []).filter((record) =>
     !search || record.title.toLowerCase().includes(search.toLowerCase()) ||
-    String(record.payload?.description || "").toLowerCase().includes(search.toLowerCase())
+    Object.values(record.payload || {}).some((value) => String(value ?? "").toLowerCase().includes(search.toLowerCase()))
   ), [recordsQuery.data, search]);
   const totals = overviewQuery.data?.totals || {};
   const activeSection = sections.find((item) => item.id === section);
   const canCreate = !["overview", "integration", "agent"].includes(section);
-  const openCreate = () => { setTitle(""); setDescription(""); setStatus("planned"); setCreateOpen(true); };
+  const openCreate = () => { setEditingRecord(null); setTitle(""); setDescription(""); setStatus("planned"); setFieldValues({}); setCreateOpen(true); };
+  const openEdit = (record: MarketingRecord) => {
+    setEditingRecord(record); setTitle(record.title); setDescription(String(record.payload?.description || ""));
+    setStatus(record.status);
+    setFieldValues(Object.fromEntries(Object.entries(record.payload || {}).filter(([key, value]) => key !== "description" && value !== null && value !== undefined).map(([key, value]) => [key, String(value)])));
+    setCreateOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[#07090d] text-white px-4 py-6 md:px-7 md:py-8">
@@ -292,7 +405,7 @@ export default function MarketingHub() {
               {recordsQuery.isLoading && <div className="py-10 text-center text-sm text-zinc-400">Carregando registros...</div>}
               {recordsQuery.isError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-200">{(recordsQuery.error as Error).message}</div>}
               {!recordsQuery.isLoading && !recordsQuery.isError && filteredRecords.length === 0 && <div className="py-12 text-center"><div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-white/5"><Search className="h-5 w-5 text-zinc-400" /></div><p className="font-semibold">Nenhum registro encontrado</p><p className="mt-1 text-sm text-zinc-500">Cadastre o primeiro item desta área para iniciar o histórico.</p></div>}
-              {filteredRecords.map((record) => <div key={record.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{record.title}</p><Badge className={statusColors[record.status] || "border-white/10 bg-white/5 text-zinc-300"}>{statusLabels[record.status] || record.status}</Badge></div><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-400">{String(record.payload?.description || "")}</p><p className="mt-2 text-[11px] text-zinc-600">Criado em {new Date(record.createdAt).toLocaleString("pt-BR")}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" disabled={updateMutation.isPending} className="border-white/10 text-zinc-200" onClick={() => updateMutation.mutate({ id: record.id, nextStatus: record.status === "completed" ? "planned" : "completed" })}>{record.status === "completed" ? "Reabrir" : "Concluir"}</Button><Button size="sm" variant="ghost" disabled={deleteMutation.isPending} className="text-red-300 hover:bg-red-500/10 hover:text-red-200" onClick={() => { if (window.confirm("Excluir este registro?")) deleteMutation.mutate(record.id); }}><Trash2 className="h-4 w-4" /></Button></div></div>)}
+              {filteredRecords.map((record) => <div key={record.id} className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><p className="font-bold">{record.title}</p><Badge className={statusColors[record.status] || "border-white/10 bg-white/5 text-zinc-300"}>{statusLabels[record.status] || record.status}</Badge></div><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-400">{String(record.payload?.description || "")}</p>{Object.entries(record.payload || {}).some(([key, value]) => key !== "description" && value !== null && value !== undefined && String(value).trim() !== "") && <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-zinc-400">{Object.entries(record.payload || {}).filter(([key, value]) => key !== "description" && value !== null && value !== undefined && String(value).trim() !== "").map(([key, value]) => <span key={key}><strong className="text-zinc-300">{fieldLabels[key] || key}:</strong> {String(value)}</span>)}</div>}<p className="mt-2 text-[11px] text-zinc-600">Criado em {new Date(record.createdAt).toLocaleString("pt-BR")}</p></div><div className="flex shrink-0 gap-2"><Button size="sm" variant="outline" className="border-white/10 text-zinc-200" onClick={() => openEdit(record)}><Pencil className="h-4 w-4" /></Button><Button size="sm" variant="outline" disabled={updateMutation.isPending} className="border-white/10 text-zinc-200" onClick={() => updateMutation.mutate({ id: record.id, nextStatus: record.status === "completed" ? "planned" : "completed" })}>{record.status === "completed" ? "Reabrir" : "Concluir"}</Button><Button size="sm" variant="ghost" disabled={deleteMutation.isPending} className="text-red-300 hover:bg-red-500/10 hover:text-red-200" onClick={() => { if (window.confirm("Excluir este registro?")) deleteMutation.mutate(record.id); }}><Trash2 className="h-4 w-4" /></Button></div></div>)}
             </CardContent>
           </Card>
         )}
@@ -301,13 +414,14 @@ export default function MarketingHub() {
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="border-white/10 bg-[#10141c] text-white sm:max-w-lg">
-          <DialogHeader><DialogTitle>Novo registro · {activeSection?.label}</DialogTitle><DialogDescription className="text-zinc-400">Os dados serão salvos no banco da Aura System, vinculados à empresa atual.</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{editingRecord ? "Editar registro" : "Novo registro"} · {activeSection?.label}</DialogTitle><DialogDescription className="text-zinc-400">Os dados serão salvos no banco da Aura System, vinculados à empresa atual.</DialogDescription></DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2"><Label htmlFor="marketing-title">Título</Label><Input id="marketing-title" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={180} placeholder="Ex.: Oportunidade no nicho de alimentação" className="border-white/10 bg-black/30 text-white" /></div>
             <div className="space-y-2"><Label htmlFor="marketing-description">Descrição e observações</Label><Textarea id="marketing-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={8000} placeholder="Contexto, hipótese, público, custos, próximos passos..." className="border-white/10 bg-black/30 text-white" /></div>
+            {(fieldDefinitions[section] || []).map((field) => <div key={field.id} className="space-y-2"><Label htmlFor={"marketing-field-" + field.id}>{field.label}</Label><Input id={"marketing-field-" + field.id} type={field.type || "text"} value={fieldValues[field.id] || ""} onChange={(e) => setFieldValues((current) => ({ ...current, [field.id]: e.target.value }))} placeholder={field.placeholder} className="border-white/10 bg-black/30 text-white" /></div>)}
             <div className="space-y-2"><Label>Status</Label><div className="flex flex-wrap gap-2">{["draft", "planned", "active", "paused", "completed"].map((value) => <Button key={value} type="button" size="sm" variant={status === value ? "default" : "outline"} className={status === value ? "bg-cyan-500 text-slate-950" : "border-white/10 text-zinc-300"} onClick={() => setStatus(value)}>{statusLabels[value]}</Button>)}</div></div>
           </div>
-          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setCreateOpen(false)} className="text-zinc-300">Cancelar</Button><Button disabled={!title.trim() || createMutation.isPending} onClick={() => createMutation.mutate()} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{createMutation.isPending ? "Salvando..." : "Salvar registro"}</Button></div>
+          <div className="flex justify-end gap-2"><Button variant="ghost" onClick={() => setCreateOpen(false)} className="text-zinc-300">Cancelar</Button><Button disabled={!title.trim() || createMutation.isPending || editMutation.isPending} onClick={() => editingRecord ? editMutation.mutate() : createMutation.mutate()} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{createMutation.isPending || editMutation.isPending ? "Salvando..." : editingRecord ? "Salvar alterações" : "Salvar registro"}</Button></div>
         </DialogContent>
       </Dialog>
     </div>
