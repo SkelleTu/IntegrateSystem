@@ -99,16 +99,18 @@ export default function MarketingHub() {
     },
     enabled: !["overview", "integration"].includes(section),
   });
-  const invalidateMarketingQueries = () => {
-    void queryClient.invalidateQueries({ queryKey: ["/api/marketing/overview"] });
-    void queryClient.invalidateQueries({ queryKey: ["/api/marketing/records"] });
+  const invalidateMarketingQueries = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/overview"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/marketing/records"] }),
+    ]);
   };
   const updateMutation = useMutation({
     mutationFn: async ({ id, nextStatus }: { id: number; nextStatus: string }) => {
       const response = await apiRequest("PATCH", "/api/marketing/records/" + id, { status: nextStatus });
       return response.json();
     },
-    onSuccess: () => { invalidateMarketingQueries(); },
+    onSuccess: () => invalidateMarketingQueries(),
     onError: (error: Error) => toast({ title: "Falha ao atualizar", description: error.message, variant: "destructive" }),
   });
   const deleteMutation = useMutation({
@@ -124,9 +126,9 @@ export default function MarketingHub() {
       });
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setCreateOpen(false); setTitle(""); setDescription(""); setStatus("planned");
-      invalidateMarketingQueries();
+      await invalidateMarketingQueries();
       toast({ title: "Registro salvo", description: "O item foi salvo na central de marketing." });
     },
     onError: (error: Error) => toast({ title: "Não foi possível salvar", description: error.message, variant: "destructive" }),
