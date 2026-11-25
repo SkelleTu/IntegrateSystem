@@ -113,7 +113,7 @@ export default function MarketingHub() {
   });
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => apiRequest("DELETE", "/api/marketing/records/" + id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/marketing"] }),
+    onSuccess: () => invalidateMarketingQueries(),
     onError: (error: Error) => toast({ title: "Falha ao excluir", description: error.message, variant: "destructive" }),
   });
   const createMutation = useMutation({
@@ -152,7 +152,7 @@ export default function MarketingHub() {
             <p className="mt-1 max-w-3xl text-sm text-zinc-400">Pesquisa, produtos, marcas, redes sociais, audiência, vendas e agentes especializados em um único núcleo.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={() => { queryClient.invalidateQueries({ queryKey: ["/api/marketing"] }); }}>
+            <Button variant="outline" className="border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={() => { invalidateMarketingQueries(); }}>
               <RefreshCw className="mr-2 h-4 w-4" /> Atualizar dados
             </Button>
             {canCreate && <Button className="bg-cyan-500 text-slate-950 hover:bg-cyan-400 font-bold" onClick={openCreate}><Plus className="mr-2 h-4 w-4" /> Novo registro</Button>}
