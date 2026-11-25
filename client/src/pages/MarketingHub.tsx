@@ -182,6 +182,10 @@ export default function MarketingHub() {
   const [aiReply, setAiReply] = useState<{ providerName: string; model: string; message: string } | null>(null);
   const [aiError, setAiError] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [memoryKey, setMemoryKey] = useState("");
+  const [memoryValue, setMemoryValue] = useState("");
+  const [memoryBusy, setMemoryBusy] = useState(false);
+  const [memoryError, setMemoryError] = useState("");
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const overviewQuery = useQuery<Overview>({ queryKey: ["/api/marketing/overview"], staleTime: 15000 });
@@ -190,6 +194,28 @@ export default function MarketingHub() {
     queryFn: async () => { const response = await fetch("/api/marketing/ai/providers", { credentials: "include" }); if (!response.ok) throw new Error("Não foi possível consultar os provedores de IA."); return response.json(); },
     enabled: section === "agent", staleTime: 30000,
   });
+  const aiMemoryQuery = useQuery<{ memory: Array<{ agent: string; key: string; value: string; updatedAt: string }> }>({
+    queryKey: ["/api/marketing/ai/memory", aiAgent],
+    queryFn: async () => {
+      const response = await fetch("/api/marketing/ai/memory?agent=" + encodeURIComponent(aiAgent), { credentials: "include" });
+      if (!response.ok) throw new Error("Memória operacional indisponível.");
+      return response.json();
+    },
+    enabled: section === "agent",
+    staleTime: 10000,
+  });
+  const saveAgentMemory = async () => {
+    if (!memoryKey.trim() || !memoryValue.trim() || memoryBusy) return;
+    setMemoryBusy(true); setMemoryError("");
+    try {
+      const response = await fetch("/api/marketing/ai/memory", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ agent: aiAgent, key: memoryKey, value: memoryValue }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || "Não foi possível salvar a memória.");
+      setMemoryKey(""); setMemoryValue("");
+      await queryClient.invalidateQueries({ queryKey: ["/api/marketing/ai/memory", aiAgent] });
+    } catch (error) { setMemoryError(error instanceof Error ? error.message : "Falha ao salvar memória."); }
+    finally { setMemoryBusy(false); }
+  };
   const aiRunsQuery = useQuery<{ runs: Array<{ id: number; agent: string; provider: string; model: string; prompt: string; response: string; createdAt: string }> }>({
     queryKey: ["/api/marketing/ai/runs", aiAgent],
     queryFn: async () => {
@@ -465,6 +491,17 @@ export default function MarketingHub() {
                 {aiError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200">{aiError}</div>}
                 {aiReply && <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4"><div className="mb-2 flex flex-wrap items-center gap-2"><Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-200">{aiReply.providerName}</Badge><span className="text-xs text-zinc-400">{aiReply.model}</span></div><p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-100">{aiReply.message}</p></div>}
                 {aiProvidersQuery.isError && <p className="text-sm text-amber-200">Não foi possível carregar o estado dos provedores. Verifique a conexão e atualize a página.</p>}
+              </CardContent>
+            </Card>
+            <Card className="border-white/10 bg-white/[0.035] text-white">
+              <CardHeader><CardTitle className="text-lg">Memória operacional do agente</CardTitle><p className="text-sm text-zinc-400">Registre regras, contexto do negócio e decisões que devem ser reutilizadas nas próximas execuções deste agente.</p></CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2"><Label>Chave da memória</Label><Input value={memoryKey} onChange={(event) => setMemoryKey(event.target.value)} maxLength={120} placeholder="Ex.: padrão de análise" className="border-white/10 bg-black/30 text-white" /></div>
+                  <div className="space-y-2"><Label>Conteúdo</Label><Textarea value={memoryValue} onChange={(event) => setMemoryValue(event.target.value)} rows={2} maxLength={4000} placeholder="Informação persistente que o agente deve considerar..." className="border-white/10 bg-black/30 text-white" /></div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3"><Button disabled={!memoryKey.trim() || !memoryValue.trim() || memoryBusy} onClick={saveAgentMemory} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400">{memoryBusy ? "Salvando..." : "Salvar memória"}</Button>{memoryError && <span className="text-sm text-red-300">{memoryError}</span>}</div>
+                <div className="space-y-2">{(aiMemoryQuery.data?.memory || []).map((item) => <div key={item.agent + ":" + item.key} className="rounded-lg border border-white/10 bg-black/20 p-3"><p className="text-xs font-bold text-cyan-200">{item.key}</p><p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">{item.value}</p></div>)}{aiMemoryQuery.isError && <p className="text-sm text-amber-200">Não foi possível carregar as memórias salvas.</p>}</div>
               </CardContent>
             </Card>
             <Card className="border-white/10 bg-white/[0.035] text-white">
