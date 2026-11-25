@@ -1,7 +1,7 @@
 import type { Express, Request, Response, NextFunction } from "express";
 
-type ProviderId = "huggingface" | "kilo" | "openai" | "compatible";
-type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string; configured: boolean; free: boolean };
+type ProviderId = "huggingface" | "kilo" | "openai" | "gemini" | "openrouter" | "groq" | "compatible";
+type ProviderConfig = { id: ProviderId; name: string; baseUrl: string; apiKey: string; model: string; configured: boolean; free: boolean; authHeader?: string };
 
 const DEFAULTS = {
   huggingface: { baseUrl: "https://router.huggingface.co/v1", model: "openai/gpt-oss-120b:fastest" },
@@ -13,12 +13,18 @@ function providerConfigs(): ProviderConfig[] {
   const hfKey = String(process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || "").trim();
   const kiloKey = String(process.env.KILO_API_KEY || "").trim();
   const openaiKey = String(process.env.OPENAI_API_KEY || "").trim();
+  const geminiKey = String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "").trim();
+  const openrouterKey = String(process.env.OPENROUTER_API_KEY || "").trim();
+  const groqKey = String(process.env.GROQ_API_KEY || "").trim();
   const compatibleUrl = String(process.env.AURA_AI_COMPAT_BASE_URL || "").trim().replace(/\/$/, "");
   const compatibleKey = String(process.env.AURA_AI_COMPAT_API_KEY || "").trim();
   return [
     { id: "huggingface", name: "Hugging Face", baseUrl: String(process.env.HF_BASE_URL || DEFAULTS.huggingface.baseUrl).replace(/\/$/, ""), apiKey: hfKey, model: String(process.env.HF_MODEL || DEFAULTS.huggingface.model), configured: Boolean(hfKey), free: false },
     { id: "kilo", name: "Kilo AI Gateway", baseUrl: String(process.env.KILO_BASE_URL || DEFAULTS.kilo.baseUrl).replace(/\/$/, ""), apiKey: kiloKey, model: String(process.env.KILO_MODEL || DEFAULTS.kilo.model), configured: Boolean(kiloKey), free: !kiloKey },
     { id: "openai", name: "OpenAI", baseUrl: String(process.env.OPENAI_BASE_URL || DEFAULTS.openai.baseUrl).replace(/\/$/, ""), apiKey: openaiKey, model: String(process.env.OPENAI_MODEL || DEFAULTS.openai.model), configured: Boolean(openaiKey), free: false },
+    { id: "gemini", name: "Google Gemini", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai", apiKey: geminiKey, model: String(process.env.GEMINI_MODEL || "gemini-2.5-flash"), configured: Boolean(geminiKey), free: false, authHeader: "x-goog-api-key" },
+    { id: "openrouter", name: "OpenRouter", baseUrl: String(process.env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1").replace(/\/$/, ""), apiKey: openrouterKey, model: String(process.env.OPENROUTER_MODEL || "openai/gpt-4.1-mini"), configured: Boolean(openrouterKey), free: false },
+    { id: "groq", name: "Groq", baseUrl: String(process.env.GROQ_BASE_URL || "https://api.groq.com/openai/v1").replace(/\/$/, ""), apiKey: groqKey, model: String(process.env.GROQ_MODEL || "llama-3.3-70b-versatile"), configured: Boolean(groqKey), free: false },
     { id: "compatible", name: String(process.env.AURA_AI_COMPAT_NAME || "OpenAI-compatible API"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: String(process.env.AURA_AI_COMPAT_MODEL || ""), configured: Boolean(compatibleUrl), free: false },
   ];
 }
@@ -56,7 +62,7 @@ function extractMessage(payload: any): string {
 
 async function listModels(provider: ProviderConfig): Promise<any[]> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
+  if (provider.apiKey) headers[provider.authHeader || "Authorization"] = provider.authHeader ? provider.apiKey : `Bearer ${provider.apiKey}`;
   const response = await fetch(`${provider.baseUrl}/models`, { headers, signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error(`Catálogo ${provider.name}: HTTP ${response.status}`);
   const data: any = await response.json();
@@ -85,7 +91,7 @@ async function complete(provider: ProviderConfig, messages: any[], model?: strin
 }
 
 function providerOrder(configs: ProviderConfig[]): ProviderConfig[] {
-  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "kilo,huggingface,openai,compatible").split(",").map((item) => item.trim().toLowerCase());
+  const requested = String(process.env.MARKETING_AI_PROVIDER_ORDER || "kilo,huggingface,openai,gemini,openrouter,groq,compatible").split(",").map((item) => item.trim().toLowerCase());
   return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && provider.configured));
 }
 
