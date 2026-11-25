@@ -26,6 +26,52 @@ function withoutUndefined<T extends Record<string, any>>(value: T): T {
   return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
 }
 
+function timeZoneParts(date: Date, timeZone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  return {
+    year: Number(values.year),
+    month: Number(values.month),
+    day: Number(values.day),
+  };
+}
+
+function timeZoneOffsetMinutes(date: Date, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+  const asUtc = Date.UTC(
+    Number(values.year),
+    Number(values.month) - 1,
+    Number(values.day),
+    Number(values.hour),
+    Number(values.minute),
+    Number(values.second),
+  );
+  return (asUtc - date.getTime()) / 60000;
+}
+
+function zonedMidnightUtc(year: number, month: number, day: number, timeZone: string): Date {
+  let guess = Date.UTC(year, month - 1, day);
+  for (let attempt = 0; attempt < 4; attempt++) {
+    guess = Date.UTC(year, month - 1, day) - timeZoneOffsetMinutes(new Date(guess), timeZone) * 60_000;
+  }
+  return new Date(guess);
+}
+
 // Helper de escrita no banco autoritativo ativo.
 // Em modo Neon/Turso, getAllDatabases() contém apenas o banco remoto; SQLite local
 // não é tratado como réplica de dados comerciais nem como backup de produção.
@@ -120,8 +166,11 @@ export interface IStorage {
 
   // Cashier
   getOpenCashRegister(userId: number): Promise<CashRegister | undefined>;
+  getPendingCashRegisterReviews(userId: number): Promise<CashRegister[]>;
   openCashRegister(register: InsertCashRegister): Promise<CashRegister>;
   closeCashRegister(id: number, closingAmount: number): Promise<CashRegister>;
+  reviewCashRegister(id: number, closingAmount: number, reviewerUserId: number): Promise<CashRegister>;
+  autoCloseExpiredCashRegisters(now?: Date): Promise<CashRegister[]>;
   createSale(sale: InsertSale, items: InsertSaleItem[], paymentsData: InsertPayment[], creditContext?: { customerId: number; enterpriseId: number }): Promise<Sale>;
   getSales(filters: { startDate?: Date; endDate?: Date }): Promise<Sale[]>;
   cancelSale(id: number): Promise<Sale>;
@@ -579,10 +628,80 @@ export class DatabaseStorage implements IStorage {
   // Cashier
   async getOpenCashRegister(userId: number): Promise<CashRegister | undefined> {
     this.logAction(`Verificação caixa aberto usuário ID:${userId}`);
+    // A verificação é defensiva: mesmo que o serviço principal tenha dormido,
+    // o primeiro acesso depois da virada do dia encerra o caixa no instante
+    // lógico da meia-noite do fuso em que ele foi aberto.
+    await this.autoCloseExpiredCashRegisters();
     const [register] = await db.select()
       .from(cashRegisters)
-      .where(and(eq(cashRegisters.userId, userId), isNull(cashRegisters.closedAt)));
+      .where(and(eq(cashRegisters.userId, userId), eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)));
     return register;
+  }
+
+  async getPendingCashRegisterReviews(userId: number): Promise<CashRegister[]> {
+    const [user] = await db.select({ enterpriseId: users.enterpriseId })
+      .from(users).where(eq(users.id, userId)).limit(1);
+    if (!user?.enterpriseId) return [];
+    return await db.select({ register: cashRegisters })
+      .from(cashRegisters)
+      .innerJoin(users, eq(users.id, cashRegisters.userId))
+      .where(and(
+        eq(cashRegisters.status, "closed_pending_review"),
+        eq(users.enterpriseId, user.enterpriseId),
+      ))
+      .orderBy(desc(cashRegisters.closedAt));
+  }
+
+  async autoCloseExpiredCashRegisters(now = new Date()): Promise<CashRegister[]> {
+    const openRegisters = await db.select().from(cashRegisters)
+      .where(and(eq(cashRegisters.status, "open"), isNull(cashRegisters.closedAt)));
+    const closed: CashRegister[] = [];
+
+    for (const register of openRegisters) {
+      const timeZone = String((register as any).timezone || "America/Sao_Paulo");
+      let openedAt = register.openedAt ? new Date(register.openedAt) : null;
+      if (!openedAt || Number.isNaN(openedAt.getTime())) continue;
+
+      const openedLocal = timeZoneParts(openedAt, timeZone);
+      const midnightAfterOpening = zonedMidnightUtc(
+        openedLocal.year,
+        openedLocal.month,
+        openedLocal.day + 1,
+        timeZone,
+      );
+
+      if (now.getTime() < midnightAfterOpening.getTime()) continue;
+
+      await dualWriteTransaction(async (database) => {
+        const [current] = await database.select().from(cashRegisters)
+          .where(eq(cashRegisters.id, register.id)).limit(1);
+        if (!current || current.status !== "open" || current.closedAt) return current;
+
+        await database.update(cashRegisters).set({
+          closedAt: midnightAfterOpening,
+          status: "closed_pending_review",
+          closingAmount: null,
+          difference: null,
+        }).where(eq(cashRegisters.id, register.id));
+
+        runtimeEvent("cash-register-auto-closed", `Caixa #${register.id} fechado automaticamente na meia-noite`, {
+          phase: "cash",
+          cashRegisterId: register.id,
+          userId: register.userId,
+          timezone: timeZone,
+          closedAt: midnightAfterOpening.toISOString(),
+          reviewRequired: true,
+        });
+
+        const [updated] = await database.select().from(cashRegisters)
+          .where(eq(cashRegisters.id, register.id)).limit(1);
+        return updated;
+      }).then((updated) => {
+        if (updated) closed.push(updated as CashRegister);
+      });
+    }
+
+    return closed;
   }
 
   async openCashRegister(register: InsertCashRegister): Promise<CashRegister> {
@@ -592,7 +711,11 @@ export class DatabaseStorage implements IStorage {
       const [existingRegister] = await database.select().from(cashRegisters)
         .where(and(eq(cashRegisters.userId, register.userId), isNull(cashRegisters.closedAt))).limit(1);
       if (existingRegister) throw new Error("Já existe um caixa aberto para este usuário.");
-      const [newRegister]: any[] = await database.insert(cashRegisters).values({ ...register, id: sharedRegisterId } as any).returning();
+      const [newRegister]: any[] = await database.insert(cashRegisters).values({
+        ...register,
+        id: sharedRegisterId,
+        timezone: String((register as any).timezone || "America/Sao_Paulo"),
+      } as any).returning();
       if (!newRegister) throw new Error("Não foi possível obter o caixa recém-aberto.");
       runtimeEvent("cash-register-opened", `Caixa #${newRegister.id} aberto`, {
         phase: "cash", cashRegisterId: newRegister.id, userId: register.userId,
@@ -641,6 +764,44 @@ export class DatabaseStorage implements IStorage {
       runtimeEvent("cash-register-closed", `Caixa #${id} fechado`, {
         phase: "cash", cashRegisterId: id, closingAmount, expectedAmount, difference,
       });
+      return updated;
+    });
+  }
+
+  async reviewCashRegister(id: number, closingAmount: number, reviewerUserId: number): Promise<CashRegister> {
+    return await dualWriteTransaction(async (database) => {
+      const [register] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
+      if (!register) throw new Error("Caixa não encontrado");
+      if (register.status !== "closed_pending_review") throw new Error("Este fechamento não está pendente de revisão.");
+
+      const salesList = await database.select().from(sales).where(eq(sales.cashRegisterId, id));
+      const completedSales = salesList.filter((s: any) => s.status === "completed");
+      const cashPayments = await Promise.all(completedSales.map(async (sale: any) => {
+        const salePayments = await database.select().from(payments)
+          .where(and(eq(payments.saleId, sale.id), eq(payments.method, "cash")));
+        return salePayments.reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0);
+      }));
+      const totalCashSales = cashPayments.reduce((sum, amount) => sum + amount, 0);
+      const expectedAmount = Number(register.openingAmount || 0) + totalCashSales;
+      const difference = closingAmount - expectedAmount;
+
+      await database.update(cashRegisters).set({
+        closingAmount,
+        difference,
+        status: "closed",
+        reviewedAt: new Date(),
+        reviewedByUserId: reviewerUserId,
+      }).where(eq(cashRegisters.id, id));
+
+      runtimeEvent("cash-register-review-completed", `Fechamento automático do caixa #${id} revisado`, {
+        phase: "cash",
+        cashRegisterId: id,
+        reviewerUserId,
+        closingAmount,
+        expectedAmount,
+        difference,
+      });
+      const [updated] = await database.select().from(cashRegisters).where(eq(cashRegisters.id, id)).limit(1);
       return updated;
     });
   }
