@@ -114,7 +114,8 @@ async function list(req: Request) {
   const r = await neonPool!.query("SELECT * FROM credit_internal_customers WHERE enterprise_id=$1", [eid(req)]);
   const rows:any[]=[];
   for(const c of r.rows) rows.push(await evaluate(req,c));
-  const rank=(c:any)=>({good:0,attention:1,bad:2,blocked:3}[c.status] ?? 4)*1000000000000 + Number(c.overdue_cents||0)*1000 + Number(c.max_days_late||0);
+  const statusRank: Record<string, number> = { good:0, attention:1, bad:2, blocked:3 };
+  const rank=(c:any)=>(statusRank[String(c.status)] ?? 4)*1000000000000 + Number(c.overdue_cents||0)*1000 + Number(c.max_days_late||0);
   rows.sort((a,b)=>rank(a)-rank(b));
   for(const c of rows){
     const q=await neonPool!.query("SELECT COALESCE(SUM(amount_cents-paid_cents),0) open FROM credit_internal_purchases WHERE enterprise_id=$1 AND customer_id=$2 AND status<>'paid'",[eid(req),c.id]);
