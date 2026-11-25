@@ -357,9 +357,22 @@ export default function Cashier() {
     }
   }, [searchTerm, filteredMenuItems, menuItems, addToCart, toast]);
 
+  const { data: pendingReviews = [] } = useQuery<any[]>({
+    queryKey: ["/api/cash-register/pending-review"],
+    queryFn: async () => {
+      const res = await fetch("/api/cash-register/pending-review");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!user,
+    staleTime: 15000,
+    refetchOnWindowFocus: true,
+  });
+
   const openMutation = useMutation({
     mutationFn: async (amount: number) => {
-      const res = await apiRequest("POST", "/api/cash-register/open", { openingAmount: amount });
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Sao_Paulo";
+      const res = await apiRequest("POST", "/api/cash-register/open", { openingAmount: amount, timeZone });
       return res.json();
     },
     onSuccess: () => {
@@ -525,6 +538,26 @@ export default function Cashier() {
 
   const [adjustModalOpen, setAdjustModalOpen] = useState(false);
   const [newOpeningAmount, setNewOpeningAmount] = useState("");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedReviewRegister, setSelectedReviewRegister] = useState<any>(null);
+  const [reviewClosingAmount, setReviewClosingAmount] = useState("");
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({ id, closingAmount }: { id: number; closingAmount: number }) => {
+      const res = await apiRequest("POST", "/api/cash-register/review", { id, closingAmount });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-register/pending-review"] });
+      setReviewDialogOpen(false);
+      setSelectedReviewRegister(null);
+      setReviewClosingAmount("");
+      toast({ title: "Fechamento revisado com sucesso!" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Falha na revisão", description: String(error?.message || error).replace(/^\d+:\s*/, ""), variant: "destructive" });
+    },
+  });
 
   const isAdmin = (register?.userId === 1) || true;
 
@@ -661,7 +694,49 @@ export default function Cashier() {
   if (!register) {
     return (
       <div className="min-h-screen bg-transparent flex items-center justify-center p-6">
-        <Card className="w-full max-w-lg bg-zinc-900/80 backdrop-blur-xl border-white/10 shadow-2xl rounded-2xl overflow-hidden border-t-4 border-t-primary">
+        <div className="w-full max-w-lg space-y-4">
+          {pendingReviews.length > 0 && (
+            <Card className="bg-amber-500/10 backdrop-blur-xl border-amber-400/40 shadow-2xl rounded-2xl overflow-hidden">
+              <CardContent className="p-5 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-amber-400/20 border border-amber-300/40 flex items-center justify-center shrink-0">
+                    <span className="text-amber-300 text-lg">!</span>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-amber-300 font-black uppercase italic text-sm">Fechamento sem revisão</p>
+                    <p className="text-white/60 text-[10px] font-bold uppercase tracking-wider mt-1">
+                      Existe fechamento automático realizado à meia-noite aguardando conferência administrativa.
+                    </p>
+                  </div>
+                </div>
+                {pendingReviews.map((review: any) => (
+                  <div key={review.id} className="rounded-xl border border-amber-400/20 bg-black/20 p-3">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-white font-black text-[10px] uppercase">Caixa #{review.id}</span>
+                      <span className="text-amber-300 font-black text-[9px] uppercase">Pendente</span>
+                    </div>
+                    <div className="text-white/40 text-[9px] uppercase font-bold mt-1">
+                      Fechado em {review.closedAt ? new Date(review.closedAt).toLocaleString("pt-BR") : "meia-noite"}
+                    </div>
+                    {(user?.role === "admin" || user?.role === "owner") && (
+                      <Button
+                        className="w-full mt-3 h-9 bg-amber-300 text-black font-black uppercase text-[9px] italic"
+                        onClick={() => {
+                          setSelectedReviewRegister(review);
+                          setReviewClosingAmount("");
+                          setReviewDialogOpen(true);
+                        }}
+                      >
+                        REVISAR FECHAMENTO
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="w-full bg-zinc-900/80 backdrop-blur-xl border-white/10 shadow-2xl rounded-2xl overflow-hidden border-t-4 border-t-primary">
           <CardHeader className="flex flex-row items-center gap-6 p-8 bg-white/5">
             <Button variant="ghost" size="icon" className="text-white hover:text-primary hover:bg-white/5 w-12 h-12 rounded-full" onClick={() => setLocation("/")}><ArrowLeft className="w-7 h-7" /></Button>
             <div className="flex flex-col"><CardTitle className="text-white uppercase italic tracking-tighter text-3xl font-black leading-none">Abertura de Caixa</CardTitle></div>
@@ -690,7 +765,45 @@ export default function Cashier() {
               {openMutation.isPending ? <Loader2 className="animate-spin" /> : "Iniciar Turno"}
             </Button>
           </CardContent>
-        </Card>
+          </Card>
+        </div>
+
+        <Dialog open={reviewDialogOpen} onOpenChange={setReviewDialogOpen}>
+          <DialogContent className="bg-zinc-950 border-amber-400/30 text-white max-w-sm rounded-2xl">
+            <DialogHeader>
+              <DialogTitle className="text-amber-300 uppercase italic font-black">Revisar Fechamento</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4 text-[10px] uppercase font-black">
+                <div className="flex justify-between"><span className="text-white/40">Caixa</span><span>#{selectedReviewRegister?.id}</span></div>
+                <div className="flex justify-between mt-2"><span className="text-white/40">Fechamento automático</span><span className="text-amber-300">Meia-noite</span></div>
+                <p className="text-white/40 font-bold mt-3 normal-case">Informe o valor físico encontrado na gaveta para concluir a conferência.</p>
+              </div>
+              <Input
+                autoFocus
+                inputMode="decimal"
+                value={reviewClosingAmount}
+                onChange={(e) => setReviewClosingAmount(e.target.value)}
+                placeholder="VALOR FÍSICO (R$)"
+                className="h-14 bg-black border-white/10 text-white text-2xl font-black text-center rounded-xl"
+              />
+              <Button
+                className="w-full h-12 bg-amber-300 text-black font-black uppercase italic"
+                disabled={reviewMutation.isPending}
+                onClick={() => {
+                  const amount = Number(reviewClosingAmount.replace(",", "."));
+                  if (!Number.isFinite(amount) || amount < 0) {
+                    toast({ title: "Valor inválido", variant: "destructive" });
+                    return;
+                  }
+                  reviewMutation.mutate({ id: selectedReviewRegister?.id, closingAmount: amount });
+                }}
+              >
+                {reviewMutation.isPending ? <Loader2 className="animate-spin" /> : "CONFIRMAR REVISÃO"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
