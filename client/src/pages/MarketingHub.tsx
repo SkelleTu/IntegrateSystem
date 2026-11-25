@@ -377,6 +377,18 @@ export default function MarketingHub() {
         </div>
 
         {section === "overview" && (
+          <>
+            {overviewQuery.isLoading && (
+              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-sm text-cyan-100">
+                <RefreshCw className="mr-2 inline h-4 w-4 animate-spin" /> Carregando dados do Marketing Hub…
+              </div>
+            )}
+            {overviewQuery.isError && (
+              <div className="rounded-xl border border-red-400/20 bg-red-400/5 px-4 py-3 text-sm text-red-100">
+                <AlertCircle className="mr-2 inline h-4 w-4" /> {(overviewQuery.error as Error)?.message || "Não foi possível carregar os dados do Marketing Hub."}
+                <Button size="sm" variant="outline" className="ml-3 border-red-300/20 text-red-100" onClick={() => overviewQuery.refetch()}>Tentar novamente</Button>
+              </div>
+            )}
           <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
             <Card className="border-white/10 bg-white/[0.035] text-white">
               <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Sparkles className="h-5 w-5 text-cyan-300" /> Centro de comando</CardTitle></CardHeader>
@@ -405,6 +417,7 @@ export default function MarketingHub() {
               </CardContent>
             </Card>
           </div>
+          </>
         )}
 
         {section === "growth" && <div className="rounded-xl border border-amber-400/20 bg-amber-400/5 p-4 text-sm text-amber-100"><AlertCircle className="mr-2 inline h-4 w-4" /> Este espaço organiza pesquisa de perfis, critérios de público e fila de follow/unfollow. A execução automática só poderá ser ativada quando existir uma API oficial ou mecanismo permitido para a plataforma; não será usado para contornar limites ou proteções de contas.</div>}
