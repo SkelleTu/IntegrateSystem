@@ -261,7 +261,7 @@ export default function MarketingHub() {
       if (!editingRecord) throw new Error("Nenhum registro selecionado.");
       const response = await apiRequest("PATCH", "/api/marketing/records/" + editingRecord.id, {
         title: title.trim(), status,
-        payload: { ...editingRecord.payload, description: description.trim(), ...Object.fromEntries(Object.entries(fieldValues).filter(([, value]) => value.trim() !== "")) },
+        payload: { ...editingRecord.payload, description: description.trim(), ...Object.fromEntries((fieldDefinitions[section] || []).map((field) => [field.id, fieldValues[field.id] || ""])) },
       });
       return response.json();
     },
