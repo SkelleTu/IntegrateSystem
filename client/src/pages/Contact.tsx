@@ -2,10 +2,12 @@ import { Mail, Phone, MapPin, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import auraLogo from "/aura-system-logo.webp?v=1";
+
 import contactBg from "@assets/generated_images/abstract_connection_network_with_glowing_communication_nodes..png";
 
 import { LandingFooter } from "@/components/layout/LandingFooter";
+
+const auraLogo = "/aura-system-logo.webp?v=1";
 
 export default function Contact() {
   return (
