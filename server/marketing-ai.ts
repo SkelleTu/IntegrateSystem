@@ -109,9 +109,18 @@ function providerOrder(configs: ProviderConfig[], agent = ""): ProviderConfig[] 
     : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
       ? creative
       : research;
-  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER");
-  const requested = (configuredOrder ? configuredOrder.split(",") : group).map((item) => item.trim().toLowerCase());
-  return requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
+  const configuredOrder = env("MARKETING_AI_PROVIDER_ORDER").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean);
+  const requested = [...configuredOrder, ...group].filter((id, index, all) => all.indexOf(id) === index);
+  const ordered = requested.map((id) => configs.find((provider) => provider.id === id)).filter((provider): provider is ProviderConfig => Boolean(provider && (provider.configured || (provider.id === "kilo" && provider.anonymousFree))));
+  return ordered.flatMap((provider) => {
+    if (provider.id !== "kilo" || !provider.anonymousFree || !agent) return [provider];
+    const preferredModel = ["Profit Analyst", "Financial Analyst", "Opportunity Scorer", "Conversion Analyst"].includes(agent)
+      ? "nvidia/nemotron-3-ultra-550b-a55b:free"
+      : ["Brand Manager", "Creative Director", "Social Media Manager", "Community Manager"].includes(agent)
+        ? "baidu/ernie-5.5-flash-preview:free"
+        : "nvidia/nemotron-3-ultra-550b-a55b:free";
+    return [{ ...provider, model: preferredModel }, { ...provider, model: "kilo-auto/free" }];
+  });
 }
 
 export function registerMarketingAIRoutes(
@@ -135,10 +144,10 @@ export function registerMarketingAIRoutes(
       const normalized = models.map((item: any) => ({
         id: String(item?.id || item?.model || ""),
         name: String(item?.name || item?.id || item?.model || ""),
-        free: item?.isFree === true || String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0"),
+        free: typeof item?.isFree === "boolean" ? item.isFree : (String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0")),
         contextLength: item?.context_length || item?.contextLength || item?.top_provider?.context_length || null,
         privacyWarning: item?.mayTrainOnYourPrompts === true ? "O provedor pode registrar ou usar prompts para melhoria." : null,
-        chatCompatible: !Array.isArray(item?.architecture?.output_modalities) || item.architecture.output_modalities.includes("text"),
+        chatCompatible: !Array.isArray(item?.architecture?.output_modalities) || (item.architecture.output_modalities.includes("text") && !item.architecture.output_modalities.includes("audio") && !item.architecture.output_modalities.includes("video")),
       })).filter((item: any) => item.id && item.chatCompatible && (!(provider.id === "kilo" && provider.anonymousFree) || item.free)).slice(0, 200);
       res.json({ provider: provider.id, models: normalized });
     } catch (error: any) {
@@ -173,7 +182,7 @@ export function registerMarketingAIRoutes(
     const agent = String(req.body?.agent || "Market Research").slice(0, 80);
     const requested = String(req.body?.provider || "auto");
     const configs = providerConfigs();
-    const candidates = requested === "auto" ? providerOrder(configs) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
+    const candidates = requested === "auto" ? providerOrder(configs, agent) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível. Configure um provedor no Render ou use o Kilo gratuito." });
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-12).filter((item: any) => ["user", "assistant"].includes(item?.role) && typeof item?.content === "string").map((item: any) => ({ role: item.role, content: item.content.slice(0, 12000) })) : [];
     const messages = [
