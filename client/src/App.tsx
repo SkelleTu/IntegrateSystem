@@ -67,6 +67,7 @@ const WindowsAppRunner = lazy(() => import("./pages/admin/WindowsAppRunner"));
 const AuraWindows = lazy(() => import("./pages/AuraWindows"));
 const Backup = lazy(() => import("./pages/Backup"));
 const SetupEnterprise = lazy(() => import("./pages/SetupEnterprise"));
+const MarketingHub = lazy(() => import("./pages/MarketingHub"));
 
 function RouteLoading() {
   return (
@@ -178,6 +179,7 @@ function Router() {
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
             <Route path="/backup" component={Backup} />
+            <Route path="/marketing" component={MarketingHub} />
             <Route component={NotFound} />
           </Switch>
           </Suspense>

@@ -1,0 +1,24 @@
+name: Aura Marketing Module CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [feat/aura-marketing-command-center]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - name: TypeScript baseline check (known legacy errors are non-blocking)
+        run: npm run check
+        continue-on-error: true
+      - name: Production bundle
+        run: npm run build
