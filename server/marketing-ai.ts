@@ -266,7 +266,7 @@ export function registerMarketingAIRoutes(
         "SELECT memory_key,memory_value FROM aura_marketing_agent_memory WHERE enterprise_id=$1 AND agent IN ($2,'*') ORDER BY updated_at DESC LIMIT 30",
         [enterpriseId, agent],
       );
-      if (memory.rows.length) memoryContext = "\\n\\nMEMÓRIA OPERACIONAL DA EMPRESA:\\n" + memory.rows.map((row: any) => "- " + row.memory_key + ": " + row.memory_value).join("\\n");
+      if (memory.rows.length) memoryContext = "\n\nMEMÓRIA OPERACIONAL DA EMPRESA:\n" + memory.rows.map((row: any) => "- " + row.memory_key + ": " + row.memory_value).join("\n");
     } catch (error: any) {
       console.error("[MARKETING AI] memory read failed:", error?.message || error);
     }
