@@ -175,9 +175,41 @@ export default function MarketingHub() {
   const [status, setStatus] = useState("planned");
   const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
   const [editingRecord, setEditingRecord] = useState<MarketingRecord | null>(null);
+  const [aiProvider, setAiProvider] = useState("auto");
+  const [aiAgent, setAiAgent] = useState("Market Research");
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiReply, setAiReply] = useState<{ providerName: string; model: string; message: string } | null>(null);
+  const [aiError, setAiError] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const overviewQuery = useQuery<Overview>({ queryKey: ["/api/marketing/overview"], staleTime: 15000 });
+  const aiProvidersQuery = useQuery<{ providers: Array<{ id: string; name: string; configured: boolean; free: boolean; defaultModel: string }> }>({
+    queryKey: ["/api/marketing/ai/providers"],
+    queryFn: async () => { const response = await fetch("/api/marketing/ai/providers", { credentials: "include" }); if (!response.ok) throw new Error("Não foi possível consultar os provedores de IA."); return response.json(); },
+    enabled: section === "agent", staleTime: 30000,
+  });
+  const runAiChat = async () => {
+    if (!aiPrompt.trim() || aiBusy) return;
+    setAiBusy(true); setAiError(""); setAiReply(null);
+    try {
+      const response = await fetch("/api/marketing/ai/chat", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider, agent: aiAgent, message: aiPrompt }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || data.failures?.join(" | ") || "A IA não conseguiu responder.");
+      setAiReply({ providerName: data.providerName, model: data.model, message: data.message });
+    } catch (error) { setAiError(error instanceof Error ? error.message : "Falha ao consultar a IA."); }
+    finally { setAiBusy(false); }
+  };
+  const testAiProvider = async () => {
+    setAiBusy(true); setAiError(""); setAiReply(null);
+    try {
+      const response = await fetch("/api/marketing/ai/test", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ provider: aiProvider }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.message || data.failures?.join(" | ") || "Teste de IA falhou.");
+      setAiReply({ providerName: data.providerName, model: data.model, message: data.response });
+    } catch (error) { setAiError(error instanceof Error ? error.message : "Falha no teste de IA."); }
+    finally { setAiBusy(false); }
+  };
   const recordsQuery = useQuery<MarketingRecord[]>({
     queryKey: ["/api/marketing/records", section],
     queryFn: async () => {
@@ -387,12 +419,29 @@ export default function MarketingHub() {
         )}
 
         {section === "agent" && (
-          <Card className="border-white/10 bg-white/[0.035] text-white">
-            <CardHeader><CardTitle className="text-lg">Catálogo de agentes especializados</CardTitle><p className="text-sm text-zinc-400">Papéis e responsabilidades definidos. A execução autônoma depende da conexão dos modelos e dos serviços de orquestração.</p></CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {agentCatalog.map(([name, detail]) => <div key={name} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-center gap-2"><Bot className="h-4 w-4 text-cyan-300" /><p className="font-bold">{name}</p><Badge className="ml-auto border-amber-400/20 bg-amber-400/10 text-amber-200">Aguardando IA</Badge></div><p className="mt-2 text-xs text-zinc-400">{detail}</p></div>)}
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            <Card className="border-white/10 bg-white/[0.035] text-white">
+              <CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Sparkles className="h-5 w-5 text-cyan-300" /> Central de execução IA</CardTitle><p className="text-sm text-zinc-400">Roteamento entre provedores, teste de conectividade e execução dos agentes especializados.</p></CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2"><Label>Provedor de IA</Label><select value={aiProvider} onChange={(event) => setAiProvider(event.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white"><option value="auto">Automático · fallback entre provedores</option>{(aiProvidersQuery.data?.providers || []).map((provider) => <option key={provider.id} value={provider.id} disabled={!provider.configured}>{provider.name}{provider.free ? " · gratuito" : ""}{!provider.configured ? " · sem credencial" : ""}</option>)}</select></div>
+                  <div className="space-y-2"><Label>Agente especializado</Label><select value={aiAgent} onChange={(event) => setAiAgent(event.target.value)} className="h-10 w-full rounded-md border border-white/10 bg-black/40 px-3 text-sm text-white">{agentCatalog.map(([name]) => <option key={name} value={name}>{name}</option>)}</select></div>
+                </div>
+                <div className="flex flex-wrap gap-2">{(aiProvidersQuery.data?.providers || []).map((provider) => <Badge key={provider.id} className={provider.configured ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-200" : "border-white/10 bg-white/5 text-zinc-400"}>{provider.name}: {provider.configured ? provider.free ? "gratuito / limitado" : "configurado" : "aguardando credencial"}</Badge>)}</div>
+                <div className="space-y-2"><Label>Solicitação ao agente</Label><Textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} rows={4} maxLength={12000} placeholder="Ex.: Analise oportunidades de negócio no nicho de alimentação saudável no interior de São Paulo." className="border-white/10 bg-black/30 text-white" /></div>
+                <div className="flex flex-wrap gap-2"><Button disabled={!aiPrompt.trim() || aiBusy} onClick={runAiChat} className="bg-cyan-500 font-bold text-slate-950 hover:bg-cyan-400"><Sparkles className="mr-2 h-4 w-4" />{aiBusy ? "Executando..." : "Executar agente"}</Button><Button disabled={aiBusy} onClick={testAiProvider} variant="outline" className="border-white/15 text-white">Testar conexão</Button></div>
+                {aiError && <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200">{aiError}</div>}
+                {aiReply && <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-4"><div className="mb-2 flex flex-wrap items-center gap-2"><Badge className="border-emerald-400/20 bg-emerald-400/10 text-emerald-200">{aiReply.providerName}</Badge><span className="text-xs text-zinc-400">{aiReply.model}</span></div><p className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-100">{aiReply.message}</p></div>}
+                {aiProvidersQuery.isError && <p className="text-sm text-amber-200">Não foi possível carregar o estado dos provedores. Verifique a conexão e atualize a página.</p>}
+              </CardContent>
+            </Card>
+            <Card className="border-white/10 bg-white/[0.035] text-white">
+              <CardHeader><CardTitle className="text-lg">Catálogo de agentes especializados</CardTitle><p className="text-sm text-zinc-400">Os agentes compartilham o roteador de IA e recebem instruções específicas por função.</p></CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {agentCatalog.map(([name, detail]) => <div key={name} className="rounded-xl border border-white/10 bg-black/20 p-4"><div className="flex items-center gap-2"><Bot className="h-4 w-4 text-cyan-300" /><p className="font-bold">{name}</p><Badge className="ml-auto border-emerald-400/20 bg-emerald-400/10 text-emerald-200">Agente pronto</Badge></div><p className="mt-2 text-xs text-zinc-400">{detail}</p></div>)}
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {!["overview", "integration", "agent"].includes(section) && (
