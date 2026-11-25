@@ -135,10 +135,10 @@ export function registerMarketingAIRoutes(
       const normalized = models.map((item: any) => ({
         id: String(item?.id || item?.model || ""),
         name: String(item?.name || item?.id || item?.model || ""),
-        free: item?.isFree === true || String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0"),
+        free: typeof item?.isFree === "boolean" ? item.isFree : (String(item?.id || "").endsWith(":free") || (String(item?.pricing?.prompt ?? "") === "0" && String(item?.pricing?.completion ?? "") === "0")),
         contextLength: item?.context_length || item?.contextLength || item?.top_provider?.context_length || null,
         privacyWarning: item?.mayTrainOnYourPrompts === true ? "O provedor pode registrar ou usar prompts para melhoria." : null,
-        chatCompatible: !Array.isArray(item?.architecture?.output_modalities) || item.architecture.output_modalities.includes("text"),
+        chatCompatible: !Array.isArray(item?.architecture?.output_modalities) || (item.architecture.output_modalities.includes("text") && !item.architecture.output_modalities.includes("audio") && !item.architecture.output_modalities.includes("video")),
       })).filter((item: any) => item.id && item.chatCompatible && (!(provider.id === "kilo" && provider.anonymousFree) || item.free)).slice(0, 200);
       res.json({ provider: provider.id, models: normalized });
     } catch (error: any) {
