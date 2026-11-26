@@ -314,8 +314,11 @@ export function registerMarketingAIRoutes(
     }
     const risk = classifyDataRisk([message, ...history.map((item: any) => item.content), memoryContext].join("\n"));
     if (risk !== "public") {
-      candidates = candidates.filter((provider) => confidentialApproved(provider, String(req.body?.model || provider.model).trim()));
-      if (!candidates.length) return res.status(409).json({ ok: false, blocked: true, risk, message: "Dados confidenciais bloqueados: não há provedor explicitamente aprovado para recebê-los. Configure a aprovação de privacidade do provedor ou remova/anonimize esses dados." });
+      // Kilo may handle the workflow, but never receives the confidential request,
+      // conversation history, tenant memory, identifiers, or user-supplied payload.
+      // Other providers still require explicit confidential approval.
+      candidates = candidates.filter((provider) => provider.id === "kilo" || confidentialApproved(provider, String(req.body?.model || provider.model).trim()));
+      if (!candidates.length) return res.status(409).json({ ok: false, blocked: true, risk, message: "Nenhum provedor autorizado para esta solicitação. O Kilo pode executar apenas o fluxo genérico sem receber o conteúdo confidencial." });
     }
     const messages = [
       { role: "system", content: `Você é ${agent}, agente especializado da Central de Marketing IA da Aura System. ${agentInstructions(agent)}${memoryContext}\n\nTrabalhe com rigor factual. Não invente pesquisas, fontes, dados, preços ou ações externas. Quando não tiver acesso a dados ao vivo, declare isso e proponha como verificar. Não execute follow/unfollow, publicação, comentários ou mensagens sem integração oficial, permissão e confirmação aplicáveis. Responda em português brasileiro, com plano prático e próximos passos.` },
@@ -325,13 +328,20 @@ export function registerMarketingAIRoutes(
     const failures: string[] = [];
     for (const provider of candidates) {
       try {
-        const outboundMessages = provider.id === "kilo" ? messages.map((item: any) => ({ ...item, content: redactSensitiveIdentifiers(String(item.content || "")) })) : messages;
+        const outboundMessages = provider.id === "kilo"
+          ? risk === "public"
+            ? messages.map((item: any) => ({ ...item, content: redactSensitiveIdentifiers(String(item.content || "")) }))
+            : [
+                { role: "system", content: "Você é um executor de procedimentos genéricos. A solicitação original contém informações protegidas que não foram compartilhadas com você. Não tente inferir, solicitar, reconstruir ou inventar esses dados. Forneça somente um procedimento, checklist ou estrutura de trabalho genérica para o tipo de agente informado." },
+                { role: "user", content: `Prepare um procedimento genérico e seguro para o agente "${agent}". Contexto: existe uma tarefa empresarial protegida, mas você não recebeu nem receberá seu conteúdo, registros, valores, documentos, histórico ou identificadores. Entregue apenas etapas operacionais genéricas que possam ser executadas localmente pelo Aura System.` },
+              ]
+          : messages;
         const result = await complete(provider, outboundMessages, req.body?.model);
         try {
           await ensureAgentSchema();
           await neonPool!.query(
             "INSERT INTO aura_marketing_agent_runs (enterprise_id,actor_user_id,agent,provider,model,prompt,response,usage) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)",
-            [enterpriseId, Number(req.user?.id), agent, provider.id, result.model, redactSensitiveIdentifiers(message), result.text, JSON.stringify(result.usage || {})],
+            [enterpriseId, Number(req.user?.id), agent, provider.id, result.model, provider.id === "kilo" && risk !== "public" ? "[CONTEÚDO PROTEGIDO — NÃO ENVIADO AO KILO]" : redactSensitiveIdentifiers(message), result.text, JSON.stringify(result.usage || {})],
           );
         } catch (persistError: any) {
           console.error("[MARKETING AI] run persistence failed:", persistError?.message || persistError);
