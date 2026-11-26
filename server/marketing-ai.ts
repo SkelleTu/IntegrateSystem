@@ -290,7 +290,7 @@ export function registerMarketingAIRoutes(
     const agent = String(req.body?.agent || "Market Research").slice(0, 80);
     const requested = String(req.body?.provider || "auto");
     const configs = providerConfigs();
-    const candidates = requested === "auto" ? providerOrder(configs, agent) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
+    let candidates = requested === "auto" ? providerOrder(configs, agent) : configs.filter((item) => item.id === requested && (item.configured || (item.id === "kilo" && item.anonymousFree)));
     if (!candidates.length) return res.status(503).json({ message: "Nenhum provedor de IA está disponível. Configure um provedor no Render ou use o Kilo gratuito." });
     const history = Array.isArray(req.body?.history) ? req.body.history.slice(-12).filter((item: any) => ["user", "assistant"].includes(item?.role) && typeof item?.content === "string").map((item: any) => ({ role: item.role, content: item.content.slice(0, 12000) })) : [];
     let memoryContext = "";
@@ -305,7 +305,7 @@ export function registerMarketingAIRoutes(
       console.error("[MARKETING AI] memory read failed:", error?.message || error);
     }
     const risk = classifyDataRisk([message, ...history.map((item: any) => item.content), memoryContext].join("\n"));
-    if (risk === "confidential") {
+    if (risk !== "public") {
       candidates = candidates.filter((provider) => confidentialApproved(provider, String(req.body?.model || provider.model).trim()));
       if (!candidates.length) return res.status(409).json({ ok: false, blocked: true, risk, message: "Dados confidenciais bloqueados: não há provedor explicitamente aprovado para recebê-los. Configure a aprovação de privacidade do provedor ou remova/anonimize esses dados." });
     }
