@@ -54,16 +54,24 @@ function safeProvider(provider: ProviderConfig) {
 type DataRisk = "public" | "internal" | "confidential";
 function classifyDataRisk(value: string): DataRisk {
   const t = value.toLowerCase();
-  if (/\b(cpf|cnpj|rg|senha|password|token|api[_ -]?key|secret|chave privada|private key|dados bancários|conta bancária|cartão de crédito|dados de clientes|lista de clientes|leads identificados|confidencial|sigiloso|não divulgar|salário|folha de pagamento|faturamento|receita|lucro|margem|custo|despesa|fluxo de caixa|saldo|contas a pagar|contas a receber)\b/i.test(t)
-    || /\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/i.test(t)) return "confidential";
-  if (/\b(interno|estratégia interna|planejamento interno|não público|rascunho interno)\b/i.test(t)) return "internal";
+  const confidential = [
+    /\b(cpf|cnpj|rg|passaporte|data de nascimento|endereço residencial|telefone pessoal|e-?mail pessoal|senha|password|token|api[_ -]?key|secret|chave privada|private key|dados bancários|conta bancária|cartão de crédito|número do cartão|cvv|pix|dados de clientes|lista de clientes|leads identificados|confidencial|sigiloso|não divulgar|salário|folha de pagamento|faturamento|receita|lucro|margem|custo|despesa|fluxo de caixa|saldo|contas a pagar|contas a receber|contrato confidencial)\b/i,
+    /\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b|\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/i,
+    /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+    /(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9?\d{4}[-.\s]?\d{4}\b/,
+    /\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})\b/i,
+    /\b(?:rua|avenida|av\.|travessa|alameda|rodovia)\s+[a-z0-9 .'-]{3,}(?:,\s*\d{1,5})?/i,
+  ];
+  if (confidential.some(pattern => pattern.test(value))) return "confidential";
+  if (/\b(interno|estratégia interna|planejamento interno|não público|rascunho interno|uso interno)\b/i.test(t)) return "internal";
   return "public";
 }
 function redactSensitiveIdentifiers(value: string): string {
   return value
-    .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF REDIGIDO]")
-    .replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, "[CNPJ REDIGIDO]")
+    .replace(/\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b/g, "[CPF REDIGIDO]")
+    .replace(/\b\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}\b/g, "[CNPJ REDIGIDO]")
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[EMAIL REDIGIDO]")
+    .replace(/(?:\+?55\s?)?(?:\(?\d{2}\)?\s?)?9?\d{4}[-.\s]?\d{4}\b/g, "[TELEFONE REDIGIDO]")
     .replace(/\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})\b/gi, "[CREDENCIAL REDIGIDA]");
 }
 
