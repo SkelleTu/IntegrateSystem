@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Network,
   CreditCard,
+  BrainCircuit,
 } from "lucide-react";
 import { 
   DropdownMenu, 
@@ -53,6 +54,7 @@ export function Navbar() {
       "/ponto":"timeclock", "/admin/master":"master",
       "/admin/account-branches":"account_branches", "/admin/credito-interno":"credit_internal",
       "/renda-variavel":"variable_income",
+      "/marketing":"marketing",
     };
     const grant = user.permissions?.[moduleByUrl[url]] || {};
     const allowed = isMasterAccount || user.masterAccessAuthorized === true || url === "/cart" || grant.view === true || grant.administer === true;
@@ -77,6 +79,9 @@ export function Navbar() {
     { title: "Monitor",   url: "/admin/monitoring",  icon: Activity },
     ...(isMasterAccount ? [{ title: "Ramificação de contas", url: "/admin/account-branches", icon: Network },
       { title: "Crédito Interno", url: "/admin/credito-interno", icon: CreditCard }] : []),
+    ...(["admin", "owner"].includes(String(user.role || "").trim().toLowerCase())
+      ? [{ title: "Central de Marketing IA", url: "/marketing", icon: BrainCircuit }]
+      : []),
   ];
 
   const funcionariosItems = [
