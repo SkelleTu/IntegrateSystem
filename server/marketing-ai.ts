@@ -54,17 +54,17 @@ function safeProvider(provider: ProviderConfig) {
 type DataRisk = "public" | "internal" | "confidential";
 function classifyDataRisk(value: string): DataRisk {
   const t = value.toLowerCase();
-  if (/\\b(cpf|cnpj|rg|senha|password|token|api[_ -]?key|secret|chave privada|private key|dados bancários|conta bancária|cartão de crédito|dados de clientes|lista de clientes|leads identificados|confidencial|sigiloso|não divulgar|salário|folha de pagamento|faturamento|receita|lucro|margem|custo|despesa|fluxo de caixa|saldo|contas a pagar|contas a receber)\\b/i.test(t)
-    || /\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}|\\d{2}\\.\\d{3}\\.\\d{3}\\/\\d{4}-\\d{2}|sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/i.test(t)) return "confidential";
-  if (/\\b(interno|estratégia interna|planejamento interno|não público|rascunho interno)\\b/i.test(t)) return "internal";
+  if (/\b(cpf|cnpj|rg|senha|password|token|api[_ -]?key|secret|chave privada|private key|dados bancários|conta bancária|cartão de crédito|dados de clientes|lista de clientes|leads identificados|confidencial|sigiloso|não divulgar|salário|folha de pagamento|faturamento|receita|lucro|margem|custo|despesa|fluxo de caixa|saldo|contas a pagar|contas a receber)\b/i.test(t)
+    || /\d{3}\.\d{3}\.\d{3}-\d{2}|\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}|sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/i.test(t)) return "confidential";
+  if (/\b(interno|estratégia interna|planejamento interno|não público|rascunho interno)\b/i.test(t)) return "internal";
   return "public";
 }
 function redactSensitiveIdentifiers(value: string): string {
   return value
-    .replace(/\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b/g, "[CPF REDIGIDO]")
-    .replace(/\\b\\d{2}\\.\\d{3}\\.\\d{3}\\/\\d{4}-\\d{2}\\b/g, "[CNPJ REDIGIDO]")
-    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, "[EMAIL REDIGIDO]")
-    .replace(/\\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})\\b/gi, "[CREDENCIAL REDIGIDA]");
+    .replace(/\b\d{3}\.\d{3}\.\d{3}-\d{2}\b/g, "[CPF REDIGIDO]")
+    .replace(/\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g, "[CNPJ REDIGIDO]")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[EMAIL REDIGIDO]")
+    .replace(/\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})\b/gi, "[CREDENCIAL REDIGIDA]");
 }
 
 function agentInstructions(agent: string): string {
@@ -304,9 +304,9 @@ export function registerMarketingAIRoutes(
     } catch (error: any) {
       console.error("[MARKETING AI] memory read failed:", error?.message || error);
     }
-    const risk = classifyDataRisk([message, ...history.map((item: any) => item.content), memoryContext].join("\\n"));
+    const risk = classifyDataRisk([message, ...history.map((item: any) => item.content), memoryContext].join("\n"));
     if (risk === "confidential") {
-      candidates = candidates.filter((provider) => confidentialApproved(provider, provider.model));
+      candidates = candidates.filter((provider) => confidentialApproved(provider, String(req.body?.model || provider.model).trim()));
       if (!candidates.length) return res.status(409).json({ ok: false, blocked: true, risk, message: "Dados confidenciais bloqueados: não há provedor explicitamente aprovado para recebê-los. Configure a aprovação de privacidade do provedor ou remova/anonimize esses dados." });
     }
     const messages = [
