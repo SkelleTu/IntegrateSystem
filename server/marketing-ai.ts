@@ -40,8 +40,31 @@ function providerConfigs(): ProviderConfig[] {
     { id: "compatible", name: env("AURA_AI_COMPAT_NAME", "API OpenAI-compatible personalizada"), baseUrl: compatibleUrl, apiKey: compatibleKey, model: env("AURA_AI_COMPAT_MODEL"), configured: Boolean(compatibleUrl && compatibleKey), free: false },
   ];
 }
+function confidentialApproved(provider: ProviderConfig, model = provider.model): boolean {
+  const approvedProviders = new Set(env("AURA_AI_CONFIDENTIAL_PROVIDERS").split(",").map(v => v.trim().toLowerCase()).filter(Boolean));
+  if (provider.id === "kilo") {
+    const approvedModels = new Set(env("KILO_CONFIDENTIAL_ALLOWED_MODELS").split(",").map(v => v.trim()).filter(Boolean));
+    return Boolean(provider.apiKey && !provider.anonymousFree && env("KILO_CONFIDENTIAL_NO_RETENTION_ATTESTED").toLowerCase() === "true" && approvedModels.has(model));
+  }
+  return approvedProviders.has(provider.id);
+}
 function safeProvider(provider: ProviderConfig) {
-  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, anonymousFree: Boolean(provider.anonymousFree), baseUrl: provider.baseUrl, defaultModel: provider.model, privacyWarning: provider.privacyWarning || null };
+  return { id: provider.id, name: provider.name, configured: provider.configured, free: provider.free, anonymousFree: Boolean(provider.anonymousFree), baseUrl: provider.baseUrl, defaultModel: provider.model, confidentialEligible: confidentialApproved(provider), privacyWarning: provider.privacyWarning || null };
+}
+type DataRisk = "public" | "internal" | "confidential";
+function classifyDataRisk(value: string): DataRisk {
+  const t = value.toLowerCase();
+  if (/\\b(cpf|cnpj|rg|senha|password|token|api[_ -]?key|secret|chave privada|private key|dados bancários|conta bancária|cartão de crédito|dados de clientes|lista de clientes|leads identificados|confidencial|sigiloso|não divulgar|salário|folha de pagamento|faturamento|receita|lucro|margem|custo|despesa|fluxo de caixa|saldo|contas a pagar|contas a receber)\\b/i.test(t)
+    || /\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}|\\d{2}\\.\\d{3}\\.\\d{3}\\/\\d{4}-\\d{2}|sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,}/i.test(t)) return "confidential";
+  if (/\\b(interno|estratégia interna|planejamento interno|não público|rascunho interno)\\b/i.test(t)) return "internal";
+  return "public";
+}
+function redactSensitiveIdentifiers(value: string): string {
+  return value
+    .replace(/\\b\\d{3}\\.\\d{3}\\.\\d{3}-\\d{2}\\b/g, "[CPF REDIGIDO]")
+    .replace(/\\b\\d{2}\\.\\d{3}\\.\\d{3}\\/\\d{4}-\\d{2}\\b/g, "[CNPJ REDIGIDO]")
+    .replace(/\\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}\\b/gi, "[EMAIL REDIGIDO]")
+    .replace(/\\b(?:sk-[a-z0-9_-]{12,}|gh[pousr]_[a-z0-9]{20,}|AIza[0-9A-Za-z_-]{20,})\\b/gi, "[CREDENCIAL REDIGIDA]");
 }
 
 function agentInstructions(agent: string): string {
@@ -202,6 +225,17 @@ export function registerMarketingAIRoutes(
     }
   });
 
+  app.get("/api/marketing/ai/privacy", isAuthenticated, (req: any, res: Response) => {
+    if (!marketingTenant(req, res)) return;
+    const providers = providerConfigs();
+    return res.json({
+      classification: ["public", "internal", "confidential"],
+      defaultPolicy: "confidential-block-unless-provider-explicitly-approved",
+      kiloConfidential: { enabled: providers.some(p => p.id === "kilo" && confidentialApproved(p)), requiresPaidCredential: true, requiresNoRetentionAttestation: true, requiresExplicitModelAllowlist: true, anonymousFreeAllowedForConfidential: false },
+      providers: providers.map(p => ({ id: p.id, configured: p.configured || Boolean(p.anonymousFree), confidentialEligible: confidentialApproved(p) })),
+    });
+  });
+
   app.get("/api/marketing/ai/providers", isAuthenticated, (req: any, res: any) => {
     if (!marketingTenant(req, res)) return;
     const providers = providerConfigs();
@@ -270,6 +304,11 @@ export function registerMarketingAIRoutes(
     } catch (error: any) {
       console.error("[MARKETING AI] memory read failed:", error?.message || error);
     }
+    const risk = classifyDataRisk([message, ...history.map((item: any) => item.content), memoryContext].join("\\n"));
+    if (risk === "confidential") {
+      candidates = candidates.filter((provider) => confidentialApproved(provider, provider.model));
+      if (!candidates.length) return res.status(409).json({ ok: false, blocked: true, risk, message: "Dados confidenciais bloqueados: não há provedor explicitamente aprovado para recebê-los. Configure a aprovação de privacidade do provedor ou remova/anonimize esses dados." });
+    }
     const messages = [
       { role: "system", content: `Você é ${agent}, agente especializado da Central de Marketing IA da Aura System. ${agentInstructions(agent)}${memoryContext}\n\nTrabalhe com rigor factual. Não invente pesquisas, fontes, dados, preços ou ações externas. Quando não tiver acesso a dados ao vivo, declare isso e proponha como verificar. Não execute follow/unfollow, publicação, comentários ou mensagens sem integração oficial, permissão e confirmação aplicáveis. Responda em português brasileiro, com plano prático e próximos passos.` },
       ...history,
@@ -278,12 +317,13 @@ export function registerMarketingAIRoutes(
     const failures: string[] = [];
     for (const provider of candidates) {
       try {
-        const result = await complete(provider, messages, req.body?.model);
+        const outboundMessages = provider.id === "kilo" ? messages.map((item: any) => ({ ...item, content: redactSensitiveIdentifiers(String(item.content || "")) })) : messages;
+        const result = await complete(provider, outboundMessages, req.body?.model);
         try {
           await ensureAgentSchema();
           await neonPool!.query(
             "INSERT INTO aura_marketing_agent_runs (enterprise_id,actor_user_id,agent,provider,model,prompt,response,usage) VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb)",
-            [enterpriseId, Number(req.user?.id), agent, provider.id, result.model, message, result.text, JSON.stringify(result.usage || {})],
+            [enterpriseId, Number(req.user?.id), agent, provider.id, result.model, redactSensitiveIdentifiers(message), result.text, JSON.stringify(result.usage || {})],
           );
         } catch (persistError: any) {
           console.error("[MARKETING AI] run persistence failed:", persistError?.message || persistError);
