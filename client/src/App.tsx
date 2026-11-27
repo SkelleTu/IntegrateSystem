@@ -199,7 +199,7 @@ function Router() {
             <Route path="/admin/account-branches" component={AccountBranches} />
             <Route path="/admin/windows-app" component={WindowsAppRunner} />
             <Route path="/aura-windows" component={AuraWindows} />
-            <Route path="/backup" component={Backup} />
+            <Route path="/backup" component={Backup} />\n            <Route path="/database" component={DatabaseManager} />
             <Route path="/marketing" component={MarketingHub} />
             <Route path="/renda-variavel" component={RendaVariavel} />
             <Route component={NotFound} />
