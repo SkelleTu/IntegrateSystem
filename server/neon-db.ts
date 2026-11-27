@@ -21,6 +21,7 @@ export const neonPool = connectionString
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
       keepAlive: true,
+      options: "-c search_path=public",
     })
   : null;
 
