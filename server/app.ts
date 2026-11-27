@@ -23,7 +23,9 @@ import { registerMcpOAuth, verifyMcpAccessToken } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 import { getRuntimeObservability } from "./runtime-observability";
-import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";\nimport { getDatabaseBackupStatus, getDatabaseBackupConfig, startDatabaseBackupScheduler, triggerDatabaseBackup } from "./databaseManager";\nimport { startSqliteMirrorScheduler } from "./sqliteMirror";
+import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";
+import { getDatabaseBackupStatus, getDatabaseBackupConfig, startDatabaseBackupScheduler, triggerDatabaseBackup } from "./databaseManager";
+import { startSqliteMirrorScheduler } from "./sqliteMirror";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -309,7 +311,9 @@ export async function initApp() {
       progress: 25,
     });
 
-    startGoogleDriveBackupScheduler();\n    startDatabaseBackupScheduler();\n    startSqliteMirrorScheduler();
+    startGoogleDriveBackupScheduler();
+    startDatabaseBackupScheduler();
+    startSqliteMirrorScheduler();
 
     runtimeEvent("backup-scheduler-ready", "Agendador de backup inicializado", {
       phase: "initialization",
