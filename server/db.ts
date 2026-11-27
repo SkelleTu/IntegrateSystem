@@ -969,6 +969,23 @@ export async function setupDatabase() {
         expire BIGINT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS aura_sessions_expire_idx ON public.aura_sessions(expire);
+      CREATE TABLE IF NOT EXISTS public.runtime_events (
+        id BIGSERIAL PRIMARY KEY,
+        sequence INTEGER NOT NULL,
+        session_id TEXT NOT NULL,
+        timestamp TIMESTAMPTZ NOT NULL,
+        process TEXT NOT NULL DEFAULT 'server',
+        pid INTEGER,
+        event TEXT NOT NULL,
+        message TEXT NOT NULL,
+        trace_id TEXT,
+        request_id TEXT,
+        source TEXT,
+        severity TEXT NOT NULL DEFAULT 'info',
+        data TEXT
+      );
+      CREATE INDEX IF NOT EXISTS runtime_events_session_sequence_idx
+        ON public.runtime_events(session_id, sequence);
     `);
     await ensureAuditTriggers();
     await neonPool.query(`
