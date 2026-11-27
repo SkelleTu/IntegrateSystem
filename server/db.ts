@@ -960,6 +960,8 @@ export async function setupDatabase() {
   // migrations before schema parity validation so existing production data is preserved.
   if (neonPool) {
     await verifyNeonConnection();
+    // Neon roles can arrive with an empty/nonexistent search_path; guarantee the application schema exists before unqualified DDL.
+    await neonPool.query("CREATE SCHEMA IF NOT EXISTS public");
     await ensureAuditTriggers();
     await neonPool.query(`
       CREATE TABLE IF NOT EXISTS audit_events (
