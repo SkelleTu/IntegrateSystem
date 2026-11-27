@@ -205,7 +205,7 @@ async function listDriveFiles(token: string) {
 }
 
 function parseBackupDate(name: string): Date | null {
-  const match = /^sqlite-(\\d{2})-(\\d{2})-(\\d{4})\\.sql$/.exec(name);
+  const match = /^sqlite-(\d{2})-(\d{2})-(\d{4})\.sql$/.exec(name);
   if (!match) return null;
   const date = new Date(Date.UTC(Number(match[3]), Number(match[2]) - 1, Number(match[1])));
   return Number.isNaN(date.getTime()) ? null : date;
@@ -222,27 +222,32 @@ async function uploadOrReplace(buffer: Buffer, name: string, token: string, exis
   const matches = existing.filter((f) => f.name === name);
   let response: Response;
   if (matches[0]) {
-    response = await driveRequest(`/upload/files/${encodeURIComponent(matches[0].id)}?uploadType=media&fields=id,name,size,modifiedTime`, {
+    response = await fetch("https://www.googleapis.com/upload/drive/v3/files/" + encodeURIComponent(matches[0].id) + "?uploadType=media&fields=id,name,size,modifiedTime", {
       method: "PATCH",
-      headers: { "Content-Type": "application/sql", "Content-Length": String(buffer.byteLength) },
+      headers: { Authorization: "Bearer " + token, "Content-Type": "application/sql", "Content-Length": String(buffer.byteLength) },
       body: buffer,
-    }, token);
-    for (const duplicate of matches.slice(1)) {
-      await driveRequest(`/files/${encodeURIComponent(duplicate.id)}`, { method: "DELETE" }, token);
-    }
+    });
   } else {
     const metadata = JSON.stringify({ name, parents: [driveConfig.folderId], mimeType: "application/sql" });
-    const boundary = `aura_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    const prefix = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n--${boundary}\r\nContent-Type: application/sql\r\n\r\n`);
-    const suffix = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const boundary = "aura_" + Date.now() + "_" + Math.random().toString(16).slice(2);
+    const prefix = Buffer.from("--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" + metadata + "\r\n--" + boundary + "\r\nContent-Type: application/sql\r\n\r\n");
+    const suffix = Buffer.from("\r\n--" + boundary + "--\r\n");
     const body = Buffer.concat([prefix, buffer, suffix]);
-    response = await driveRequest("/upload/files?uploadType=multipart&fields=id,name,size,modifiedTime", {
+    response = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,modifiedTime", {
       method: "POST",
-      headers: { "Content-Type": `multipart/related; boundary=${boundary}`, "Content-Length": String(body.byteLength) },
+      headers: { Authorization: "Bearer " + token, "Content-Type": "multipart/related; boundary=" + boundary, "Content-Length": String(body.byteLength) },
       body,
-    }, token);
+    });
   }
-  return response.json() as Promise<{id: string; name: string; size?: string; modifiedTime?: string}>;
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error("Google Drive upload HTTP " + response.status + ": " + detail.slice(0, 400));
+  }
+  const uploaded = await response.json() as {id: string; name: string; size?: string; modifiedTime?: string};
+  for (const duplicate of matches.slice(1)) {
+    await driveRequest("/files/" + encodeURIComponent(duplicate.id), { method: "DELETE" }, token);
+  }
+  return uploaded;
 }
 
 async function enforceRetention(token: string) {
@@ -325,7 +330,7 @@ export async function getDatabaseBackupStatus(): Promise<DatabaseBackupStatus> {
     drive: {
       configured: !!(driveConfig.clientId && driveConfig.clientSecret && driveConfig.refreshToken && driveConfig.folderId),
       folderConfigured: !!driveConfig.folderId,
-      lastFiles: driveFiles.filter((f) => /^sqlite-\\d{2}-\\d{2}-\\d{4}\\.sql$/.test(f.name)).sort((a,b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime))).slice(0, 30),
+      lastFiles: driveFiles.filter((f) => /^sqlite-\d{2}-\d{2}-\d{4}\.sql$/.test(f.name)).sort((a,b) => String(b.modifiedTime).localeCompare(String(a.modifiedTime))).slice(0, 30),
     },
   };
   lastStatus = status;
