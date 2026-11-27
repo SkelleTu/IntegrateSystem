@@ -225,7 +225,7 @@ async function persistRuntimeEvent(record: {
     const [{ localSqlite, tursoClient, persistLocalSqlite }, { neonPool }] = await Promise.all([import("./db"), import("./neon-db.js")]);
     const context = record.data;
     const redactedData = redact(context);
-    const statement = `INSERT INTO runtime_events
+    const statement = `INSERT INTO public.runtime_events
       (sequence, session_id, timestamp, process, pid, event, message, trace_id, request_id, source, severity, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const args = [
@@ -290,7 +290,7 @@ async function persistRuntimeEvent(record: {
       } else if (localResult.status === "rejected" && remoteResult.status === "fulfilled") {
         if (neonPool) {
           await neonPool.query(
-            "DELETE FROM runtime_events WHERE session_id = $1 AND sequence = $2",
+            "DELETE FROM public.runtime_events WHERE session_id = $1 AND sequence = $2",
             [record.sessionId, record.sequence],
           ).catch(() => undefined);
         } else if (tursoClient) {
