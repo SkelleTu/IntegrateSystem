@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { neonPool } from "./neon-db.js";
-import { localSqlite, persistLocalSqlite } from "./db.js";
+import { localSqlite, persistLocalSqlite } from "./db.js";\nimport { getSqliteMirrorStatus } from "./sqliteMirror.js";
 
 const execFileAsync = promisify(execFile);
 const TZ = "America/Sao_Paulo";
@@ -308,7 +308,7 @@ export async function getDatabaseBackupStatus(): Promise<DatabaseBackupStatus> {
 
   const status: DatabaseBackupStatus = {
     database: { primary: "neon-postgresql", connected, latencyMs, tables, rows },
-    sqlite: { enabled: true, fileSizeBytes: localSqlite.export().byteLength, lastSyncAt: lastSqliteSyncAt },
+    sqlite: { enabled: true, fileSizeBytes: localSqlite.export().byteLength, lastSyncAt: getSqliteMirrorStatus().lastSyncAt },
     backup: {
       enabled: true,
       configured: !!(driveConfig.clientId && driveConfig.clientSecret && driveConfig.refreshToken && driveConfig.folderId),
