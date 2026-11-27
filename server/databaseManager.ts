@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { neonPool } from "./neon-db.js";
-import { localSqlite, persistLocalSqlite } from "./db.js";\nimport { getSqliteMirrorStatus } from "./sqliteMirror.js";
+import { localSqlite, persistLocalSqlite } from "./db.js";
+import { getSqliteMirrorStatus } from "./sqliteMirror.js";
 
 const execFileAsync = promisify(execFile);
 const TZ = "America/Sao_Paulo";
