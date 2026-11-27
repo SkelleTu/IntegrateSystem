@@ -23,7 +23,7 @@ import { registerMcpOAuth, verifyMcpAccessToken } from "./mcp-oauth";
 import { registerAuraDirectMcp } from "./direct-mcp";
 import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./mcp-compatibility-controller";
 import { getRuntimeObservability } from "./runtime-observability";
-import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";
+import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";\nimport { getDatabaseBackupStatus, getDatabaseBackupConfig, startDatabaseBackupScheduler, triggerDatabaseBackup } from "./databaseManager";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -309,7 +309,7 @@ export async function initApp() {
       progress: 25,
     });
 
-    startGoogleDriveBackupScheduler();
+    startGoogleDriveBackupScheduler();\n    startDatabaseBackupScheduler();
 
     runtimeEvent("backup-scheduler-ready", "Agendador de backup inicializado", {
       phase: "initialization",
@@ -329,6 +329,33 @@ export async function initApp() {
     runtimeEvent("routes-ready", "Rotas da aplicação registradas", {
       phase: "initialization",
       progress: 55,
+    });
+
+    const requireDatabaseAdmin = (req: Request, res: Response, next: NextFunction) => {
+      const user = (req as any).user;
+      const role = String(user?.role || "").trim().toLowerCase();
+      if (!user || !["admin", "owner"].includes(role)) {
+        return res.status(403).json({ ok: false, error: "Acesso administrativo necessário." });
+      }
+      next();
+    };
+
+    app.get("/api/database/config", requireDatabaseAdmin, (_req: Request, res: Response) => {
+      res.json(getDatabaseBackupConfig());
+    });
+
+    app.get("/api/database/status", requireDatabaseAdmin, async (_req: Request, res: Response) => {
+      try {
+        res.json(await getDatabaseBackupStatus());
+      } catch (error: any) {
+        res.status(503).json({ ok: false, error: error?.message || String(error) });
+      }
+    });
+
+    app.post("/api/database/backup", requireDatabaseAdmin, async (_req: Request, res: Response) => {
+      const result = await triggerDatabaseBackup();
+      if (!result.accepted) return res.status(503).json(result);
+      res.json(result);
     });
 
     app.get("/api/google-drive/status", (_req: Request, res: Response) => {
