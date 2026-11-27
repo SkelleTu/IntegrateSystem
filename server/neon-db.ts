@@ -24,16 +24,7 @@ export const neonPool = connectionString
     })
   : null;
 
-// Neon pooler rejects the PostgreSQL startup "options" parameter. Set the
-// schema after each physical connection is established, before it is handed
-// to a query consumer, so every pooled connection resolves unqualified tables.
-if (neonPool) {
-  neonPool.on("connect", (client) => {
-    void client.query("SET search_path TO public").catch((error) => {
-      console.error("[DB] Failed to set Neon search_path to public:", error);
-    });
-  });
-}
+// The Neon role default search_path is provisioned as public and verified below.
 
 export const neonDb = neonPool ? drizzle(neonPool, { schema }) : null;
 
