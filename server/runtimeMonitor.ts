@@ -225,7 +225,7 @@ async function persistRuntimeEvent(record: {
     const [{ localSqlite, tursoClient, persistLocalSqlite }, { neonPool }] = await Promise.all([import("./db"), import("./neon-db.js")]);
     const context = record.data;
     const redactedData = redact(context);
-    const statement = `INSERT INTO public.runtime_events
+    const statement = `INSERT INTO runtime_events
       (sequence, session_id, timestamp, process, pid, event, message, trace_id, request_id, source, severity, data)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     const args = [
@@ -254,7 +254,7 @@ async function persistRuntimeEvent(record: {
     };
     const remoteWrite = () => neonPool
       ? neonPool.query(
-          `INSERT INTO runtime_events
+          `INSERT INTO public.runtime_events
             (sequence, session_id, timestamp, process, pid, event, message, trace_id, request_id, source, severity, data)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
           [
