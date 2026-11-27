@@ -76,7 +76,8 @@ export function Navbar() {
     { title: "Estoque",   url: "/inventory",         icon: Package },
     { title: "Fiscal",    url: "/fiscal",            icon: FileText },
     { title: "Etiquetas", url: "/admin/labels",      icon: Tag },
-    { title: "Monitor",   url: "/admin/monitoring",  icon: Activity },\n    { title: "Banco de Dados", url: "/database", icon: Database },
+    { title: "Monitor",   url: "/admin/monitoring",  icon: Activity },
+    { title: "Banco de Dados", url: "/database", icon: Database },
     ...(isMasterAccount ? [{ title: "Ramificação de contas", url: "/admin/account-branches", icon: Network },
       { title: "Crédito Interno", url: "/admin/credito-interno", icon: CreditCard }] : []),
     ...(["admin", "owner"].includes(String(user.role || "").trim().toLowerCase())
