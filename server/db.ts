@@ -962,6 +962,14 @@ export async function setupDatabase() {
     await verifyNeonConnection();
     // Neon roles can arrive with an empty/nonexistent search_path; guarantee the application schema exists before unqualified DDL.
     await neonPool.query("CREATE SCHEMA IF NOT EXISTS public");
+    await neonPool.query(`
+      CREATE TABLE IF NOT EXISTS public.aura_sessions (
+        sid TEXT PRIMARY KEY,
+        sess TEXT NOT NULL,
+        expire BIGINT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS aura_sessions_expire_idx ON public.aura_sessions(expire);
+    `);
     await ensureAuditTriggers();
     await neonPool.query(`
       CREATE TABLE IF NOT EXISTS audit_events (
