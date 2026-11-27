@@ -24,7 +24,15 @@ export const neonPool = connectionString
     })
   : null;
 
-// The Neon role default search_path is provisioned as public and verified below.
+// Neon poolers reject startup "options"; set the schema on each physical
+// connection before application queries use it.
+if (neonPool) {
+  neonPool.on("connect", (client) => {
+    void client.query("SET search_path TO public").catch((error) => {
+      console.error("[DB] Failed to set Neon search_path to public:", error);
+    });
+  });
+}
 
 export const neonDb = neonPool ? drizzle(neonPool, { schema }) : null;
 
