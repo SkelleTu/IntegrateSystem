@@ -25,7 +25,6 @@ import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./
 import { getRuntimeObservability } from "./runtime-observability";
 import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";
 import { getDatabaseBackupStatus, getDatabaseBackupConfig, startDatabaseBackupScheduler, triggerDatabaseBackup } from "./databaseManager";
-import { startSqliteMirrorScheduler } from "./sqliteMirror";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -313,7 +312,6 @@ export async function initApp() {
 
     startGoogleDriveBackupScheduler();
     startDatabaseBackupScheduler();
-    startSqliteMirrorScheduler();
 
     runtimeEvent("backup-scheduler-ready", "Agendador de backup inicializado", {
       phase: "initialization",
