@@ -168,7 +168,7 @@ async function getAuthoritativeUserById(id: number): Promise<any | undefined> {
 async function getAuthoritativeUserByUsername(username: string): Promise<any | undefined> {
   const normalized = String(username ?? "").trim();
   if (!normalized) return undefined;
-  if (neonPool) {
+  if (neonPool && neonOperational) {
     const result = await neonPool.query(
       'SELECT id,username,email,password,role,enterprise_id AS "enterpriseId" FROM users WHERE LOWER(TRIM(username))=LOWER(TRIM($1)) LIMIT 1',
       [normalized],
@@ -182,7 +182,7 @@ async function getAuthoritativeUserByUsername(username: string): Promise<any | u
 async function getAuthoritativeEnterprise(id: number): Promise<any | undefined> {
   const numericId = Number(id);
   if (!Number.isSafeInteger(numericId) || numericId <= 0) return undefined;
-  if (neonPool) {
+  if (neonPool && neonOperational) {
     const result = await neonPool.query('SELECT id,name,status FROM enterprises WHERE id=$1 LIMIT 1',[numericId]);
     if (result.rows[0]) return result.rows[0];
   }
@@ -418,7 +418,7 @@ export async function registerRoutes(
   // Suspensions revoke access immediately, including endpoints that also serve public workflows.
   app.use(async (req: any, res: any, next: any) => {
     if (!req.isAuthenticated?.() || !req.user) return next();
-    if (!neonPool) return process.env.NODE_ENV === "production" && !isIsolatedQaRuntime && !isMasterAccount(req.user) ? res.status(503).json({ message: "Controle de contas indisponível; acesso bloqueado por segurança." }) : next();
+    if (!neonPool || !neonOperational) return process.env.NODE_ENV === "production" && !isIsolatedQaRuntime && !isMasterAccount(req.user) ? res.status(503).json({ message: "Controle de contas indisponível; acesso bloqueado por segurança." }) : next();
     try {
       const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(req.user.id)]);
       if (control.rows[0]?.status === "suspended") return res.status(403).json({ message: "Conta suspensa. Procure a conta master." });
@@ -435,7 +435,7 @@ export async function registerRoutes(
         const normalizedUsername = String(username ?? "").trim();
         let user = await getAuthoritativeUserByUsername(normalizedUsername);
         if (!user) return done(null, false, { message: "Incorrect username." });
-        if (neonPool) {
+        if (neonPool && neonOperational) {
           const control = await neonPool.query("SELECT status FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
           if (control.rows[0]?.status === "suspended") return done(null, false, { message: "ACCOUNT_SUSPENDED" });
         }
@@ -556,7 +556,7 @@ export async function registerRoutes(
   app.get("/api/audit/events", isAuthenticated, async (req: any, res: any) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Acesso restrito à gestão." });
-    if (!neonPool) return res.json([]);
+    if (!neonPool || !neonOperational) return res.json([]);
     await ensureAuditTriggers();
     const params: any[] = []; const where: string[] = [];
     const add = (part: string, value: any) => { params.push(value); where.push(part.replace("$N", "$" + params.length)); };
@@ -580,7 +580,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/db/status", async (req, res) => {
-    if (neonPool) {
+    if (neonPool && neonOperational) {
       try {
         const startedAt = Date.now();
         await neonPool.query("SELECT 1");
@@ -648,7 +648,7 @@ export async function registerRoutes(
     passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) return res.status(500).json({ message: "Login failed." });
       if (!user) {
-        if (neonPool) {
+        if (neonPool && neonOperational) {
           const failedAccount = attemptedUsername ? await getAuthoritativeUserByUsername(attemptedUsername).catch(() => undefined) : undefined;
           await neonPool.query(
             "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES (NULL,$1,'account.login_failed',$2::jsonb,$3,$4)",
@@ -670,12 +670,12 @@ export async function registerRoutes(
           ipAddress: req.ip,
           userAgent: req.get("user-agent")
         });
-        if (neonPool) await neonPool.query(
+        if (neonPool && neonOperational) await neonPool.query(
           "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.login',$2::jsonb,$3,$4)",
           [Number(user.id), JSON.stringify({ username:user.username }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
         );
         const publicUser: any = toPublicUser(user);
-        if (neonPool && !isMasterAccount(user)) {
+        if (neonPool && neonOperational && !isMasterAccount(user)) {
           const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
           publicUser.accountStatus = control.rows[0]?.status || "active";
           publicUser.permissions = control.rows[0]?.permissions || {};
@@ -726,7 +726,7 @@ export async function registerRoutes(
       }
 
       req.session.masterAccessUntil = Date.now() + 5 * 60 * 1000;
-      if (neonPool) await neonPool.query(
+      if (neonPool && neonOperational) await neonPool.query(
         "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.master_authorized',$2::jsonb,$3,$4)",
         [Number(req.user.id), JSON.stringify({ expiresAt:req.session.masterAccessUntil }), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
       );
@@ -754,7 +754,7 @@ export async function registerRoutes(
         ipAddress: req.ip,
         userAgent: req.get("user-agent")
       });
-      if (neonPool) await neonPool.query(
+      if (neonPool && neonOperational) await neonPool.query(
         "INSERT INTO aura_account_audit (actor_user_id,target_user_id,action,details,ip_address,user_agent) VALUES ($1,$1,'account.logout','{}'::jsonb,$2,$3)",
         [Number(user.id), String(req.ip || "").slice(0,200), String(req.get("user-agent") || "").slice(0,500)],
       );
@@ -790,7 +790,7 @@ export async function registerRoutes(
 
       const newHash = await hashPassword(newPassword);
       let updatedUser: any;
-      if (neonPool) {
+      if (neonPool && neonOperational) {
         const updated = await neonPool.query(
           'UPDATE users SET password=$1 WHERE id=$2 RETURNING id,username,email,password,role,enterprise_id AS "enterpriseId"',
           [newHash, Number(dbUser.id)],
@@ -807,7 +807,7 @@ export async function registerRoutes(
       // Revoke every other persisted session for this account; preserve the current session.
       if (req.sessionID) {
         try {
-          if (neonPool) {
+          if (neonPool && neonOperational) {
             await neonPool.query(
               "DELETE FROM aura_sessions WHERE (sess::jsonb #>> '{passport,user}') = $1 AND sid <> $2",
               [String(dbUser.id), String(req.sessionID)],
@@ -835,7 +835,7 @@ export async function registerRoutes(
     const publicUser: any = toPublicUser(user);
     publicUser.masterAccessAuthorized = user.__masterAccessAuthorized === true;
     publicUser.masterAccessExpiresAt = user.__masterAccessAuthorized === true ? Number((req.session as any)?.masterAccessUntil || 0) : null;
-    if (neonPool && !isMasterAccount(user)) {
+    if (neonPool && neonOperational && !isMasterAccount(user)) {
       const control = await neonPool.query("SELECT status,permissions FROM aura_account_controls WHERE user_id=$1",[Number(user.id)]);
       publicUser.accountStatus = control.rows[0]?.status || "active";
       publicUser.permissions = control.rows[0]?.permissions || {};
@@ -860,7 +860,7 @@ export async function registerRoutes(
   app.post("/api/admin/register-barber", isAuthenticated, async (req, res) => {
     const user = req.user as any;
     if (!hasAdminRole(user)) return res.status(403).json({ message: "Apenas administradores podem cadastrar funcionários." });
-    if (!neonPool) return res.status(503).json({ message: "Banco de dados indisponível para criar contas." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "Banco de dados indisponível para criar contas." });
 
     try {
       const schema = z.object({
@@ -976,7 +976,7 @@ export async function registerRoutes(
 
   // Persistent account branching, granular permissions and immutable audit trail.
   // Production uses Neon; fail closed rather than silently storing security state in process memory.
-  if (neonPool) {
+  if (neonPool && neonOperational) {
     await neonPool.query(`
       CREATE TABLE IF NOT EXISTS aura_account_controls (
         user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
@@ -1005,7 +1005,7 @@ export async function registerRoutes(
     view: false, create: false, edit: false, delete: false, approve: false, administer: false,
   }]));
   // Add the investment module permission without changing existing grants.
-  if (neonPool) {
+  if (neonPool && neonOperational) {
     try {
       await neonPool.query(
         `UPDATE aura_account_controls AS controls
@@ -1026,7 +1026,7 @@ export async function registerRoutes(
     }
   }
   const auditAccountAction = async (req: any, targetUserId: number | null, action: string, details: any = {}) => {
-    if (!neonPool) return;
+    if (!neonPool || !neonOperational) return;
     const actorId = Number(req.user?.id) || null;
     const detailsJson = JSON.stringify(details).replace(/'/g, "''");
     const ipAddress = String(req.headers["x-forwarded-for"] || req.socket?.remoteAddress || "").slice(0,200).replace(/'/g, "''");
@@ -1042,7 +1042,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/account-branches", isAuthenticated, async (req, res) => {
     if (!isSystemOwner(req.user)) return res.status(403).json({ message: "Acesso restrito à conta master." });
-    if (!neonPool) return res.status(503).json({ message: "O gerenciamento seguro de contas requer o banco PostgreSQL de produção." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "O gerenciamento seguro de contas requer o banco PostgreSQL de produção." });
     try {
       const result = await neonPool.query(`
         SELECT u.id,u.username,u.email,u.role,u.enterprise_id AS "enterpriseId", e.name AS "enterpriseName",
@@ -1092,7 +1092,7 @@ export async function registerRoutes(
   app.post("/api/admin/account-branches/link-existing", isAuthenticated, async (req, res) => {
     const actor = req.user as any;
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
-    if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
 
     const parsed = z.object({
       username: z.string().trim().min(3).max(32),
@@ -1248,7 +1248,7 @@ export async function registerRoutes(
   app.post("/api/admin/account-branches", isAuthenticated, async (req, res) => {
     const actor = req.user as any;
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
-    if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível para gerenciamento seguro." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "Banco PostgreSQL indisponível para gerenciamento seguro." });
     const parsed = z.object({
       username: z.string().trim().min(3).max(32).regex(/^[a-zA-Z0-9._-]+$/),
       password: z.string().regex(/^\d{4}$/, "A senha deve conter exatamente 4 dígitos."),
@@ -1305,7 +1305,7 @@ export async function registerRoutes(
     } catch (error: any) {
       if (createdAccountId) {
         try {
-          if (neonPool) await neonPool.query("DELETE FROM users WHERE id=$1", [createdAccountId]);
+          if (neonPool && neonOperational) await neonPool.query("DELETE FROM users WHERE id=$1", [createdAccountId]);
           else await storage.deleteUser(createdAccountId);
         } catch (cleanupError: any) {
           console.error("[ACCOUNT-BRANCHES] create rollback failed:", cleanupError?.message || cleanupError);
@@ -1319,7 +1319,7 @@ export async function registerRoutes(
   app.patch("/api/admin/account-branches/:id", isAuthenticated, async (req, res) => {
     const actor = req.user as any;
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
-    if (!neonPool) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "Banco PostgreSQL indisponível." });
     const targetId = Number(req.params.id);
     if (!Number.isSafeInteger(targetId) || targetId <= 0) return res.status(400).json({ message: "ID inválido." });
     if (targetId === Number(actor.id)) return res.status(400).json({ message: "A conta master autenticada não pode alterar a própria proteção por este painel." });
@@ -1445,7 +1445,7 @@ export async function registerRoutes(
     if (!isSystemOwner(actor)) return res.status(403).json({ message: "Acesso restrito à conta master." });
     const targetId = Number(req.params.id);
     if (!Number.isSafeInteger(targetId) || targetId <= 0 || targetId === Number(actor.id)) return res.status(400).json({ message: "Não é permitido remover esta conta." });
-    if (!neonPool) return res.status(503).json({ message: "Banco de dados indisponível para remover contas." });
+    if (!neonPool || !neonOperational) return res.status(503).json({ message: "Banco de dados indisponível para remover contas." });
     try {
       const target = await getAuthoritativeUserById(targetId);
       if (!target || Number(target.enterpriseId) !== Number(actor.enterpriseId)) return res.status(404).json({ message: "Conta não encontrada neste estabelecimento." });
@@ -1778,7 +1778,7 @@ export async function registerRoutes(
       : path.startsWith("/api/services") || path.startsWith("/api/queue") ? "dashboard"
       : null;
     if (!module) return next();
-    if (!neonPool) return process.env.NODE_ENV === "production" && !isIsolatedQaRuntime ? res.status(503).json({ message: "Validação de permissões indisponível; acesso bloqueado por segurança." }) : next();
+    if (!neonPool || !neonOperational) return process.env.NODE_ENV === "production" && !isIsolatedQaRuntime ? res.status(503).json({ message: "Validação de permissões indisponível; acesso bloqueado por segurança." }) : next();
 
     const isApprovalAction = ["/cancel", "/emit-fiscal", "/emitir", "/approve", "/restore"].some((part) => path.includes(part));
     const isPostEditAction = ["/close", "/adjust", "/deduct", "/restock", "/swap-codigo", "/zero-quantities", "/settings"].some((part) => path.includes(part));
@@ -3558,7 +3558,7 @@ export async function registerRoutes(
   // A reset only occurs when AURA_BOOTSTRAP_ADMIN_RESET=true; never reset credentials on every restart.
   void (async () => {
     try {
-      if (neonPool) {
+      if (neonPool && neonOperational) {
         console.log("[BOOT] Legacy SQLite/Turso owner reconciliation skipped; Neon owner provisioning is handled by initApp.");
         return;
       }
@@ -3742,15 +3742,15 @@ export async function registerRoutes(
       autoBackup: isRemoteEnabled ? { exists: false } : getAutoBackupInfo(),
       backup: {
         complete: !isRemoteEnabled,
-        authoritativeSource: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
-        message: neonPool
+        authoritativeSource: neonPool && neonOperational ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
+        message: neonPool && neonOperational
           ? "O banco primário é Neon PostgreSQL. O backup remoto verificado ainda não está configurado; snapshots locais não são cópia completa da produção."
           : isRemoteEnabled
             ? "O banco primário é Turso. O backup local não é uma cópia completa e a restauração está bloqueada até existir backup remoto verificado."
             : "O banco primário é SQLite local.",
       },
       databases: {
-        primary: neonPool ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
+        primary: neonPool && neonOperational ? "neon-postgresql" : isRemoteEnabled ? "turso" : "sqlite-local",
         localMirror: false,
         localTelemetry: true,
         remote: isRemoteEnabled,
@@ -3868,7 +3868,7 @@ export async function registerRoutes(
   // Aura Marketing Hub — isolated, tenant-scoped workspace.
   let marketingSchemaPromise: Promise<void> | null = null;
   const ensureMarketingSchema = async () => {
-    if (!neonPool) throw new Error("MARKETING_DATABASE_UNAVAILABLE");
+    if (!neonPool || !neonOperational) throw new Error("MARKETING_DATABASE_UNAVAILABLE");
     if (!marketingSchemaPromise) {
       marketingSchemaPromise = (async () => {
         await neonPool.query(`
