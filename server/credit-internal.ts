@@ -1,5 +1,6 @@
 import type { Express, Request } from "express";
 import { neonPool } from "./neon-db.js";
+import { neonOperational } from "./db";
 
 const LEGAL_MONTHLY_PCT = 0.749583;
 const PENALTY_PCT = 2;
@@ -13,7 +14,7 @@ function cents(v: any) { return Math.max(0, Math.round(Number(String(v ?? 0).rep
 function money(v: any) { return Number(v || 0) / 100; }
 
 export async function ensureCreditInternalSchema() {
-  if (!neonPool) return;
+  if (!neonPool || !neonOperational) return;
   await neonPool.query(
     "CREATE TABLE IF NOT EXISTS credit_internal_customers (" +
     "id SERIAL PRIMARY KEY, enterprise_id INTEGER NOT NULL, full_name TEXT NOT NULL, cpf TEXT NOT NULL, rg TEXT, birth_date DATE, " +
@@ -50,7 +51,7 @@ export async function ensureCreditInternalSchema() {
 }
 
 async function audit(req: Request, customerId: number | null, action: string, details: any) {
-  if (!neonPool) return;
+  if (!neonPool || !neonOperational) return;
   await neonPool.query(
     "INSERT INTO credit_internal_audit(enterprise_id,customer_id,actor_user_id,action,details) VALUES($1,$2,$3,$4,$5::jsonb)",
     [eid(req), customerId, Number((req.user as any)?.id || 0) || null, action, JSON.stringify(details || {})]
@@ -58,7 +59,7 @@ async function audit(req: Request, customerId: number | null, action: string, de
 }
 
 async function evaluate(req: Request, c: any) {
-  if (!neonPool) return c;
+  if (!neonPool || !neonOperational) return c;
   const q = await neonPool.query("SELECT amount_cents,paid_cents,due_at,status FROM credit_internal_purchases WHERE enterprise_id=$1 AND customer_id=$2 AND status<>'paid'", [eid(req), c.id]);
   let overdue = 0, maxDays = 0;
   for (const p of q.rows) {
