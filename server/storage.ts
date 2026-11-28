@@ -92,7 +92,7 @@ async function dualWriteTransaction(operation: (database: any) => Promise<any>) 
 
 // Generate one identifier shared by all active databases before mirrored inserts.
 async function nextSharedId(table: any): Promise<number> {
-  if (neonPool) {
+  if (neonPool && dbRemote) {
     const tableName = getTableName(table);
     const result = await neonPool.query(
       "SELECT nextval(pg_get_serial_sequence($1, 'id')) AS id",
