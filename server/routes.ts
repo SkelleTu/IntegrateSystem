@@ -155,7 +155,7 @@ async function comparePassword(stored: string, supplied: string) {
 async function getAuthoritativeUserById(id: number): Promise<any | undefined> {
   const numericId = Number(id);
   if (!Number.isSafeInteger(numericId) || numericId <= 0) return undefined;
-  if (neonPool) {
+  if (neonPool && neonOperational) {
     const result = await neonPool.query(
       'SELECT id,username,email,password,role,enterprise_id AS "enterpriseId" FROM users WHERE id=$1 LIMIT 1',
       [numericId],
@@ -190,7 +190,7 @@ async function getAuthoritativeEnterprise(id: number): Promise<any | undefined> 
 }
 
 import { eq, desc, asc, and, isNull, gte, lte, or } from "drizzle-orm";
-import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite } from "./db";
+import { db, localSqlite, getAllDatabases, auditDatabaseParity, tursoClient, persistLocalSqlite, neonOperational } from "./db";
 import { insertFiscalSettingsSchema } from "../shared/schema";
 import {
   tickets, users, fiscalSettings,
@@ -371,7 +371,7 @@ export async function registerRoutes(
   if (process.env.NODE_ENV === "production" && sessionSecret.length < 32) {
     throw new Error("[SECURITY] SESSION_SECRET precisa conter pelo menos 32 caracteres em produção; segredo fixo conhecido foi removido.");
   }
-  const sessionStore = neonPool
+  const sessionStore = neonPool && neonOperational
     ? new NeonSessionStore(neonPool)
     : tursoClient
       ? new TursoSessionStore(tursoClient)
