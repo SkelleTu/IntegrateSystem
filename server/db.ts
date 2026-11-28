@@ -194,7 +194,9 @@ export async function multiWrite<T>(
 
     const remoteFailedOnly = failures.length === 1 && dbRemote && dbs[failures[0].index] === dbRemote;
     if (!remoteFailedOnly) throw new Error(`Falha na gravação simultânea do banco de dados. ${details}`);
-    console.warn(`[DB FAILOVER] Banco remoto indisponível; operação preservada no SQLite local. ${details}`);
+    dbRemote = null;
+    setActiveDatabase(dbLocal);
+    console.warn(`[DB FAILOVER] Banco remoto indisponível; SQLite local assumiu o atendimento e preservou a operação. ${details}`);
   }
 
   const firstSuccess = results.find((result): result is PromiseFulfilledResult<T> => result.status === "fulfilled");
