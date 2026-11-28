@@ -25,6 +25,7 @@ import { registerMcpCompatibilityController, runMcpCompatibilityCheck } from "./
 import { getRuntimeObservability } from "./runtime-observability";
 import { registerCreditInternalRoutes, ensureCreditInternalSchema } from "./credit-internal";
 import { getDatabaseBackupStatus, getDatabaseBackupConfig, startDatabaseBackupScheduler, triggerDatabaseBackup } from "./databaseManager";
+import { supabaseReplicaConfigured, verifySupabaseReplica, hydrateSqliteFromSupabaseReplica, publishSqliteSnapshot } from "./supabaseReplica";
 
 const app = express();
 export const httpServer = createServer(app);
@@ -233,6 +234,28 @@ export async function initApp() {
 
     const { setupDatabase } = await import("./db");
     await setupDatabase();
+
+    if (supabaseReplicaConfigured()) {
+      try {
+        const health = await verifySupabaseReplica();
+        if (health.ok) {
+          const hydrated = await hydrateSqliteFromSupabaseReplica();
+          runtimeEvent("database-replica", "Supabase Integrate System disponível como réplica operacional", {
+            phase: "initialization",
+            latencyMs: health.latencyMs,
+            hydratedTables: hydrated.tables,
+            hydratedRows: hydrated.rows,
+          });
+          setInterval(() => {
+            void publishSqliteSnapshot().catch((error: any) => {
+              runtimeError(error, "Falha ao publicar réplica SQLite no Supabase");
+            });
+          }, Number(process.env.SUPABASE_REPLICA_INTERVAL_MS || 30000)).unref?.();
+        }
+      } catch (error: any) {
+        console.warn("[DB REPLICA] Supabase indisponível; operação segue com SQLite/Neon.", error?.message || String(error));
+      }
+    }
 
     // One-time-by-absence master provisioning. The password is supplied only as
     // a Render secret; it is scrypt-hashed and never logged or returned by an API.
