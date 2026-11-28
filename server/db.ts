@@ -66,6 +66,8 @@ if (!dbRemote && neonDb) {
 }
 
 export const isRemoteEnabled = !!dbRemote;
+// Neon is optional at runtime. The core application must never depend on Neon availability.
+export let neonOperational = false;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
 let activeDatabase: any = dbRemote ?? dbLocal;
@@ -970,6 +972,7 @@ export async function setupDatabase() {
   if (neonPool) {
     try {
       await verifyNeonConnection();
+      neonOperational = true;
     // Neon roles can arrive with an empty/nonexistent search_path; guarantee the application schema exists before unqualified DDL.
     await neonPool.query("CREATE SCHEMA IF NOT EXISTS public");
     await neonPool.query(`
@@ -1055,6 +1058,7 @@ export async function setupDatabase() {
     if (!report.ok) throw new Error(JSON.stringify(report.mismatches));
     console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
     } catch (error: any) {
+      neonOperational = false;
       console.error(`[DB FAILOVER] Neon indisponível durante bootstrap. SQLite local assumirá o serviço: ${error?.message || String(error)}`);
       dbRemote = null;
       setActiveDatabase(dbLocal);
