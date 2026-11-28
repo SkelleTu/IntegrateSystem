@@ -545,7 +545,7 @@ export async function registerRoutes(
 
   app.get("/api/financial/cogs", isAuthenticated, async (req: any, res: any) => {
     const user=req.user as any; if(!hasAdminRole(user)) return res.status(403).json({message:"Acesso restrito à gestão."});
-    if(!neonPool) return res.json({revenue:0,cogs:0,grossProfit:0,trackedItems:0});
+    if(!neonPool || !neonOperational) return res.json({revenue:0,cogs:0,grossProfit:0,trackedItems:0});
     const start=String(req.query.start||""); const end=String(req.query.end||"");
     const params:any[]=[]; const where:string[]=["s.status='completed'"];
     if(start){params.push(start+"T00:00:00-03:00");where.push("s.created_at >= $"+params.length+"::timestamptz");}
@@ -3759,7 +3759,7 @@ export async function registerRoutes(
     });
   });
 
-  const remoteBackupUnavailable = { message: neonPool ? "Backup remoto verificado do Neon PostgreSQL ainda não está configurado. Backups locais não são cópias completas da produção." : "Backup remoto Turso ainda não está configurado. Backups locais antigos não são considerados cópias confiáveis da produção." };
+  const remoteBackupUnavailable = { message: neonPool && neonOperational ? "Backup remoto verificado do Neon PostgreSQL ainda não está configurado. Backups locais não são cópias completas da produção." : "Backup remoto Turso ainda não está configurado. Backups locais antigos não são considerados cópias confiáveis da produção." };
 
   // GET /api/backup/export — baixa snapshot JSON completo
   app.get("/api/backup/export", (req: any, res: any) => {
