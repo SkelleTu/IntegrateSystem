@@ -341,7 +341,18 @@ export async function initApp() {
       progress: 30,
     });
 
-    await ensureCreditInternalSchema();
+    try {
+      await ensureCreditInternalSchema();
+    } catch (creditSchemaError: any) {
+      // The credit-internal module is Neon-backed. A quota/outage in that optional
+      // subsystem must not take the entire application offline when another
+      // configured database is serving the core application.
+      console.error("[DB DEGRADED] Crédito Interno indisponível durante a inicialização; aplicação principal continuará ativa:", creditSchemaError?.message || String(creditSchemaError));
+      runtimeEvent("credit-internal-schema-unavailable", "Módulo Crédito Interno temporariamente indisponível; aplicação principal preservada", {
+        phase: "database",
+        reason: creditSchemaError?.code || "schema-bootstrap-failed",
+      });
+    }
     await registerRoutes(httpServer, app);
     registerCreditInternalRoutes(app);
 
