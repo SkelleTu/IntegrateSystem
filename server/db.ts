@@ -68,8 +68,12 @@ if (!dbRemote && neonDb) {
 export const isRemoteEnabled = !!dbRemote;
 
 // ─── 3. db principal — Turso quando disponível + espelhamento automático ─────
-const primaryDatabase: any = dbRemote ?? dbLocal;
-const mirrorDatabase: any = null; // Turso is the sole business-data database in remote mode; SQLite remains process-local telemetry only.
+let activeDatabase: any = dbRemote ?? dbLocal;
+const mirrorDatabase: any = dbLocal;
+export function setActiveDatabase(database: any) {
+  activeDatabase = database ?? dbLocal;
+  console.log(`[DB] Banco ativo: ${activeDatabase === dbLocal ? "SQLite local" : "remoto"}`);
+}
 
 function isPromiseLike(value: any): boolean {
   if (!value) return false;
@@ -143,26 +147,25 @@ function createMirroredQuery(primaryQuery: any, mirrorQuery: any): any {
   });
 }
 
-export const db = (mirrorDatabase
-  ? new Proxy(primaryDatabase as any, {
-      get(target, property, receiver) {
-        if (property === "insert" || property === "update" || property === "delete") {
-          return (...args: any[]) => {
-            const primaryQuery = target[property].apply(target, args);
-            const mirrorQuery = (mirrorDatabase as any)[property].apply(mirrorDatabase, args);
-            return createMirroredQuery(primaryQuery, mirrorQuery);
-          };
-        }
-        return Reflect.get(target, property, receiver);
-      },
-    })
-  : primaryDatabase) as any;
+export const db = new Proxy({} as any, {
+  get(_ignoredTarget, property, receiver) {
+    const target = activeDatabase;
+    if (property === "insert" || property === "update" || property === "delete") {
+      return (...args: any[]) => {
+        const primaryQuery = target[property].apply(target, args);
+        if (target === mirrorDatabase) return primaryQuery;
+        const mirrorQuery = (mirrorDatabase as any)[property].apply(mirrorDatabase, args);
+        return createMirroredQuery(primaryQuery, mirrorQuery);
+      };
+    }
+    const member = Reflect.get(target, property, receiver);
+    return typeof member === "function" ? member.bind(target) : member;
+  },
+}) as any;
 
 // ─── 4. Lista de TODOS os bancos ativos ──────────────────────────────────────
 export function getAllDatabases(): Array<typeof db> {
-  if (dbRemote) {
-    return [dbRemote];
-  }
+  if (dbRemote) return [dbRemote, dbLocal];
   return [dbLocal];
 }
 
@@ -189,10 +192,14 @@ export async function multiWrite<T>(
       })
       .join(" | ");
 
-    throw new Error(`Falha na gravação simultânea do banco de dados. ${details}`);
+    const remoteFailedOnly = failures.length === 1 && dbRemote && dbs[failures[0].index] === dbRemote;
+    if (!remoteFailedOnly) throw new Error(`Falha na gravação simultânea do banco de dados. ${details}`);
+    console.warn(`[DB FAILOVER] Banco remoto indisponível; operação preservada no SQLite local. ${details}`);
   }
 
-  return (results[0] as PromiseFulfilledResult<T>).value;
+  const firstSuccess = results.find((result): result is PromiseFulfilledResult<T> => result.status === "fulfilled");
+  if (!firstSuccess) throw new Error("Nenhum banco de dados conseguiu concluir a operação.");
+  return firstSuccess.value;
 }
 
 // ─── 6. Setup / auto-migração das tabelas ────────────────────────────────────
@@ -1041,11 +1048,15 @@ export async function setupDatabase() {
         ADD COLUMN IF NOT EXISTS package_quantity NUMERIC(12,3) DEFAULT 1;
     `);
 
-    const report = await auditDatabaseParity();
-    if (!report.ok) {
-      throw new Error("[DB] Neon schema validation failed: " + JSON.stringify(report.mismatches));
+    try {
+      const report = await auditDatabaseParity();
+      if (!report.ok) throw new Error(JSON.stringify(report.mismatches));
+      console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
+    } catch (error: any) {
+      console.error(`[DB FAILOVER] Neon indisponível durante bootstrap. SQLite local assumirá o serviço: ${error?.message || String(error)}`);
+      dbRemote = null;
+      setActiveDatabase(dbLocal);
     }
-    console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
   }
 
   // Ensure local sql.js changes made with prepare().run() are persisted.
