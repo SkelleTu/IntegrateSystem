@@ -966,7 +966,8 @@ export async function setupDatabase() {
   // Neon is authoritative when DATABASE_URL is configured. Apply additive price-basis
   // migrations before schema parity validation so existing production data is preserved.
   if (neonPool) {
-    await verifyNeonConnection();
+    try {
+      await verifyNeonConnection();
     // Neon roles can arrive with an empty/nonexistent search_path; guarantee the application schema exists before unqualified DDL.
     await neonPool.query("CREATE SCHEMA IF NOT EXISTS public");
     await neonPool.query(`
@@ -1048,10 +1049,9 @@ export async function setupDatabase() {
         ADD COLUMN IF NOT EXISTS package_quantity NUMERIC(12,3) DEFAULT 1;
     `);
 
-    try {
-      const report = await auditDatabaseParity();
-      if (!report.ok) throw new Error(JSON.stringify(report.mismatches));
-      console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
+    const report = await auditDatabaseParity();
+    if (!report.ok) throw new Error(JSON.stringify(report.mismatches));
+    console.log(`[DB] Neon PostgreSQL verified: ${report.tablesChecked} application tables and required columns.`);
     } catch (error: any) {
       console.error(`[DB FAILOVER] Neon indisponível durante bootstrap. SQLite local assumirá o serviço: ${error?.message || String(error)}`);
       dbRemote = null;
